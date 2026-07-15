@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Path — Nền tảng học Machine Learning</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="?view=home" aria-label="ML Path">
+      <span class="brand-mark"><i></i><i></i><i></i></span>
+      <span>ML<span>PATH</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Điều hướng chính">
+      <a class="active" href="?view=home">Trang chủ</a>
+      <a href="?view=dashboard">Bài học</a>
+      <a href="?view=labs">Playground</a>
+    </nav>
+    <label class="search-box">
+      <span>⌕</span>
+      <input type="search" placeholder="Tìm bài học, thuật toán...">
+      <kbd>⌘ K</kbd>
+    </label>
+    <div class="top-actions">
+      <button class="icon-btn" aria-label="Thông báo">♢<b></b></button>
+      <a class="avatar" href="?view=profile">LP</a>
+      <div class="profile-copy"><strong>Linh Phương</strong><small>Học viên</small></div>
+      <span class="chevron">⌄</span>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <template id="home-template">
+    <div class="home-page">
+      <section class="home-hero">
+        <div class="hero-copy reveal">
+          <span class="eyebrow">HỌC BẰNG CÁCH QUAN SÁT VÀ THỬ NGHIỆM</span>
+          <h1>Machine Learning<br>không còn là một<br><em>hộp đen.</em></h1>
+          <p>Học theo lộ trình rõ ràng, nhìn thuật toán hoạt động trên biểu đồ và tự điều chỉnh tham số mà chưa cần viết code.</p>
+          <div class="hero-actions">
+            <a class="primary-btn" href="?view=dashboard">Bắt đầu học miễn phí <span>→</span></a>
+            <a class="text-link" href="?view=labs"><i>▶</i> Xem Playground</a>
+          </div>
+          <div class="hero-proof"><span><b>02</b> khóa học nền tảng</span><span><b>10</b> bài toán thực hành</span><span><b>100%</b> học trên trình duyệt</span></div>
+        </div>
+        <div class="hero-lab reveal delay-1">
+          <div class="lab-window">
+            <div class="window-bar"><span><i></i><i></i><i></i></span><b>linear-regression.lab</b><em>Đang chạy</em></div>
+            <div class="mini-lab-layout">
+              <div class="mini-controls"><span>THAM SỐ</span><label>Tốc độ học <b>0.05</b></label><i style="--value:56%"></i><label>Vòng lặp <b>250</b></label><i style="--value:72%"></i><button>Chạy mô hình</button></div>
+              <svg viewBox="0 0 520 330" aria-label="Trực quan hồi quy tuyến tính">
+                <g stroke="#dbe6e5"><path d="M58 35V280M58 280H490"/><path d="M58 220H490M58 160H490M58 100H490" stroke-dasharray="4 7"/></g>
+                <path d="M90 252L455 62" stroke="#f0a432" stroke-width="6" stroke-linecap="round"/>
+                <g fill="#087c86" stroke="#fff" stroke-width="4"><circle cx="105" cy="244" r="9"/><circle cx="160" cy="213" r="9"/><circle cx="218" cy="201" r="9"/><circle cx="270" cy="151" r="9"/><circle cx="332" cy="143" r="9"/><circle cx="389" cy="96" r="9"/><circle cx="446" cy="68" r="9"/></g>
+                <g fill="#728487" font-size="12" font-family="Segoe UI"><text x="82" y="304">40</text><text x="200" y="304">80</text><text x="315" y="304">120</text><text x="430" y="304">160</text></g>
+              </svg>
+            </div>
+            <div class="lab-metrics"><span>R² <b>0.87</b></span><span>RMSE <b>0.31</b></span><span class="good">● Mô hình phù hợp tốt</span></div>
+          </div>
+          <div class="floating-note"><i>✦</i><span><b>Thử thay đổi tham số</b><small>Kết quả cập nhật ngay trên biểu đồ</small></span></div>
+        </div>
+      </section>
+
+      <section class="home-search reveal delay-2"><span>⌕</span><input placeholder="Bạn muốn học thuật toán nào?"><button>Tìm bài học</button></section>
+
+      <section class="learning-loop">
+        <div class="section-heading"><div><span class="eyebrow">MỘT LỘ TRÌNH, BA BƯỚC</span><h2>Từ khái niệm đến trực giác</h2></div><p>Không cần cài đặt môi trường. Mỗi bài học nối trực tiếp với một hoạt động quan sát hoặc thực hành.</p></div>
+        <div class="loop-grid">
+          <article><span>01</span><i>◫</i><h3>Học theo lộ trình</h3><p>Nội dung được chia thành module ngắn, mở khóa tuần tự và luôn cho biết bạn đang ở đâu.</p></article>
+          <article class="featured"><span>02</span><i>⌁</i><h3>Quan sát thuật toán</h3><p>Biểu đồ giúp nhìn thấy đường dự đoán, ranh giới phân loại và quá trình mô hình cải thiện.</p></article>
+          <article><span>03</span><i>⚙</i><h3>Tự mình thử nghiệm</h3><p>Thay đổi dữ liệu, thuật toán và tham số trong Playground rồi so sánh các lần chạy.</p></article>
+        </div>
+      </section>
+
+      <section class="home-courses">
+        <div class="section-heading"><div><span class="eyebrow">LỘ TRÌNH NỀN TẢNG</span><h2>Bắt đầu từ điều cốt lõi</h2></div><a href="?view=dashboard">Xem chương trình học <span>→</span></a></div>
+        <div class="home-course-grid">
+          <article class="home-course classical"><div class="course-index">01</div><div><span class="tag teal">NÊN HỌC TRƯỚC</span><h3>Học máy cổ điển</h3><p>Hồi quy, phân loại, phân cụm và cách đánh giá một mô hình.</p><footer><span>8 module</span><span>12 giờ</span><a href="?view=dashboard">Khám phá →</a></footer></div></article>
+          <article class="home-course deep"><div class="course-index">02</div><div><span class="tag coral">TIẾP THEO</span><h3>Học sâu cơ bản</h3><p>Mạng nơ-ron, hàm mất mát và cách mô hình học qua nhiều vòng lặp.</p><footer><span>6 module</span><span>9 giờ</span><a href="?view=dashboard">Xem lộ trình →</a></footer></div></article>
+        </div>
+      </section>
+      <footer class="site-footer"><a class="brand" href="?view=home"><span class="brand-mark"><i></i><i></i><i></i></span><span>ML<span>PATH</span></span></a><p>Nền tảng học tập tương tác môn Machine Learning.</p><span>© 2026 ML Path</span></footer>
+    </div>
+  </template>
+
+  <template id="labs-template">
+    <div class="labs-page">
+      <section class="labs-intro">
+        <div><span class="eyebrow">KHÔNG GIAN THỬ NGHIỆM</span><h1>Playground</h1><p>Chọn một bài toán, sử dụng thuật toán đã mở khóa và kiểm chứng điều vừa học bằng dữ liệu.</p></div>
+        <div class="labs-summary"><span><b>3</b> thuật toán đã mở</span><span><b>7</b> bài toán còn lại</span><div class="progress-track"><i style="width:30%"></i></div></div>
+      </section>
+      <section class="labs-toolbar"><label><span>⌕</span><input placeholder="Tìm bài toán hoặc thuật toán..."></label><div><button class="active">Tất cả</button><button>Hồi quy</button><button>Phân loại</button><button>Phân cụm</button></div></section>
+      <div class="labs-layout">
+        <aside class="labs-path-card">
+          <span class="eyebrow">TIẾN ĐỘ CỦA BẠN</span><h2>3/10 bài toán</h2><p>Mỗi module hoàn thành sẽ mở thêm thuật toán tương ứng.</p>
+          <div class="ring-progress"><b>30%</b><span>đã mở khóa</span></div>
+          <ol><li class="done"><i>✓</i><span><b>Nhập môn ML</b><small>Hoàn thành</small></span></li><li class="done"><i>✓</i><span><b>Dữ liệu & tiền xử lý</b><small>Hoàn thành</small></span></li><li class="current"><i>3</i><span><b>Hồi quy</b><small>Đang học · 68%</small></span></li><li><i>4</i><span><b>Phân loại</b><small>Chưa hoàn thành</small></span></li></ol>
+          <a href="?view=lesson">Tiếp tục bài học →</a>
+        </aside>
+        <section class="lab-list">
+          <article class="lab-item unlocked"><div class="lab-number">01</div><div class="lab-icon house">⌂</div><div class="lab-copy"><span class="tag teal">ĐÃ MỞ KHÓA</span><h3>Dự đoán giá nhà</h3><p>Dùng hồi quy tuyến tính để quan sát mối quan hệ giữa diện tích và giá.</p><footer><span>Hồi quy</span><span>120 mẫu</span><span>Cơ bản</span></footer></div><div class="lab-action"><b>R² mục tiêu: 0.80</b><a class="primary-btn" href="?view=playground">Vào thử nghiệm →</a></div></article>
+          <article class="lab-item unlocked"><div class="lab-number">02</div><div class="lab-icon flower">✿</div><div class="lab-copy"><span class="tag teal">ĐÃ MỞ KHÓA</span><h3>Phân loại hoa Iris</h3><p>Quan sát KNN bỏ phiếu từ các điểm dữ liệu gần nhất.</p><footer><span>KNN</span><span>150 mẫu</span><span>Cơ bản</span></footer></div><div class="lab-action"><b>Accuracy mục tiêu: 0.90</b><a class="outline-btn" href="?view=playground">Mở bài toán</a></div></article>
+          <article class="lab-item locked"><div class="lab-number">03</div><div class="lab-icon wine">♧</div><div class="lab-copy"><span class="tag lock">CHƯA MỞ</span><h3>Phân loại rượu vang</h3><p>So sánh ranh giới phân loại trên nhiều đặc trưng hóa học.</p><footer><span>Logistic Regression</span><span>178 mẫu</span></footer></div><div class="lab-action"><b>Hoàn thành Module 4</b><button disabled>⌑ Chưa mở khóa</button></div></article>
+          <article class="lab-item locked"><div class="lab-number">04</div><div class="lab-icon cluster">⌘</div><div class="lab-copy"><span class="tag lock">CHƯA MỞ</span><h3>Phân nhóm khách hàng</h3><p>Thay đổi số cụm k và quan sát cách tâm cụm dịch chuyển.</p><footer><span>K-means</span><span>200 mẫu</span></footer></div><div class="lab-action"><b>Hoàn thành Module 5</b><button disabled>⌑ Chưa mở khóa</button></div></article>
+        </section>
+      </div>
+    </div>
+  </template>
+
+  <template id="profile-template">
+    <div class="profile-page">
+      <section class="profile-hero"><div class="profile-avatar-large">LP</div><div><span class="eyebrow">HỒ SƠ HỌC VIÊN</span><h1>Linh Phương</h1><p>Thành viên từ tháng 7/2026 · Chuỗi học 5 ngày</p></div><button class="outline-btn">Chỉnh sửa hồ sơ</button></section>
+      <div class="profile-layout">
+        <aside class="profile-nav"><a class="active">Tổng quan</a><a>Thông tin cá nhân</a><a>Tùy chọn học tập</a><a>Bảo mật</a><a class="danger">Đăng xuất</a></aside>
+        <section class="profile-main">
+          <div class="profile-stats"><article><span>TIẾN ĐỘ TỔNG</span><strong>42%</strong><div class="progress-track"><i style="width:42%"></i></div></article><article><span>BÀI ĐÃ HỌC</span><strong>18</strong><small>trên 42 bài</small></article><article><span>PLAYGROUND</span><strong>12</strong><small>lần thử nghiệm</small></article></div>
+          <article class="account-card"><div class="card-heading"><div><span class="eyebrow">TÀI KHOẢN</span><h2>Thông tin cá nhân</h2></div><span>Được bảo vệ</span></div><div class="account-grid"><label>Họ và tên<strong>Linh Phương</strong></label><label>Email<strong>linhphuong@example.com</strong></label><label>Ngôn ngữ<strong>Tiếng Việt</strong></label><label>Giao diện<strong>Sáng</strong></label></div><div class="security-row"><div><i>⌾</i><span><b>Mật khẩu</b><small>Được quản lý an toàn, không hiển thị trong hồ sơ.</small></span></div><button>Đổi mật khẩu</button></div></article>
+          <article class="recent-card"><div class="card-heading"><div><span class="eyebrow">HOẠT ĐỘNG GẦN ĐÂY</span><h2>Tiếp tục hành trình</h2></div><a href="?view=dashboard">Xem dashboard →</a></div><div class="recent-row"><i>✓</i><span><b>Hoàn thành “Mô hình đường thẳng”</b><small>Hôm nay, 09:24</small></span><em>+20 XP</em></div><div class="recent-row"><i>⌁</i><span><b>Chạy bài toán dự đoán giá nhà</b><small>Hôm qua, 20:15</small></span><em>R² 0.87</em></div></article>
+        </section>
+      </div>
+    </div>
+  </template>
+
+  <template id="dashboard-template">
+    <div class="dashboard-page">
+      <section class="welcome-strip">
+        <div>
+          <span class="eyebrow">LỘ TRÌNH CỦA BẠN</span>
+          <h1>Chào buổi sáng, Phương.</h1>
+          <p>Tiếp tục từ nơi bạn dừng lại và hoàn thành mục tiêu học tập hôm nay.</p>
+        </div>
+        <div class="streak-card">
+          <div class="streak-icon">✦</div>
+          <div><strong>5 ngày</strong><span>Chuỗi học liên tục</span></div>
+          <div class="week-dots"><i>2</i><i>3</i><i>4</i><i class="done">5</i><i class="done">6</i><i class="today">7</i><i>8</i></div>
+        </div>
+      </section>
+
+      <section class="continue-card">
+        <div class="continue-visual">
+          <svg viewBox="0 0 360 230" role="img" aria-label="Minh họa hồi quy tuyến tính">
+            <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0d2b3f"/><stop offset="1" stop-color="#14596b"/></linearGradient></defs>
+            <rect width="360" height="230" rx="18" fill="url(#bg)"/>
+            <path d="M45 180H325M45 180V42" stroke="#b5dbe1" stroke-opacity=".35"/>
+            <path d="M62 166L310 57" stroke="#f3ad3d" stroke-width="5" stroke-linecap="round"/>
+            <g fill="#eaf8f7" stroke="#0b293c" stroke-width="3">
+              <circle cx="75" cy="150" r="7"/><circle cx="112" cy="139" r="7"/><circle cx="145" cy="112" r="7"/>
+              <circle cx="183" cy="118" r="7"/><circle cx="217" cy="87" r="7"/><circle cx="258" cy="82" r="7"/><circle cx="298" cy="55" r="7"/>
+            </g>
+            <rect x="235" y="173" width="92" height="32" rx="16" fill="#eaf8f7" fill-opacity=".12"/>
+            <text x="252" y="194" fill="#eaf8f7" font-size="12" font-family="Segoe UI">y = ax + b</text>
+          </svg>
+          <span class="lesson-duration">12 phút</span>
+        </div>
+        <div class="continue-copy">
+          <span class="tag amber">ĐANG HỌC</span>
+          <h2>Hồi quy tuyến tính</h2>
+          <p class="course-name">Khóa Học máy cổ điển · Module 2</p>
+          <p>Tìm hiểu cách mô hình đường thẳng mô tả mối quan hệ giữa các biến và cách đánh giá sai số dự đoán.</p>
+          <div class="progress-row"><span><b>4</b>/6 bài học</span><strong>68%</strong></div>
+          <div class="progress-track"><i style="width:68%"></i></div>
+          <a class="primary-btn" href="?view=lesson">Tiếp tục bài học <span>→</span></a>
+        </div>
+      </section>
+
+      <div class="section-heading">
+        <div><span class="eyebrow">KHÁM PHÁ</span><h2>Khóa học dành cho bạn</h2></div>
+        <a href="#">Xem tất cả <span>→</span></a>
+      </div>
+      <section class="course-grid">
+        <article class="course-card">
+          <div class="course-art blue-art">
+            <div class="node-web"><i></i><i></i><i></i><i></i><i></i></div>
+            <span>01</span>
+          </div>
+          <div class="course-body">
+            <span class="tag teal">NỀN TẢNG</span>
+            <h3>Học máy cổ điển</h3>
+            <p>Nắm vững quy trình xây dựng mô hình qua các bài toán hồi quy, phân loại và phân cụm.</p>
+            <div class="course-meta"><span>◫ 8 module</span><span>◷ 12 giờ</span><span>☆ 4,9</span></div>
+            <div class="mini-progress"><i style="width:42%"></i></div>
+            <small>Đã hoàn thành 42%</small>
+          </div>
+        </article>
+        <article class="course-card">
+          <div class="course-art coral-art">
+            <div class="network-art"><i></i><i></i><i></i></div>
+            <span>02</span>
+          </div>
+          <div class="course-body">
+            <span class="tag coral">TIẾP THEO</span>
+            <h3>Học sâu cơ bản</h3>
+            <p>Khám phá mạng nơ-ron, quá trình huấn luyện và cách mô hình học từ dữ liệu.</p>
+            <div class="course-meta"><span>◫ 6 module</span><span>◷ 9 giờ</span><span>☆ 4,8</span></div>
+            <a class="outline-btn" href="#">Xem lộ trình</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="path-section">
+        <div class="section-heading compact"><div><span class="eyebrow">HỌC TUẦN TỰ</span><h2>Lộ trình Học máy cổ điển</h2></div><span class="path-score">3/8 module</span></div>
+        <div class="path-line">
+          <article class="path-step complete"><b>✓</b><span>01</span><h4>Nhập môn ML</h4><small>Hoàn thành</small></article>
+          <article class="path-step complete"><b>✓</b><span>02</span><h4>Dữ liệu & tiền xử lý</h4><small>Hoàn thành</small></article>
+          <article class="path-step current"><b>▶</b><span>03</span><h4>Hồi quy</h4><small>Đang học · 68%</small></article>
+          <article class="path-step"><b>4</b><span>04</span><h4>Phân loại</h4><small>Chưa mở</small></article>
+          <article class="path-step"><b>5</b><span>05</span><h4>Phân cụm</h4><small>Chưa mở</small></article>
+          <article class="path-step"><b>6</b><span>06</span><h4>Đánh giá mô hình</h4><small>Chưa mở</small></article>
+        </div>
+      </section>
+    </div>
+  </template>
+
+  <template id="lesson-template">
+    <div class="lesson-page">
+      <aside class="curriculum-panel">
+        <a class="back-link" href="?view=dashboard">← &nbsp;Học máy cổ điển</a>
+        <div class="course-summary">
+          <span>TIẾN ĐỘ KHÓA HỌC</span><strong>42%</strong>
+          <div class="progress-track"><i style="width:42%"></i></div>
+        </div>
+        <nav class="curriculum">
+          <div class="module finished"><button><span>01</span><div><b>Nhập môn Machine Learning</b><small>4/4 bài học</small></div><i>⌃</i></button></div>
+          <div class="module finished"><button><span>02</span><div><b>Dữ liệu và tiền xử lý</b><small>5/5 bài học</small></div><i>⌃</i></button></div>
+          <div class="module open">
+            <button><span>03</span><div><b>Hồi quy</b><small>4/6 bài học</small></div><i>⌃</i></button>
+            <ol>
+              <li class="done"><i>✓</i><div><b>Hồi quy là gì?</b><small>6 phút</small></div></li>
+              <li class="done"><i>✓</i><div><b>Mô hình đường thẳng</b><small>8 phút</small></div></li>
+              <li class="active"><i>▶</i><div><b>Hàm mất mát</b><small>12 phút</small></div></li>
+              <li><i>4</i><div><b>Gradient Descent</b><small>10 phút</small></div></li>
+              <li><i>5</i><div><b>Demo: dự đoán giá nhà</b><small>8 phút</small></div></li>
+              <li><i>6</i><div><b>Quiz cuối module</b><small>5 câu hỏi</small></div></li>
+            </ol>
+          </div>
+          <div class="module locked"><button><span>04</span><div><b>Phân loại</b><small>6 bài học</small></div><i>⌄</i></button></div>
+          <div class="module locked"><button><span>05</span><div><b>Phân cụm</b><small>5 bài học</small></div><i>⌄</i></button></div>
+        </nav>
+      </aside>
+      <article class="lesson-content">
+        <div class="lesson-breadcrumb">MODULE 03 &nbsp;/&nbsp; BÀI 03</div>
+        <h1>Hàm mất mát: mô hình sai bao nhiêu?</h1>
+        <p class="lead">Để cải thiện một mô hình, trước hết chúng ta cần một cách đo mức độ chênh lệch giữa giá trị dự đoán và giá trị thực tế.</p>
+        <div class="lesson-info"><span>◷ 12 phút đọc</span><span>◇ Mức độ cơ bản</span><button>☆ Lưu bài học</button></div>
+        <hr>
+        <h2>Từ sai số đến hàm mất mát</h2>
+        <p>Giả sử mô hình dự đoán một căn nhà có giá 2,1 tỷ đồng, trong khi giá thực tế là 2,4 tỷ đồng. Khoảng cách 0,3 tỷ đồng cho biết dự đoán chưa chính xác. Với nhiều mẫu dữ liệu, ta cần tổng hợp các khoảng cách này thành một con số duy nhất.</p>
+        <div class="formula-card">
+          <span>SAI SỐ BÌNH PHƯƠNG TRUNG BÌNH</span>
+          <div>MSE = <span class="fraction"><b>1</b><i>n</i></span> <em>Σ</em> (y<sub>i</sub> − ŷ<sub>i</sub>)<sup>2</sup></div>
+          <p>MSE càng nhỏ, đường hồi quy càng phù hợp với dữ liệu quan sát.</p>
+        </div>
+        <div class="insight-box"><i>!</i><div><b>Vì sao phải bình phương sai số?</b><p>Phép bình phương loại bỏ dấu âm và khiến các dự đoán sai lệch lớn bị “phạt” nhiều hơn. Nhờ đó, mô hình có xu hướng tránh những sai số quá lớn.</p></div></div>
+        <h2>Quan sát trên dữ liệu</h2>
+        <div class="lesson-chart-card">
+          <div class="chart-caption"><b>Mối quan hệ giữa diện tích và giá nhà</b><span><i class="dot actual"></i>Giá thực tế <i class="line"></i>Đường dự đoán</span></div>
+          <svg viewBox="0 0 700 270" aria-label="Biểu đồ hồi quy">
+            <g stroke="#d9e0e2"><path d="M60 30V230M60 230H670"/><path d="M60 180H670M60 130H670M60 80H670" stroke-dasharray="4 6"/></g>
+            <path d="M85 209L640 47" stroke="#ef9f2d" stroke-width="4" stroke-linecap="round"/>
+            <g stroke="#3e7f8b" stroke-width="2" stroke-dasharray="3 3"><path d="M135 182V196"/><path d="M245 157V168"/><path d="M360 112V135"/><path d="M470 104V101"/><path d="M580 62V69"/></g>
+            <g fill="#087c86" stroke="white" stroke-width="3"><circle cx="135" cy="182" r="7"/><circle cx="245" cy="157" r="7"/><circle cx="360" cy="112" r="7"/><circle cx="470" cy="104" r="7"/><circle cx="580" cy="62" r="7"/></g>
+            <g fill="#718084" font-size="12" font-family="Segoe UI"><text x="40" y="235">0</text><text x="120" y="250">50</text><text x="230" y="250">75</text><text x="338" y="250">100</text><text x="450" y="250">125</text><text x="560" y="250">150</text><text x="310" y="268">Diện tích (m²)</text></g>
+          </svg>
+        </div>
+        <div class="lesson-footer-actions"><button class="ghost-btn">← Bài trước</button><a class="primary-btn" href="?view=playground">Tiếp tục: Gradient Descent <span>→</span></a></div>
+      </article>
+      <aside class="lesson-outline">
+        <span>TRONG BÀI NÀY</span>
+        <a class="active" href="#">Từ sai số đến hàm mất mát</a><a href="#">Quan sát trên dữ liệu</a><a href="#">Ảnh hưởng của ngoại lệ</a><a href="#">Tóm tắt</a>
+        <div class="note-card"><i>✎</i><b>Ghi chú của bạn</b><p>Ghi lại điều cần nhớ trong bài học.</p><button>Thêm ghi chú</button></div>
+      </aside>
+    </div>
+  </template>
+
+  <template id="playground-template">
+    <div class="playground-page">
+      <header class="playground-header">
+        <div><span class="eyebrow">PLAYGROUND</span><h1>Phòng thí nghiệm mô hình</h1><p>Điều chỉnh tham số, chạy thử và quan sát mô hình thay đổi theo dữ liệu.</p></div>
+        <div class="playground-head-actions"><button class="ghost-btn">↶ Đặt lại</button><button class="primary-btn run-button">▶ Chạy mô hình</button></div>
+      </header>
+      <div class="playground-layout">
+        <aside class="control-panel">
+          <section><div class="panel-title"><span>01</span><div><b>Chọn bài toán</b><small>Dataset đã được chuẩn bị</small></div></div>
+            <label class="dataset-card selected"><div class="dataset-icon">⌂</div><div><b>Dự đoán giá nhà</b><small>120 mẫu · 2 thuộc tính</small></div><i>✓</i></label>
+            <label class="dataset-card"><div class="dataset-icon wine">♧</div><div><b>Phân loại rượu vang</b><small>178 mẫu · 13 thuộc tính</small></div><i>○</i></label>
+          </section>
+          <section><div class="panel-title"><span>02</span><div><b>Chọn thuật toán</b><small>Đã mở khóa từ bài học</small></div></div>
+            <select><option>Hồi quy tuyến tính</option><option>K-Nearest Neighbors</option></select>
+          </section>
+          <section><div class="panel-title"><span>03</span><div><b>Điều chỉnh tham số</b><small>Thử các giá trị khác nhau</small></div></div>
+            <div class="range-field"><label><span>Tốc độ học</span><output>0.05</output></label><input type="range" min="1" max="100" value="44"><div><span>0.001</span><span>0.1</span></div></div>
+            <div class="range-field"><label><span>Số vòng lặp</span><output>250</output></label><input type="range" min="1" max="100" value="62"><div><span>50</span><span>500</span></div></div>
+            <div class="split-field"><label>Tỉ lệ tập kiểm tra</label><div><button>20%</button><button class="active">30%</button><button>40%</button></div></div>
+          </section>
+        </aside>
+        <section class="experiment-area">
+          <div class="experiment-toolbar"><div><b>Kết quả thử nghiệm</b><span class="success-dot">● Đã hoàn thành trong 0,8 giây</span></div><div class="chart-tabs"><button class="active">Dự đoán</button><button>Sai số</button><button>Đường học</button></div></div>
+          <div class="main-chart">
+            <div class="axis-title y">Giá nhà (tỷ đồng)</div>
+            <svg viewBox="0 0 780 430" aria-label="Kết quả mô hình hồi quy">
+              <g stroke="#dce4e5"><path d="M75 35V370M75 370H745"/><path d="M75 300H745M75 230H745M75 160H745M75 90H745" stroke-dasharray="4 7"/></g>
+              <path d="M110 333C225 295 350 228 455 180S650 95 710 66" fill="none" stroke="#f1a631" stroke-width="5" stroke-linecap="round"/>
+              <path d="M110 352C225 314 350 246 455 197S650 112 710 83L710 49C650 79 555 113 455 163S225 276 110 316Z" fill="#f1a631" opacity=".13"/>
+              <g fill="#087c86" stroke="white" stroke-width="4"><circle cx="130" cy="330" r="8"/><circle cx="185" cy="314" r="8"/><circle cx="245" cy="272" r="8"/><circle cx="300" cy="260" r="8"/><circle cx="360" cy="216" r="8"/><circle cx="420" cy="211" r="8"/><circle cx="478" cy="166" r="8"/><circle cx="545" cy="150" r="8"/><circle cx="610" cy="107" r="8"/><circle cx="685" cy="79" r="8"/></g>
+              <g fill="#718084" font-size="13" font-family="Segoe UI"><text x="55" y="375">0</text><text x="50" y="305">1</text><text x="50" y="235">2</text><text x="50" y="165">3</text><text x="50" y="95">4</text><text x="118" y="395">40</text><text x="245" y="395">70</text><text x="378" y="395">100</text><text x="510" y="395">130</text><text x="645" y="395">160</text><text x="350" y="420">Diện tích (m²)</text></g>
+            </svg>
+            <div class="legend"><span><i class="dot actual"></i>Dữ liệu thực tế</span><span><i class="line"></i>Giá dự đoán</span><span><i class="band"></i>Khoảng tin cậy</span></div>
+          </div>
+          <div class="metric-grid">
+            <article><span>R² SCORE</span><strong>0.87</strong><small class="positive">↑ Mô hình phù hợp tốt</small></article>
+            <article><span>RMSE</span><strong>0.31</strong><small>Sai số trung bình (tỷ đồng)</small></article>
+            <article><span>MAE</span><strong>0.24</strong><small>Thấp hơn lần chạy trước 8%</small></article>
+            <article class="tip"><i>✦</i><div><span>GỢI Ý THỬ NGHIỆM</span><p>Tăng số vòng lặp lên 350 và quan sát RMSE thay đổi như thế nào.</p></div></article>
+          </div>
+        </section>
+        <aside class="history-panel">
+          <div class="history-title"><div><span>LỊCH SỬ THỬ</span><b>4 lần chạy</b></div><button>⋯</button></div>
+          <article class="run-card current"><div><b>Lần chạy #04</b><span>Vừa xong</span></div><p>Learning rate <strong>0.05</strong></p><p>Iterations <strong>250</strong></p><footer><span>R² <b>0.87</b></span><i>Đang xem</i></footer></article>
+          <article class="run-card"><div><b>Lần chạy #03</b><span>5 phút trước</span></div><p>Learning rate <strong>0.03</strong></p><p>Iterations <strong>200</strong></p><footer><span>R² <b>0.82</b></span><button>So sánh</button></footer></article>
+          <article class="run-card"><div><b>Lần chạy #02</b><span>12 phút trước</span></div><p>Learning rate <strong>0.08</strong></p><p>Iterations <strong>150</strong></p><footer><span>R² <b>0.76</b></span><button>So sánh</button></footer></article>
+          <button class="compare-btn">⊞ So sánh các lần chạy</button>
+        </aside>
+      </div>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+
+# Test and framework output
+playwright-report/
+test-results/
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Local environment and secrets
+.env
+.env.*
+*.local
+*.pem
+*.key
+*service-account*.json
+
+# Local academic administration files that may contain personal data
+docs/*phan cong*.xlsx
+docs/*- D40 - BCDK1.docx
+
+# Editor, OS, and temporary files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.tmp-*
+.edge-*
