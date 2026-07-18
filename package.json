@@ -8,11 +8,24 @@
   },
   "scripts": {
     "dev": "pnpm --filter @ml-path/web dev",
-    "build": "pnpm --filter @ml-path/web build",
-    "test": "pnpm --filter @ml-path/web test",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @ml-path/web test:e2e",
-    "typecheck": "pnpm --filter @ml-path/web typecheck",
-    "lint": "pnpm --filter @ml-path/web lint",
-    "format:check": "pnpm --filter @ml-path/web format:check"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml firebase.json && prettier --check .firebaserc --parser json && pnpm -r --if-present format:check",
+    "firebase:build": "pnpm --filter @ml-path/functions --filter @ml-path/emulator-seed build",
+    "prefirebase:validate": "pnpm firebase:build",
+    "firebase:validate": "node firebase/emulator-seed/dist/validate-environment.js",
+    "prefirebase:emulators:start": "pnpm firebase:build",
+    "firebase:emulators:start": "node firebase/emulator-seed/dist/run-emulators.js start",
+    "prefirebase:emulators:seed": "pnpm firebase:build",
+    "firebase:emulators:seed": "node firebase/emulator-seed/dist/seed-emulators.js",
+    "prefirebase:emulators:verify": "pnpm firebase:build",
+    "firebase:emulators:verify": "node firebase/emulator-seed/dist/run-emulators.js verify"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.24.0",
+    "prettier": "^3.9.5"
   }
 }
