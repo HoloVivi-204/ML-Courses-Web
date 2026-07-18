@@ -28,6 +28,21 @@ test('public learning journey is responsive and passes automated WCAG checks', a
   await expectNoWcagViolations(page);
 });
 
+test('registration entry remains responsive and accessible before authentication starts', async ({
+  page,
+}) => {
+  await page.goto('/register');
+
+  await expect(
+    page.getByRole('heading', { name: /biến câu hỏi đầu tiên thành một lộ trình/i }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page.getByLabel('Mật khẩu')).toHaveAttribute('type', 'password');
+  await expect(page.getByRole('button', { name: 'Tiếp tục với Google' })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expectNoWcagViolations(page);
+});
+
 async function waitForVisualState(page: import('@playwright/test').Page) {
   await page.evaluate(async () => {
     await Promise.all(

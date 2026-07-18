@@ -16,6 +16,7 @@
     "@fontsource/be-vietnam-pro": "^5.2.8",
     "@fontsource/newsreader": "^5.2.10",
     "antd": "^6.5.1",
+    "firebase": "^12.16.0",
     "i18next": "^26.3.6",
     "katex": "^0.17.0",
     "lucide-react": "^1.25.0",

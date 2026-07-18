@@ -10,6 +10,8 @@ const resources = {
       'nav.home': 'Home',
       'nav.courses': 'Courses',
       'nav.method': 'Method',
+      'nav.login': 'Sign in',
+      'nav.register': 'Create account',
       'nav.start': 'Start learning',
       'landing.eyebrow': 'SEE IT. CHANGE IT. UNDERSTAND IT.',
       'landing.title':
@@ -134,6 +136,8 @@ const resources = {
       'nav.home': 'Trang chủ',
       'nav.courses': 'Khóa học',
       'nav.method': 'Phương pháp',
+      'nav.login': 'Đăng nhập',
+      'nav.register': 'Tạo tài khoản',
       'nav.start': 'Bắt đầu học',
       'landing.eyebrow': 'QUAN SÁT. THAY ĐỔI. THẤU HIỂU.',
       'landing.title':

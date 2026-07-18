@@ -70,8 +70,11 @@ export function SiteHeader({ locale, onLocaleChange, onThemeChange, theme }: Sit
             }
             onClick={onThemeChange}
           />
-          <Link className="header-cta" to="/courses/course-deep-learning-basic">
-            {t('nav.start')}
+          <Link className="header-login" to="/login">
+            {t('nav.login')}
+          </Link>
+          <Link className="header-cta" to="/register">
+            {t('nav.register')}
           </Link>
         </div>
       </div>

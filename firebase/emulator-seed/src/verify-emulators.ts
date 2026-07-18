@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 import { deleteApp } from 'firebase-admin/app';
 
@@ -33,6 +34,31 @@ async function assertHealthEndpoint(): Promise<void> {
     data: { service: 'api', status: 'ok' },
     requestId: response.headers.get('x-request-id'),
   });
+}
+
+async function assertEmailPasswordAuthentication(): Promise<void> {
+  const email = `learner-${randomUUID()}@example.test`;
+  const password = `test-${randomUUID()}`;
+  const emulatorKey = randomUUID();
+  const baseUrl = `http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1`;
+
+  const registerResponse = await fetch(`${baseUrl}/accounts:signUp?key=${emulatorKey}`, {
+    body: JSON.stringify({ email, password, returnSecureToken: true }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
+  assert.equal(registerResponse.status, 200, 'Email/password registration must succeed.');
+
+  const loginResponse = await fetch(`${baseUrl}/accounts:signInWithPassword?key=${emulatorKey}`, {
+    body: JSON.stringify({ email, password, returnSecureToken: true }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
+  assert.equal(loginResponse.status, 200, 'Email/password sign-in must succeed.');
+
+  const loginBody = (await loginResponse.json()) as { email?: unknown; idToken?: unknown };
+  assert.equal(loginBody.email, email);
+  assert.equal(typeof loginBody.idToken, 'string');
 }
 
 async function assertClientAccessDenied(): Promise<void> {
@@ -73,6 +99,7 @@ async function verifyResetAndSeed(): Promise<void> {
 await assertEmulatorHub();
 await verifyResetAndSeed();
 await assertHealthEndpoint();
+await assertEmailPasswordAuthentication();
 await assertClientAccessDenied();
 
 console.log(

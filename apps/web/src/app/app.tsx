@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { CourseCatalogPage, CoursePage, RouteNotFoundPage } from '../features/catalog/catalog-page';
 import type { Locale } from '../features/catalog/course-data';
+import type { AuthGateway } from '../features/auth/auth-context';
 import { LandingPage } from '../features/landing/landing-page';
 import { createAppI18n } from '../shared/i18n/i18n';
 import { useTheme } from '../shared/theme/use-theme';
@@ -16,7 +17,17 @@ const TrialPostPage = lazy(async () => {
   return { default: module.TrialPostPage };
 });
 
-function AppRoutes() {
+const AuthEntry = lazy(async () => {
+  const module = await import('../features/auth/auth-entry');
+
+  return { default: module.AuthEntry };
+});
+
+interface AppRoutesProps {
+  authGateway?: AuthGateway | undefined;
+}
+
+function AppRoutes({ authGateway }: AppRoutesProps) {
   const { i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const locale: Locale = i18n.resolvedLanguage === 'en' ? 'en' : 'vi';
@@ -51,6 +62,22 @@ function AppRoutes() {
           />
           <Routes>
             <Route path="/" element={<LandingPage locale={locale} />} />
+            <Route
+              path="/login"
+              element={
+                <Suspense fallback={<AuthRouteLoading />}>
+                  <AuthEntry authGateway={authGateway} locale={locale} mode="sign-in" />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                <Suspense fallback={<AuthRouteLoading />}>
+                  <AuthEntry authGateway={authGateway} locale={locale} mode="sign-up" />
+                </Suspense>
+              }
+            />
             <Route path="/courses" element={<CourseCatalogPage locale={locale} />} />
             <Route path="/courses/:courseId" element={<CoursePage locale={locale} />} />
             <Route
@@ -79,12 +106,20 @@ function TrialRouteLoading() {
   );
 }
 
-export function App() {
+function AuthRouteLoading() {
+  return <main className="route-loading page-shell" role="status" />;
+}
+
+interface AppProps {
+  authGateway?: AuthGateway | undefined;
+}
+
+export function App({ authGateway }: AppProps) {
   const i18n = useMemo(() => createAppI18n(), []);
 
   return (
     <I18nextProvider i18n={i18n}>
-      <AppRoutes />
+      <AppRoutes authGateway={authGateway} />
     </I18nextProvider>
   );
 }
