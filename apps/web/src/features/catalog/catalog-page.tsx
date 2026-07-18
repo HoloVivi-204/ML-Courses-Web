@@ -127,6 +127,17 @@ export function CoursePage({ locale }: LocaleProps) {
                       </span>
                     </div>
                     <p>{localize(module.description, locale)}</p>
+                    {isFirstModule ? (
+                      <Link
+                        className="module-trial-link"
+                        to={`/learn/${course.id}/posts/${module.postId}`}
+                      >
+                        {t('course.openTrialLabel', {
+                          title: localize(module.title, locale),
+                        })}
+                        <ArrowRight aria-hidden="true" size={17} />
+                      </Link>
+                    ) : null}
                     <div className="module-facts">
                       <span>
                         <Clock3 aria-hidden="true" size={15} />

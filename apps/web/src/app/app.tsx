@@ -6,6 +6,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { CourseCatalogPage, CoursePage, RouteNotFoundPage } from '../features/catalog/catalog-page';
 import type { Locale } from '../features/catalog/course-data';
 import { LandingPage } from '../features/landing/landing-page';
+import { TrialPostPage } from '../features/learning/trial-post-page';
 import { createAppI18n } from '../shared/i18n/i18n';
 import { useTheme } from '../shared/theme/use-theme';
 import { SiteHeader } from '../shared/ui/site-header';
@@ -47,6 +48,10 @@ function AppRoutes() {
             <Route path="/" element={<LandingPage locale={locale} />} />
             <Route path="/courses" element={<CourseCatalogPage locale={locale} />} />
             <Route path="/courses/:courseId" element={<CoursePage locale={locale} />} />
+            <Route
+              path="/learn/:courseId/posts/:postId"
+              element={<TrialPostPage locale={locale} />}
+            />
             <Route path="*" element={<RouteNotFoundPage />} />
           </Routes>
         </div>
