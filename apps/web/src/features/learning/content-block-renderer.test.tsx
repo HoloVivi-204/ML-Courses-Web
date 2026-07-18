@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { createAppI18n } from '../../shared/i18n/i18n';
 import { ContentBlockRenderer, type ContentBlock } from './content-block-renderer';
 
+const GOOGLE_NEURAL_NODES_URL =
+  'https://developers.google.com/machine-learning/crash-course/' +
+  'neural-networks/nodes-hidden-layers';
+
 describe('content block renderer', () => {
   it('renders supported blocks as localized semantic lesson content', () => {
     const blocks: ContentBlock[] = [
@@ -38,8 +42,8 @@ describe('content block renderer', () => {
         assetIds: [],
         id: 'explanation',
         locales: {
-          en: { paragraphs: ['Weights control how strongly each input affects the result.'] },
-          vi: { paragraphs: ['Trọng số kiểm soát mức ảnh hưởng của từng đầu vào.'] },
+          en: { markdown: 'Weights control how strongly each input affects the result.' },
+          vi: { markdown: 'Trọng số kiểm soát mức ảnh hưởng của từng đầu vào.' },
         },
         order: 2,
         postId: 'post-test',
@@ -136,16 +140,29 @@ describe('content block renderer', () => {
         required: false,
         resources: [
           {
+            attribution: {
+              en: 'Reference: Google for Developers.',
+              vi: 'Tham khảo: Google for Developers.',
+            },
             language: 'en',
+            license: {
+              name: 'CC BY 4.0',
+              url: 'https://creativecommons.org/licenses/by/4.0/',
+            },
             relatedTopicIds: [],
             resourceType: 'documentation',
             sourceId: 'source-google-neural-nodes',
             sourceName: 'Google for Developers',
             title: 'Neural networks: Nodes and hidden layers',
-            url: 'https://developers.google.com/machine-learning/crash-course/neural-networks/nodes-hidden-layers',
+            url: GOOGLE_NEURAL_NODES_URL,
           },
           {
+            attribution: { en: 'Unsafe.', vi: 'Không an toàn.' },
             language: 'en',
+            license: {
+              name: 'Unknown',
+              url: 'javascript:alert(1)',
+            },
             relatedTopicIds: [],
             resourceType: 'documentation',
             sourceId: 'source-unsafe',
@@ -165,12 +182,14 @@ describe('content block renderer', () => {
     const safeLink = screen.getByRole('link', {
       name: 'Neural networks: Nodes and hidden layers',
     });
-    expect(safeLink).toHaveAttribute(
-      'href',
-      'https://developers.google.com/machine-learning/crash-course/neural-networks/nodes-hidden-layers',
-    );
+    expect(safeLink).toHaveAttribute('href', GOOGLE_NEURAL_NODES_URL);
     expect(safeLink).toHaveAttribute('target', '_blank');
     expect(safeLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText(/Tham khảo: Google for Developers/i)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'CC BY 4.0' })).toHaveAttribute(
+      'href',
+      'https://creativecommons.org/licenses/by/4.0/',
+    );
     expect(screen.queryByRole('link', { name: 'Unsafe resource' })).not.toBeInTheDocument();
   });
 
@@ -297,7 +316,7 @@ describe('content block renderer', () => {
     expect(comparison).toHaveTextContent('Dấu của z giải thích đầu ra.');
   });
 
-  it('renders markdown text without interpreting raw HTML', () => {
+  it('renders GFM and math while dropping raw HTML and unsafe links', () => {
     const blocks: ContentBlock[] = [
       {
         accessibility: { en: null, vi: null },
@@ -305,8 +324,12 @@ describe('content block renderer', () => {
         assetIds: [],
         id: 'safe-text',
         locales: {
-          en: { paragraphs: ['<img src=x onerror=alert(1)>'] },
-          vi: { paragraphs: ['<img src=x onerror=alert(1)>'] },
+          en: { markdown: '**Weight** contributes to $z = wx + b$.' },
+          vi: {
+            markdown:
+              '**Trọng số** góp vào $z = wx + b$.\n\n- đầu vào\n- trọng số\n\n' +
+              '<img src=x onerror=alert(1)>\n\n[Không an toàn](javascript:alert(1))',
+          },
         },
         order: 1,
         postId: 'post-test',
@@ -319,7 +342,11 @@ describe('content block renderer', () => {
 
     render(<ContentBlockRenderer blocks={blocks} locale="vi" postId="post-test" />);
 
-    expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
+    expect(screen.getByText('Trọng số')).toHaveProperty('tagName', 'STRONG');
+    expect(screen.getByRole('list')).toHaveTextContent('đầu vào');
+    expect(document.querySelector('.katex')).toBeInTheDocument();
+    expect(screen.queryByText('<img src=x onerror=alert(1)>')).not.toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Không an toàn' })).not.toBeInTheDocument();
   });
 });

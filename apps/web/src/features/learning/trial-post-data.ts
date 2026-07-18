@@ -12,6 +12,9 @@ export interface TrialPost {
 }
 
 const TRIAL_POST_ID = 'dl-p01-neuron-perceptron';
+const GOOGLE_NEURAL_NODES_URL =
+  'https://developers.google.com/machine-learning/crash-course/' +
+  'neural-networks/nodes-hidden-layers';
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -29,12 +32,16 @@ const trialBlocks = [
     id: 'what-is-a-neuron',
     locales: {
       en: {
-        lede: 'A neuron is a tiny decision unit. It receives signals, scores their importance, then produces one output.',
+        lede:
+          'A neuron is a tiny decision unit. It receives signals, scores their importance, ' +
+          'then produces one output.',
         navigationTitle: 'What does a neuron do?',
         title: 'From signals to a decision',
       },
       vi: {
-        lede: 'Neuron là một đơn vị ra quyết định rất nhỏ. Nó nhận tín hiệu, đánh giá mức quan trọng rồi tạo ra một đầu ra.',
+        lede:
+          'Neuron là một đơn vị ra quyết định rất nhỏ. Nó nhận tín hiệu, đánh giá mức ' +
+          'quan trọng rồi tạo ra một đầu ra.',
         navigationTitle: 'Một neuron làm gì?',
         title: 'Từ tín hiệu đến quyết định',
       },
@@ -47,14 +54,14 @@ const trialBlocks = [
     id: 'neuron-explanation',
     locales: {
       en: {
-        paragraphs: [
-          'Think of each input as one piece of evidence. The neuron does not understand that evidence like a person; it combines numbers using a fixed, inspectable rule.',
-        ],
+        markdown:
+          'Think of each input as one piece of **evidence**. The neuron combines numbers ' +
+          'using a fixed, inspectable rule: $z = w_1x_1 + w_2x_2 + b$.',
       },
       vi: {
-        paragraphs: [
-          'Hãy xem mỗi đầu vào như một mẩu bằng chứng. Neuron không hiểu bằng chứng như con người; nó kết hợp các con số bằng một quy tắc cố định và có thể kiểm tra.',
-        ],
+        markdown:
+          'Hãy xem mỗi đầu vào như một mẩu **bằng chứng**. Neuron kết hợp các con số bằng ' +
+          'một quy tắc cố định, có thể kiểm tra: $z = w_1x_1 + w_2x_2 + b$.',
       },
     },
     order: 2,
@@ -65,11 +72,15 @@ const trialBlocks = [
     id: 'neuron-insight',
     locales: {
       en: {
-        body: 'A model decision becomes explainable when you can trace the inputs, weights, bias, and threshold that produced it.',
+        body:
+          'A model decision becomes explainable when you can trace the inputs, weights, ' +
+          'bias, and threshold that produced it.',
         title: 'The useful idea',
       },
       vi: {
-        body: 'Quyết định của mô hình trở nên giải thích được khi bạn lần theo đầu vào, trọng số, độ lệch và ngưỡng đã tạo ra nó.',
+        body:
+          'Quyết định của mô hình trở nên giải thích được khi bạn lần theo đầu vào, ' +
+          'trọng số, độ lệch và ngưỡng đã tạo ra nó.',
         title: 'Ý tưởng cần giữ lại',
       },
     },
@@ -82,12 +93,16 @@ const trialBlocks = [
     id: 'weighted-sum',
     locales: {
       en: {
-        lede: 'Before adding the inputs, the neuron multiplies each one by a weight. Larger weights create a stronger influence.',
+        lede:
+          'Before adding the inputs, the neuron multiplies each one by a weight. ' +
+          'Larger weights create a stronger influence.',
         navigationTitle: 'Why weights matter',
         title: 'Weights say which signals matter',
       },
       vi: {
-        lede: 'Trước khi cộng các đầu vào, neuron nhân từng đầu vào với một trọng số. Trọng số lớn tạo ảnh hưởng mạnh hơn.',
+        lede:
+          'Trước khi cộng các đầu vào, neuron nhân từng đầu vào với một trọng số. ' +
+          'Trọng số lớn tạo ảnh hưởng mạnh hơn.',
         navigationTitle: 'Vì sao trọng số quan trọng?',
         title: 'Trọng số cho biết tín hiệu nào quan trọng',
       },
@@ -100,14 +115,14 @@ const trialBlocks = [
     id: 'weight-explanation',
     locales: {
       en: {
-        paragraphs: [
-          'The bias shifts the decision point. A step function then compares score z with zero and returns either 0 or 1.',
-        ],
+        markdown:
+          'The bias shifts the decision point. A step function compares $z$ with zero and ' +
+          'returns either **0** or **1**.',
       },
       vi: {
-        paragraphs: [
-          'Độ lệch dịch chuyển điểm ra quyết định. Hàm bước sau đó so sánh điểm z với 0 và trả về 0 hoặc 1.',
-        ],
+        markdown:
+          'Độ lệch dịch chuyển điểm ra quyết định. Hàm bước so sánh $z$ với 0 và trả về ' +
+          '**0** hoặc **1**.',
       },
     },
     order: 5,
@@ -116,7 +131,9 @@ const trialBlocks = [
   {
     ...blockDefaults,
     accessibility: {
-      en: 'Inputs x one and x two are multiplied by weights, then bias is added to produce score z.',
+      en:
+        'Inputs x one and x two are multiplied by weights, then bias is added ' +
+        'to produce score z.',
       vi: 'Đầu vào x một và x hai được nhân với trọng số rồi cộng độ lệch để tạo điểm z.',
     },
     id: 'weighted-sum-formula',
@@ -173,7 +190,9 @@ const trialBlocks = [
     id: 'result-thresholds',
     locales: {
       en: {
-        body: 'Toggle the two inputs again and narrate the chain aloud: inputs, weighted sum, threshold, output.',
+        body:
+          'Toggle the two inputs again and narrate the chain aloud: inputs, weighted sum, ' +
+          'threshold, output.',
         items: [
           {
             body: 'The combined evidence has not reached the threshold.',
@@ -189,7 +208,9 @@ const trialBlocks = [
         title: 'Two outcomes, one rule',
       },
       vi: {
-        body: 'Hãy đổi hai đầu vào lần nữa và đọc thành tiếng chuỗi này: đầu vào, tổng có trọng số, ngưỡng, đầu ra.',
+        body:
+          'Hãy đổi hai đầu vào lần nữa và đọc thành tiếng chuỗi này: đầu vào, ' +
+          'tổng có trọng số, ngưỡng, đầu ra.',
         items: [
           { body: 'Bằng chứng kết hợp chưa chạm ngưỡng.', label: 'z < 0', title: 'Đầu ra 0' },
           {
@@ -224,13 +245,21 @@ const trialBlocks = [
     required: false,
     resources: [
       {
+        attribution: {
+          en: 'Reference material by Google for Developers.',
+          vi: 'Tài liệu tham khảo của Google for Developers.',
+        },
         language: 'en',
+        license: {
+          name: 'CC BY 4.0',
+          url: 'https://creativecommons.org/licenses/by/4.0/',
+        },
         relatedTopicIds: [],
         resourceType: 'documentation',
         sourceId: 'source-google-neural-nodes',
         sourceName: 'Google for Developers',
         title: 'Neural networks: Nodes and hidden layers',
-        url: 'https://developers.google.com/machine-learning/crash-course/neural-networks/nodes-hidden-layers',
+        url: GOOGLE_NEURAL_NODES_URL,
       },
     ],
     sourceIds: ['source-google-neural-nodes'],

@@ -10,6 +10,7 @@
     "dev": "pnpm --filter @ml-path/web dev",
     "build": "pnpm --filter @ml-path/web build",
     "test": "pnpm --filter @ml-path/web test",
+    "test:e2e": "pnpm --filter @ml-path/web test:e2e",
     "typecheck": "pnpm --filter @ml-path/web typecheck",
     "lint": "pnpm --filter @ml-path/web lint",
     "format:check": "pnpm --filter @ml-path/web format:check"

@@ -5,6 +5,15 @@ import { describe, expect, it } from 'vitest';
 import { App } from './app';
 
 describe('public learning journey', () => {
+  it('does not expose the static lab preview as an interactive run control', () => {
+    window.history.pushState({}, '', '/');
+
+    render(<App />);
+
+    expect(screen.queryByRole('button', { name: 'Chạy mô hình' })).not.toBeInTheDocument();
+    expect(screen.getByText('Chạy mô hình')).toHaveClass('lab-run-preview');
+  });
+
   it('lets a guest open the deep-learning roadmap from the landing page', async () => {
     window.history.pushState({}, '', '/');
     const user = userEvent.setup();
@@ -72,9 +81,13 @@ describe('public learning journey', () => {
     await user.click(screen.getByRole('link', { name: /học thử neuron và perceptron/i }));
 
     expect(
-      await screen.findByRole('heading', {
-        name: /một neuron đưa ra quyết định như thế nào/i,
-      }),
+      await screen.findByRole(
+        'heading',
+        {
+          name: /một neuron đưa ra quyết định như thế nào/i,
+        },
+        { timeout: 3_000 },
+      ),
     ).toBeVisible();
     expect(window.location.pathname).toBe(
       '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
@@ -91,7 +104,7 @@ describe('public learning journey', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('status')).toHaveTextContent('Neuron chưa kích hoạt: 0');
+    expect(await screen.findByText('Neuron chưa kích hoạt: 0')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Đầu vào x1, hiện tại 0' }));
     await user.click(screen.getByRole('button', { name: 'Đầu vào x2, hiện tại 0' }));
@@ -100,7 +113,7 @@ describe('public learning journey', () => {
     expect(screen.getByText('0.7 × 1 + 0.7 × 1 − 1.0 = 0.4')).toBeVisible();
   });
 
-  it('presents the trial lesson as a navigable learning sequence', () => {
+  it('presents the trial lesson as a navigable learning sequence', async () => {
     window.history.pushState(
       {},
       '',
@@ -109,7 +122,7 @@ describe('public learning journey', () => {
 
     render(<App />);
 
-    const contents = screen.getByRole('navigation', { name: 'Mục lục bài học' });
+    const contents = await screen.findByRole('navigation', { name: 'Mục lục bài học' });
     expect(contents).toBeVisible();
     expect(within(contents).getByRole('link', { name: 'Một neuron làm gì?' })).toHaveAttribute(
       'href',
@@ -140,19 +153,21 @@ describe('public learning journey', () => {
     );
   });
 
-  it('does not expose an undesignated trial lesson', () => {
+  it('does not expose an undesignated trial lesson', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic/posts/not-a-public-trial');
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Không tìm thấy bài học thử' })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'Không tìm thấy bài học thử' }),
+    ).toBeVisible();
     expect(screen.getByRole('link', { name: 'Về danh sách khóa học' })).toHaveAttribute(
       'href',
       '/courses',
     );
   });
 
-  it('offers vetted further reading from the public trial lesson', () => {
+  it('offers vetted further reading from the public trial lesson', async () => {
     window.history.pushState(
       {},
       '',
@@ -161,7 +176,7 @@ describe('public learning journey', () => {
 
     render(<App />);
 
-    const resource = screen.getByRole('link', {
+    const resource = await screen.findByRole('link', {
       name: 'Neural networks: Nodes and hidden layers',
     });
     expect(resource).toHaveAttribute('target', '_blank');

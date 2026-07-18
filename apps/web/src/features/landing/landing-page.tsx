@@ -47,10 +47,10 @@ function XorLabPreview() {
           <div className="lab-range" aria-hidden="true">
             <i style={{ width: '72%' }} />
           </div>
-          <button type="button">
+          <span className="lab-run-preview">
             <Play aria-hidden="true" fill="currentColor" size={13} />
             {t('landing.lab.run')}
-          </button>
+          </span>
         </div>
         <div className="xor-plot">
           <svg viewBox="0 0 520 340" role="img" aria-label={t('landing.lab.chartAlt')}>

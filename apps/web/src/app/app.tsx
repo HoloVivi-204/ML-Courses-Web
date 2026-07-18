@@ -1,15 +1,20 @@
 import { ConfigProvider, theme as antTheme } from 'antd';
-import { useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { CourseCatalogPage, CoursePage, RouteNotFoundPage } from '../features/catalog/catalog-page';
 import type { Locale } from '../features/catalog/course-data';
 import { LandingPage } from '../features/landing/landing-page';
-import { TrialPostPage } from '../features/learning/trial-post-page';
 import { createAppI18n } from '../shared/i18n/i18n';
 import { useTheme } from '../shared/theme/use-theme';
 import { SiteHeader } from '../shared/ui/site-header';
+
+const TrialPostPage = lazy(async () => {
+  const module = await import('../features/learning/trial-post-page');
+
+  return { default: module.TrialPostPage };
+});
 
 function AppRoutes() {
   const { i18n } = useTranslation();
@@ -31,7 +36,7 @@ function AppRoutes() {
         algorithm: theme === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
         token: {
           borderRadius: 6,
-          colorPrimary: theme === 'dark' ? '#63d4cd' : '#087c78',
+          colorPrimary: theme === 'dark' ? '#63d4cd' : '#06736f',
           fontFamily: "'Be Vietnam Pro', sans-serif",
         },
       }}
@@ -50,13 +55,27 @@ function AppRoutes() {
             <Route path="/courses/:courseId" element={<CoursePage locale={locale} />} />
             <Route
               path="/learn/:courseId/posts/:postId"
-              element={<TrialPostPage locale={locale} />}
+              element={
+                <Suspense fallback={<TrialRouteLoading />}>
+                  <TrialPostPage locale={locale} />
+                </Suspense>
+              }
             />
             <Route path="*" element={<RouteNotFoundPage />} />
           </Routes>
         </div>
       </BrowserRouter>
     </ConfigProvider>
+  );
+}
+
+function TrialRouteLoading() {
+  const { t } = useTranslation();
+
+  return (
+    <main className="route-loading page-shell" role="status">
+      {t('route.loading')}
+    </main>
   );
 }
 

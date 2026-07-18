@@ -15,7 +15,8 @@ const resources = {
       'landing.title':
         '<line>Machine Learning</line> <line>is no longer a <accent>black box.</accent></line>',
       'landing.lede':
-        'Follow a deliberate path, watch each model make decisions, then change the variables yourself — no setup and no code required.',
+        'Follow a deliberate path, watch each model make decisions, then change the ' +
+        'variables yourself — no setup and no code required.',
       'landing.primaryCta': 'Start the first journey',
       'landing.secondaryCta': 'See how learning works',
       'landing.stats.courses': 'foundation courses',
@@ -28,7 +29,8 @@ const resources = {
       'landing.lab.epochs': 'Epochs',
       'landing.lab.run': 'Run model',
       'landing.lab.chartAlt':
-        'XOR points in four quadrants with one straight decision boundary that cannot separate them',
+        'XOR points in four quadrants with one straight decision boundary that cannot ' +
+        'separate them',
       'landing.lab.insightTitle': 'A useful failure',
       'landing.lab.insightBody': 'One line cannot separate XOR.',
       'landing.lab.accuracy': 'ACCURACY',
@@ -38,7 +40,8 @@ const resources = {
       'landing.method.eyebrow': 'ONE PATH, THREE MOVES',
       'landing.method.title': 'From concept to intuition',
       'landing.method.intro':
-        'Every lesson ends in an observable action. You always know what to notice and what to try next.',
+        'Every lesson ends in an observable action. You always know what to notice and ' +
+        'what to try next.',
       'landing.method.items.0.title': 'Follow the path',
       'landing.method.items.0.body':
         'Short modules reveal prerequisites and keep your current position visible.',
@@ -58,10 +61,12 @@ const resources = {
       'catalog.eyebrow': 'COURSE CATALOG',
       'catalog.title': 'Two paths, one learning language',
       'catalog.intro':
-        'Start with classical foundations or inspect a neural network from its smallest useful unit.',
+        'Start with classical foundations or inspect a neural network from its smallest ' +
+        'useful unit.',
       'catalog.principleTitle': 'Sequential by design',
       'catalog.principleBody':
-        'Metadata stays public; learning content opens only when verified prerequisites are complete.',
+        'Metadata stays public; learning content opens only when verified prerequisites ' +
+        'are complete.',
       'course.moduleCount': '{{count}} modules',
       'course.postCount': '{{count}} lessons',
       'course.hourCount': '{{count}} hours',
@@ -73,7 +78,8 @@ const resources = {
       'course.roadmapEyebrow': 'COURSE ROADMAP',
       'course.roadmapTitle': 'Learn in the right order',
       'course.roadmapIntro':
-        'Each module closes with a mastery check. Completing it unlocks the next concept and its algorithm.',
+        'Each module closes with a mastery check. Completing it unlocks the next concept ' +
+        'and its algorithm.',
       'course.trialState': 'Start here',
       'course.openTrialLabel': 'Try {{title}}',
       'course.sequenceState': 'Sequential',
@@ -86,6 +92,7 @@ const resources = {
       'route.notFound.title': 'This path does not exist',
       'route.notFound.body': 'The address may be old or incomplete.',
       'route.notFound.back': 'Return home',
+      'route.loading': 'Loading lesson…',
       'content.invalidBlock': 'This content is temporarily unavailable.',
       'content.resourceType.article': 'Article',
       'content.resourceType.blog': 'Blog',
@@ -113,7 +120,8 @@ const resources = {
       'trial.summary.eyebrow': 'LESSON COMPLETE',
       'trial.summary.title': 'You just inspected a neuron from end to end.',
       'trial.summary.body':
-        'The full course continues from this single unit to Perceptrons, layers, training, and the limits of linear decisions.',
+        'The full course continues from this single unit to Perceptrons, layers, training, ' +
+        'and the limits of linear decisions.',
       'trial.summary.back': 'Return to course roadmap',
     },
   },
@@ -131,7 +139,8 @@ const resources = {
       'landing.title':
         '<line>Machine Learning</line> <line>không còn là một <accent>hộp đen.</accent></line>',
       'landing.lede':
-        'Đi theo lộ trình rõ ràng, quan sát mô hình ra quyết định rồi tự thay đổi từng biến số — không cần cài đặt, không cần viết code.',
+        'Đi theo lộ trình rõ ràng, quan sát mô hình ra quyết định rồi tự thay đổi từng biến ' +
+        'số — không cần cài đặt, không cần viết code.',
       'landing.primaryCta': 'Bắt đầu lộ trình đầu tiên',
       'landing.secondaryCta': 'Xem cách học hoạt động',
       'landing.stats.courses': 'khóa học nền tảng',
@@ -154,7 +163,8 @@ const resources = {
       'landing.method.eyebrow': 'MỘT LỘ TRÌNH, BA BƯỚC',
       'landing.method.title': 'Từ khái niệm đến trực giác',
       'landing.method.intro':
-        'Mỗi bài học kết thúc bằng một hành động quan sát được. Bạn luôn biết cần nhìn gì và thử gì tiếp theo.',
+        'Mỗi bài học kết thúc bằng một hành động quan sát được. Bạn luôn biết cần nhìn gì ' +
+        'và thử gì tiếp theo.',
       'landing.method.items.0.title': 'Học theo lộ trình',
       'landing.method.items.0.body':
         'Module ngắn chỉ rõ điều kiện học trước và luôn cho biết bạn đang ở đâu.',
@@ -169,7 +179,8 @@ const resources = {
       'landing.courses.all': 'Xem toàn bộ khóa học',
       'landing.closing.quote': 'Thấu hiểu bắt đầu khi kết quả không còn giống phép màu.',
       'landing.closing.body':
-        'Lộ trình đầu tiên dùng Perceptron và XOR để biến giới hạn của mô hình thành thứ có thể nhìn thấy.',
+        'Lộ trình đầu tiên dùng Perceptron và XOR để biến giới hạn của mô hình thành thứ ' +
+        'có thể nhìn thấy.',
       'landing.closing.cta': 'Mở lộ trình đầu tiên',
       'catalog.eyebrow': 'DANH MỤC KHÓA HỌC',
       'catalog.title': 'Hai lộ trình, một ngôn ngữ học tập',
@@ -189,7 +200,8 @@ const resources = {
       'course.roadmapEyebrow': 'LỘ TRÌNH KHÓA HỌC',
       'course.roadmapTitle': 'Học đúng thứ tự',
       'course.roadmapIntro':
-        'Mỗi module kết thúc bằng mastery check. Hoàn thành sẽ mở khái niệm và thuật toán tiếp theo.',
+        'Mỗi module kết thúc bằng mastery check. Hoàn thành sẽ mở khái niệm và thuật toán ' +
+        'tiếp theo.',
       'course.trialState': 'Bắt đầu ở đây',
       'course.openTrialLabel': 'Học thử {{title}}',
       'course.sequenceState': 'Theo lộ trình',
@@ -202,6 +214,7 @@ const resources = {
       'route.notFound.title': 'Đường dẫn này không tồn tại',
       'route.notFound.body': 'Địa chỉ có thể đã cũ hoặc chưa đầy đủ.',
       'route.notFound.back': 'Về trang chủ',
+      'route.loading': 'Đang tải bài học…',
       'content.invalidBlock': 'Nội dung này tạm thời không khả dụng.',
       'content.resourceType.article': 'Bài viết',
       'content.resourceType.blog': 'Blog',
@@ -229,7 +242,8 @@ const resources = {
       'trial.summary.eyebrow': 'HOÀN THÀNH BÀI HỌC',
       'trial.summary.title': 'Bạn vừa quan sát trọn vẹn một neuron.',
       'trial.summary.body':
-        'Khóa học đầy đủ đi tiếp từ đơn vị này đến Perceptron, các lớp, quá trình huấn luyện và giới hạn của quyết định tuyến tính.',
+        'Khóa học đầy đủ đi tiếp từ đơn vị này đến Perceptron, các lớp, quá trình huấn ' +
+        'luyện và giới hạn của quyết định tuyến tính.',
       'trial.summary.back': 'Trở về lộ trình khóa học',
     },
   },
