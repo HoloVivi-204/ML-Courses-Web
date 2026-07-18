@@ -151,4 +151,21 @@ describe('public learning journey', () => {
       '/courses',
     );
   });
+
+  it('offers vetted further reading from the public trial lesson', () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    );
+
+    render(<App />);
+
+    const resource = screen.getByRole('link', {
+      name: 'Neural networks: Nodes and hidden layers',
+    });
+    expect(resource).toHaveAttribute('target', '_blank');
+    expect(resource).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText(/developers\.google\.com/i)).toBeVisible();
+  });
 });
