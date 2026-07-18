@@ -1,0 +1,17 @@
+{
+  "name": "ml-courses-web",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @ml-path/web dev",
+    "build": "pnpm --filter @ml-path/web build",
+    "test": "pnpm --filter @ml-path/web test",
+    "typecheck": "pnpm --filter @ml-path/web typecheck",
+    "lint": "pnpm --filter @ml-path/web lint",
+    "format:check": "pnpm --filter @ml-path/web format:check"
+  }
+}
