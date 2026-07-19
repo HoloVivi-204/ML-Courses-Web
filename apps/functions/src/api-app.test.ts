@@ -491,6 +491,92 @@ describe('API foundation', () => {
     expect(progressReads).toEqual(new Set(['learner-01']));
   });
 
+  it('rejects student access to the admin content inventory', async () => {
+    const response = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/content')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(403);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_FORBIDDEN',
+        message: 'Admin access is required.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
+  it('lists seeded admin content without leaking quiz keys or hints', async () => {
+    const response = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'admin-01',
+          displayName: 'Operator',
+          role: 'admin',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'post', courseId: 'course-deep-learning-basic' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.content).toEqual([
+      expect.objectContaining({
+        entityType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        courseId: 'course-deep-learning-basic',
+        moduleId: 'dl-m01-neuron-perceptron',
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        status: 'published',
+        localeAvailability: ['en', 'vi'],
+        preview: {
+          en: expect.stringContaining('single neuron'),
+          vi: expect.any(String),
+        },
+      }),
+    ]);
+    expect(JSON.stringify(response.body.data.content)).not.toMatch(
+      /correctAnswer|answerKey|explanation|hint/i,
+    );
+  });
+
+  it('rejects unsupported admin content entity filters', async () => {
+    const response = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'admin-01',
+          displayName: 'Operator',
+          role: 'admin',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'source' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(400);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_CONTENT_ENTITY_TYPE_INVALID',
+        message: 'The requested admin content entity type is not supported.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
   it('creates a playground run session through the authenticated learner boundary', async () => {
     const createdSessions = new Set<string>();
     const app = createApiApp({

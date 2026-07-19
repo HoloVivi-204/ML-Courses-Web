@@ -9,6 +9,10 @@ import express, {
 import { getAuth } from 'firebase-admin/auth';
 import helmet from 'helmet';
 
+import {
+  createDefaultAdminContentRepository,
+  type AdminContentRepository,
+} from './admin-content-repository.js';
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
@@ -23,6 +27,7 @@ import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
 export interface VerifiedAuthUser {
   displayName: string;
   email?: string | undefined;
+  role?: 'admin' | undefined;
   uid: string;
 }
 
@@ -33,6 +38,7 @@ interface ApiErrorBody {
 }
 
 export interface ApiAppOptions {
+  adminContentRepository?: AdminContentRepository | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
@@ -47,6 +53,16 @@ function getAuthUser(response: Response): VerifiedAuthUser {
 
   if (!authUser) {
     throw new ApiError(401, 'UNAUTHENTICATED', 'Authentication is required.');
+  }
+
+  return authUser;
+}
+
+function requireAdminUser(response: Response): VerifiedAuthUser {
+  const authUser = getAuthUser(response);
+
+  if (authUser.role !== 'admin') {
+    throw new ApiError(403, 'ADMIN_FORBIDDEN', 'Admin access is required.');
   }
 
   return authUser;
@@ -120,6 +136,20 @@ function getStringQueryField(request: Request, name: string): string {
 
   if (typeof value !== 'string' || !value.trim()) {
     throw new ApiError(400, 'INVALID_QUERY_PARAMETER', `${name} query parameter is required.`);
+  }
+
+  return value.trim();
+}
+
+function getOptionalStringQueryField(request: Request, name: string): string | undefined {
+  const value = request.query[name];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, 'INVALID_QUERY_PARAMETER', `${name} query parameter must be a string.`);
   }
 
   return value.trim();
@@ -267,6 +297,7 @@ async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser
     uid: decodedToken.uid,
     displayName: typeof decodedToken.name === 'string' ? decodedToken.name : 'Learner',
     email: typeof decodedToken.email === 'string' ? decodedToken.email : undefined,
+    role: decodedToken.role === 'admin' ? 'admin' : undefined,
   };
 }
 
@@ -310,9 +341,16 @@ const handleApiError: ErrorRequestHandler = (error, request, response, next) => 
 
 export function createApiApp(options: ApiAppOptions = {}): express.Express {
   const app = express();
+  let adminContentRepository = options.adminContentRepository;
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
   const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
+
+  function getAdminContentRepository(): AdminContentRepository {
+    adminContentRepository ??= createDefaultAdminContentRepository();
+
+    return adminContentRepository;
+  }
 
   function getLearningRepository(): LearningRepository {
     learningRepository ??= createDefaultLearningRepository();
@@ -437,6 +475,22 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       const authUser = getAuthUser(response);
       const result = await getLearningRepository().getProgress({
         uid: authUser.uid,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/v1/admin/content', requireAuth, async (request, response, next) => {
+    try {
+      requireAdminUser(response);
+
+      const result = await getAdminContentRepository().listContent({
+        entityType: getOptionalStringQueryField(request, 'entityType'),
+        courseId: getOptionalStringQueryField(request, 'courseId'),
+        moduleId: getOptionalStringQueryField(request, 'moduleId'),
       });
 
       sendSuccess(response, result.statusCode, result.data);

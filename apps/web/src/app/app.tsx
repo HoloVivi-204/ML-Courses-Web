@@ -30,6 +30,12 @@ const AuthEntry = lazy(async () => {
   return { default: module.AuthEntry };
 });
 
+const AdminContentPage = lazy(async () => {
+  const module = await import('../features/admin/admin-content-page');
+
+  return { default: module.AdminContentPage };
+});
+
 const LearningCoursePage = lazy(async () => {
   const module = await import('../features/learning/learning-course-page');
 
@@ -118,6 +124,16 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
               />
               <Route path="/courses" element={<CourseCatalogPage locale={locale} />} />
               <Route path="/courses/:courseId" element={<CoursePage locale={locale} />} />
+              <Route
+                path="/admin/content"
+                element={
+                  <RequireAuthenticated>
+                    <Suspense fallback={<TrialRouteLoading />}>
+                      <AdminContentPage learningApiClient={learningClient} locale={locale} />
+                    </Suspense>
+                  </RequireAuthenticated>
+                }
+              />
               <Route
                 path="/learn/:courseId"
                 element={

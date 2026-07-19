@@ -140,6 +140,7 @@ function createLearningApiClient() {
         },
       ],
     }),
+    listAdminContent: vi.fn().mockResolvedValue([]),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
     savePlaygroundRun: vi.fn().mockResolvedValue({

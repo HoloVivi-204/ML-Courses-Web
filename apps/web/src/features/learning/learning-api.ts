@@ -130,6 +130,29 @@ export interface LearningProgressSnapshot {
   }>;
 }
 
+export type AdminContentEntityType = 'course' | 'demo' | 'module' | 'post' | 'quiz';
+
+export interface AdminContentSummary {
+  courseId: string;
+  entityId: string;
+  entityType: AdminContentEntityType;
+  localeAvailability: ReadonlyArray<'en' | 'vi'>;
+  moduleId?: string | undefined;
+  postId?: string | undefined;
+  preview: {
+    en: string;
+    vi: string;
+  };
+  publishedRevisionId: string;
+  sourceStatus: 'seeded';
+  status: 'published';
+  title: {
+    en: string;
+    vi: string;
+  };
+  validationStatus: 'not-run' | 'valid';
+}
+
 export interface PlaygroundRunSession {
   algorithmId: 'perceptron';
   config: {
@@ -204,6 +227,12 @@ export interface LearningApiClient {
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
+  listAdminContent(input: {
+    courseId?: string | undefined;
+    entityType?: AdminContentEntityType | undefined;
+    idToken: string;
+    moduleId?: string | undefined;
+  }): Promise<AdminContentSummary[]>;
   createPlaygroundRunSession(input: {
     algorithmId: 'perceptron';
     config: PlaygroundRunSession['config'];
@@ -383,6 +412,32 @@ export function createFetchLearningApiClient(): LearningApiClient {
           },
         }),
       );
+    },
+    async listAdminContent({ courseId, entityType, idToken, moduleId }) {
+      const query = new URLSearchParams();
+
+      if (entityType !== undefined) {
+        query.set('entityType', entityType);
+      }
+
+      if (courseId !== undefined) {
+        query.set('courseId', courseId);
+      }
+
+      if (moduleId !== undefined) {
+        query.set('moduleId', moduleId);
+      }
+
+      const queryString = query.toString();
+      const data = await readSuccessEnvelope<{ content: AdminContentSummary[] }>(
+        await fetch(`/api/v1/admin/content${queryString ? `?${queryString}` : ''}`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+
+      return data.content;
     },
     async createPlaygroundRunSession({
       algorithmId,

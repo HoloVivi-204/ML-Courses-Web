@@ -224,6 +224,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       ],
     }),
+    listAdminContent: vi.fn().mockResolvedValue([]),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
     savePlaygroundRun: vi.fn().mockResolvedValue(
@@ -750,6 +751,66 @@ describe('public learning journey', () => {
       '/playground/pg-xor',
     );
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+  });
+
+  it('lets an authenticated admin preview the seeded content inventory', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const listAdminContent = vi.fn().mockResolvedValue([
+      {
+        courseId: 'course-deep-learning-basic',
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        localeAvailability: ['en', 'vi'],
+        moduleId: 'dl-m01-neuron-perceptron',
+        preview: {
+          en: 'Read from a single neuron decision to the XOR limit.',
+          vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR.',
+        },
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        sourceStatus: 'seeded',
+        status: 'published',
+        title: {
+          en: 'How does a neuron make a decision?',
+          vi: 'Một neuron đưa ra quyết định như thế nào?',
+        },
+        validationStatus: 'not-run',
+      },
+    ]);
+    const learningApiClient = {
+      ...createLearningApiClient(),
+      listAdminContent,
+    };
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Quản trị nội dung seed' })).toBeVisible();
+    expect(await screen.findAllByText('dl-p01-neuron-perceptron')).toHaveLength(2);
+    expect(await screen.findByText('post-dl-p01-neuron-perceptron-rev-r1')).toBeVisible();
+    expect(await screen.findByText(/Read from a single neuron decision/i)).toBeVisible();
+    expect(document.body).not.toHaveTextContent(/answerKey|correctAnswer|hint/i);
+    expect(listAdminContent).toHaveBeenCalledWith({ idToken: 'local-id-token' });
+  });
+
+  it('shows a safe forbidden state when the admin inventory API rejects access', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const listAdminContent = vi.fn().mockRejectedValue(new Error('Forbidden'));
+    const learningApiClient = {
+      ...createLearningApiClient(),
+      listAdminContent,
+    };
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Cần quyền Admin' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Bạn cần Admin claim để xem nội dung seed.',
+    );
+    expect(screen.queryByText('dl-p01-neuron-perceptron')).not.toBeInTheDocument();
+    expect(listAdminContent).toHaveBeenCalledWith({ idToken: 'local-id-token' });
   });
 
   it('keeps pg-xor Playground locked until backend progress unlocks Perceptron', async () => {
