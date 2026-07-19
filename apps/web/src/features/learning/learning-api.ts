@@ -89,6 +89,47 @@ export interface QuizSubmissionResult {
   score: number;
 }
 
+export interface LearningProgressSnapshot {
+  algorithmUnlocks: ReadonlyArray<{
+    algorithmId: string;
+    moduleId: string;
+  }>;
+  contentAccess: ReadonlyArray<{
+    contentType: 'demo' | 'module' | 'post';
+    entityId: string;
+  }>;
+  demos: ReadonlyArray<{
+    completed: boolean;
+    demoId: string;
+  }>;
+  enrollment: {
+    courseId: string;
+    progressPercent: number;
+    status: 'completed' | 'in-progress' | 'not-enrolled';
+  };
+  modules: ReadonlyArray<{
+    completedStepCount: number;
+    moduleId: string;
+    progressPercent: number;
+    requiredStepCount: number;
+    status: 'completed' | 'in-progress' | 'locked';
+  }>;
+  posts: ReadonlyArray<{
+    bestScore: number;
+    completed: boolean;
+    postId: string;
+    quizId: string;
+    quizPassed: boolean;
+  }>;
+  quizzes: ReadonlyArray<{
+    attemptCount: number;
+    bestScore: number;
+    passed: boolean;
+    quizId: string;
+    quizKind: 'module' | 'post';
+  }>;
+}
+
 export interface LearningApiClient {
   bootstrapProfile(idToken: string): Promise<void>;
   completeDemo(input: {
@@ -103,6 +144,7 @@ export interface LearningApiClient {
     idToken: string;
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
+  getProgress(idToken: string): Promise<LearningProgressSnapshot>;
   submitQuizAttempt(input: {
     answers: readonly QuizAnswer[];
     attemptId: string;
@@ -172,6 +214,15 @@ export function createFetchLearningApiClient(): LearningApiClient {
           headers: {
             authorization: `Bearer ${idToken}`,
             'idempotency-key': idempotencyKey,
+          },
+        }),
+      );
+    },
+    async getProgress(idToken) {
+      return readSuccessEnvelope<LearningProgressSnapshot>(
+        await fetch('/api/v1/users/me/progress', {
+          headers: {
+            authorization: `Bearer ${idToken}`,
           },
         }),
       );

@@ -77,6 +77,30 @@ async function assertClientAccessDenied(): Promise<void> {
   }
 }
 
+async function assertDirectProgressMutationDenied(): Promise<void> {
+  const baseUrl = `http://127.0.0.1:8080/v1/projects/${LOCAL_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const protectedDocumentPaths = [
+    'users/local-student/algorithmUnlocks/perceptron',
+    'users/local-student/contentAccess/demo_demo-perceptron-and-gate',
+    'users/local-student/quizProgress/quiz-module-dl-m01',
+  ];
+
+  for (const documentPath of protectedDocumentPaths) {
+    const response = await fetch(`${baseUrl}/${documentPath}`, {
+      body: JSON.stringify({
+        fields: {
+          schemaVersion: { integerValue: '1' },
+          forged: { booleanValue: true },
+        },
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(response.status, 403, `${documentPath} must reject direct client writes.`);
+  }
+}
+
 async function verifyResetAndSeed(): Promise<void> {
   const services = createLocalAdminServices();
   const manifest = createLocalSeedManifest();
@@ -101,6 +125,7 @@ await verifyResetAndSeed();
 await assertHealthEndpoint();
 await assertEmailPasswordAuthentication();
 await assertClientAccessDenied();
+await assertDirectProgressMutationDenied();
 
 console.log(
   JSON.stringify({
@@ -109,5 +134,6 @@ console.log(
     emulators: ['auth', 'firestore', 'functions', 'storage'],
     deterministicSeed: true,
     clientAccess: 'deny-by-default',
+    directProgressWrites: 'denied',
   }),
 );

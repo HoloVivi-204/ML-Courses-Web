@@ -51,6 +51,57 @@ function createLearningApiClient() {
       },
       nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     }),
+    getProgress: vi.fn().mockResolvedValue({
+      algorithmUnlocks: [],
+      contentAccess: [
+        {
+          contentType: 'module',
+          entityId: 'dl-m01-neuron-perceptron',
+        },
+        {
+          contentType: 'post',
+          entityId: 'dl-p01-neuron-perceptron',
+        },
+      ],
+      demos: [
+        {
+          completed: false,
+          demoId: 'demo-perceptron-and-gate',
+        },
+      ],
+      enrollment: {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 0,
+        status: 'in-progress',
+      },
+      modules: [
+        {
+          completedStepCount: 0,
+          moduleId: 'dl-m01-neuron-perceptron',
+          progressPercent: 0,
+          requiredStepCount: 3,
+          status: 'in-progress',
+        },
+      ],
+      posts: [
+        {
+          bestScore: 0,
+          completed: false,
+          postId: 'dl-p01-neuron-perceptron',
+          quizId: 'quiz-post-dl-p01',
+          quizPassed: false,
+        },
+      ],
+      quizzes: [
+        {
+          attemptCount: 0,
+          bestScore: 0,
+          passed: false,
+          quizId: 'quiz-post-dl-p01',
+          quizKind: 'post',
+        },
+      ],
+    }),
     submitQuizAttempt: vi.fn().mockResolvedValue({
       bestScore: 100,
       feedback: [],

@@ -106,6 +106,10 @@ const resources = {
       'learning.enrollment.ready': 'Enrollment ready. Your first module is open.',
       'learning.enrollment.failed':
         'We could not confirm enrollment. Refresh or try again after signing in.',
+      'learning.progress.label': 'Verified learning progress',
+      'learning.progress.verified': 'Verified progress: {{percent}}%',
+      'learning.progress.moduleSteps': 'Module complete: {{completed}}/{{required}} steps',
+      'learning.progress.algorithmUnlocked': '{{algorithm}} unlocked',
       'learning.notFound.title': 'Learning path not found',
       'learning.notFound.body': 'This course does not have an active learning sequence yet.',
       'learning.notFound.back': 'Back to course catalog',
@@ -247,6 +251,10 @@ const resources = {
       'learning.enrollment.ready': 'Enrollment đã sẵn sàng. Module đầu tiên đã mở.',
       'learning.enrollment.failed':
         'Chưa thể xác nhận enrollment. Hãy tải lại hoặc thử lại sau khi đăng nhập.',
+      'learning.progress.label': 'Tiến độ học đã xác minh',
+      'learning.progress.verified': 'Tiến độ đã xác minh: {{percent}}%',
+      'learning.progress.moduleSteps': 'Module hoàn thành: {{completed}}/{{required}} bước',
+      'learning.progress.algorithmUnlocked': '{{algorithm}} đã mở',
       'learning.notFound.title': 'Không tìm thấy lộ trình học',
       'learning.notFound.body': 'Khóa học này chưa có chuỗi học đang hoạt động.',
       'learning.notFound.back': 'Về danh sách khóa học',

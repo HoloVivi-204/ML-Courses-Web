@@ -38,11 +38,56 @@ export interface CreateQuizAttemptInput {
   uid: string;
 }
 
+export interface GetProgressInput {
+  uid: string;
+}
+
 export interface SubmitQuizAttemptInput {
   answers: readonly QuizAnswer[];
   attemptId: string;
   idempotencyKey: string;
   uid: string;
+}
+
+export interface LearningProgressSnapshot {
+  algorithmUnlocks: ReadonlyArray<{
+    algorithmId: string;
+    moduleId: string;
+  }>;
+  contentAccess: ReadonlyArray<{
+    contentType: 'demo' | 'module' | 'post';
+    entityId: string;
+  }>;
+  demos: ReadonlyArray<{
+    completed: boolean;
+    demoId: string;
+  }>;
+  enrollment: {
+    courseId: string;
+    progressPercent: number;
+    status: 'completed' | 'in-progress' | 'not-enrolled';
+  };
+  modules: ReadonlyArray<{
+    completedStepCount: number;
+    moduleId: string;
+    progressPercent: number;
+    requiredStepCount: number;
+    status: 'completed' | 'in-progress' | 'locked';
+  }>;
+  posts: ReadonlyArray<{
+    bestScore: number;
+    completed: boolean;
+    postId: string;
+    quizId: string;
+    quizPassed: boolean;
+  }>;
+  quizzes: ReadonlyArray<{
+    attemptCount: number;
+    bestScore: number;
+    passed: boolean;
+    quizId: string;
+    quizKind: 'module' | 'post';
+  }>;
 }
 
 export interface LearningRepository {
@@ -62,6 +107,10 @@ export interface LearningRepository {
     data: unknown;
     statusCode: 200 | 201;
   }>;
+  getProgress(input: GetProgressInput): Promise<{
+    data: LearningProgressSnapshot;
+    statusCode: 200;
+  }>;
   submitQuizAttempt(input: SubmitQuizAttemptInput): Promise<{
     data: unknown;
     statusCode: 200;
@@ -74,6 +123,24 @@ interface EnrollmentSeed {
   firstModuleId: string;
   firstPostId: string;
   nextPath: string;
+}
+
+interface ModuleCompletionSeed {
+  courseId: string;
+  moduleId: string;
+  moduleRevisionId: string;
+  moduleQuizId: string;
+  nextModuleId: string | null;
+  nextPostId: string | null;
+  requiredModuleCount: number;
+  requiredPostIds: readonly string[];
+  unlockAlgorithmIds: readonly string[];
+}
+
+interface DemoAccessSeed {
+  demoId: string;
+  moduleId: string;
+  postId: string;
 }
 
 interface LearnerProfilePayload {
@@ -153,6 +220,26 @@ const releaseOneEnrollmentSeeds: Readonly<Record<string, EnrollmentSeed>> = {
     nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
   },
 };
+const releaseOneModuleCompletionSeeds: readonly ModuleCompletionSeed[] = [
+  {
+    courseId: 'course-deep-learning-basic',
+    moduleId: 'dl-m01-neuron-perceptron',
+    moduleRevisionId: 'dl-m01-neuron-perceptron-rev-r1',
+    moduleQuizId: 'quiz-module-dl-m01',
+    nextModuleId: 'dl-m02-mlp',
+    nextPostId: 'dl-p02-mlp-forward-activation',
+    requiredModuleCount: 3,
+    requiredPostIds: ['dl-p01-neuron-perceptron'],
+    unlockAlgorithmIds: ['perceptron'],
+  },
+];
+const releaseOneDemoAccessSeeds: readonly DemoAccessSeed[] = [
+  {
+    demoId: 'demo-perceptron-and-gate',
+    moduleId: 'dl-m01-neuron-perceptron',
+    postId: 'dl-p01-neuron-perceptron',
+  },
+];
 
 function getEnrollmentSeed(courseId: string): EnrollmentSeed {
   const seed = releaseOneEnrollmentSeeds[courseId];
@@ -162,6 +249,22 @@ function getEnrollmentSeed(courseId: string): EnrollmentSeed {
   }
 
   return seed;
+}
+
+function getModuleCompletionSeedByModuleId(moduleId: string): ModuleCompletionSeed | null {
+  return releaseOneModuleCompletionSeeds.find((seed) => seed.moduleId === moduleId) ?? null;
+}
+
+function getModuleCompletionSeedByQuizId(quizId: string): ModuleCompletionSeed | null {
+  return releaseOneModuleCompletionSeeds.find((seed) => seed.moduleQuizId === quizId) ?? null;
+}
+
+function getDemoAccessSeedByPostId(postId: string): DemoAccessSeed | null {
+  return releaseOneDemoAccessSeeds.find((seed) => seed.postId === postId) ?? null;
+}
+
+function getDemoAccessSeedByDemoId(demoId: string): DemoAccessSeed | null {
+  return releaseOneDemoAccessSeeds.find((seed) => seed.demoId === demoId) ?? null;
 }
 
 function normalizeDisplayName(displayName: string): string {
@@ -349,6 +452,128 @@ function createQuizSubmissionResponseData(input: {
   };
 }
 
+function getBooleanField(data: FirebaseFirestore.DocumentData | undefined, fieldName: string) {
+  return data?.[fieldName] === true;
+}
+
+function getNumberField(data: FirebaseFirestore.DocumentData | undefined, fieldName: string) {
+  const value = data?.[fieldName];
+
+  return typeof value === 'number' ? value : 0;
+}
+
+function getStatusField(data: FirebaseFirestore.DocumentData | undefined) {
+  const status = data?.status;
+
+  return status === 'completed' || status === 'in-progress' ? status : null;
+}
+
+function getRequiredPostCompletionIdsForModule(moduleId: string): readonly string[] {
+  return getModuleCompletionSeedByModuleId(moduleId)?.requiredPostIds ?? [];
+}
+
+function createDeepLearningProgressSnapshot(input: {
+  algorithmUnlock: FirebaseFirestore.DocumentData | undefined;
+  contentAccess: ReadonlyArray<FirebaseFirestore.DocumentData | undefined>;
+  demoCompletion: FirebaseFirestore.DocumentData | undefined;
+  enrollment: FirebaseFirestore.DocumentData | undefined;
+  moduleCompletion: FirebaseFirestore.DocumentData | undefined;
+  moduleQuizProgress: FirebaseFirestore.DocumentData | undefined;
+  postCompletion: FirebaseFirestore.DocumentData | undefined;
+  postQuizProgress: FirebaseFirestore.DocumentData | undefined;
+}): LearningProgressSnapshot {
+  const postQuizPassed = getBooleanField(input.postQuizProgress, 'passed');
+  const moduleQuizPassed = getBooleanField(input.moduleQuizProgress, 'passed');
+  const postCompleted = input.postCompletion !== undefined || postQuizPassed;
+  const demoCompleted = input.demoCompletion !== undefined;
+  const moduleCompleted =
+    input.moduleCompletion !== undefined || (postCompleted && demoCompleted && moduleQuizPassed);
+  const completedStepCount = [postCompleted, demoCompleted, moduleQuizPassed].filter(
+    Boolean,
+  ).length;
+  const moduleProgressPercent = Math.round((completedStepCount / 3) * 100);
+  const computedEnrollmentProgressPercent = moduleCompleted ? 33 : 0;
+  const storedEnrollmentStatus = getStatusField(input.enrollment);
+  const storedEnrollmentProgressPercent = getNumberField(input.enrollment, 'progressPercent');
+  const enrollmentProgressPercent = Math.max(
+    storedEnrollmentProgressPercent,
+    computedEnrollmentProgressPercent,
+  );
+
+  return {
+    algorithmUnlocks: input.algorithmUnlock
+      ? [
+          {
+            algorithmId:
+              typeof input.algorithmUnlock.algorithmId === 'string'
+                ? input.algorithmUnlock.algorithmId
+                : 'perceptron',
+            moduleId:
+              typeof input.algorithmUnlock.moduleId === 'string'
+                ? input.algorithmUnlock.moduleId
+                : 'dl-m01-neuron-perceptron',
+          },
+        ]
+      : [],
+    contentAccess: input.contentAccess
+      .filter((data): data is FirebaseFirestore.DocumentData => data !== undefined)
+      .map((data) => ({
+        contentType:
+          data.contentType === 'demo' || data.contentType === 'module' ? data.contentType : 'post',
+        entityId: typeof data.entityId === 'string' ? data.entityId : '',
+      }))
+      .filter((item) => item.entityId.length > 0),
+    demos: [
+      {
+        demoId: 'demo-perceptron-and-gate',
+        completed: demoCompleted,
+      },
+    ],
+    enrollment: {
+      courseId: 'course-deep-learning-basic',
+      progressPercent: enrollmentProgressPercent,
+      status:
+        enrollmentProgressPercent >= 100
+          ? 'completed'
+          : (storedEnrollmentStatus ?? (input.enrollment ? 'in-progress' : 'not-enrolled')),
+    },
+    modules: [
+      {
+        moduleId: 'dl-m01-neuron-perceptron',
+        completedStepCount,
+        progressPercent: moduleCompleted ? 100 : moduleProgressPercent,
+        requiredStepCount: 3,
+        status: moduleCompleted ? 'completed' : input.enrollment ? 'in-progress' : 'locked',
+      },
+    ],
+    posts: [
+      {
+        postId: 'dl-p01-neuron-perceptron',
+        quizId: 'quiz-post-dl-p01',
+        completed: postCompleted,
+        quizPassed: postQuizPassed,
+        bestScore: getNumberField(input.postQuizProgress, 'bestScore'),
+      },
+    ],
+    quizzes: [
+      {
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post',
+        attemptCount: getNumberField(input.postQuizProgress, 'attemptCount'),
+        bestScore: getNumberField(input.postQuizProgress, 'bestScore'),
+        passed: postQuizPassed,
+      },
+      {
+        quizId: 'quiz-module-dl-m01',
+        quizKind: 'module',
+        attemptCount: getNumberField(input.moduleQuizProgress, 'attemptCount'),
+        bestScore: getNumberField(input.moduleQuizProgress, 'bestScore'),
+        passed: moduleQuizPassed,
+      },
+    ],
+  };
+}
+
 export function createFirestoreLearningRepository(firestore: Firestore): LearningRepository {
   return {
     async bootstrapLearner(input) {
@@ -387,20 +612,32 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
       const requestHash = createDemoCompletionRequestHash(input);
 
       return firestore.runTransaction(async (transaction) => {
-        const accessRef = firestore.doc(
-          `users/${input.uid}/contentAccess/module_${input.moduleId}`,
-        );
+        const demoAccessSeed = getDemoAccessSeedByDemoId(input.demoId);
+        const accessRef = firestore.doc(`users/${input.uid}/contentAccess/demo_${input.demoId}`);
         const completionRef = firestore.doc(`users/${input.uid}/demoCompletions/${input.demoId}`);
         const idempotencyRef = firestore.doc(
           `users/${input.uid}/idempotencyKeys/${input.idempotencyKey}`,
         );
-        const [accessSnapshot, idempotencySnapshot] = await Promise.all([
-          transaction.get(accessRef),
-          transaction.get(idempotencyRef),
-        ]);
+        const requiredPostCompletionRefs = demoAccessSeed
+          ? [firestore.doc(`users/${input.uid}/postCompletions/${demoAccessSeed.postId}`)]
+          : [];
+        const [accessSnapshot, idempotencySnapshot, ...requiredPostCompletionSnapshots] =
+          await Promise.all([
+            transaction.get(accessRef),
+            transaction.get(idempotencyRef),
+            ...requiredPostCompletionRefs.map((reference) => transaction.get(reference)),
+          ]);
 
         if (!accessSnapshot.exists) {
-          throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Demo access is required.');
+          throw new ApiError(403, 'DEMO_ACCESS_REQUIRED', 'Demo access is required.');
+        }
+
+        if (requiredPostCompletionSnapshots.some((snapshot) => !snapshot.exists)) {
+          throw new ApiError(
+            403,
+            'POST_COMPLETION_REQUIRED',
+            'Post completion is required before this demo.',
+          );
         }
 
         if (idempotencySnapshot.exists) {
@@ -463,14 +700,34 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         const demoCompletionRef = manifest.demoId
           ? firestore.doc(`users/${input.uid}/demoCompletions/${manifest.demoId}`)
           : null;
-        const [accessSnapshot, progressSnapshot, demoCompletionSnapshot] = await Promise.all([
+        const requiredPostCompletionRefs =
+          manifest.quizKind === 'module'
+            ? getRequiredPostCompletionIdsForModule(manifest.moduleId).map((postId) =>
+                firestore.doc(`users/${input.uid}/postCompletions/${postId}`),
+              )
+            : [];
+        const [
+          accessSnapshot,
+          progressSnapshot,
+          demoCompletionSnapshot,
+          ...requiredPostCompletionSnapshots
+        ] = await Promise.all([
           transaction.get(accessRef),
           transaction.get(progressRef),
           demoCompletionRef ? transaction.get(demoCompletionRef) : Promise.resolve(null),
+          ...requiredPostCompletionRefs.map((reference) => transaction.get(reference)),
         ]);
 
         if (!accessSnapshot.exists) {
           throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Quiz access is required.');
+        }
+
+        if (requiredPostCompletionSnapshots.some((snapshot) => !snapshot.exists)) {
+          throw new ApiError(
+            403,
+            'POST_COMPLETION_REQUIRED',
+            'Post completion is required before this quiz.',
+          );
         }
 
         if (demoCompletionRef && !demoCompletionSnapshot?.exists) {
@@ -630,6 +887,55 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         return { statusCode, data: responseData };
       });
     },
+    async getProgress(input) {
+      const [
+        enrollmentSnapshot,
+        moduleAccessSnapshot,
+        postAccessSnapshot,
+        demoAccessSnapshot,
+        nextModuleAccessSnapshot,
+        nextPostAccessSnapshot,
+        postCompletionSnapshot,
+        demoCompletionSnapshot,
+        moduleCompletionSnapshot,
+        postQuizProgressSnapshot,
+        moduleQuizProgressSnapshot,
+        algorithmUnlockSnapshot,
+      ] = await Promise.all([
+        firestore.doc(`users/${input.uid}/enrollments/course-deep-learning-basic`).get(),
+        firestore.doc(`users/${input.uid}/contentAccess/module_dl-m01-neuron-perceptron`).get(),
+        firestore.doc(`users/${input.uid}/contentAccess/post_dl-p01-neuron-perceptron`).get(),
+        firestore.doc(`users/${input.uid}/contentAccess/demo_demo-perceptron-and-gate`).get(),
+        firestore.doc(`users/${input.uid}/contentAccess/module_dl-m02-mlp`).get(),
+        firestore.doc(`users/${input.uid}/contentAccess/post_dl-p02-mlp-forward-activation`).get(),
+        firestore.doc(`users/${input.uid}/postCompletions/dl-p01-neuron-perceptron`).get(),
+        firestore.doc(`users/${input.uid}/demoCompletions/demo-perceptron-and-gate`).get(),
+        firestore.doc(`users/${input.uid}/moduleCompletions/dl-m01-neuron-perceptron`).get(),
+        firestore.doc(`users/${input.uid}/quizProgress/quiz-post-dl-p01`).get(),
+        firestore.doc(`users/${input.uid}/quizProgress/quiz-module-dl-m01`).get(),
+        firestore.doc(`users/${input.uid}/algorithmUnlocks/perceptron`).get(),
+      ]);
+
+      return {
+        statusCode: 200 as const,
+        data: createDeepLearningProgressSnapshot({
+          algorithmUnlock: algorithmUnlockSnapshot.data(),
+          contentAccess: [
+            moduleAccessSnapshot.data(),
+            postAccessSnapshot.data(),
+            demoAccessSnapshot.data(),
+            nextModuleAccessSnapshot.data(),
+            nextPostAccessSnapshot.data(),
+          ],
+          demoCompletion: demoCompletionSnapshot.data(),
+          enrollment: enrollmentSnapshot.data(),
+          moduleCompletion: moduleCompletionSnapshot.data(),
+          moduleQuizProgress: moduleQuizProgressSnapshot.data(),
+          postCompletion: postCompletionSnapshot.data(),
+          postQuizProgress: postQuizProgressSnapshot.data(),
+        }),
+      };
+    },
     async submitQuizAttempt(input) {
       const requestHash = createQuizSubmissionRequestHash(input);
 
@@ -686,8 +992,36 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           throw new ApiError(409, 'QUIZ_ATTEMPT_EXPIRED', 'Quiz attempt has expired.');
         }
 
+        const moduleSeed = getModuleCompletionSeedByQuizId(manifest.quizId);
         const progressRef = firestore.doc(`users/${input.uid}/quizProgress/${manifest.quizId}`);
-        const progressSnapshot = await transaction.get(progressRef);
+        const moduleCompletionRef = moduleSeed
+          ? firestore.doc(`users/${input.uid}/moduleCompletions/${moduleSeed.moduleId}`)
+          : null;
+        const enrollmentRef = moduleSeed
+          ? firestore.doc(`users/${input.uid}/enrollments/${moduleSeed.courseId}`)
+          : null;
+        const moduleDemoCompletionRef =
+          moduleSeed && manifest.demoId
+            ? firestore.doc(`users/${input.uid}/demoCompletions/${manifest.demoId}`)
+            : null;
+        const moduleRequiredPostCompletionRefs = moduleSeed
+          ? moduleSeed.requiredPostIds.map((postId) =>
+              firestore.doc(`users/${input.uid}/postCompletions/${postId}`),
+            )
+          : [];
+        const [
+          progressSnapshot,
+          enrollmentSnapshot,
+          moduleDemoCompletionSnapshot,
+          ...moduleRequiredPostCompletionSnapshots
+        ] = await Promise.all([
+          transaction.get(progressRef),
+          enrollmentRef ? transaction.get(enrollmentRef) : Promise.resolve(null),
+          moduleDemoCompletionRef
+            ? transaction.get(moduleDemoCompletionRef)
+            : Promise.resolve(null),
+          ...moduleRequiredPostCompletionRefs.map((reference) => transaction.get(reference)),
+        ]);
         const previousProgress = progressSnapshot.data();
         const grade = gradeQuizSubmission({
           answers: input.answers,
@@ -705,6 +1039,19 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           passed: grade.passed,
           score: grade.score,
         });
+
+        if (
+          grade.passed &&
+          moduleSeed &&
+          (moduleRequiredPostCompletionSnapshots.some((snapshot) => !snapshot.exists) ||
+            !moduleDemoCompletionSnapshot?.exists)
+        ) {
+          throw new ApiError(
+            403,
+            'MODULE_COMPLETION_PREREQUISITES_REQUIRED',
+            'Post and demo completion are required before completing this module.',
+          );
+        }
 
         transaction.set(
           attemptRef,
@@ -737,19 +1084,117 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         );
 
         if (grade.passed) {
+          if (moduleSeed && moduleCompletionRef && enrollmentRef) {
+            const completedModuleCount = 1;
+            const enrollmentProgressPercent = Math.round(
+              (completedModuleCount / moduleSeed.requiredModuleCount) * 100,
+            );
+
+            transaction.set(
+              moduleCompletionRef,
+              {
+                schemaVersion: 1,
+                courseId: moduleSeed.courseId,
+                moduleId: moduleSeed.moduleId,
+                moduleQuizId: moduleSeed.moduleQuizId,
+                moduleRevisionId: moduleSeed.moduleRevisionId,
+                status: 'completed',
+                completedAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+            transaction.set(
+              firestore.doc(`users/${input.uid}/moduleProgress/${moduleSeed.moduleId}`),
+              {
+                schemaVersion: 1,
+                courseId: moduleSeed.courseId,
+                moduleId: moduleSeed.moduleId,
+                completedStepCount: 3,
+                progressPercent: 100,
+                requiredStepCount: 3,
+                status: 'completed',
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+            transaction.set(
+              enrollmentRef,
+              {
+                schemaVersion: 1,
+                courseId: moduleSeed.courseId,
+                progressPercent: enrollmentProgressPercent,
+                status: enrollmentProgressPercent >= 100 ? 'completed' : 'in-progress',
+                ...(enrollmentProgressPercent >= 100 && enrollmentSnapshot?.exists
+                  ? { completedAt: FieldValue.serverTimestamp() }
+                  : {}),
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+
+            if (moduleSeed.nextModuleId) {
+              transaction.set(
+                firestore.doc(`users/${input.uid}/contentAccess/module_${moduleSeed.nextModuleId}`),
+                {
+                  schemaVersion: 1,
+                  contentType: 'module',
+                  entityId: moduleSeed.nextModuleId,
+                  grantedAt: FieldValue.serverTimestamp(),
+                  reason: 'module-completed',
+                  sourceProgressId: `moduleCompletions/${moduleSeed.moduleId}`,
+                },
+                { merge: true },
+              );
+            }
+
+            if (moduleSeed.nextPostId) {
+              transaction.set(
+                firestore.doc(`users/${input.uid}/contentAccess/post_${moduleSeed.nextPostId}`),
+                {
+                  schemaVersion: 1,
+                  contentType: 'post',
+                  entityId: moduleSeed.nextPostId,
+                  grantedAt: FieldValue.serverTimestamp(),
+                  reason: 'module-completed',
+                  sourceProgressId: `moduleCompletions/${moduleSeed.moduleId}`,
+                },
+                { merge: true },
+              );
+            }
+          }
+
           for (const unlocked of grade.newlyUnlocked) {
             if (unlocked.type === 'post') {
+              const demoAccessSeed = getDemoAccessSeedByPostId(unlocked.id);
+
               transaction.set(
                 firestore.doc(`users/${input.uid}/postCompletions/${unlocked.id}`),
                 {
                   schemaVersion: 1,
                   completedAt: FieldValue.serverTimestamp(),
+                  postId: unlocked.id,
                   quizId: manifest.quizId,
                   status: 'completed',
                   updatedAt: FieldValue.serverTimestamp(),
                 },
                 { merge: true },
               );
+
+              if (demoAccessSeed) {
+                transaction.set(
+                  firestore.doc(`users/${input.uid}/contentAccess/demo_${demoAccessSeed.demoId}`),
+                  {
+                    schemaVersion: 1,
+                    contentType: 'demo',
+                    entityId: demoAccessSeed.demoId,
+                    grantedAt: FieldValue.serverTimestamp(),
+                    reason: 'post-completed',
+                    sourceProgressId: `postCompletions/${unlocked.id}`,
+                  },
+                  { merge: true },
+                );
+              }
             }
 
             if (unlocked.type === 'algorithm') {
@@ -758,9 +1203,13 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
                 {
                   schemaVersion: 1,
                   algorithmId: unlocked.id,
+                  moduleId: moduleSeed?.moduleId ?? manifest.moduleId,
+                  moduleRevisionId: moduleSeed?.moduleRevisionId ?? `${manifest.moduleId}-rev-r1`,
                   grantedAt: FieldValue.serverTimestamp(),
                   quizId: manifest.quizId,
-                  reason: 'module-quiz-passed',
+                  reason: moduleSeed ? 'module-completed' : 'module-quiz-passed',
+                  sourceModuleId: moduleSeed?.moduleId ?? manifest.moduleId,
+                  unlockedAt: FieldValue.serverTimestamp(),
                 },
                 { merge: true },
               );

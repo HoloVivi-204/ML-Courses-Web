@@ -4,9 +4,14 @@ import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
-import { hasLearningModuleAccess, hasLearningPostAccess } from './learning-access-store';
+import {
+  hasLearningModuleAccess,
+  hasLearningPostAccess,
+  rememberLearningContentAccessGrants,
+} from './learning-access-store';
 import type {
   LearningApiClient,
+  LearningProgressSnapshot,
   QuizAnswer,
   QuizAnswerValue,
   QuizAttemptResult,
@@ -20,6 +25,7 @@ interface LearningQuizPageProps {
 }
 
 type QuizPageStatus = 'failed' | 'idle' | 'loading' | 'ready';
+type QuizProgressStatus = 'failed' | 'idle' | 'loading' | 'ready';
 type QuizSubmitStatus = 'failed' | 'idle' | 'submitting';
 
 function createIdempotencyKey(): string {
@@ -85,22 +91,75 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     {},
   );
   const [pageStatus, setPageStatus] = useState<QuizPageStatus>('idle');
+  const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
+  const [progressStatus, setProgressStatus] = useState<QuizProgressStatus>('idle');
   const [submitStatus, setSubmitStatus] = useState<QuizSubmitStatus>('idle');
   const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
   const [attemptRequestIndex, setAttemptRequestIndex] = useState(0);
+  const progressLoadStarted = useRef(false);
   const attemptStarted = useRef(false);
   const idempotencyKey = useRef(createIdempotencyKey());
-  const hasAccess =
+  const hasStoredAccess =
     status === 'authenticated' &&
     quizRoute !== undefined &&
     quizRoute.courseId === courseId &&
     hasQuizAccess(quizRoute, user?.uid);
+  const hasAccess =
+    hasStoredAccess &&
+    progressStatus === 'ready' &&
+    progressSnapshot !== null &&
+    hasVerifiedQuizProgress(quizRoute, progressSnapshot);
   const answers = useMemo(
     () => toAnswerList(attempt, answersByQuestionId),
     [answersByQuestionId, attempt],
   );
   const isReadyToSubmit = attempt ? answers.length === attempt.questions.length : false;
   const isAttemptClosed = submissionResult !== null;
+
+  useEffect(() => {
+    if (!quizRoute || !hasStoredAccess || progressLoadStarted.current) {
+      return;
+    }
+
+    let isActive = true;
+    const activeQuizRoute = quizRoute;
+    progressLoadStarted.current = true;
+
+    async function loadProgress() {
+      setProgressStatus('loading');
+
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken || !user) {
+          throw new Error('Authenticated user is missing an ID token or user identity.');
+        }
+
+        const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
+
+        rememberLearningContentAccessGrants({
+          contentAccess: nextProgressSnapshot.contentAccess,
+          courseId: activeQuizRoute.courseId,
+          uid: user.uid,
+        });
+
+        if (isActive) {
+          setProgressSnapshot(nextProgressSnapshot);
+          setProgressStatus('ready');
+        }
+      } catch {
+        if (isActive) {
+          setProgressStatus('failed');
+        }
+      }
+    }
+
+    void loadProgress();
+
+    return () => {
+      isActive = false;
+    };
+  }, [getIdToken, hasStoredAccess, learningApiClient, quizRoute, user]);
 
   useEffect(() => {
     if (!quizRoute || !hasAccess || attemptStarted.current) {
@@ -147,7 +206,19 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     };
   }, [attemptRequestIndex, getIdToken, hasAccess, learningApiClient, quizRoute]);
 
-  if (!quizRoute || !hasAccess) {
+  if (!quizRoute || !hasStoredAccess) {
+    return <QuizNotFoundPage locale={locale} />;
+  }
+
+  if (progressStatus === 'loading' || progressStatus === 'idle') {
+    return (
+      <main className="route-loading page-shell" role="status">
+        {text.loading}
+      </main>
+    );
+  }
+
+  if (progressStatus === 'failed' || !hasAccess) {
     return <QuizNotFoundPage locale={locale} />;
   }
 
@@ -174,11 +245,12 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   async function submitQuiz(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!isReadyToSubmit || !attempt) {
+    if (!isReadyToSubmit || !attempt || !quizRoute) {
       return;
     }
 
     const activeAttempt = attempt;
+    const activeQuizRoute = quizRoute;
     setSubmitStatus('submitting');
 
     try {
@@ -196,6 +268,22 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
       });
 
       setSubmissionResult(result);
+
+      if (result.passed && user) {
+        try {
+          const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
+
+          rememberLearningContentAccessGrants({
+            contentAccess: nextProgressSnapshot.contentAccess,
+            courseId: activeQuizRoute.courseId,
+            uid: user.uid,
+          });
+          setProgressSnapshot(nextProgressSnapshot);
+        } catch {
+          // Quiz submission is already committed; progress refresh can recover on next route load.
+        }
+      }
+
       setSubmitStatus('idle');
     } catch {
       setSubmitStatus('failed');
@@ -312,6 +400,30 @@ function hasQuizAccess(quizRoute: PublicQuizRoute, uid: string | undefined): boo
   }
 
   return hasLearningModuleAccess(quizRoute.courseId, quizRoute.moduleId, uid);
+}
+
+function hasVerifiedQuizProgress(
+  quizRoute: PublicQuizRoute | undefined,
+  progressSnapshot: LearningProgressSnapshot,
+): boolean {
+  if (!quizRoute) {
+    return false;
+  }
+
+  if (quizRoute.quizKind === 'post' && quizRoute.postId) {
+    return progressSnapshot.contentAccess.some(
+      (item) => item.contentType === 'post' && item.entityId === quizRoute.postId,
+    );
+  }
+
+  const requiredPostCompleted = progressSnapshot.posts.some(
+    (post) => post.postId === 'dl-p01-neuron-perceptron' && post.completed,
+  );
+  const requiredDemoCompleted = progressSnapshot.demos.some(
+    (demo) => demo.demoId === 'demo-perceptron-and-gate' && demo.completed,
+  );
+
+  return requiredPostCompleted && requiredDemoCompleted;
 }
 
 function toAnswerList(

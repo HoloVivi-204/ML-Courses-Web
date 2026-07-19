@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   hasLearningModuleAccess,
+  hasLearningDemoAccess,
   hasLearningPostAccess,
   rememberLearningAccessGrant,
+  rememberLearningContentAccessGrants,
 } from './learning-access-store';
 
 describe('learning access store', () => {
@@ -55,6 +57,26 @@ describe('learning access store', () => {
         'dl-m01-neuron-perceptron',
         'learner-01',
       ),
+    ).toBe(false);
+  });
+
+  it('remembers backend progress content access for demo routes', () => {
+    rememberLearningContentAccessGrants({
+      courseId: 'course-deep-learning-basic',
+      uid: 'learner-01',
+      contentAccess: [
+        {
+          contentType: 'demo',
+          entityId: 'demo-perceptron-and-gate',
+        },
+      ],
+    });
+
+    expect(
+      hasLearningDemoAccess('course-deep-learning-basic', 'demo-perceptron-and-gate', 'learner-01'),
+    ).toBe(true);
+    expect(
+      hasLearningDemoAccess('course-deep-learning-basic', 'demo-perceptron-and-gate', 'learner-02'),
     ).toBe(false);
   });
 });

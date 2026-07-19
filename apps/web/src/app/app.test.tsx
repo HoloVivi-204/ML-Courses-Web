@@ -20,7 +20,7 @@ function createAuthenticatedGateway(): AuthGateway {
   };
 }
 
-function createLearningApiClient(): LearningApiClient {
+function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): LearningApiClient {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(undefined),
     completeDemo: vi.fn().mockResolvedValue({
@@ -137,6 +137,64 @@ function createLearningApiClient(): LearningApiClient {
       },
       nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     }),
+    getProgress: vi.fn().mockResolvedValue({
+      algorithmUnlocks: [],
+      contentAccess: [
+        {
+          contentType: 'module',
+          entityId: 'dl-m01-neuron-perceptron',
+        },
+        {
+          contentType: 'post',
+          entityId: 'dl-p01-neuron-perceptron',
+        },
+      ],
+      demos: [
+        {
+          completed: false,
+          demoId: 'demo-perceptron-and-gate',
+        },
+      ],
+      enrollment: {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 0,
+        status: 'in-progress',
+      },
+      modules: [
+        {
+          completedStepCount: 0,
+          moduleId: 'dl-m01-neuron-perceptron',
+          progressPercent: 0,
+          requiredStepCount: 3,
+          status: 'in-progress',
+        },
+      ],
+      posts: [
+        {
+          bestScore: 0,
+          completed: false,
+          postId: 'dl-p01-neuron-perceptron',
+          quizId: 'quiz-post-dl-p01',
+          quizPassed: false,
+        },
+      ],
+      quizzes: [
+        {
+          attemptCount: 0,
+          bestScore: 0,
+          passed: false,
+          quizId: 'quiz-post-dl-p01',
+          quizKind: 'post',
+        },
+        {
+          attemptCount: 0,
+          bestScore: 0,
+          passed: false,
+          quizId: 'quiz-module-dl-m01',
+          quizKind: 'module',
+        },
+      ],
+    }),
     submitQuizAttempt: vi.fn().mockResolvedValue({
       bestScore: 100,
       feedback: [
@@ -156,6 +214,7 @@ function createLearningApiClient(): LearningApiClient {
       passed: true,
       score: 100,
     }),
+    ...overrides,
   };
 }
 
@@ -372,6 +431,88 @@ describe('public learning journey', () => {
     expect(screen.getByText('FULL LESSON')).toBeVisible();
   });
 
+  it('shows backend-verified progress and unlocked algorithms on the learning path', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        algorithmUnlocks: [
+          {
+            algorithmId: 'perceptron',
+            moduleId: 'dl-m01-neuron-perceptron',
+          },
+        ],
+        contentAccess: [
+          {
+            contentType: 'module',
+            entityId: 'dl-m01-neuron-perceptron',
+          },
+          {
+            contentType: 'post',
+            entityId: 'dl-p01-neuron-perceptron',
+          },
+          {
+            contentType: 'demo',
+            entityId: 'demo-perceptron-and-gate',
+          },
+        ],
+        demos: [
+          {
+            completed: true,
+            demoId: 'demo-perceptron-and-gate',
+          },
+        ],
+        enrollment: {
+          courseId: 'course-deep-learning-basic',
+          progressPercent: 33,
+          status: 'in-progress',
+        },
+        modules: [
+          {
+            completedStepCount: 3,
+            moduleId: 'dl-m01-neuron-perceptron',
+            progressPercent: 100,
+            requiredStepCount: 3,
+            status: 'completed',
+          },
+        ],
+        posts: [
+          {
+            bestScore: 100,
+            completed: true,
+            postId: 'dl-p01-neuron-perceptron',
+            quizId: 'quiz-post-dl-p01',
+            quizPassed: true,
+          },
+        ],
+        quizzes: [
+          {
+            attemptCount: 1,
+            bestScore: 100,
+            passed: true,
+            quizId: 'quiz-post-dl-p01',
+            quizKind: 'post',
+          },
+          {
+            attemptCount: 1,
+            bestScore: 100,
+            passed: true,
+            quizId: 'quiz-module-dl-m01',
+            quizKind: 'module',
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Tiến độ đã xác minh: 33%')).toBeVisible();
+    expect(screen.getByText('Module hoàn thành: 3/3 bước')).toBeVisible();
+    expect(screen.getByText('Perceptron đã mở')).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+  });
+
   it('keeps full Perceptron/XOR content closed without a content access grant', async () => {
     window.history.pushState(
       {},
@@ -419,10 +560,100 @@ describe('public learning journey', () => {
     expect(learningApiClient.completeDemo).not.toHaveBeenCalled();
   });
 
-  it('lets an enrolled learner complete the fixed AND gate demo after required steps', async () => {
+  it('keeps the fixed AND gate demo closed until backend progress grants demo access', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     const user = userEvent.setup();
     const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: /Mở demo AND gate/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Demo chưa khả dụng' })).toBeVisible();
+    expect(learningApiClient.completeDemo).not.toHaveBeenCalled();
+  });
+
+  it('lets an enrolled learner complete the fixed AND gate demo after required steps', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        algorithmUnlocks: [],
+        contentAccess: [
+          {
+            contentType: 'module',
+            entityId: 'dl-m01-neuron-perceptron',
+          },
+          {
+            contentType: 'post',
+            entityId: 'dl-p01-neuron-perceptron',
+          },
+          {
+            contentType: 'demo',
+            entityId: 'demo-perceptron-and-gate',
+          },
+        ],
+        demos: [
+          {
+            completed: false,
+            demoId: 'demo-perceptron-and-gate',
+          },
+        ],
+        enrollment: {
+          courseId: 'course-deep-learning-basic',
+          progressPercent: 33,
+          status: 'in-progress',
+        },
+        modules: [
+          {
+            completedStepCount: 1,
+            moduleId: 'dl-m01-neuron-perceptron',
+            progressPercent: 33,
+            requiredStepCount: 3,
+            status: 'in-progress',
+          },
+        ],
+        posts: [
+          {
+            bestScore: 100,
+            completed: true,
+            postId: 'dl-p01-neuron-perceptron',
+            quizId: 'quiz-post-dl-p01',
+            quizPassed: true,
+          },
+        ],
+        quizzes: [
+          {
+            attemptCount: 1,
+            bestScore: 100,
+            passed: true,
+            quizId: 'quiz-post-dl-p01',
+            quizKind: 'post',
+          },
+          {
+            attemptCount: 0,
+            bestScore: 0,
+            passed: false,
+            quizId: 'quiz-module-dl-m01',
+            quizKind: 'module',
+          },
+        ],
+      }),
+    });
 
     render(
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
@@ -467,6 +698,32 @@ describe('public learning journey', () => {
 
   it('keeps the post quiz closed without a post access grant', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Quiz chưa khả dụng' })).toBeVisible();
+    expect(learningApiClient.createQuizAttempt).not.toHaveBeenCalled();
+  });
+
+  it('keeps the module quiz closed until backend progress verifies post and demo completion', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/quizzes/quiz-module-dl-m01',
+    );
+    sessionStorage.setItem(
+      'ml-path-learning-access-grants',
+      JSON.stringify([
+        {
+          courseId: 'course-deep-learning-basic',
+          moduleId: 'dl-m01-neuron-perceptron',
+          uid: 'learner-01',
+        },
+      ]),
+    );
     const learningApiClient = createLearningApiClient();
 
     render(

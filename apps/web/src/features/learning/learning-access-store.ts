@@ -1,8 +1,14 @@
 interface LearningAccessGrant {
   courseId: string;
-  moduleId: string;
-  postId: string;
+  demoId?: string;
+  moduleId?: string;
+  postId?: string;
   uid: string;
+}
+
+interface LearningContentAccessItem {
+  contentType: 'demo' | 'module' | 'post';
+  entityId: string;
 }
 
 const STORAGE_KEY = 'ml-path-learning-access-grants';
@@ -14,6 +20,8 @@ export function rememberLearningAccessGrant(grant: LearningAccessGrant) {
       ...grants.filter(
         (item) =>
           item.courseId !== grant.courseId ||
+          item.demoId !== grant.demoId ||
+          item.moduleId !== grant.moduleId ||
           item.postId !== grant.postId ||
           item.uid !== grant.uid,
       ),
@@ -23,6 +31,22 @@ export function rememberLearningAccessGrant(grant: LearningAccessGrant) {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextGrants));
   } catch {
     return;
+  }
+}
+
+export function rememberLearningContentAccessGrants(input: {
+  contentAccess: readonly LearningContentAccessItem[];
+  courseId: string;
+  uid: string;
+}) {
+  for (const item of input.contentAccess) {
+    rememberLearningAccessGrant({
+      courseId: input.courseId,
+      uid: input.uid,
+      ...(item.contentType === 'demo' ? { demoId: item.entityId } : {}),
+      ...(item.contentType === 'module' ? { moduleId: item.entityId } : {}),
+      ...(item.contentType === 'post' ? { postId: item.entityId } : {}),
+    });
   }
 }
 
@@ -54,6 +78,20 @@ export function hasLearningModuleAccess(
   );
 }
 
+export function hasLearningDemoAccess(
+  courseId: string | undefined,
+  demoId: string | undefined,
+  uid: string | undefined,
+) {
+  if (!courseId || !demoId || !uid) {
+    return false;
+  }
+
+  return readLearningAccessGrants().some(
+    (grant) => grant.courseId === courseId && grant.demoId === demoId && grant.uid === uid,
+  );
+}
+
 function readLearningAccessGrants(): LearningAccessGrant[] {
   try {
     const rawValue = sessionStorage.getItem(STORAGE_KEY);
@@ -79,12 +117,12 @@ function isLearningAccessGrant(value: unknown): value is LearningAccessGrant {
     typeof value === 'object' &&
     value !== null &&
     'courseId' in value &&
-    'moduleId' in value &&
-    'postId' in value &&
     'uid' in value &&
     typeof value.courseId === 'string' &&
-    typeof value.moduleId === 'string' &&
-    typeof value.postId === 'string' &&
-    typeof value.uid === 'string'
+    typeof value.uid === 'string' &&
+    ('moduleId' in value || 'postId' in value || 'demoId' in value) &&
+    (!('moduleId' in value) || typeof value.moduleId === 'string') &&
+    (!('postId' in value) || typeof value.postId === 'string') &&
+    (!('demoId' in value) || typeof value.demoId === 'string')
   );
 }

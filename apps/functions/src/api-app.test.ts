@@ -18,6 +18,9 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     enrollLearner: async () => {
       throw new Error('Enrollment is not part of this test.');
     },
+    getProgress: async () => {
+      throw new Error('Progress snapshot is not part of this test.');
+    },
     submitQuizAttempt: async () => {
       throw new Error('Quiz submission is not part of this test.');
     },
@@ -381,5 +384,74 @@ describe('API foundation', () => {
     expect(submissions).toEqual(
       new Set(['learner-01:attempt-quiz-post-dl-p01-01:38fd203c-e09f-40e4-a26c-50127c6b24ee']),
     );
+  });
+
+  it('returns the authenticated learner progress snapshot through the owner boundary', async () => {
+    const progressReads = new Set<string>();
+    const learningRepository = {
+      ...createLearningRepository({}),
+      getProgress: async (input: { uid: string }) => {
+        progressReads.add(input.uid);
+
+        return {
+          statusCode: 200 as const,
+          data: {
+            algorithmUnlocks: [
+              {
+                algorithmId: 'perceptron',
+                moduleId: 'dl-m01-neuron-perceptron',
+              },
+            ],
+            contentAccess: [
+              {
+                contentType: 'post',
+                entityId: 'dl-p01-neuron-perceptron',
+              },
+            ],
+            enrollment: {
+              courseId: 'course-deep-learning-basic',
+              progressPercent: 33,
+              status: 'in-progress',
+            },
+            modules: [
+              {
+                completedStepCount: 3,
+                moduleId: 'dl-m01-neuron-perceptron',
+                progressPercent: 100,
+                requiredStepCount: 3,
+                status: 'completed',
+              },
+            ],
+          },
+        };
+      },
+    } as LearningRepository & {
+      getProgress(input: { uid: string }): Promise<{ data: unknown; statusCode: 200 }>;
+    };
+    const app = createApiApp({
+      learningRepository,
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .get('/api/v1/users/me/progress')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+
+    expect(response.body.data.enrollment).toEqual({
+      courseId: 'course-deep-learning-basic',
+      progressPercent: 33,
+      status: 'in-progress',
+    });
+    expect(response.body.data.algorithmUnlocks).toEqual([
+      {
+        algorithmId: 'perceptron',
+        moduleId: 'dl-m01-neuron-perceptron',
+      },
+    ]);
+    expect(progressReads).toEqual(new Set(['learner-01']));
   });
 });

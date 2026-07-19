@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
 import { andGateDemo, getFixedDemo, type DemoStep } from './and-gate-demo-data';
-import { hasLearningModuleAccess } from './learning-access-store';
+import { hasLearningDemoAccess } from './learning-access-store';
 import type { DemoCompletionResult, LearningApiClient } from './learning-api';
 
 interface LearningDemoPageProps {
@@ -100,7 +100,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     status === 'authenticated' &&
     demo !== undefined &&
     demo.courseId === courseId &&
-    hasLearningModuleAccess(courseId, demo.moduleId, user?.uid);
+    hasLearningDemoAccess(courseId, demo.demoId, user?.uid);
   const currentStep = demo?.steps[stepIndex];
   const requiredStepIds = useMemo(() => new Set(demo?.requiredStepIds ?? []), [demo]);
   const requiredViewedCount = viewedStepIds.filter((stepId) => requiredStepIds.has(stepId)).length;

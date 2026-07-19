@@ -355,6 +355,19 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     },
   );
 
+  app.get('/api/v1/users/me/progress', requireAuth, async (_request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getLearningRepository().getProgress({
+        uid: authUser.uid,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.use((_request, response) => {
     sendError(response, 404, {
       code: 'NOT_FOUND',

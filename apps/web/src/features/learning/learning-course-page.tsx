@@ -5,8 +5,11 @@ import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
-import { rememberLearningAccessGrant } from './learning-access-store';
-import type { LearningApiClient } from './learning-api';
+import {
+  rememberLearningAccessGrant,
+  rememberLearningContentAccessGrants,
+} from './learning-access-store';
+import type { LearningApiClient, LearningProgressSnapshot } from './learning-api';
 
 interface LearningCoursePageProps {
   learningApiClient: LearningApiClient;
@@ -27,6 +30,7 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
   const firstModule = course?.modules?.[0];
   const idempotencyKey = useRef(createIdempotencyKey());
   const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus>('syncing');
+  const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
 
   useEffect(() => {
     if (!course) {
@@ -59,7 +63,16 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
           uid: user.uid,
         });
 
+        const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
+
+        rememberLearningContentAccessGrants({
+          contentAccess: nextProgressSnapshot.contentAccess,
+          courseId: selectedCourse.id,
+          uid: user.uid,
+        });
+
         if (isActive) {
+          setProgressSnapshot(nextProgressSnapshot);
           setEnrollmentStatus('ready');
         }
       } catch {
@@ -106,6 +119,8 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
           {t(`learning.enrollment.${enrollmentStatus}`)}
         </p>
 
+        {progressSnapshot ? <VerifiedProgressPanel progressSnapshot={progressSnapshot} /> : null}
+
         <div className="learning-open-module">
           <span className="module-state open">
             <Sparkles aria-hidden="true" size={14} />
@@ -121,4 +136,49 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
       </section>
     </main>
   );
+}
+
+function VerifiedProgressPanel({
+  progressSnapshot,
+}: {
+  progressSnapshot: LearningProgressSnapshot;
+}) {
+  const { t } = useTranslation();
+  const firstModule = progressSnapshot.modules[0];
+  const unlockedAlgorithms = progressSnapshot.algorithmUnlocks;
+
+  return (
+    <section className="learning-progress-panel" aria-label={t('learning.progress.label')}>
+      <p>
+        {t('learning.progress.verified', { percent: progressSnapshot.enrollment.progressPercent })}
+      </p>
+      {firstModule ? (
+        <p>
+          {t('learning.progress.moduleSteps', {
+            completed: firstModule.completedStepCount,
+            required: firstModule.requiredStepCount,
+          })}
+        </p>
+      ) : null}
+      {unlockedAlgorithms.length ? (
+        <ul>
+          {unlockedAlgorithms.map((unlock) => (
+            <li key={unlock.algorithmId}>
+              {t('learning.progress.algorithmUnlocked', {
+                algorithm: formatAlgorithmName(unlock.algorithmId),
+              })}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function formatAlgorithmName(algorithmId: string): string {
+  if (algorithmId === 'perceptron') {
+    return 'Perceptron';
+  }
+
+  return algorithmId;
 }

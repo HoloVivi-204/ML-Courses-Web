@@ -1349,6 +1349,47 @@ a {
   color: var(--teal);
 }
 
+.learning-progress-panel {
+  display: grid;
+  margin: 20px 0 24px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--teal) 35%, var(--line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--teal) 11%, transparent), transparent),
+    var(--surface);
+  color: var(--ink);
+  gap: 8px;
+}
+
+.learning-progress-panel p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.learning-progress-panel p:first-child {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.learning-progress-panel ul {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 8px;
+}
+
+.learning-progress-panel li {
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .module-content > p {
   max-width: 690px;
   margin: 15px 0 23px;
