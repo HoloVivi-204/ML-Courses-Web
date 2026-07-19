@@ -6,6 +6,8 @@ import { App } from './app';
 import type { AuthGateway } from '../features/auth/auth-context';
 import type { LearningApiClient } from '../features/learning/learning-api';
 
+const LAZY_ROUTE_TIMEOUT_MS = 5_000;
+
 function createAuthenticatedGateway(): AuthGateway {
   return {
     getIdToken: vi.fn().mockResolvedValue('local-id-token'),
@@ -92,6 +94,95 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       title: {
         en: 'Updated draft title',
         vi: 'Tiêu đề draft đã cập nhật',
+      },
+      validationStatus: 'not-run',
+    }),
+    validateAdminContentDraft: vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Updated attribution',
+          vi: 'Updated attribution VI',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Updated draft preview',
+        vi: 'Preview draft đã cập nhật',
+      },
+      revisionVersion: 2,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Updated draft title',
+        vi: 'Tiêu đề draft đã cập nhật',
+      },
+      validationStatus: 'valid',
+    }),
+    publishAdminContentRevision: vi.fn().mockResolvedValue({
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: null,
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      moduleId: 'dl-m01-neuron-perceptron',
+      previousPublishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      preview: {
+        en: 'Updated draft preview',
+        vi: 'Preview draft đã cập nhật',
+      },
+      publishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      sourceStatus: 'seeded',
+      status: 'published',
+      title: {
+        en: 'Updated draft title',
+        vi: 'Tiêu đề draft đã cập nhật',
+      },
+      validationStatus: 'valid',
+    }),
+    rollbackAdminContentRevision: vi.fn().mockResolvedValue({
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: null,
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      moduleId: 'dl-m01-neuron-perceptron',
+      previousPublishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      preview: {
+        en: 'Published learner copy',
+        vi: 'Published learner copy VI',
+      },
+      publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      sourceStatus: 'seeded',
+      status: 'published',
+      title: {
+        en: 'Published title',
+        vi: 'Published title VI',
+      },
+      validationStatus: 'not-run',
+    }),
+    unpublishAdminContentEntity: vi.fn().mockResolvedValue({
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: null,
+      entityId: 'course-deep-learning-basic',
+      entityType: 'course',
+      localeAvailability: ['en', 'vi'],
+      preview: {
+        en: 'Published course copy',
+        vi: 'Published course copy VI',
+      },
+      publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+      sourceStatus: 'seeded',
+      status: 'unpublished',
+      title: {
+        en: 'Deep Learning Basics',
+        vi: 'Học sâu cơ bản',
       },
       validationStatus: 'not-run',
     }),
@@ -592,7 +683,7 @@ describe('public learning journey', () => {
         {
           name: /một neuron đưa ra quyết định như thế nào/i,
         },
-        { timeout: 3_000 },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
     expect(window.location.pathname).toBe(
@@ -610,7 +701,11 @@ describe('public learning journey', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Neuron chưa kích hoạt: 0')).toBeVisible();
+    expect(
+      await screen.findByText('Neuron chưa kích hoạt: 0', undefined, {
+        timeout: LAZY_ROUTE_TIMEOUT_MS,
+      }),
+    ).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Đầu vào x1, hiện tại 0' }));
     await user.click(screen.getByRole('button', { name: 'Đầu vào x2, hiện tại 0' }));
@@ -628,7 +723,11 @@ describe('public learning journey', () => {
 
     render(<App />);
 
-    const contents = await screen.findByRole('navigation', { name: 'Mục lục bài học' });
+    const contents = await screen.findByRole(
+      'navigation',
+      { name: 'Mục lục bài học' },
+      { timeout: LAZY_ROUTE_TIMEOUT_MS },
+    );
     expect(contents).toBeVisible();
     expect(within(contents).getByRole('link', { name: 'Một neuron làm gì?' })).toHaveAttribute(
       'href',
@@ -648,10 +747,22 @@ describe('public learning journey', () => {
 
     render(<App />);
 
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: /một neuron đưa ra quyết định như thế nào/i },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+
     await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'How does a neuron make a decision?' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'How does a neuron make a decision?' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
     ).toBeVisible();
     expect(screen.getByRole('navigation', { name: 'Lesson contents' })).toBeVisible();
     expect(window.location.pathname).toBe(
@@ -665,7 +776,11 @@ describe('public learning journey', () => {
     render(<App />);
 
     expect(
-      await screen.findByRole('heading', { name: 'Không tìm thấy bài học thử' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'Không tìm thấy bài học thử' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
     ).toBeVisible();
     expect(screen.getByRole('link', { name: 'Về danh sách khóa học' })).toHaveAttribute(
       'href',
@@ -682,9 +797,13 @@ describe('public learning journey', () => {
 
     render(<App />);
 
-    const resource = await screen.findByRole('link', {
-      name: 'Neural networks: Nodes and hidden layers',
-    });
+    const resource = await screen.findByRole(
+      'link',
+      {
+        name: 'Neural networks: Nodes and hidden layers',
+      },
+      { timeout: LAZY_ROUTE_TIMEOUT_MS },
+    );
     expect(resource).toHaveAttribute('target', '_blank');
     expect(resource).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(/developers\.google\.com/i)).toBeVisible();
@@ -1056,6 +1175,145 @@ describe('public learning journey', () => {
     });
     expect(await screen.findAllByText('Edited draft preview copy')).toHaveLength(2);
     expect(screen.getByText('Published learner copy')).toBeVisible();
+  });
+
+  it('lets an authenticated admin validate and publish a draft from the content screen', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const listAdminContent = vi.fn().mockResolvedValue([
+      {
+        courseId: 'course-deep-learning-basic',
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        localeAvailability: ['en', 'vi'],
+        moduleId: 'dl-m01-neuron-perceptron',
+        preview: {
+          en: 'Published learner copy',
+          vi: 'Published learner copy VI',
+        },
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        sourceStatus: 'seeded',
+        status: 'published',
+        title: {
+          en: 'Published title',
+          vi: 'Published title VI',
+        },
+        validationStatus: 'not-run',
+      },
+    ]);
+    const createAdminContentDraft = vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Reviewed attribution',
+          vi: 'Reviewed attribution VI',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Draft preview ready for publish',
+        vi: 'Draft preview ready for publish VI',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Draft publish title',
+        vi: 'Draft publish title VI',
+      },
+      validationStatus: 'not-run',
+    });
+    const validateAdminContentDraft = vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Reviewed attribution',
+          vi: 'Reviewed attribution VI',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Draft preview ready for publish',
+        vi: 'Draft preview ready for publish VI',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Draft publish title',
+        vi: 'Draft publish title VI',
+      },
+      validationStatus: 'valid',
+    });
+    const publishAdminContentRevision = vi.fn().mockResolvedValue({
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: null,
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      moduleId: 'dl-m01-neuron-perceptron',
+      previousPublishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      preview: {
+        en: 'Draft preview ready for publish',
+        vi: 'Draft preview ready for publish VI',
+      },
+      publishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      sourceStatus: 'seeded',
+      status: 'published',
+      title: {
+        en: 'Draft publish title',
+        vi: 'Draft publish title VI',
+      },
+      validationStatus: 'valid',
+    });
+    const learningApiClient = {
+      ...createLearningApiClient(),
+      createAdminContentDraft,
+      listAdminContent,
+      publishAdminContentRevision,
+      validateAdminContentDraft,
+    };
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /draft/i }));
+    await user.click(await screen.findByRole('button', { name: /Validate draft|Kiểm tra draft/i }));
+    expect(await screen.findByText(/Draft passed validation|Draft đã qua kiểm tra/i)).toBeVisible();
+    await user.clear(screen.getByLabelText(/Lifecycle reason|Lý do lifecycle/i));
+    await user.type(
+      screen.getByLabelText(/Lifecycle reason|Lý do lifecycle/i),
+      'Reviewed localized draft copy for pilot release.',
+    );
+    await user.click(screen.getByRole('button', { name: /Publish draft/i }));
+
+    expect(validateAdminContentDraft).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+    });
+    expect(publishAdminContentRevision).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      idempotencyKey: expect.any(String),
+      reason: 'Reviewed localized draft copy for pilot release.',
+      revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+    });
+    expect(await screen.findByText('Draft preview ready for publish')).toBeVisible();
+    expect(screen.getByText('post-dl-p01-neuron-perceptron-rev-r1')).toBeVisible();
+    expect(screen.queryByText('Published learner copy')).not.toBeInTheDocument();
   });
 
   it('shows a safe forbidden state when the admin inventory API rejects access', async () => {

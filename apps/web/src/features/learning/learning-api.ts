@@ -148,13 +148,14 @@ export interface AdminContentSummary {
   localeAvailability: ReadonlyArray<'en' | 'vi'>;
   moduleId?: string | undefined;
   postId?: string | undefined;
+  previousPublishedRevisionId?: string | null | undefined;
   preview: {
     en: string;
     vi: string;
   };
   publishedRevisionId: string;
   sourceStatus: 'seeded';
-  status: 'published';
+  status: 'published' | 'unpublished';
   title: {
     en: string;
     vi: string;
@@ -199,6 +200,26 @@ export interface UpdateAdminContentDraftInput {
     en: string;
     vi: string;
   };
+}
+
+export interface AdminContentDraftRevisionInput {
+  idToken: string;
+  revisionId: string;
+}
+
+export interface AdminContentPublishRevisionInput extends AdminContentDraftRevisionInput {
+  idempotencyKey: string;
+  reason: string;
+}
+
+export interface AdminContentRollbackRevisionInput extends AdminContentDraftRevisionInput {
+  reason: string;
+}
+
+export interface AdminContentUnpublishEntityInput {
+  entityId: string;
+  idToken: string;
+  reason: string;
 }
 
 export interface PlaygroundRunSession {
@@ -286,7 +307,17 @@ export interface LearningApiClient {
     idToken: string;
     moduleId?: string | undefined;
   }): Promise<AdminContentSummary[]>;
+  publishAdminContentRevision(
+    input: AdminContentPublishRevisionInput,
+  ): Promise<AdminContentSummary>;
+  rollbackAdminContentRevision(
+    input: AdminContentRollbackRevisionInput,
+  ): Promise<AdminContentSummary>;
+  unpublishAdminContentEntity(
+    input: AdminContentUnpublishEntityInput,
+  ): Promise<AdminContentSummary>;
   updateAdminContentDraft(input: UpdateAdminContentDraftInput): Promise<AdminContentDraft>;
+  validateAdminContentDraft(input: AdminContentDraftRevisionInput): Promise<AdminContentDraft>;
   createPlaygroundRunSession(input: {
     algorithmId: 'perceptron';
     config: PlaygroundRunSession['config'];
@@ -533,6 +564,61 @@ export function createFetchLearningApiClient(): LearningApiClient {
       );
 
       return data.draft;
+    },
+    async validateAdminContentDraft({ idToken, revisionId }) {
+      const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
+        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/validate`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.draft;
+    },
+    async publishAdminContentRevision({ idToken, idempotencyKey, reason, revisionId }) {
+      const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
+        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/publish`, {
+          body: JSON.stringify({ reason }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.content;
+    },
+    async rollbackAdminContentRevision({ idToken, reason, revisionId }) {
+      const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
+        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/rollback`, {
+          body: JSON.stringify({ reason }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.content;
+    },
+    async unpublishAdminContentEntity({ entityId, idToken, reason }) {
+      const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
+        await fetch(`/api/v1/admin/entities/${encodeURIComponent(entityId)}/unpublish`, {
+          body: JSON.stringify({ reason }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.content;
     },
     async createPlaygroundRunSession({
       algorithmId,

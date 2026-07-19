@@ -1,4 +1,4 @@
-import { ArrowLeft, FilePlus, FileText, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FilePlus, FileText, RotateCcw, ShieldCheck } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -21,6 +21,8 @@ interface AdminContentPageProps {
 type LoadStatus = 'failed' | 'loading' | 'ready';
 type DraftActionStatus = 'creating' | 'failed' | 'idle';
 type DraftEditableFields = Pick<UpdateAdminContentDraftInput, 'metadata' | 'preview' | 'title'>;
+type LifecycleActionStatus =
+  'failed' | 'idle' | 'publishing' | 'rolling-back' | 'succeeded' | 'unpublishing' | 'validating';
 type DraftSaveStatus = 'failed' | 'idle' | 'saved' | 'saving';
 
 interface DraftActionState {
@@ -92,6 +94,10 @@ function createDraftEditableFields(formState: DraftFormState): DraftEditableFiel
   };
 }
 
+function createIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 export function AdminContentPage({ learningApiClient, locale }: AdminContentPageProps) {
   const { t } = useTranslation();
   const { getIdToken } = useAuth();
@@ -149,6 +155,28 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
   const selectedDraftPreview =
     selectedContentKey !== null ? (draftPreviewsByKey[selectedContentKey] ?? null) : null;
 
+  async function getRequiredIdToken(): Promise<string> {
+    const idToken = await getIdToken();
+
+    if (!idToken) {
+      throw new Error('Authenticated user is missing an ID token.');
+    }
+
+    return idToken;
+  }
+
+  function updateContentItem(updatedContent: AdminContentSummary): void {
+    setContent((currentContent) => {
+      return currentContent.map((contentItem) => {
+        if (getContentKey(contentItem) !== getContentKey(updatedContent)) {
+          return contentItem;
+        }
+
+        return updatedContent;
+      });
+    });
+  }
+
   async function handleCreateDraft(item: AdminContentSummary) {
     const contentKey = getContentKey(item);
     const currentDraftActionStatus =
@@ -161,11 +189,7 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
     setDraftAction({ contentKey, status: 'creating' });
 
     try {
-      const idToken = await getIdToken();
-
-      if (!idToken) {
-        throw new Error('Authenticated user is missing an ID token.');
-      }
+      const idToken = await getRequiredIdToken();
 
       const draft = await learningApiClient.createAdminContentDraft({
         entityId: item.entityId,
@@ -207,11 +231,7 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
     draft: AdminContentDraft,
     fields: DraftEditableFields,
   ): Promise<void> {
-    const idToken = await getIdToken();
-
-    if (!idToken) {
-      throw new Error('Authenticated user is missing an ID token.');
-    }
+    const idToken = await getRequiredIdToken();
 
     const updatedDraft = await learningApiClient.updateAdminContentDraft({
       ...fields,
@@ -226,6 +246,61 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
         [getContentKey(updatedDraft)]: updatedDraft,
       };
     });
+  }
+
+  async function handleValidateDraft(draft: AdminContentDraft): Promise<void> {
+    const idToken = await getRequiredIdToken();
+    const validatedDraft = await learningApiClient.validateAdminContentDraft({
+      idToken,
+      revisionId: draft.draftRevisionId,
+    });
+
+    setDraftPreviewsByKey((currentDraftPreviews) => {
+      return {
+        ...currentDraftPreviews,
+        [getContentKey(validatedDraft)]: validatedDraft,
+      };
+    });
+  }
+
+  async function handlePublishDraft(draft: AdminContentDraft, reason: string): Promise<void> {
+    const idToken = await getRequiredIdToken();
+    const publishedContent = await learningApiClient.publishAdminContentRevision({
+      idToken,
+      idempotencyKey: createIdempotencyKey(),
+      reason,
+      revisionId: draft.draftRevisionId,
+    });
+
+    updateContentItem(publishedContent);
+    setDraftPreviewsByKey((currentDraftPreviews) => {
+      const nextDraftPreviews = { ...currentDraftPreviews };
+      delete nextDraftPreviews[getContentKey(publishedContent)];
+
+      return nextDraftPreviews;
+    });
+  }
+
+  async function handleUnpublishContent(item: AdminContentSummary, reason: string): Promise<void> {
+    const idToken = await getRequiredIdToken();
+    const unpublishedContent = await learningApiClient.unpublishAdminContentEntity({
+      entityId: item.entityId,
+      idToken,
+      reason,
+    });
+
+    updateContentItem(unpublishedContent);
+  }
+
+  async function handleRollbackContent(revisionId: string, reason: string): Promise<void> {
+    const idToken = await getRequiredIdToken();
+    const rolledBackContent = await learningApiClient.rollbackAdminContentRevision({
+      idToken,
+      reason,
+      revisionId,
+    });
+
+    updateContentItem(rolledBackContent);
   }
 
   return (
@@ -274,7 +349,11 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
             item={selectedContent}
             locale={locale}
             onCreateDraft={handleCreateDraft}
+            onPublishDraft={handlePublishDraft}
+            onRollbackContent={handleRollbackContent}
+            onUnpublishContent={handleUnpublishContent}
             onUpdateDraft={handleUpdateDraft}
+            onValidateDraft={handleValidateDraft}
           />
         </section>
       ) : null}
@@ -339,14 +418,22 @@ function ContentPreview({
   item,
   locale,
   onCreateDraft,
+  onPublishDraft,
+  onRollbackContent,
+  onUnpublishContent,
   onUpdateDraft,
+  onValidateDraft,
 }: {
   draftActionStatus: DraftActionStatus;
   draftPreview: AdminContentDraft | null;
   item: AdminContentSummary | null;
   locale: Locale;
   onCreateDraft: (item: AdminContentSummary) => void;
+  onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
+  onRollbackContent: (revisionId: string, reason: string) => Promise<void>;
+  onUnpublishContent: (item: AdminContentSummary, reason: string) => Promise<void>;
   onUpdateDraft: (draft: AdminContentDraft, fields: DraftEditableFields) => Promise<void>;
+  onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
 }) {
   const { t } = useTranslation();
 
@@ -385,6 +472,14 @@ function ContentPreview({
             <code>{item.publishedRevisionId}</code>
           </dd>
         </div>
+        {item.previousPublishedRevisionId ? (
+          <div>
+            <dt>{t('admin.content.previousRevision')}</dt>
+            <dd>
+              <code>{item.previousPublishedRevisionId}</code>
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>{t('admin.content.draftRevision')}</dt>
           <dd>
@@ -434,6 +529,12 @@ function ContentPreview({
         ) : null}
       </div>
 
+      <PublishedLifecyclePanel
+        item={item}
+        onRollbackContent={onRollbackContent}
+        onUnpublishContent={onUnpublishContent}
+      />
+
       <div className="admin-content-preview-copy">
         <article>
           <span>{locale.toUpperCase()}</span>
@@ -452,7 +553,9 @@ function ContentPreview({
           draft={draftPreview}
           key={`${draftPreview.draftRevisionId}:${draftPreview.revisionVersion}`}
           locale={locale}
+          onPublishDraft={onPublishDraft}
           onUpdateDraft={onUpdateDraft}
+          onValidateDraft={onValidateDraft}
         />
       ) : (
         <p className="admin-content-muted">{t('admin.content.draftPreviewEmpty')}</p>
@@ -464,11 +567,15 @@ function ContentPreview({
 function DraftPreview({
   draft,
   locale,
+  onPublishDraft,
   onUpdateDraft,
+  onValidateDraft,
 }: {
   draft: AdminContentDraft;
   locale: Locale;
+  onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
   onUpdateDraft: (draft: AdminContentDraft, fields: DraftEditableFields) => Promise<void>;
+  onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const secondaryLocale: Locale = locale === 'vi' ? 'en' : 'vi';
@@ -526,6 +633,217 @@ function DraftPreview({
       </div>
 
       <DraftEditor draft={draft} onUpdateDraft={onUpdateDraft} />
+      <DraftLifecyclePanel
+        draft={draft}
+        onPublishDraft={onPublishDraft}
+        onValidateDraft={onValidateDraft}
+      />
+    </section>
+  );
+}
+
+function DraftLifecyclePanel({
+  draft,
+  onPublishDraft,
+  onValidateDraft,
+}: {
+  draft: AdminContentDraft;
+  onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
+  onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('Reviewed localized draft copy for pilot release.');
+  const [status, setStatus] = useState<LifecycleActionStatus>('idle');
+  const canPublish = draft.validationStatus === 'valid';
+  const isBusy = status === 'publishing' || status === 'validating';
+
+  async function validateDraft() {
+    setStatus('validating');
+
+    try {
+      await onValidateDraft(draft);
+      setStatus('succeeded');
+    } catch {
+      setStatus('failed');
+    }
+  }
+
+  async function publishDraft(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canPublish || !reason.trim()) {
+      return;
+    }
+
+    setStatus('publishing');
+
+    try {
+      await onPublishDraft(draft, reason.trim());
+      setStatus('succeeded');
+    } catch {
+      setStatus('failed');
+    }
+  }
+
+  return (
+    <form className="admin-content-lifecycle-form" onSubmit={publishDraft}>
+      <div className="admin-content-panel-heading">
+        <CheckCircle2 aria-hidden="true" size={18} />
+        <h3>{t('admin.content.lifecycle')}</h3>
+      </div>
+
+      <label>
+        <span>{t('admin.content.lifecycleReason')}</span>
+        <textarea
+          onChange={(event) => setReason(event.target.value)}
+          required
+          rows={2}
+          value={reason}
+        />
+      </label>
+
+      <div className="admin-content-actions">
+        <button
+          className="admin-content-secondary-button"
+          disabled={isBusy}
+          onClick={validateDraft}
+          type="button"
+        >
+          {status === 'validating'
+            ? t('admin.content.validatingDraft')
+            : t('admin.content.validateDraft')}
+        </button>
+        <button
+          className="admin-content-draft-button"
+          disabled={!canPublish || isBusy || !reason.trim()}
+          type="submit"
+        >
+          {status === 'publishing'
+            ? t('admin.content.publishingDraft')
+            : t('admin.content.publishDraft')}
+        </button>
+      </div>
+
+      {canPublish ? (
+        <p className="admin-content-save-state" role="status">
+          {t('admin.content.draftValid')}
+        </p>
+      ) : (
+        <p className="admin-content-muted">{t('admin.content.publishRequiresValidation')}</p>
+      )}
+      {status === 'failed' ? (
+        <p className="admin-content-inline-error" role="alert">
+          {t('admin.content.lifecycleFailed')}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+function PublishedLifecyclePanel({
+  item,
+  onRollbackContent,
+  onUnpublishContent,
+}: {
+  item: AdminContentSummary;
+  onRollbackContent: (revisionId: string, reason: string) => Promise<void>;
+  onUnpublishContent: (item: AdminContentSummary, reason: string) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('Planned lifecycle change for pilot review.');
+  const [status, setStatus] = useState<LifecycleActionStatus>('idle');
+  const canRollback = Boolean(item.previousPublishedRevisionId);
+  const canUnpublish = item.entityType === 'course' && item.status === 'published';
+  const isBusy = status === 'rolling-back' || status === 'unpublishing';
+
+  if (!canRollback && !canUnpublish) {
+    return null;
+  }
+
+  async function unpublishContent() {
+    if (!canUnpublish || !reason.trim()) {
+      return;
+    }
+
+    setStatus('unpublishing');
+
+    try {
+      await onUnpublishContent(item, reason.trim());
+      setStatus('succeeded');
+    } catch {
+      setStatus('failed');
+    }
+  }
+
+  async function rollbackContent() {
+    if (!item.previousPublishedRevisionId || !reason.trim()) {
+      return;
+    }
+
+    setStatus('rolling-back');
+
+    try {
+      await onRollbackContent(item.previousPublishedRevisionId, reason.trim());
+      setStatus('succeeded');
+    } catch {
+      setStatus('failed');
+    }
+  }
+
+  return (
+    <section className="admin-content-lifecycle-form" aria-label={t('admin.content.lifecycle')}>
+      <div className="admin-content-panel-heading">
+        <RotateCcw aria-hidden="true" size={18} />
+        <h3>{t('admin.content.lifecycle')}</h3>
+      </div>
+
+      <label>
+        <span>{t('admin.content.lifecycleReason')}</span>
+        <textarea
+          onChange={(event) => setReason(event.target.value)}
+          required
+          rows={2}
+          value={reason}
+        />
+      </label>
+
+      <div className="admin-content-actions">
+        {canUnpublish ? (
+          <button
+            className="admin-content-secondary-button"
+            disabled={isBusy || !reason.trim()}
+            onClick={unpublishContent}
+            type="button"
+          >
+            {status === 'unpublishing'
+              ? t('admin.content.unpublishing')
+              : t('admin.content.unpublish')}
+          </button>
+        ) : null}
+        {canRollback ? (
+          <button
+            className="admin-content-secondary-button"
+            disabled={isBusy || !reason.trim()}
+            onClick={rollbackContent}
+            type="button"
+          >
+            {status === 'rolling-back'
+              ? t('admin.content.rollingBack')
+              : t('admin.content.rollback')}
+          </button>
+        ) : null}
+      </div>
+
+      {status === 'succeeded' ? (
+        <p className="admin-content-save-state" role="status">
+          {t('admin.content.lifecycleSaved')}
+        </p>
+      ) : null}
+      {status === 'failed' ? (
+        <p className="admin-content-inline-error" role="alert">
+          {t('admin.content.lifecycleFailed')}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -371,6 +371,14 @@ function getAdminContentDraftPatchBody(request: Request): {
   };
 }
 
+function getAdminContentLifecycleReasonBody(request: Request): string {
+  const body = getObjectBody(request);
+
+  assertBodyFieldsAllowlisted(body, ['reason']);
+
+  return getTrimmedStringValue(body.reason, 'reason', 240);
+}
+
 function getBodyField(request: Request, name: string): unknown {
   const body = getObjectBody(request);
 
@@ -706,6 +714,82 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       next(error);
     }
   });
+
+  app.post(
+    '/api/v1/admin/revisions/:revisionId/validate',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const result = await getAdminContentRepository().validateDraft({
+          actorUid: adminUser.uid,
+          revisionId: getRouteParam(request, 'revisionId'),
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/revisions/:revisionId/publish',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const result = await getAdminContentRepository().publishRevision({
+          actorUid: adminUser.uid,
+          idempotencyKey: getIdempotencyKey(request),
+          reason: getAdminContentLifecycleReasonBody(request),
+          revisionId: getRouteParam(request, 'revisionId'),
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/revisions/:revisionId/rollback',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const result = await getAdminContentRepository().rollbackRevision({
+          actorUid: adminUser.uid,
+          reason: getAdminContentLifecycleReasonBody(request),
+          revisionId: getRouteParam(request, 'revisionId'),
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/entities/:entityId/unpublish',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const result = await getAdminContentRepository().unpublishEntity({
+          actorUid: adminUser.uid,
+          entityId: getRouteParam(request, 'entityId'),
+          reason: getAdminContentLifecycleReasonBody(request),
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.post('/api/v1/playground-run-sessions', requireAuth, async (request, response, next) => {
     try {

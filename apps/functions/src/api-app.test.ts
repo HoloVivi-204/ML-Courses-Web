@@ -842,6 +842,334 @@ describe('API foundation', () => {
     });
   });
 
+  it('validates and publishes a draft revision atomically without leaving a second draft pointer', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const validateResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(validateResponse.body.data.draft).toEqual(
+      expect.objectContaining({
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        validationStatus: 'valid',
+      }),
+    );
+    expect(validateResponse.body.data.validation).toEqual(
+      expect.objectContaining({
+        revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        status: 'valid',
+      }),
+    );
+
+    const publishResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish')
+      .set('authorization', 'Bearer admin-id-token')
+      .set('idempotency-key', 'publish-draft-neuron-01')
+      .send({ reason: 'Reviewed localized draft copy for pilot release.' })
+      .expect(200);
+
+    expect(publishResponse.body.data.content).toEqual(
+      expect.objectContaining({
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        previousPublishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        publishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        status: 'published',
+        validationStatus: 'valid',
+      }),
+    );
+    expect(publishResponse.body.data.lifecycleEvent).toEqual(
+      expect.objectContaining({
+        actorUid: 'admin-01',
+        entityId: 'dl-p01-neuron-perceptron',
+        fromRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        reason: 'Reviewed localized draft copy for pilot release.',
+        toRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        type: 'published',
+      }),
+    );
+
+    const retryResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish')
+      .set('authorization', 'Bearer admin-id-token')
+      .set('idempotency-key', 'publish-draft-neuron-01')
+      .send({ reason: 'Reviewed localized draft copy for pilot release.' })
+      .expect(200);
+
+    expect(retryResponse.body.data).toEqual(publishResponse.body.data);
+
+    const inventoryResponse = await request(app)
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'post', courseId: 'course-deep-learning-basic' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(inventoryResponse.body.data.content).toEqual([
+      expect.objectContaining({
+        draftRevisionId: null,
+        previousPublishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        publishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        status: 'published',
+      }),
+    ]);
+  });
+
+  it('unpublishes a course idempotently without changing the current revision pointer', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    const unpublishResponse = await request(app)
+      .post('/api/v1/admin/entities/course-deep-learning-basic/unpublish')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({ reason: 'Pause new enrollments during pilot review.' })
+      .expect(200);
+
+    expect(unpublishResponse.body.data.content).toEqual(
+      expect.objectContaining({
+        draftRevisionId: null,
+        entityId: 'course-deep-learning-basic',
+        entityType: 'course',
+        publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+        status: 'unpublished',
+      }),
+    );
+    expect(unpublishResponse.body.data.lifecycleEvent).toEqual(
+      expect.objectContaining({
+        actorUid: 'admin-01',
+        entityId: 'course-deep-learning-basic',
+        fromRevisionId: 'course-deep-learning-basic-rev-r1',
+        reason: 'Pause new enrollments during pilot review.',
+        toRevisionId: null,
+        type: 'unpublished',
+      }),
+    );
+
+    const retryResponse = await request(app)
+      .post('/api/v1/admin/entities/course-deep-learning-basic/unpublish')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({ reason: 'Pause new enrollments during pilot review.' })
+      .expect(200);
+
+    expect(retryResponse.body.data.content).toEqual(unpublishResponse.body.data.content);
+
+    const inventoryResponse = await request(app)
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'course', courseId: 'course-deep-learning-basic' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(inventoryResponse.body.data.content).toEqual([
+      expect.objectContaining({
+        publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+        status: 'unpublished',
+      }),
+    ]);
+  });
+
+  it('rolls back the published pointer to a previous immutable revision', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+    await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+    await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish')
+      .set('authorization', 'Bearer admin-id-token')
+      .set('idempotency-key', 'publish-before-rollback-01')
+      .send({ reason: 'Publish draft before rollback drill.' })
+      .expect(200);
+
+    const rollbackResponse = await request(app)
+      .post('/api/v1/admin/revisions/post-dl-p01-neuron-perceptron-rev-r1/rollback')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({ reason: 'Rollback to the previous approved text revision.' })
+      .expect(200);
+
+    expect(rollbackResponse.body.data.content).toEqual(
+      expect.objectContaining({
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        previousPublishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        status: 'published',
+      }),
+    );
+    expect(rollbackResponse.body.data.content.preview.en).toContain('single neuron');
+    expect(rollbackResponse.body.data.lifecycleEvent).toEqual(
+      expect.objectContaining({
+        actorUid: 'admin-01',
+        entityId: 'dl-p01-neuron-perceptron',
+        fromRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        reason: 'Rollback to the previous approved text revision.',
+        toRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        type: 'rolled-back',
+      }),
+    );
+
+    const inventoryResponse = await request(app)
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'post', courseId: 'course-deep-learning-basic' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(inventoryResponse.body.data.content).toEqual([
+      expect.objectContaining({
+        draftRevisionId: null,
+        previousPublishedRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        status: 'published',
+      }),
+    ]);
+  });
+
+  it('blocks publish until the current draft revision has passed validation', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const firstPublishResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish')
+      .set('authorization', 'Bearer admin-id-token')
+      .set('idempotency-key', 'publish-unvalidated-01')
+      .send({ reason: 'Attempt publish without validator pass.' })
+      .expect(422);
+
+    expect(firstPublishResponse.body.error.code).toBe('ADMIN_CONTENT_VALIDATION_REQUIRED');
+
+    await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    const editResponse = await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        title: {
+          en: 'Edited after validation',
+          vi: 'Tiêu đề sửa sau validation',
+        },
+      })
+      .expect(200);
+
+    expect(editResponse.body.data.draft).toEqual(
+      expect.objectContaining({
+        revisionVersion: 2,
+        validationStatus: 'not-run',
+      }),
+    );
+
+    const secondPublishResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish')
+      .set('authorization', 'Bearer admin-id-token')
+      .set('idempotency-key', 'publish-stale-validation-01')
+      .send({ reason: 'Attempt publish after editing a validated draft.' })
+      .expect(422);
+
+    expect(secondPublishResponse.body.error.code).toBe('ADMIN_CONTENT_VALIDATION_REQUIRED');
+  });
+
+  it('requires an idempotency key for admin publish', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+    await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    const response = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({ reason: 'Publish without required idempotency header.' })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+  });
+
+  it('rejects unauthorized lifecycle actions and unsupported non-course unpublish scope', async () => {
+    const studentResponse = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .post('/api/v1/admin/entities/course-deep-learning-basic/unpublish')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ reason: 'Student cannot unpublish content.' })
+      .expect(403);
+
+    expect(studentResponse.body.error.code).toBe('ADMIN_FORBIDDEN');
+
+    const postResponse = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'admin-01',
+          displayName: 'Operator',
+          role: 'admin',
+        }),
+      }),
+    )
+      .post('/api/v1/admin/entities/dl-p01-neuron-perceptron/unpublish')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({ reason: 'Unsupported standalone post unpublish.' })
+      .expect(409);
+
+    expect(postResponse.body.error.code).toBe('ADMIN_CONTENT_UNPUBLISH_SCOPE_UNSUPPORTED');
+  });
+
   it('rejects creating a second draft for the same seeded content item', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({
