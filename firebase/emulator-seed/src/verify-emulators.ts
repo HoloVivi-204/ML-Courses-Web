@@ -84,6 +84,8 @@ async function assertDirectProgressMutationDenied(): Promise<void> {
     'users/local-student/contentAccess/demo_demo-perceptron-and-gate',
     'users/local-student/quizProgress/quiz-module-dl-m01',
     'playgroundRunSessions/forged-session',
+    'users/local-student/playgroundRuns/forged-run',
+    'users/local-student/playgroundConfigs/forged-config',
   ];
 
   for (const documentPath of protectedDocumentPaths) {

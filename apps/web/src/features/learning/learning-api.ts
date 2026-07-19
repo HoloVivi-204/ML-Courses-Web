@@ -153,6 +153,38 @@ export interface PlaygroundRunSessionCancellation {
   status: 'cancelled';
 }
 
+export interface PlaygroundRunRecord {
+  algorithmId: 'perceptron';
+  config: PlaygroundRunSession['config'];
+  createdAt: string;
+  datasetVersionId: 'ds-xor-noisy-v1';
+  durationMs: number;
+  feedback: readonly ('linear-limit' | 'non-convergence')[];
+  isPinned: false;
+  metrics: {
+    accuracy: number;
+    loss: number;
+    testAccuracy: number;
+    trainAccuracy: number;
+  };
+  runId: string;
+  scenarioId: 'pg-xor';
+  targetReached: null;
+  targetVersionId: null;
+  verificationLevel: 'client-computed';
+}
+
+export interface PlaygroundConfigRecord {
+  algorithmId: 'perceptron';
+  compatibilityReason: string | null;
+  compatibilityStatus: 'compatible' | 'incompatible';
+  config: PlaygroundRunSession['config'];
+  configId: string;
+  datasetVersionId: 'ds-xor-noisy-v1';
+  name: string;
+  scenarioId: 'pg-xor';
+}
+
 export interface LearningApiClient {
   bootstrapProfile(idToken: string): Promise<void>;
   cancelPlaygroundRunSession(input: {
@@ -180,6 +212,30 @@ export interface LearningApiClient {
     idToken: string;
     scenarioId: 'pg-xor';
   }): Promise<PlaygroundRunSession>;
+  createPlaygroundConfig(input: {
+    algorithmId: 'perceptron';
+    config: PlaygroundRunSession['config'];
+    datasetVersionId: 'ds-xor-noisy-v1';
+    idToken: string;
+    name: string;
+    scenarioId: 'pg-xor';
+  }): Promise<PlaygroundConfigRecord>;
+  deletePlaygroundConfig(input: { configId: string; idToken: string }): Promise<void>;
+  deletePlaygroundRun(input: { idToken: string; runId: string }): Promise<void>;
+  listPlaygroundConfigs(input: {
+    idToken: string;
+    scenarioId: 'pg-xor';
+  }): Promise<PlaygroundConfigRecord[]>;
+  listPlaygroundRuns(input: {
+    idToken: string;
+    scenarioId: 'pg-xor';
+  }): Promise<PlaygroundRunRecord[]>;
+  savePlaygroundRun(input: {
+    idToken: string;
+    idempotencyKey: string;
+    result: unknown;
+    sessionId: string;
+  }): Promise<PlaygroundRunRecord>;
   submitQuizAttempt(input: {
     answers: readonly QuizAnswer[];
     attemptId: string;
@@ -205,6 +261,12 @@ async function readSuccessEnvelope<TData>(response: Response): Promise<TData> {
   }
 
   return body.data;
+}
+
+async function ensureSuccessResponse(response: Response): Promise<void> {
+  if (!response.ok) {
+    throw new Error('Learning API request failed.');
+  }
 }
 
 export function createFetchLearningApiClient(): LearningApiClient {
@@ -255,6 +317,53 @@ export function createFetchLearningApiClient(): LearningApiClient {
         }),
       );
     },
+    async createPlaygroundConfig({
+      algorithmId,
+      config,
+      datasetVersionId,
+      idToken,
+      name,
+      scenarioId,
+    }) {
+      const data = await readSuccessEnvelope<{ config: PlaygroundConfigRecord }>(
+        await fetch('/api/v1/playground-configs', {
+          body: JSON.stringify({
+            name,
+            scenarioId,
+            algorithmId,
+            datasetVersionId,
+            config,
+          }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.config;
+    },
+    async deletePlaygroundConfig({ configId, idToken }) {
+      await ensureSuccessResponse(
+        await fetch(`/api/v1/playground-configs/${encodeURIComponent(configId)}`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+          method: 'DELETE',
+        }),
+      );
+    },
+    async deletePlaygroundRun({ idToken, runId }) {
+      await ensureSuccessResponse(
+        await fetch(`/api/v1/playground-runs/${encodeURIComponent(runId)}`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+          method: 'DELETE',
+        }),
+      );
+    },
     async enrollCourse({ courseId, idToken, idempotencyKey }) {
       return readSuccessEnvelope<EnrollmentResult>(
         await fetch(`/api/v1/courses/${encodeURIComponent(courseId)}/enrollments`, {
@@ -299,6 +408,43 @@ export function createFetchLearningApiClient(): LearningApiClient {
           method: 'POST',
         }),
       );
+    },
+    async listPlaygroundConfigs({ idToken, scenarioId }) {
+      const data = await readSuccessEnvelope<{ configs: PlaygroundConfigRecord[] }>(
+        await fetch(`/api/v1/playground-configs?scenarioId=${encodeURIComponent(scenarioId)}`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+
+      return data.configs;
+    },
+    async listPlaygroundRuns({ idToken, scenarioId }) {
+      const data = await readSuccessEnvelope<{ runs: PlaygroundRunRecord[] }>(
+        await fetch(`/api/v1/playground-runs?scenarioId=${encodeURIComponent(scenarioId)}`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+
+      return data.runs;
+    },
+    async savePlaygroundRun({ idToken, idempotencyKey, result, sessionId }) {
+      const data = await readSuccessEnvelope<{ run: PlaygroundRunRecord }>(
+        await fetch('/api/v1/playground-runs', {
+          body: JSON.stringify({ sessionId, result }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.run;
     },
     async submitQuizAttempt({ answers, attemptId, idToken, idempotencyKey }) {
       return readSuccessEnvelope<QuizSubmissionResult>(

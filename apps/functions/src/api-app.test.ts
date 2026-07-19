@@ -36,8 +36,29 @@ function createPlaygroundRepository(
     cancelRunSession: async () => {
       throw new Error('Playground run session cancellation is not part of this test.');
     },
+    createConfig: async () => {
+      throw new Error('Playground config creation is not part of this test.');
+    },
     createRunSession: async () => {
       throw new Error('Playground run session creation is not part of this test.');
+    },
+    deleteConfig: async () => {
+      throw new Error('Playground config deletion is not part of this test.');
+    },
+    deleteRun: async () => {
+      throw new Error('Playground run deletion is not part of this test.');
+    },
+    listConfigs: async () => {
+      throw new Error('Playground config listing is not part of this test.');
+    },
+    listRuns: async () => {
+      throw new Error('Playground run listing is not part of this test.');
+    },
+    saveRun: async () => {
+      throw new Error('Playground run saving is not part of this test.');
+    },
+    updateConfig: async () => {
+      throw new Error('Playground config update is not part of this test.');
     },
     ...overrides,
   };
@@ -568,4 +589,274 @@ describe('API foundation', () => {
     });
     expect(cancelledSessions).toEqual(new Set(['learner-01:session-pg-xor-01']));
   });
+
+  it('saves, lists, and deletes playground runs through the authenticated owner boundary', async () => {
+    const savedRuns = new Set<string>();
+    const listedRunScenarios = new Set<string>();
+    const deletedRuns = new Set<string>();
+    const app = createApiApp({
+      playgroundRepository: createPlaygroundRepository({
+        deleteRun: async (input) => {
+          deletedRuns.add(`${input.uid}:${input.runId}`);
+
+          return {
+            statusCode: 204,
+            data: null,
+          };
+        },
+        listRuns: async (input) => {
+          listedRunScenarios.add(`${input.uid}:${input.scenarioId}`);
+
+          return {
+            statusCode: 200,
+            data: {
+              runs: [
+                {
+                  runId: 'run-pg-xor-01',
+                  scenarioId: 'pg-xor',
+                  algorithmId: 'perceptron',
+                  datasetVersionId: 'ds-xor-noisy-v1',
+                  config: {
+                    learningRate: 0.1,
+                    epochs: 100,
+                    trainRatio: 0.75,
+                    seed: 42,
+                  },
+                  durationMs: 1234,
+                  feedback: ['linear-limit'],
+                  isPinned: false,
+                  metrics: {
+                    accuracy: 0.5,
+                    loss: 0.5,
+                    testAccuracy: 0.5,
+                    trainAccuracy: 0.5,
+                  },
+                  createdAt: '2026-07-19T14:00:00.000Z',
+                  targetReached: null,
+                  targetVersionId: null,
+                  verificationLevel: 'client-computed',
+                },
+              ],
+            },
+          };
+        },
+        saveRun: async (input) => {
+          savedRuns.add(
+            `${input.uid}:${input.idempotencyKey}:${input.sessionId}:${
+              typeof input.result === 'object' && input.result !== null ? 'result' : 'missing'
+            }`,
+          );
+
+          return {
+            statusCode: 201,
+            data: {
+              run: {
+                runId: 'run-pg-xor-01',
+                scenarioId: 'pg-xor',
+                algorithmId: 'perceptron',
+                datasetVersionId: 'ds-xor-noisy-v1',
+                config: {
+                  learningRate: 0.1,
+                  epochs: 100,
+                  trainRatio: 0.75,
+                  seed: 42,
+                },
+                durationMs: 1234,
+                feedback: ['linear-limit'],
+                isPinned: false,
+                metrics: {
+                  accuracy: 0.5,
+                  loss: 0.5,
+                  testAccuracy: 0.5,
+                  trainAccuracy: 0.5,
+                },
+                createdAt: '2026-07-19T14:00:00.000Z',
+                targetReached: null,
+                targetVersionId: null,
+                verificationLevel: 'client-computed',
+              },
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const saveResponse = await request(app)
+      .post('/api/v1/playground-runs')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', '3dd0b7e9-1c02-46e6-ae31-f5b3f63b39a0')
+      .send({
+        sessionId: 'session-pg-xor-01',
+        result: {
+          runId: 'client-run-01',
+          scenarioId: 'pg-xor',
+          algorithmId: 'perceptron',
+          datasetVersionId: 'ds-xor-noisy-v1',
+          configHash: '9'.repeat(64),
+          durationMs: 1234,
+          metrics: {
+            accuracy: 0.5,
+            loss: 0.5,
+            testAccuracy: 0.5,
+            trainAccuracy: 0.5,
+          },
+        },
+      })
+      .expect(201);
+    const listResponse = await request(app)
+      .get('/api/v1/playground-runs')
+      .query({ scenarioId: 'pg-xor' })
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+
+    await request(app)
+      .delete('/api/v1/playground-runs/run-pg-xor-01')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(204);
+
+    expect(saveResponse.body.data.run).toMatchObject({
+      runId: 'run-pg-xor-01',
+      verificationLevel: 'client-computed',
+    });
+    expect(listResponse.body.data.runs).toHaveLength(1);
+    expect(savedRuns).toEqual(
+      new Set(['learner-01:3dd0b7e9-1c02-46e6-ae31-f5b3f63b39a0:session-pg-xor-01:result']),
+    );
+    expect(listedRunScenarios).toEqual(new Set(['learner-01:pg-xor']));
+    expect(deletedRuns).toEqual(new Set(['learner-01:run-pg-xor-01']));
+  });
+
+  it('creates, lists, renames, and deletes playground configs through the authenticated owner boundary', async () => {
+    const createdConfigs = new Set<string>();
+    const listedConfigScenarios = new Set<string>();
+    const renamedConfigs = new Set<string>();
+    const deletedConfigs = new Set<string>();
+    const app = createApiApp({
+      playgroundRepository: createPlaygroundRepository({
+        createConfig: async (input) => {
+          createdConfigs.add(
+            `${input.uid}:${input.scenarioId}:${input.algorithmId}:${input.datasetVersionId}:${input.name}`,
+          );
+
+          return {
+            statusCode: 201,
+            data: {
+              config: createPlaygroundConfigFixture({
+                configId: 'config-pg-xor-01',
+                name: input.name,
+              }),
+            },
+          };
+        },
+        deleteConfig: async (input) => {
+          deletedConfigs.add(`${input.uid}:${input.configId}`);
+
+          return {
+            statusCode: 204,
+            data: null,
+          };
+        },
+        listConfigs: async (input) => {
+          listedConfigScenarios.add(`${input.uid}:${input.scenarioId}`);
+
+          return {
+            statusCode: 200,
+            data: {
+              configs: [
+                createPlaygroundConfigFixture({
+                  configId: 'config-pg-xor-01',
+                  name: 'XOR baseline',
+                }),
+              ],
+            },
+          };
+        },
+        updateConfig: async (input) => {
+          renamedConfigs.add(`${input.uid}:${input.configId}:${input.name ?? 'unchanged'}`);
+
+          return {
+            statusCode: 200,
+            data: {
+              config: createPlaygroundConfigFixture({
+                configId: input.configId,
+                name: input.name ?? 'XOR baseline',
+              }),
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const createResponse = await request(app)
+      .post('/api/v1/playground-configs')
+      .set('authorization', 'Bearer local-id-token')
+      .send({
+        name: 'XOR baseline',
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+      })
+      .expect(201);
+    const listResponse = await request(app)
+      .get('/api/v1/playground-configs')
+      .query({ scenarioId: 'pg-xor' })
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+    const renameResponse = await request(app)
+      .patch('/api/v1/playground-configs/config-pg-xor-01')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ name: 'Renamed XOR baseline' })
+      .expect(200);
+
+    await request(app)
+      .delete('/api/v1/playground-configs/config-pg-xor-01')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(204);
+
+    expect(createResponse.body.data.config).toMatchObject({
+      configId: 'config-pg-xor-01',
+      name: 'XOR baseline',
+      compatibilityStatus: 'compatible',
+    });
+    expect(listResponse.body.data.configs).toHaveLength(1);
+    expect(renameResponse.body.data.config.name).toBe('Renamed XOR baseline');
+    expect(createdConfigs).toEqual(
+      new Set(['learner-01:pg-xor:perceptron:ds-xor-noisy-v1:XOR baseline']),
+    );
+    expect(listedConfigScenarios).toEqual(new Set(['learner-01:pg-xor']));
+    expect(renamedConfigs).toEqual(new Set(['learner-01:config-pg-xor-01:Renamed XOR baseline']));
+    expect(deletedConfigs).toEqual(new Set(['learner-01:config-pg-xor-01']));
+  });
 });
+
+function createPlaygroundConfigFixture(input: { configId: string; name: string }) {
+  return {
+    configId: input.configId,
+    name: input.name,
+    scenarioId: 'pg-xor' as const,
+    algorithmId: 'perceptron' as const,
+    datasetVersionId: 'ds-xor-noisy-v1' as const,
+    config: {
+      learningRate: 0.1,
+      epochs: 100,
+      trainRatio: 0.75,
+      seed: 42,
+    },
+    compatibilityStatus: 'compatible' as const,
+    compatibilityReason: null,
+  };
+}

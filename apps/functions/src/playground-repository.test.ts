@@ -1,4 +1,4 @@
-import { type Firestore } from 'firebase-admin/firestore';
+import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 
 import { createFirestorePlaygroundRepository } from './playground-repository.js';
@@ -7,12 +7,26 @@ interface FakeDocumentReference {
   path: string;
 }
 
+interface FakeCollectionReference {
+  get(): Promise<FakeQuerySnapshot>;
+  orderBy(fieldPath: string, directionStr?: 'asc' | 'desc'): FakeCollectionReference;
+  path: string;
+  where(fieldPath: string, opStr: '==', value: unknown): FakeCollectionReference;
+}
+
 interface FakeDocumentSnapshot {
   exists: boolean;
+  id: string;
+  ref: FakeDocumentReference;
   data(): Record<string, unknown> | undefined;
 }
 
+interface FakeQuerySnapshot {
+  docs: FakeDocumentSnapshot[];
+}
+
 interface FakeTransaction {
+  delete(reference: FakeDocumentReference): void;
   get(reference: FakeDocumentReference): Promise<FakeDocumentSnapshot>;
   set(
     reference: FakeDocumentReference,
@@ -24,13 +38,33 @@ interface FakeTransaction {
 function createFakeFirestore(initialDocuments: Record<string, Record<string, unknown>> = {}) {
   const documents = new Map<string, Record<string, unknown>>(Object.entries(initialDocuments));
   const firestore = {
+    batch() {
+      const deletes: string[] = [];
+
+      return {
+        delete(reference: FakeDocumentReference) {
+          deletes.push(reference.path);
+        },
+        async commit() {
+          for (const path of deletes) {
+            documents.delete(path);
+          }
+        },
+      };
+    },
+    collection(path: string): FakeCollectionReference {
+      return createCollectionReference(documents, path);
+    },
     doc(path: string): FakeDocumentReference {
       return { path };
     },
     async runTransaction<TResult>(callback: (transaction: FakeTransaction) => Promise<TResult>) {
       const transaction: FakeTransaction = {
+        delete(reference) {
+          documents.delete(reference.path);
+        },
         async get(reference) {
-          return createSnapshot(documents.get(reference.path));
+          return createSnapshot(reference.path, documents.get(reference.path));
         },
         set(reference, data, options) {
           const currentData = documents.get(reference.path) ?? {};
@@ -40,16 +74,89 @@ function createFakeFirestore(initialDocuments: Record<string, Record<string, unk
 
       return callback(transaction);
     },
-  } as Firestore;
+  } as unknown as Firestore;
 
   return { documents, firestore };
 }
 
-function createSnapshot(data: Record<string, unknown> | undefined): FakeDocumentSnapshot {
+function createCollectionReference(
+  documents: Map<string, Record<string, unknown>>,
+  path: string,
+  filters: ReadonlyArray<{ fieldPath: string; value: unknown }> = [],
+  ordering: { fieldPath: string; direction: 'asc' | 'desc' } | null = null,
+): FakeCollectionReference {
+  return {
+    path,
+    async get() {
+      const prefix = `${path}/`;
+      const docs = [...documents.entries()]
+        .filter(([documentPath]) => {
+          const suffix = documentPath.slice(prefix.length);
+
+          return documentPath.startsWith(prefix) && suffix.length > 0 && !suffix.includes('/');
+        })
+        .filter(([, data]) => filters.every((filter) => data[filter.fieldPath] === filter.value))
+        .map(([documentPath, data]) => createSnapshot(documentPath, data));
+
+      if (ordering) {
+        docs.sort((left, right) => {
+          const leftValue = getComparableValue(left.data()?.[ordering.fieldPath]);
+          const rightValue = getComparableValue(right.data()?.[ordering.fieldPath]);
+
+          return ordering.direction === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+        });
+      }
+
+      return { docs };
+    },
+    orderBy(fieldPath, directionStr = 'asc') {
+      return createCollectionReference(documents, path, filters, {
+        fieldPath,
+        direction: directionStr,
+      });
+    },
+    where(fieldPath, opStr, value) {
+      if (opStr !== '==') {
+        throw new Error('Only equality filters are supported by this fake.');
+      }
+
+      return createCollectionReference(
+        documents,
+        path,
+        [...filters, { fieldPath, value }],
+        ordering,
+      );
+    },
+  };
+}
+
+function createSnapshot(
+  path: string,
+  data: Record<string, unknown> | undefined,
+): FakeDocumentSnapshot {
   return {
     exists: data !== undefined,
+    id: path.split('/').at(-1) ?? path,
+    ref: { path },
     data: () => data,
   };
+}
+
+function getComparableValue(value: unknown): number {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toMillis' in value &&
+    typeof value.toMillis === 'function'
+  ) {
+    return value.toMillis();
+  }
+
+  return 0;
 }
 
 describe('Firestore playground repository run sessions', () => {
@@ -148,4 +255,236 @@ describe('Firestore playground repository run sessions', () => {
       status: 'cancelled',
     });
   });
+
+  it('saves a completed run idempotently and consumes the issued run session', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/perceptron': {
+        algorithmId: 'perceptron',
+        schemaVersion: 1,
+      },
+      'playgroundRunSessions/session-01': {
+        uid: 'learner-01',
+        status: 'issued',
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        configHash: 'hash-01',
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+        expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const firstResult = await repository.saveRun({
+      uid: 'learner-01',
+      idempotencyKey: 'save-run-key-01',
+      sessionId: 'session-01',
+      result: createCompletedRunResult(),
+    });
+    const retryResult = await repository.saveRun({
+      uid: 'learner-01',
+      idempotencyKey: 'save-run-key-01',
+      sessionId: 'session-01',
+      result: createCompletedRunResult(),
+    });
+    const listedRuns = await repository.listRuns({
+      uid: 'learner-01',
+      scenarioId: 'pg-xor',
+    });
+
+    expect(firstResult.statusCode).toBe(201);
+    expect(retryResult.data).toEqual(firstResult.data);
+    expect(firstResult.data.run).toMatchObject({
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      verificationLevel: 'client-computed',
+      metrics: {
+        accuracy: 0.5,
+        loss: 0.5,
+      },
+    });
+    expect(documents.get('playgroundRunSessions/session-01')).toMatchObject({
+      status: 'consumed',
+      consumedRunId: firstResult.data.run.runId,
+    });
+    expect(
+      documents.get(`users/learner-01/playgroundRuns/${firstResult.data.run.runId}`),
+    ).toMatchObject({
+      runId: firstResult.data.run.runId,
+      verificationLevel: 'client-computed',
+      isPinned: false,
+    });
+    expect(listedRuns.data.runs[0]).toMatchObject({
+      runId: firstResult.data.run.runId,
+      feedback: ['linear-limit', 'non-convergence'],
+    });
+  });
+
+  it('rejects saving a successful run through a cancelled session', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/perceptron': {
+        algorithmId: 'perceptron',
+        schemaVersion: 1,
+      },
+      'playgroundRunSessions/session-01': {
+        uid: 'learner-01',
+        status: 'cancelled',
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        configHash: 'hash-01',
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+        expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    await expect(
+      repository.saveRun({
+        uid: 'learner-01',
+        idempotencyKey: 'save-run-key-01',
+        sessionId: 'session-01',
+        result: createCompletedRunResult(),
+      }),
+    ).rejects.toMatchObject({
+      code: 'PLAYGROUND_RUN_SESSION_NOT_ISSUED',
+      statusCode: 409,
+    });
+  });
+
+  it('keeps only the newest 50 unpinned runs for a learner scenario', async () => {
+    const initialDocuments: Record<string, Record<string, unknown>> = {
+      'users/learner-01/algorithmUnlocks/perceptron': {
+        algorithmId: 'perceptron',
+        schemaVersion: 1,
+      },
+      'playgroundRunSessions/session-01': {
+        uid: 'learner-01',
+        status: 'issued',
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        configHash: 'hash-01',
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+        expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+      },
+    };
+
+    for (let index = 1; index <= 50; index += 1) {
+      initialDocuments[`users/learner-01/playgroundRuns/run-${String(index).padStart(2, '0')}`] = {
+        runId: `run-${String(index).padStart(2, '0')}`,
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        isPinned: false,
+        createdAtMillis: index,
+      };
+    }
+
+    const { documents, firestore } = createFakeFirestore(initialDocuments);
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    await repository.saveRun({
+      uid: 'learner-01',
+      idempotencyKey: 'save-run-key-01',
+      sessionId: 'session-01',
+      result: createCompletedRunResult(),
+    });
+
+    const retainedRunPaths = [...documents.keys()].filter((path) =>
+      path.startsWith('users/learner-01/playgroundRuns/'),
+    );
+
+    expect(retainedRunPaths).toHaveLength(50);
+    expect(documents.has('users/learner-01/playgroundRuns/run-01')).toBe(false);
+  });
+
+  it('creates, lists, renames, and deletes an owner saved config', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/perceptron': {
+        algorithmId: 'perceptron',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const createdConfig = await repository.createConfig({
+      uid: 'learner-01',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      name: '  XOR baseline  ',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+    });
+    const listedBeforeRename = await repository.listConfigs({
+      uid: 'learner-01',
+      scenarioId: 'pg-xor',
+    });
+    const renamedConfig = await repository.updateConfig({
+      uid: 'learner-01',
+      configId: createdConfig.data.config.configId,
+      name: 'Renamed XOR baseline',
+    });
+
+    await repository.deleteConfig({
+      uid: 'learner-01',
+      configId: createdConfig.data.config.configId,
+    });
+
+    expect(createdConfig.data.config).toMatchObject({
+      name: 'XOR baseline',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      compatibilityStatus: 'compatible',
+    });
+    expect(listedBeforeRename.data.configs).toHaveLength(1);
+    expect(renamedConfig.data.config.name).toBe('Renamed XOR baseline');
+    expect(
+      documents.has(`users/learner-01/playgroundConfigs/${createdConfig.data.config.configId}`),
+    ).toBe(false);
+  });
 });
+
+function createCompletedRunResult() {
+  return {
+    runId: 'client-run-01',
+    scenarioId: 'pg-xor',
+    algorithmId: 'perceptron',
+    datasetVersionId: 'ds-xor-noisy-v1',
+    configHash: 'hash-01',
+    durationMs: 1234,
+    metrics: {
+      accuracy: 0.5,
+      loss: 0.5,
+      testAccuracy: 0.5,
+      trainAccuracy: 0.5,
+    },
+    feedback: ['linear-limit', 'non-convergence'],
+    boundary: {
+      weights: [0.1, -0.1],
+      bias: 0,
+    },
+    lossCurve: [{ epoch: 100, loss: 0.5 }],
+  };
+}

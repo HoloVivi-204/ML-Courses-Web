@@ -5,7 +5,11 @@ import { Link, useParams } from 'react-router-dom';
 
 import type { Locale } from '../catalog/course-data';
 import { useAuth } from '../auth/auth-context';
-import type { LearningApiClient } from '../learning/learning-api';
+import type {
+  LearningApiClient,
+  PlaygroundConfigRecord,
+  PlaygroundRunRecord,
+} from '../learning/learning-api';
 import { createMlWorkerController } from './ml-worker-controller';
 import {
   validateXorPerceptronConfig,
@@ -27,6 +31,10 @@ const DEFAULT_CONFIG: XorPerceptronConfig = {
   trainRatio: 0.75,
   seed: 42,
 };
+const DEFAULT_CONFIG_NAME = 'XOR baseline';
+const PLAYGROUND_SCENARIO_ID = 'pg-xor';
+const PLAYGROUND_ALGORITHM_ID = 'perceptron';
+const PLAYGROUND_DATASET_VERSION_ID = 'ds-xor-noisy-v1';
 
 export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProps) {
   const { t } = useTranslation();
@@ -41,6 +49,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   const [status, setStatus] = useState<RunStatus>('idle');
   const [progress, setProgress] = useState<XorPerceptronProgressEvent | null>(null);
   const [result, setResult] = useState<XorPerceptronResult | null>(null);
+  const [savedRuns, setSavedRuns] = useState<PlaygroundRunRecord[]>([]);
+  const [savedConfigs, setSavedConfigs] = useState<PlaygroundConfigRecord[]>([]);
+  const [isPersistenceLoading, setIsPersistenceLoading] = useState(false);
+  const [configName, setConfigName] = useState(DEFAULT_CONFIG_NAME);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [safeError, setSafeError] = useState<string | null>(null);
   const activeRunRef = useRef<{ runId: string; sessionId: string } | null>(null);
   const isStoppingRef = useRef(false);
@@ -55,6 +68,24 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     return idToken;
   }, [getIdToken, t]);
 
+  const loadSavedArtifacts = useCallback(
+    async (idToken: string) => {
+      const [runs, configs] = await Promise.all([
+        learningApiClient.listPlaygroundRuns({
+          idToken,
+          scenarioId: PLAYGROUND_SCENARIO_ID,
+        }),
+        learningApiClient.listPlaygroundConfigs({
+          idToken,
+          scenarioId: PLAYGROUND_SCENARIO_ID,
+        }),
+      ]);
+
+      return { configs, runs };
+    },
+    [learningApiClient],
+  );
+
   useEffect(() => {
     let isMounted = true;
 
@@ -62,12 +93,37 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       try {
         const idToken = await readRequiredIdToken();
         const snapshot = await learningApiClient.getProgress(idToken);
+        const isUnlocked = snapshot.algorithmUnlocks.some(
+          (unlock) => unlock.algorithmId === PLAYGROUND_ALGORITHM_ID,
+        );
 
         if (isMounted) {
-          setAlgorithmUnlocked(
-            snapshot.algorithmUnlocks.some((unlock) => unlock.algorithmId === 'perceptron'),
-          );
+          setAlgorithmUnlocked(isUnlocked);
           setSafeError(null);
+        }
+
+        if (isUnlocked) {
+          if (isMounted) {
+            setIsPersistenceLoading(true);
+          }
+
+          try {
+            const artifacts = await loadSavedArtifacts(idToken);
+
+            if (isMounted) {
+              setSavedRuns(artifacts.runs);
+              setSavedConfigs(artifacts.configs);
+              setPersistenceError(null);
+            }
+          } catch {
+            if (isMounted) {
+              setPersistenceError(t('playground.error.persistence'));
+            }
+          } finally {
+            if (isMounted) {
+              setIsPersistenceLoading(false);
+            }
+          }
         }
       } catch {
         if (isMounted) {
@@ -85,13 +141,13 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     return () => {
       isMounted = false;
     };
-  }, [learningApiClient, readRequiredIdToken, t]);
+  }, [learningApiClient, loadSavedArtifacts, readRequiredIdToken, t]);
 
   useEffect(() => {
     return () => controller.dispose();
   }, [controller]);
 
-  if (scenarioId !== 'pg-xor') {
+  if (scenarioId !== PLAYGROUND_SCENARIO_ID) {
     return <PlaygroundNotFoundPage />;
   }
 
@@ -130,17 +186,20 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       setProgress(null);
       setResult(null);
       setSafeError(null);
+      setPersistenceError(null);
+      isStoppingRef.current = false;
 
       const idToken = await readRequiredIdToken();
       const session = await learningApiClient.createPlaygroundRunSession({
         idToken,
-        scenarioId: 'pg-xor',
-        algorithmId: 'perceptron',
-        datasetVersionId: 'ds-xor-noisy-v1',
+        scenarioId: PLAYGROUND_SCENARIO_ID,
+        algorithmId: PLAYGROUND_ALGORITHM_ID,
+        datasetVersionId: PLAYGROUND_DATASET_VERSION_ID,
         deviceProfile,
         config,
       });
       const runId = createRunId();
+      const startedAt = Date.now();
 
       activeRunRef.current = { runId, sessionId: session.sessionId };
 
@@ -159,8 +218,32 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
       if (activeRunRef.current?.runId === runResult.runId) {
         setResult(runResult);
-        setStatus('completed');
-        activeRunRef.current = null;
+        try {
+          const savedRun = await learningApiClient.savePlaygroundRun({
+            idToken,
+            idempotencyKey: createRunSaveIdempotencyKey(runResult.runId),
+            sessionId: session.sessionId,
+            result: {
+              ...runResult,
+              configHash: session.configHash,
+              durationMs: Math.max(0, Date.now() - startedAt),
+            },
+          });
+
+          if (activeRunRef.current?.runId === runResult.runId) {
+            setSavedRuns((currentRuns) => upsertSavedRun(currentRuns, savedRun));
+            setPersistenceError(null);
+          }
+        } catch {
+          if (activeRunRef.current?.runId === runResult.runId) {
+            setPersistenceError(t('playground.error.persistence'));
+          }
+        }
+
+        if (activeRunRef.current?.runId === runResult.runId) {
+          setStatus('completed');
+          activeRunRef.current = null;
+        }
       }
     } catch (error) {
       if (!isStoppingRef.current) {
@@ -206,7 +289,71 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     setProgress(null);
     setResult(null);
     setSafeError(null);
+    setPersistenceError(null);
     setStatus('idle');
+  }
+
+  async function handleSaveConfig() {
+    if (!user || status === 'running' || status === 'stopping') {
+      return;
+    }
+
+    try {
+      validateXorPerceptronConfig(config, deviceProfile);
+      setPersistenceError(null);
+      const idToken = await readRequiredIdToken();
+      const savedConfig = await learningApiClient.createPlaygroundConfig({
+        idToken,
+        name: configName,
+        scenarioId: PLAYGROUND_SCENARIO_ID,
+        algorithmId: PLAYGROUND_ALGORITHM_ID,
+        datasetVersionId: PLAYGROUND_DATASET_VERSION_ID,
+        config,
+      });
+
+      setConfigName(savedConfig.name);
+      setSavedConfigs((currentConfigs) => upsertSavedConfig(currentConfigs, savedConfig));
+    } catch {
+      setPersistenceError(t('playground.error.persistence'));
+    }
+  }
+
+  function handleRestoreConfig(savedConfig: PlaygroundConfigRecord) {
+    if (savedConfig.compatibilityStatus !== 'compatible') {
+      return;
+    }
+
+    setConfig(savedConfig.config);
+    setProgress(null);
+    setResult(null);
+    setSafeError(null);
+    setStatus('idle');
+  }
+
+  async function handleDeleteRun(runId: string) {
+    try {
+      const idToken = await readRequiredIdToken();
+
+      await learningApiClient.deletePlaygroundRun({ idToken, runId });
+      setSavedRuns((currentRuns) => currentRuns.filter((run) => run.runId !== runId));
+      setPersistenceError(null);
+    } catch {
+      setPersistenceError(t('playground.error.persistence'));
+    }
+  }
+
+  async function handleDeleteConfig(configId: string) {
+    try {
+      const idToken = await readRequiredIdToken();
+
+      await learningApiClient.deletePlaygroundConfig({ idToken, configId });
+      setSavedConfigs((currentConfigs) =>
+        currentConfigs.filter((savedConfig) => savedConfig.configId !== configId),
+      );
+      setPersistenceError(null);
+    } catch {
+      setPersistenceError(t('playground.error.persistence'));
+    }
   }
 
   return (
@@ -282,6 +429,25 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
               {t('playground.reset')}
             </button>
           </div>
+          <div className="playground-config-save">
+            <label className="playground-text-field">
+              <span>{t('playground.configs.name')}</span>
+              <input
+                aria-label={t('playground.configs.name')}
+                maxLength={80}
+                onChange={(event) => setConfigName(event.currentTarget.value)}
+                type="text"
+                value={configName}
+              />
+            </label>
+            <button
+              disabled={status === 'running' || status === 'stopping'}
+              onClick={handleSaveConfig}
+              type="button"
+            >
+              {t('playground.configs.save')}
+            </button>
+          </div>
         </form>
 
         <section className="playground-output" aria-live="polite">
@@ -300,6 +466,91 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           {safeError ? <p className="playground-error">{safeError}</p> : null}
         </section>
       </section>
+
+      <section className="playground-persistence">
+        <section className="playground-history" aria-live="polite">
+          <h2>{t('playground.history.title')}</h2>
+          {isPersistenceLoading ? (
+            <p className="playground-muted" role="status">
+              {t('playground.persistence.loading')}
+            </p>
+          ) : null}
+          {savedRuns.length > 0 ? (
+            <ul className="playground-card-list">
+              {savedRuns.map((savedRun) => (
+                <li className="playground-history-card" key={savedRun.runId}>
+                  <div>
+                    <strong>{savedRun.runId}</strong>
+                    <span>{savedRun.verificationLevel}</span>
+                  </div>
+                  <p>
+                    {t('playground.history.accuracy', {
+                      accuracy: formatPercent(savedRun.metrics.accuracy),
+                    })}{' '}
+                    ·{' '}
+                    {t('playground.history.duration', {
+                      duration: savedRun.durationMs,
+                    })}
+                  </p>
+                  <button onClick={() => void handleDeleteRun(savedRun.runId)} type="button">
+                    {t('playground.history.delete')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="playground-muted">{t('playground.history.empty')}</p>
+          )}
+        </section>
+
+        <section className="playground-configs">
+          <h2>{t('playground.configs.title')}</h2>
+          {savedConfigs.length > 0 ? (
+            <ul className="playground-card-list">
+              {savedConfigs.map((savedConfig) => (
+                <li className="playground-config-card" key={savedConfig.configId}>
+                  <div>
+                    <strong>{savedConfig.name}</strong>
+                    <span>{savedConfig.compatibilityStatus}</span>
+                  </div>
+                  <p>
+                    lr {savedConfig.config.learningRate} · epochs {savedConfig.config.epochs} · seed{' '}
+                    {savedConfig.config.seed}
+                  </p>
+                  {savedConfig.compatibilityStatus === 'incompatible' ? (
+                    <p className="playground-error">
+                      {savedConfig.compatibilityReason ?? t('playground.configs.incompatible')}
+                    </p>
+                  ) : null}
+                  <div className="playground-card-actions">
+                    <button
+                      aria-label={`${t('playground.configs.restore')} ${savedConfig.name}`}
+                      disabled={
+                        savedConfig.compatibilityStatus !== 'compatible' ||
+                        status === 'running' ||
+                        status === 'stopping'
+                      }
+                      onClick={() => handleRestoreConfig(savedConfig)}
+                      type="button"
+                    >
+                      {t('playground.configs.restore')}
+                    </button>
+                    <button
+                      onClick={() => void handleDeleteConfig(savedConfig.configId)}
+                      type="button"
+                    >
+                      {t('playground.configs.delete')}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="playground-muted">{t('playground.configs.empty')}</p>
+          )}
+        </section>
+      </section>
+      {persistenceError ? <p className="playground-error">{persistenceError}</p> : null}
     </main>
   );
 }
@@ -387,6 +638,27 @@ function PlaygroundNotFoundPage() {
 
 function createRunId(): string {
   return `run-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
+}
+
+function createRunSaveIdempotencyKey(runId: string): string {
+  return `playground-run-save-${runId}`;
+}
+
+function upsertSavedRun(
+  currentRuns: readonly PlaygroundRunRecord[],
+  savedRun: PlaygroundRunRecord,
+): PlaygroundRunRecord[] {
+  return [savedRun, ...currentRuns.filter((run) => run.runId !== savedRun.runId)].slice(0, 50);
+}
+
+function upsertSavedConfig(
+  currentConfigs: readonly PlaygroundConfigRecord[],
+  savedConfig: PlaygroundConfigRecord,
+): PlaygroundConfigRecord[] {
+  return [
+    savedConfig,
+    ...currentConfigs.filter((config) => config.configId !== savedConfig.configId),
+  ];
 }
 
 function formatPercent(value: number): string {

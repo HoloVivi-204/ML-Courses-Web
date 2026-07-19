@@ -16,6 +16,7 @@ import { createDefaultLearningRepository, type LearningRepository } from './lear
 import {
   createDefaultPlaygroundRepository,
   type PlaygroundRepository,
+  type UpdatePlaygroundConfigInput,
 } from './playground-repository.js';
 import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
 
@@ -75,6 +76,10 @@ function sendSuccess(response: Response, statusCode: number, data: unknown): voi
   });
 }
 
+function sendNoContent(response: Response): void {
+  response.status(204).send();
+}
+
 function isInvalidJsonError(error: unknown): boolean {
   return error instanceof SyntaxError && 'body' in error;
 }
@@ -110,6 +115,16 @@ function getRouteParam(request: Request, name: string): string {
   return value;
 }
 
+function getStringQueryField(request: Request, name: string): string {
+  const value = request.query[name];
+
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, 'INVALID_QUERY_PARAMETER', `${name} query parameter is required.`);
+  }
+
+  return value.trim();
+}
+
 function getStringArrayBodyField(request: Request, name: string): string[] {
   const value = (request.body as Record<string, unknown> | undefined)?.[name];
 
@@ -138,6 +153,30 @@ function getStringBodyField(request: Request, name: string): string {
   }
 
   return value.trim();
+}
+
+function getOptionalStringBodyField(request: Request, name: string): string | undefined {
+  const value = getObjectBody(request)[name];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a non-empty string.`);
+  }
+
+  return value.trim();
+}
+
+function getBodyField(request: Request, name: string): unknown {
+  const body = getObjectBody(request);
+
+  if (!(name in body)) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} is required.`);
+  }
+
+  return body[name];
 }
 
 function getDeviceProfileBodyField(request: Request): 'desktop' | 'mobile' {
@@ -437,6 +476,133 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         });
 
         sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post('/api/v1/playground-runs', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getPlaygroundRepository().saveRun({
+        uid: authUser.uid,
+        idempotencyKey: getIdempotencyKey(request),
+        sessionId: getStringBodyField(request, 'sessionId'),
+        result: getBodyField(request, 'result'),
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/v1/playground-runs', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getPlaygroundRepository().listRuns({
+        uid: authUser.uid,
+        scenarioId: getStringQueryField(request, 'scenarioId'),
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete('/api/v1/playground-runs/:runId', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+
+      await getPlaygroundRepository().deleteRun({
+        uid: authUser.uid,
+        runId: getRouteParam(request, 'runId'),
+      });
+
+      sendNoContent(response);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/v1/playground-configs', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const body = getObjectBody(request);
+      const result = await getPlaygroundRepository().createConfig({
+        uid: authUser.uid,
+        name: getStringBodyField(request, 'name'),
+        scenarioId: getStringBodyField(request, 'scenarioId'),
+        algorithmId: getStringBodyField(request, 'algorithmId'),
+        datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
+        config: body.config,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/v1/playground-configs', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getPlaygroundRepository().listConfigs({
+        uid: authUser.uid,
+        scenarioId: getStringQueryField(request, 'scenarioId'),
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch(
+    '/api/v1/playground-configs/:configId',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const body = getObjectBody(request);
+        const input: UpdatePlaygroundConfigInput = {
+          uid: authUser.uid,
+          configId: getRouteParam(request, 'configId'),
+        };
+        const name = getOptionalStringBodyField(request, 'name');
+
+        if (name !== undefined) {
+          input.name = name;
+        }
+
+        if ('config' in body) {
+          input.config = body.config;
+        }
+
+        const result = await getPlaygroundRepository().updateConfig(input);
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.delete(
+    '/api/v1/playground-configs/:configId',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+
+        await getPlaygroundRepository().deleteConfig({
+          uid: authUser.uid,
+          configId: getRouteParam(request, 'configId'),
+        });
+
+        sendNoContent(response);
       } catch (error) {
         next(error);
       }

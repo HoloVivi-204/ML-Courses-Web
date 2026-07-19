@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -146,6 +146,14 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       verificationLevel: 'client-computed',
       workerProtocolVersion: 'ml-worker-v1',
     }),
+    createPlaygroundConfig: vi.fn().mockResolvedValue(
+      createSavedPlaygroundConfigFixture({
+        configId: 'config-pg-xor-01',
+        name: 'XOR baseline',
+      }),
+    ),
+    deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
+    deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -216,6 +224,13 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       ],
     }),
+    listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
+    listPlaygroundRuns: vi.fn().mockResolvedValue([]),
+    savePlaygroundRun: vi.fn().mockResolvedValue(
+      createSavedPlaygroundRunFixture({
+        runId: 'run-pg-xor-01',
+      }),
+    ),
     submitQuizAttempt: vi.fn().mockResolvedValue({
       bestScore: 100,
       feedback: [
@@ -236,6 +251,56 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       score: 100,
     }),
     ...overrides,
+  };
+}
+
+function createSavedPlaygroundRunFixture(input: { runId: string }) {
+  return {
+    runId: input.runId,
+    scenarioId: 'pg-xor' as const,
+    algorithmId: 'perceptron' as const,
+    datasetVersionId: 'ds-xor-noisy-v1' as const,
+    config: {
+      learningRate: 0.1,
+      epochs: 100,
+      trainRatio: 0.75,
+      seed: 42,
+    },
+    durationMs: 1234,
+    feedback: ['linear-limit'] as const,
+    isPinned: false as const,
+    metrics: {
+      accuracy: 0.5,
+      loss: 0.5,
+      testAccuracy: 0.5,
+      trainAccuracy: 0.5,
+    },
+    createdAt: '2026-07-19T14:00:00.000Z',
+    targetReached: null,
+    targetVersionId: null,
+    verificationLevel: 'client-computed' as const,
+  };
+}
+
+function createSavedPlaygroundConfigFixture(input: {
+  config?: { epochs: number; learningRate: number; seed: number; trainRatio: number };
+  configId: string;
+  name: string;
+}) {
+  return {
+    configId: input.configId,
+    name: input.name,
+    scenarioId: 'pg-xor' as const,
+    algorithmId: 'perceptron' as const,
+    datasetVersionId: 'ds-xor-noisy-v1' as const,
+    config: input.config ?? {
+      learningRate: 0.1,
+      epochs: 100,
+      trainRatio: 0.75,
+      seed: 42,
+    },
+    compatibilityStatus: 'compatible' as const,
+    compatibilityReason: null,
   };
 }
 
@@ -738,7 +803,111 @@ describe('public learning journey', () => {
         seed: 42,
       },
     });
+    await waitFor(() =>
+      expect(learningApiClient.savePlaygroundRun).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        idempotencyKey: expect.any(String),
+        sessionId: 'session-pg-xor-01',
+        result: expect.objectContaining({
+          runId: expect.any(String),
+          scenarioId: 'pg-xor',
+          algorithmId: 'perceptron',
+          datasetVersionId: 'ds-xor-noisy-v1',
+          configHash: '9'.repeat(64),
+          durationMs: expect.any(Number),
+        }),
+      }),
+    );
+    expect(await screen.findByText('run-pg-xor-01')).toBeVisible();
+    expect(screen.getAllByText('client-computed')).not.toHaveLength(0);
     vi.unstubAllGlobals();
+  });
+
+  it('loads saved pg-xor runs and configs, then restores a config without starting a run', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundConfigs: vi.fn().mockResolvedValue([
+        createSavedPlaygroundConfigFixture({
+          configId: 'config-pg-xor-01',
+          name: 'XOR tuned',
+          config: {
+            learningRate: 0.2,
+            epochs: 200,
+            trainRatio: 0.8,
+            seed: 7,
+          },
+        }),
+      ]),
+      listPlaygroundRuns: vi.fn().mockResolvedValue([
+        createSavedPlaygroundRunFixture({
+          runId: 'run-history-01',
+        }),
+      ]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Lịch sử run')).toBeVisible();
+    expect(screen.getByText('run-history-01')).toBeVisible();
+    expect(screen.getByText('XOR tuned')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /Khôi phục/i }));
+
+    expect(screen.getByRole('spinbutton', { name: 'Tốc độ học' })).toHaveValue(0.2);
+    expect(screen.getByRole('spinbutton', { name: 'Epochs' })).toHaveValue(200);
+    expect(screen.getByRole('spinbutton', { name: 'Tỷ lệ train' })).toHaveValue(0.8);
+    expect(screen.getByRole('spinbutton', { name: 'Seed' })).toHaveValue(7);
+    expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+    });
+    expect(learningApiClient.listPlaygroundConfigs).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+    });
+    expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+  });
+
+  it('saves the current pg-xor config for later restore', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      createPlaygroundConfig: vi.fn().mockResolvedValue(
+        createSavedPlaygroundConfigFixture({
+          configId: 'config-pg-xor-02',
+          name: 'XOR thử nghiệm',
+        }),
+      ),
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' });
+    await user.clear(screen.getByLabelText('Tên cấu hình'));
+    await user.type(screen.getByLabelText('Tên cấu hình'), 'XOR thử nghiệm');
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+
+    expect(await screen.findByText('XOR thử nghiệm')).toBeVisible();
+    expect(learningApiClient.createPlaygroundConfig).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      name: 'XOR thử nghiệm',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+    });
   });
 
   it('stops pg-xor without saving a successful worker result', async () => {
@@ -765,6 +934,7 @@ describe('public learning journey', () => {
       idToken: 'local-id-token',
       sessionId: 'session-pg-xor-01',
     });
+    expect(learningApiClient.savePlaygroundRun).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
