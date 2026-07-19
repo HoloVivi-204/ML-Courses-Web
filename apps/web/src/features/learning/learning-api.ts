@@ -24,6 +24,71 @@ export interface DemoCompletionResult {
   };
 }
 
+export type QuizQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
+
+export type QuizAnswerValue = readonly string[] | string;
+
+export interface QuizAnswer {
+  questionId: string;
+  value: QuizAnswerValue;
+}
+
+export interface QuizAttemptResult {
+  attempt: {
+    attemptId: string;
+    attemptNumber: number;
+    expiresAt: string;
+    passingScorePercent: number;
+    questionCount: number;
+    quizId: string;
+    quizKind: 'module' | 'post';
+    quizRevisionId: string;
+    requiredCorrectCount: number | null;
+    shuffleSeed: string | null;
+  };
+  mastery: {
+    en: string;
+    vi: string;
+  };
+  questions: ReadonlyArray<{
+    options: ReadonlyArray<{
+      optionId: string;
+      text: {
+        en: string;
+        vi: string;
+      };
+    }>;
+    prompt: {
+      en: string;
+      vi: string;
+    };
+    questionId: string;
+    sourceId: string;
+    type: QuizQuestionType;
+  }>;
+}
+
+export interface QuizSubmissionResult {
+  bestScore: number;
+  feedback: ReadonlyArray<{
+    correctAnswer?: QuizAnswerValue;
+    explanation?: {
+      en: string;
+      vi: string;
+    };
+    hint: {
+      en: string;
+      vi: string;
+    } | null;
+    hintLevel: 0 | 1 | 2;
+    isCorrect: boolean;
+    questionId: string;
+  }>;
+  newlyUnlocked: ReadonlyArray<{ id: string; type: 'algorithm' | 'module' | 'post' }>;
+  passed: boolean;
+  score: number;
+}
+
 export interface LearningApiClient {
   bootstrapProfile(idToken: string): Promise<void>;
   completeDemo(input: {
@@ -32,11 +97,18 @@ export interface LearningApiClient {
     idempotencyKey: string;
     viewedStepIds: readonly string[];
   }): Promise<DemoCompletionResult>;
+  createQuizAttempt(input: { idToken: string; quizId: string }): Promise<QuizAttemptResult>;
   enrollCourse(input: {
     courseId: string;
     idToken: string;
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
+  submitQuizAttempt(input: {
+    answers: readonly QuizAnswer[];
+    attemptId: string;
+    idToken: string;
+    idempotencyKey: string;
+  }): Promise<QuizSubmissionResult>;
 }
 
 interface SuccessEnvelope<TData> {
@@ -83,6 +155,16 @@ export function createFetchLearningApiClient(): LearningApiClient {
         }),
       );
     },
+    async createQuizAttempt({ idToken, quizId }) {
+      return readSuccessEnvelope<QuizAttemptResult>(
+        await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/attempts`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+          method: 'POST',
+        }),
+      );
+    },
     async enrollCourse({ courseId, idToken, idempotencyKey }) {
       return readSuccessEnvelope<EnrollmentResult>(
         await fetch(`/api/v1/courses/${encodeURIComponent(courseId)}/enrollments`, {
@@ -91,6 +173,19 @@ export function createFetchLearningApiClient(): LearningApiClient {
             authorization: `Bearer ${idToken}`,
             'idempotency-key': idempotencyKey,
           },
+        }),
+      );
+    },
+    async submitQuizAttempt({ answers, attemptId, idToken, idempotencyKey }) {
+      return readSuccessEnvelope<QuizSubmissionResult>(
+        await fetch(`/api/v1/quiz-attempts/${encodeURIComponent(attemptId)}/submissions`, {
+          body: JSON.stringify({ answers }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
         }),
       );
     },

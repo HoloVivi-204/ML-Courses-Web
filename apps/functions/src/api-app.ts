@@ -13,6 +13,7 @@ import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { createDefaultLearningRepository, type LearningRepository } from './learning-repository.js';
+import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
 
 export interface VerifiedAuthUser {
   displayName: string;
@@ -112,6 +113,64 @@ function getStringArrayBodyField(request: Request, name: string): string[] {
   }
 
   return [...new Set(value.map((item) => item.trim()))];
+}
+
+function getQuizAnswersBodyField(request: Request): QuizAnswer[] {
+  const value = (request.body as Record<string, unknown> | undefined)?.answers;
+
+  if (!Array.isArray(value)) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'answers must be an array.');
+  }
+
+  return value.map((item) => {
+    if (!isQuizAnswerBodyItem(item)) {
+      throw new ApiError(
+        400,
+        'INVALID_REQUEST_BODY',
+        'Each answer must contain a questionId and a string or string[] value.',
+      );
+    }
+
+    return {
+      questionId: item.questionId.trim(),
+      value: normalizeQuizAnswerValue(item.value),
+    };
+  });
+}
+
+function isQuizAnswerBodyItem(
+  value: unknown,
+): value is { questionId: string; value: QuizAnswerValue } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'questionId' in value &&
+    'value' in value &&
+    typeof value.questionId === 'string' &&
+    value.questionId.trim().length > 0 &&
+    isQuizAnswerValue(value.value)
+  );
+}
+
+function isQuizAnswerValue(value: unknown): value is QuizAnswerValue {
+  return (
+    (typeof value === 'string' && value.trim().length > 0) ||
+    (Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((item) => typeof item === 'string' && item.trim().length > 0))
+  );
+}
+
+function normalizeQuizAnswerValue(value: QuizAnswerValue): QuizAnswerValue {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((item) => item.trim()))];
+  }
+
+  return value;
 }
 
 function createAuthMiddleware(
@@ -261,6 +320,40 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       next(error);
     }
   });
+
+  app.post('/api/v1/quizzes/:quizId/attempts', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getLearningRepository().createQuizAttempt({
+        quizId: getRouteParam(request, 'quizId'),
+        uid: authUser.uid,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post(
+    '/api/v1/quiz-attempts/:attemptId/submissions',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getLearningRepository().submitQuizAttempt({
+          answers: getQuizAnswersBodyField(request),
+          attemptId: getRouteParam(request, 'attemptId'),
+          idempotencyKey: getIdempotencyKey(request),
+          uid: authUser.uid,
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.use((_request, response) => {
     sendError(response, 404, {

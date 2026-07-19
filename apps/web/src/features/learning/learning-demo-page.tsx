@@ -30,6 +30,7 @@ const copy: Readonly<
       failed: string;
       fixed: string;
       heading: string;
+      moduleQuiz: string;
       next: string;
       notFoundBack: string;
       notFoundBody: string;
@@ -50,6 +51,7 @@ const copy: Readonly<
     failed: 'Demo completion could not be recorded. Revisit the required steps and try again.',
     fixed: 'FIXED DEMO',
     heading: 'Perceptron demo: AND gate',
+    moduleQuiz: 'Open the module quiz',
     next: 'Next step',
     notFoundBack: 'Back to course catalog',
     notFoundBody: 'This demo is not available for the current learner access.',
@@ -68,6 +70,7 @@ const copy: Readonly<
     failed: 'Chưa thể ghi nhận hoàn thành demo. Hãy xem lại các bước bắt buộc rồi thử lại.',
     fixed: 'DEMO CỐ ĐỊNH',
     heading: 'Demo Perceptron: cổng AND',
+    moduleQuiz: 'Mở quiz module',
     next: 'Bước tiếp theo',
     notFoundBack: 'Về danh sách khóa học',
     notFoundBody: 'Demo này chưa khả dụng với quyền truy cập hiện tại.',
@@ -235,6 +238,15 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
             <CheckCircle2 aria-hidden="true" size={18} />
             {text.completed}: {completionResult.event.demoId}
           </p>
+        ) : null}
+        {completionStatus === 'ready' ? (
+          <Link
+            className="secondary-link"
+            to={`/learn/${demo.courseId}/quizzes/quiz-module-dl-m01`}
+          >
+            {text.moduleQuiz}
+            <ArrowRight aria-hidden="true" size={16} />
+          </Link>
         ) : null}
       </section>
     </main>

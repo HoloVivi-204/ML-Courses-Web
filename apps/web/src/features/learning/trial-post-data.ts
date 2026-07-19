@@ -9,6 +9,7 @@ export interface TrialPost {
   durationMinutes: number;
   id: string;
   moduleId: string;
+  postQuizId: string;
   title: LocalizedText;
 }
 
@@ -373,6 +374,7 @@ const trialPosts = [
     durationMinutes: 8,
     id: TRIAL_POST_ID,
     moduleId: 'dl-m01-neuron-perceptron',
+    postQuizId: 'quiz-post-dl-p01',
     title: {
       en: 'How does a neuron make a decision?',
       vi: 'Một neuron đưa ra quyết định như thế nào?',

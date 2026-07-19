@@ -20,6 +20,25 @@ function createLearningApiClient() {
         viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
       },
     }),
+    createQuizAttempt: vi.fn().mockResolvedValue({
+      attempt: {
+        attemptId: 'attempt-quiz-post-dl-p01-01',
+        attemptNumber: 1,
+        expiresAt: '2026-07-19T13:00:00.000Z',
+        passingScorePercent: 100,
+        questionCount: 3,
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post',
+        quizRevisionId: 'quiz-post-dl-p01-rev-r1',
+        requiredCorrectCount: 3,
+        shuffleSeed: null,
+      },
+      mastery: {
+        en: 'Answer all 3 questions correctly to complete this lesson.',
+        vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+      },
+      questions: [],
+    }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -31,6 +50,13 @@ function createLearningApiClient() {
         status: 'in-progress',
       },
       nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    }),
+    submitQuizAttempt: vi.fn().mockResolvedValue({
+      bestScore: 100,
+      feedback: [],
+      newlyUnlocked: [{ id: 'dl-p01-neuron-perceptron', type: 'post' }],
+      passed: true,
+      score: 100,
     }),
   };
 }

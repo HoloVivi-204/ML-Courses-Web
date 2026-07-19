@@ -35,6 +35,96 @@ function createLearningApiClient(): LearningApiClient {
         viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
       },
     }),
+    createQuizAttempt: vi.fn().mockResolvedValue({
+      attempt: {
+        attemptId: 'attempt-quiz-post-dl-p01-01',
+        attemptNumber: 1,
+        expiresAt: '2026-07-19T13:00:00.000Z',
+        passingScorePercent: 100,
+        questionCount: 3,
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post',
+        quizRevisionId: 'quiz-post-dl-p01-rev-r1',
+        requiredCorrectCount: 3,
+        shuffleSeed: null,
+      },
+      mastery: {
+        en: 'Answer all 3 questions correctly to complete this lesson.',
+        vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+      },
+      questions: [
+        {
+          options: [
+            {
+              optionId: 'opt-linear-limit',
+              text: {
+                en: 'A straight-line decision boundary has a known limit.',
+                vi: 'Ranh giới quyết định thẳng có một giới hạn rõ.',
+              },
+            },
+            {
+              optionId: 'opt-randomness',
+              text: {
+                en: 'A Perceptron only fails when the seed is random.',
+                vi: 'Perceptron chỉ thất bại khi seed là ngẫu nhiên.',
+              },
+            },
+          ],
+          prompt: {
+            en: 'What does the XOR example show?',
+            vi: 'Ví dụ XOR cho thấy điều gì?',
+          },
+          questionId: 'q-dl-p01-perceptron-role',
+          sourceId: 'act-dl-p01-neuron-perceptron-quiz-01',
+          type: 'single-choice',
+        },
+        {
+          options: [
+            {
+              optionId: 'opt-weighted-sum',
+              text: {
+                en: 'Weighted sum with bias',
+                vi: 'Tổng có trọng số kèm độ lệch',
+              },
+            },
+            {
+              optionId: 'opt-step-activation',
+              text: {
+                en: 'Step activation that returns 0 or 1',
+                vi: 'Hàm bước trả về 0 hoặc 1',
+              },
+            },
+            {
+              optionId: 'opt-uploaded-dataset',
+              text: {
+                en: 'Uploaded arbitrary dataset',
+                vi: 'Dataset tùy ý do người học tải lên',
+              },
+            },
+          ],
+          prompt: {
+            en: 'Which two parts are in the Perceptron decision rule?',
+            vi: 'Hai phần nào nằm trong quy tắc quyết định Perceptron?',
+          },
+          questionId: 'q-dl-p01-perceptron-parts',
+          sourceId: 'act-dl-p01-neuron-perceptron-quiz-02',
+          type: 'multiple-choice',
+        },
+        {
+          options: [
+            { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+            { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+          ],
+          prompt: {
+            en: 'True or false: AND is linearly separable.',
+            vi: 'Đúng hay sai: AND tách tuyến tính được.',
+          },
+          questionId: 'q-dl-p01-and-linearly-separable',
+          sourceId: 'act-dl-p01-neuron-perceptron-quiz-03',
+          type: 'true-false',
+        },
+      ],
+    }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -46,6 +136,25 @@ function createLearningApiClient(): LearningApiClient {
         status: 'in-progress',
       },
       nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    }),
+    submitQuizAttempt: vi.fn().mockResolvedValue({
+      bestScore: 100,
+      feedback: [
+        {
+          correctAnswer: 'opt-linear-limit',
+          explanation: {
+            en: 'XOR is not linearly separable.',
+            vi: 'XOR không tách tuyến tính được.',
+          },
+          hint: null,
+          hintLevel: 0,
+          isCorrect: true,
+          questionId: 'q-dl-p01-perceptron-role',
+        },
+      ],
+      newlyUnlocked: [{ id: 'dl-p01-neuron-perceptron', type: 'post' }],
+      passed: true,
+      score: 100,
     }),
   };
 }
@@ -353,6 +462,71 @@ describe('public learning journey', () => {
       idToken: 'local-id-token',
       idempotencyKey: expect.any(String),
       viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+    });
+  });
+
+  it('keeps the post quiz closed without a post access grant', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Quiz chưa khả dụng' })).toBeVisible();
+    expect(learningApiClient.createQuizAttempt).not.toHaveBeenCalled();
+  });
+
+  it('lets an enrolled learner pass the post mastery quiz with server-side scoring', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: /Mở quiz bài học/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible();
+    expect(screen.getByText('Cần trả lời đúng cả 3 câu để hoàn thành bài.')).toBeVisible();
+    expect(screen.getByTestId('quiz-attempt')).not.toHaveTextContent(/correctAnswer|hint/i);
+
+    await user.click(
+      screen.getByRole('radio', {
+        name: 'Ranh giới quyết định thẳng có một giới hạn rõ.',
+      }),
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Tổng có trọng số kèm độ lệch' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Hàm bước trả về 0 hoặc 1' }));
+    await user.click(screen.getByRole('radio', { name: 'Đúng' }));
+    await user.click(screen.getByRole('button', { name: 'Nộp quiz' }));
+
+    expect(await screen.findByText('quiz_passed: quiz-post-dl-p01')).toBeVisible();
+    expect(learningApiClient.submitQuizAttempt).toHaveBeenCalledWith({
+      answers: [
+        { questionId: 'q-dl-p01-perceptron-role', value: 'opt-linear-limit' },
+        {
+          questionId: 'q-dl-p01-perceptron-parts',
+          value: ['opt-weighted-sum', 'opt-step-activation'],
+        },
+        { questionId: 'q-dl-p01-and-linearly-separable', value: 'true' },
+      ],
+      attemptId: 'attempt-quiz-post-dl-p01-01',
+      idToken: 'local-id-token',
+      idempotencyKey: expect.any(String),
     });
   });
 });

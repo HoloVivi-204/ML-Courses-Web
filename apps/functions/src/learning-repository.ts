@@ -1,7 +1,16 @@
+import { randomUUID } from 'node:crypto';
+
 import { FieldValue, getFirestore, Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import {
+  createQuizAttemptPayload,
+  getQuizManifest,
+  gradeQuizSubmission,
+  type QuizAnswer,
+  type StoredQuestionWrongCounts,
+} from './quiz-manifest.js';
 
 export interface BootstrapLearnerInput {
   displayName: string;
@@ -24,6 +33,18 @@ export interface CompleteDemoInput {
   viewedStepIds: readonly string[];
 }
 
+export interface CreateQuizAttemptInput {
+  quizId: string;
+  uid: string;
+}
+
+export interface SubmitQuizAttemptInput {
+  answers: readonly QuizAnswer[];
+  attemptId: string;
+  idempotencyKey: string;
+  uid: string;
+}
+
 export interface LearningRepository {
   bootstrapLearner(input: BootstrapLearnerInput): Promise<{
     data: unknown;
@@ -33,9 +54,17 @@ export interface LearningRepository {
     data: unknown;
     statusCode: 200;
   }>;
+  createQuizAttempt(input: CreateQuizAttemptInput): Promise<{
+    data: unknown;
+    statusCode: 201;
+  }>;
   enrollLearner(input: EnrollLearnerInput): Promise<{
     data: unknown;
     statusCode: 200 | 201;
+  }>;
+  submitQuizAttempt(input: SubmitQuizAttemptInput): Promise<{
+    data: unknown;
+    statusCode: 200;
   }>;
 }
 
@@ -83,13 +112,38 @@ interface DemoCompletionResponseData {
   };
 }
 
+interface QuizSubmissionResponseData {
+  bestScore: number;
+  feedback: readonly unknown[];
+  newlyUnlocked: ReadonlyArray<{ id: string; type: 'algorithm' | 'module' | 'post' }>;
+  passed: boolean;
+  score: number;
+}
+
 interface StoredIdempotencyRecord {
   requestHash?: unknown;
   responseData?: unknown;
   statusCode?: unknown;
 }
 
+interface StoredQuizAttempt {
+  attemptNumber?: unknown;
+  expiresAt?: unknown;
+  questionIds?: unknown;
+  quizId?: unknown;
+  quizRevisionId?: unknown;
+  status?: unknown;
+}
+
+interface StoredQuizProgress {
+  attemptCount?: unknown;
+  bestScore?: unknown;
+  passed?: unknown;
+  wrongCounts?: unknown;
+}
+
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
+const QUIZ_ATTEMPT_TTL_MS = 2 * 60 * 60 * 1_000;
 const releaseOneEnrollmentSeeds: Readonly<Record<string, EnrollmentSeed>> = {
   'course-deep-learning-basic': {
     courseId: 'course-deep-learning-basic',
@@ -191,8 +245,108 @@ function createDemoCompletionRequestHash(input: CompleteDemoInput): string {
   });
 }
 
+function createQuizSubmissionRequestHash(input: SubmitQuizAttemptInput): string {
+  return JSON.stringify({
+    operation: 'quiz-submission',
+    uid: input.uid,
+    attemptId: input.attemptId,
+    answers: input.answers
+      .map((answer) => ({
+        questionId: answer.questionId,
+        value: Array.isArray(answer.value) ? [...answer.value].sort() : answer.value,
+      }))
+      .sort((leftAnswer, rightAnswer) =>
+        leftAnswer.questionId.localeCompare(rightAnswer.questionId),
+      ),
+  });
+}
+
 function isStoredIdempotencyRecord(data: unknown): data is StoredIdempotencyRecord {
   return typeof data === 'object' && data !== null;
+}
+
+function isStoredQuizAttempt(data: unknown): data is StoredQuizAttempt {
+  return typeof data === 'object' && data !== null;
+}
+
+function isStoredQuizProgress(data: unknown): data is StoredQuizProgress {
+  return typeof data === 'object' && data !== null;
+}
+
+function getStoredAttemptCount(data: unknown): number {
+  if (!isStoredQuizProgress(data) || typeof data.attemptCount !== 'number') {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(data.attemptCount));
+}
+
+function getStoredBestScore(data: unknown): number {
+  if (!isStoredQuizProgress(data) || typeof data.bestScore !== 'number') {
+    return 0;
+  }
+
+  return Math.max(0, data.bestScore);
+}
+
+function getStoredWrongCounts(data: unknown): StoredQuestionWrongCounts {
+  if (!isStoredQuizProgress(data) || !isRecord(data.wrongCounts)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(data.wrongCounts)
+      .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+      .map(([questionId, wrongCount]) => [questionId, Math.max(0, Math.floor(wrongCount))]),
+  );
+}
+
+function getStoredQuestionIds(data: StoredQuizAttempt): string[] {
+  if (
+    !Array.isArray(data.questionIds) ||
+    data.questionIds.some((value) => typeof value !== 'string')
+  ) {
+    throw new ApiError(409, 'QUIZ_ATTEMPT_INVALID', 'Quiz attempt question order is invalid.');
+  }
+
+  return data.questionIds;
+}
+
+function getTimestampMillis(value: unknown): number | null {
+  if (value instanceof Timestamp) {
+    return value.toMillis();
+  }
+
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toMillis' in value &&
+    typeof value.toMillis === 'function'
+  ) {
+    return value.toMillis();
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function createQuizSubmissionResponseData(input: {
+  bestScore: number;
+  feedback: readonly unknown[];
+  newlyUnlocked: ReadonlyArray<{ id: string; type: 'algorithm' | 'module' | 'post' }>;
+  passed: boolean;
+  score: number;
+}): QuizSubmissionResponseData {
+  return {
+    bestScore: input.bestScore,
+    feedback: input.feedback,
+    newlyUnlocked: input.newlyUnlocked,
+    passed: input.passed,
+    score: input.score,
+  };
 }
 
 export function createFirestoreLearningRepository(firestore: Firestore): LearningRepository {
@@ -291,6 +445,88 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         });
 
         return { statusCode: 200 as const, data: responseData };
+      });
+    },
+    async createQuizAttempt(input) {
+      const manifest = getQuizManifest(input.quizId);
+      const attemptId = `attempt_${randomUUID()}`;
+      const expiresAt = Timestamp.fromMillis(Date.now() + QUIZ_ATTEMPT_TTL_MS);
+      const expiresAtIso = expiresAt.toDate().toISOString();
+
+      return firestore.runTransaction(async (transaction) => {
+        const accessRef =
+          manifest.quizKind === 'post' && manifest.postId
+            ? firestore.doc(`users/${input.uid}/contentAccess/post_${manifest.postId}`)
+            : firestore.doc(`users/${input.uid}/contentAccess/module_${manifest.moduleId}`);
+        const progressRef = firestore.doc(`users/${input.uid}/quizProgress/${input.quizId}`);
+        const attemptRef = firestore.doc(`users/${input.uid}/quizAttempts/${attemptId}`);
+        const demoCompletionRef = manifest.demoId
+          ? firestore.doc(`users/${input.uid}/demoCompletions/${manifest.demoId}`)
+          : null;
+        const [accessSnapshot, progressSnapshot, demoCompletionSnapshot] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(progressRef),
+          demoCompletionRef ? transaction.get(demoCompletionRef) : Promise.resolve(null),
+        ]);
+
+        if (!accessSnapshot.exists) {
+          throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Quiz access is required.');
+        }
+
+        if (demoCompletionRef && !demoCompletionSnapshot?.exists) {
+          throw new ApiError(
+            403,
+            'DEMO_COMPLETION_REQUIRED',
+            'Demo completion is required before this quiz.',
+          );
+        }
+
+        const attemptNumber = getStoredAttemptCount(progressSnapshot.data()) + 1;
+        const shuffleSeed =
+          attemptNumber === 1 ? null : `${input.uid}:${manifest.quizId}:${attemptNumber}`;
+        const responseData = createQuizAttemptPayload({
+          attemptId,
+          attemptNumber,
+          expiresAtIso,
+          quizId: input.quizId,
+          shuffleSeed,
+        });
+
+        transaction.set(attemptRef, {
+          schemaVersion: 1,
+          attemptNumber,
+          createdAt: FieldValue.serverTimestamp(),
+          expiresAt,
+          optionOrderByQuestionId: Object.fromEntries(
+            responseData.questions.map((question) => [
+              question.questionId,
+              question.options.map((option) => option.optionId),
+            ]),
+          ),
+          questionIds: responseData.questions.map((question) => question.questionId),
+          quizId: input.quizId,
+          quizKind: manifest.quizKind,
+          quizRevisionId: manifest.quizRevisionId,
+          shuffleSeed,
+          status: 'in-progress',
+          submittedAt: null,
+        });
+        transaction.set(
+          progressRef,
+          {
+            schemaVersion: 1,
+            attemptCount: attemptNumber,
+            bestScore: getStoredBestScore(progressSnapshot.data()),
+            passed: isStoredQuizProgress(progressSnapshot.data())
+              ? progressSnapshot.data()?.passed === true
+              : false,
+            updatedAt: FieldValue.serverTimestamp(),
+            wrongCounts: getStoredWrongCounts(progressSnapshot.data()),
+          },
+          { merge: true },
+        );
+
+        return { statusCode: 201 as const, data: responseData };
       });
     },
     async enrollLearner(input) {
@@ -392,6 +628,157 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         });
 
         return { statusCode, data: responseData };
+      });
+    },
+    async submitQuizAttempt(input) {
+      const requestHash = createQuizSubmissionRequestHash(input);
+
+      return firestore.runTransaction(async (transaction) => {
+        const attemptRef = firestore.doc(`users/${input.uid}/quizAttempts/${input.attemptId}`);
+        const idempotencyRef = firestore.doc(
+          `users/${input.uid}/idempotencyKeys/${input.idempotencyKey}`,
+        );
+        const [attemptSnapshot, idempotencySnapshot] = await Promise.all([
+          transaction.get(attemptRef),
+          transaction.get(idempotencyRef),
+        ]);
+
+        if (idempotencySnapshot.exists) {
+          const record = idempotencySnapshot.data();
+
+          if (!isStoredIdempotencyRecord(record) || record.requestHash !== requestHash) {
+            throw new ApiError(
+              409,
+              'IDEMPOTENCY_CONFLICT',
+              'This Idempotency-Key was used for a different request.',
+            );
+          }
+
+          return {
+            statusCode: 200 as const,
+            data: record.responseData,
+          };
+        }
+
+        if (!attemptSnapshot.exists) {
+          throw new ApiError(404, 'QUIZ_ATTEMPT_NOT_FOUND', 'Quiz attempt was not found.');
+        }
+
+        const attemptData = attemptSnapshot.data();
+
+        if (!isStoredQuizAttempt(attemptData) || typeof attemptData.quizId !== 'string') {
+          throw new ApiError(409, 'QUIZ_ATTEMPT_INVALID', 'Quiz attempt is invalid.');
+        }
+
+        const manifest = getQuizManifest(attemptData.quizId);
+
+        if (attemptData.quizRevisionId !== manifest.quizRevisionId) {
+          throw new ApiError(409, 'QUIZ_REVISION_MISMATCH', 'Quiz attempt revision is stale.');
+        }
+
+        if (attemptData.status !== 'in-progress') {
+          throw new ApiError(409, 'QUIZ_ATTEMPT_ALREADY_SUBMITTED', 'Quiz attempt is closed.');
+        }
+
+        const expiresAtMillis = getTimestampMillis(attemptData.expiresAt);
+
+        if (expiresAtMillis !== null && expiresAtMillis < Date.now()) {
+          throw new ApiError(409, 'QUIZ_ATTEMPT_EXPIRED', 'Quiz attempt has expired.');
+        }
+
+        const progressRef = firestore.doc(`users/${input.uid}/quizProgress/${manifest.quizId}`);
+        const progressSnapshot = await transaction.get(progressRef);
+        const previousProgress = progressSnapshot.data();
+        const grade = gradeQuizSubmission({
+          answers: input.answers,
+          previousWrongCounts: getStoredWrongCounts(previousProgress),
+          questionIds: getStoredQuestionIds(attemptData),
+          quizId: manifest.quizId,
+        });
+        const bestScore = Math.max(getStoredBestScore(previousProgress), grade.score);
+        const hasAlreadyPassed =
+          isStoredQuizProgress(previousProgress) && previousProgress.passed === true;
+        const responseData = createQuizSubmissionResponseData({
+          bestScore,
+          feedback: grade.feedback,
+          newlyUnlocked: grade.newlyUnlocked,
+          passed: grade.passed,
+          score: grade.score,
+        });
+
+        transaction.set(
+          attemptRef,
+          {
+            answers: input.answers.map((answer) => ({
+              questionId: answer.questionId,
+              value: Array.isArray(answer.value) ? [...answer.value] : answer.value,
+            })),
+            bestScore,
+            passed: grade.passed,
+            score: grade.score,
+            status: 'submitted',
+            submittedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.set(
+          progressRef,
+          {
+            schemaVersion: 1,
+            bestScore,
+            passed: hasAlreadyPassed || grade.passed,
+            ...(grade.passed && !hasAlreadyPassed
+              ? { passedAt: FieldValue.serverTimestamp() }
+              : {}),
+            updatedAt: FieldValue.serverTimestamp(),
+            wrongCounts: grade.nextWrongCounts,
+          },
+          { merge: true },
+        );
+
+        if (grade.passed) {
+          for (const unlocked of grade.newlyUnlocked) {
+            if (unlocked.type === 'post') {
+              transaction.set(
+                firestore.doc(`users/${input.uid}/postCompletions/${unlocked.id}`),
+                {
+                  schemaVersion: 1,
+                  completedAt: FieldValue.serverTimestamp(),
+                  quizId: manifest.quizId,
+                  status: 'completed',
+                  updatedAt: FieldValue.serverTimestamp(),
+                },
+                { merge: true },
+              );
+            }
+
+            if (unlocked.type === 'algorithm') {
+              transaction.set(
+                firestore.doc(`users/${input.uid}/algorithmUnlocks/${unlocked.id}`),
+                {
+                  schemaVersion: 1,
+                  algorithmId: unlocked.id,
+                  grantedAt: FieldValue.serverTimestamp(),
+                  quizId: manifest.quizId,
+                  reason: 'module-quiz-passed',
+                },
+                { merge: true },
+              );
+            }
+          }
+        }
+
+        transaction.set(idempotencyRef, {
+          schemaVersion: 1,
+          operation: 'quiz-submission',
+          requestHash,
+          responseData,
+          statusCode: 200,
+          createdAt: FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + IDEMPOTENCY_TTL_MS),
+        });
+
+        return { statusCode: 200 as const, data: responseData };
       });
     },
   };

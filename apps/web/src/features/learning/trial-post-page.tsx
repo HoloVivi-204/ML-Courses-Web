@@ -30,6 +30,8 @@ export function TrialPostPage({ locale }: TrialPostPageProps) {
     post.accessLevel === 'full' && module?.demoId
       ? `/learn/${post.courseId}/demos/${module.demoId}`
       : null;
+  const quizPath =
+    post.accessLevel === 'full' ? `/learn/${post.courseId}/quizzes/${post.postQuizId}` : null;
 
   return (
     <main className="trial-post-page page-shell">
@@ -69,6 +71,12 @@ export function TrialPostPage({ locale }: TrialPostPageProps) {
             {demoPath ? (
               <Link className="primary-link" to={demoPath}>
                 {t('trial.summary.openDemo')}
+                <MoveRight aria-hidden="true" size={17} />
+              </Link>
+            ) : null}
+            {quizPath ? (
+              <Link className="secondary-link" to={quizPath}>
+                {t('trial.summary.openQuiz')}
                 <MoveRight aria-hidden="true" size={17} />
               </Link>
             ) : null}
