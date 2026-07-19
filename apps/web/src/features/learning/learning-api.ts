@@ -132,6 +132,14 @@ export interface LearningProgressSnapshot {
 
 export type AdminContentEntityType = 'course' | 'demo' | 'module' | 'post' | 'quiz';
 
+export interface AdminContentMetadata {
+  attribution: {
+    en: string;
+    vi: string;
+  };
+  externalLinkUrl: string | null;
+}
+
 export interface AdminContentSummary {
   courseId: string;
   draftRevisionId: string | null;
@@ -163,6 +171,7 @@ export interface AdminContentDraft {
   localeAvailability: ReadonlyArray<'en' | 'vi'>;
   moduleId?: string | undefined;
   postId?: string | undefined;
+  metadata: AdminContentMetadata;
   preview: {
     en: string;
     vi: string;
@@ -175,6 +184,21 @@ export interface AdminContentDraft {
     vi: string;
   };
   validationStatus: 'not-run' | 'valid';
+}
+
+export interface UpdateAdminContentDraftInput {
+  idToken: string;
+  metadata: AdminContentMetadata;
+  preview: {
+    en: string;
+    vi: string;
+  };
+  revisionId: string;
+  revisionVersion: number;
+  title: {
+    en: string;
+    vi: string;
+  };
 }
 
 export interface PlaygroundRunSession {
@@ -262,6 +286,7 @@ export interface LearningApiClient {
     idToken: string;
     moduleId?: string | undefined;
   }): Promise<AdminContentSummary[]>;
+  updateAdminContentDraft(input: UpdateAdminContentDraftInput): Promise<AdminContentDraft>;
   createPlaygroundRunSession(input: {
     algorithmId: 'perceptron';
     config: PlaygroundRunSession['config'];
@@ -479,6 +504,32 @@ export function createFetchLearningApiClient(): LearningApiClient {
             method: 'POST',
           },
         ),
+      );
+
+      return data.draft;
+    },
+    async updateAdminContentDraft({
+      idToken,
+      metadata,
+      preview,
+      revisionId,
+      revisionVersion,
+      title,
+    }) {
+      const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
+        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}`, {
+          body: JSON.stringify({
+            revisionVersion,
+            title,
+            preview,
+            metadata,
+          }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'PATCH',
+        }),
       );
 
       return data.draft;

@@ -46,6 +46,13 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       entityId: 'dl-p01-neuron-perceptron',
       entityType: 'post',
       localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Seed attribution',
+          vi: 'Seed attribution VI',
+        },
+        externalLinkUrl: null,
+      },
       moduleId: 'dl-m01-neuron-perceptron',
       preview: {
         en: 'Draft preview',
@@ -57,6 +64,34 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       title: {
         en: 'Draft title',
         vi: 'Tiêu đề draft',
+      },
+      validationStatus: 'not-run',
+    }),
+    updateAdminContentDraft: vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Updated attribution',
+          vi: 'Updated attribution VI',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Updated draft preview',
+        vi: 'Preview draft đã cập nhật',
+      },
+      revisionVersion: 2,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Updated draft title',
+        vi: 'Tiêu đề draft đã cập nhật',
       },
       validationStatus: 'not-run',
     }),
@@ -847,6 +882,13 @@ describe('public learning journey', () => {
       entityId: 'dl-p01-neuron-perceptron',
       entityType: 'post',
       localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Seed attribution',
+          vi: 'Seed attribution VI',
+        },
+        externalLinkUrl: null,
+      },
       moduleId: 'dl-m01-neuron-perceptron',
       preview: {
         en: 'Draft-only copy',
@@ -883,7 +925,136 @@ describe('public learning journey', () => {
     expect(await screen.findAllByText('draft-post-dl-p01-neuron-perceptron-rev-d1')).toHaveLength(
       2,
     );
-    expect(screen.getByText('Draft-only copy')).toBeVisible();
+    expect(screen.getAllByText('Draft-only copy')).toHaveLength(2);
+    expect(screen.getByText('Published learner copy')).toBeVisible();
+  });
+
+  it('lets an authenticated admin edit a draft with revision concurrency', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const listAdminContent = vi.fn().mockResolvedValue([
+      {
+        courseId: 'course-deep-learning-basic',
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        localeAvailability: ['en', 'vi'],
+        moduleId: 'dl-m01-neuron-perceptron',
+        preview: {
+          en: 'Published learner copy',
+          vi: 'Published learner copy VI',
+        },
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        sourceStatus: 'seeded',
+        status: 'published',
+        title: {
+          en: 'Published title',
+          vi: 'Published title VI',
+        },
+        validationStatus: 'not-run',
+      },
+    ]);
+    const createAdminContentDraft = vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Seed attribution',
+          vi: 'Seed attribution VI',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Draft preview copy',
+        vi: 'Draft preview copy VI',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Draft title',
+        vi: 'Draft title VI',
+      },
+      validationStatus: 'not-run',
+    });
+    const updateAdminContentDraft = vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Edited attribution',
+          vi: 'Edited attribution VI',
+        },
+        externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Edited draft preview copy',
+        vi: 'Edited draft preview copy VI',
+      },
+      revisionVersion: 2,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Edited draft title',
+        vi: 'Edited draft title VI',
+      },
+      validationStatus: 'not-run',
+    });
+    const learningApiClient = {
+      ...createLearningApiClient(),
+      createAdminContentDraft,
+      listAdminContent,
+      updateAdminContentDraft,
+    };
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /draft/i }));
+    await user.clear(await screen.findByLabelText('Title EN'));
+    await user.type(screen.getByLabelText('Title EN'), 'Edited draft title');
+    await user.clear(screen.getByLabelText('Preview EN'));
+    await user.type(screen.getByLabelText('Preview EN'), 'Edited draft preview copy');
+    await user.clear(screen.getByLabelText('Attribution EN'));
+    await user.type(screen.getByLabelText('Attribution EN'), 'Edited attribution');
+    await user.type(
+      screen.getByLabelText('External link URL'),
+      'https://developers.google.com/machine-learning/crash-course',
+    );
+    await user.click(screen.getByRole('button', { name: /Save draft|Lưu draft/i }));
+
+    expect(updateAdminContentDraft).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      metadata: {
+        attribution: {
+          en: 'Edited attribution',
+          vi: 'Seed attribution VI',
+        },
+        externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+      },
+      preview: {
+        en: 'Edited draft preview copy',
+        vi: 'Draft preview copy VI',
+      },
+      revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      revisionVersion: 1,
+      title: {
+        en: 'Edited draft title',
+        vi: 'Draft title VI',
+      },
+    });
+    expect(await screen.findAllByText('Edited draft preview copy')).toHaveLength(2);
     expect(screen.getByText('Published learner copy')).toBeVisible();
   });
 

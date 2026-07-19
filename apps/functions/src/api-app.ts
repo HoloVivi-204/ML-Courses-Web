@@ -11,7 +11,10 @@ import helmet from 'helmet';
 
 import {
   createDefaultAdminContentRepository,
+  type AdminContentDraftPatch,
+  type AdminContentMetadata,
   type AdminContentRepository,
+  type LocalizedText,
 } from './admin-content-repository.js';
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
@@ -197,6 +200,175 @@ function getOptionalStringBodyField(request: Request, name: string): string | un
   }
 
   return value.trim();
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertBodyFieldsAllowlisted(
+  body: Record<string, unknown>,
+  allowedFields: readonly string[],
+): void {
+  const unsupportedFields = Object.keys(body).filter((field) => !allowedFields.includes(field));
+
+  if (unsupportedFields.length > 0) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      `Unsupported request body fields: ${unsupportedFields.join(', ')}.`,
+    );
+  }
+}
+
+function getPositiveIntegerBodyField(body: Record<string, unknown>, name: string): number {
+  const value = body[name];
+
+  if (!Number.isInteger(value) || typeof value !== 'number' || value < 1) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a positive integer.`);
+  }
+
+  return value;
+}
+
+function getTrimmedStringValue(value: unknown, name: string, maxLength: number): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a non-empty string.`);
+  }
+
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.length > maxLength) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      `${name} must be ${maxLength} characters or fewer.`,
+    );
+  }
+
+  return trimmedValue;
+}
+
+function getLocalizedTextValue(value: unknown, name: string, maxLength: number): LocalizedText {
+  if (!isPlainObject(value)) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be an object.`);
+  }
+
+  assertBodyFieldsAllowlisted(value, ['en', 'vi']);
+
+  return {
+    en: getTrimmedStringValue(value.en, `${name}.en`, maxLength),
+    vi: getTrimmedStringValue(value.vi, `${name}.vi`, maxLength),
+  };
+}
+
+function getOptionalLocalizedTextBodyField(
+  body: Record<string, unknown>,
+  name: string,
+  maxLength: number,
+): LocalizedText | undefined {
+  const value = body[name];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return getLocalizedTextValue(value, name, maxLength);
+}
+
+function getOptionalExternalLinkUrlValue(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'metadata.externalLinkUrl must be an HTTP(S) URL or null.',
+    );
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  if (trimmedValue.length > 2048) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'metadata.externalLinkUrl must be 2048 characters or fewer.',
+    );
+  }
+
+  try {
+    const url = new URL(trimmedValue);
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      throw new Error('Unsupported URL protocol.');
+    }
+
+    return url.toString();
+  } catch {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'metadata.externalLinkUrl must be an HTTP(S) URL or null.',
+    );
+  }
+}
+
+function getOptionalAdminContentMetadataBodyField(
+  body: Record<string, unknown>,
+): AdminContentMetadata | undefined {
+  const value = body.metadata;
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isPlainObject(value)) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'metadata must be an object.');
+  }
+
+  assertBodyFieldsAllowlisted(value, ['attribution', 'externalLinkUrl']);
+
+  return {
+    attribution: getLocalizedTextValue(value.attribution, 'metadata.attribution', 600),
+    externalLinkUrl: getOptionalExternalLinkUrlValue(value.externalLinkUrl),
+  };
+}
+
+function getAdminContentDraftPatchBody(request: Request): {
+  patch: AdminContentDraftPatch;
+  revisionVersion: number;
+} {
+  const body = getObjectBody(request);
+  assertBodyFieldsAllowlisted(body, ['revisionVersion', 'title', 'preview', 'metadata']);
+
+  const title = getOptionalLocalizedTextBodyField(body, 'title', 160);
+  const preview = getOptionalLocalizedTextBodyField(body, 'preview', 600);
+  const metadata = getOptionalAdminContentMetadataBodyField(body);
+  const patch: AdminContentDraftPatch = {};
+
+  if (title !== undefined) {
+    patch.title = title;
+  }
+
+  if (preview !== undefined) {
+    patch.preview = preview;
+  }
+
+  if (metadata !== undefined) {
+    patch.metadata = metadata;
+  }
+
+  return {
+    patch,
+    revisionVersion: getPositiveIntegerBodyField(body, 'revisionVersion'),
+  };
 }
 
 function getBodyField(request: Request, name: string): unknown {
@@ -517,6 +689,23 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       }
     },
   );
+
+  app.patch('/api/v1/admin/revisions/:revisionId', requireAuth, async (request, response, next) => {
+    try {
+      const adminUser = requireAdminUser(response);
+      const updateBody = getAdminContentDraftPatchBody(request);
+      const result = await getAdminContentRepository().updateDraft({
+        actorUid: adminUser.uid,
+        patch: updateBody.patch,
+        revisionId: getRouteParam(request, 'revisionId'),
+        revisionVersion: updateBody.revisionVersion,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.post('/api/v1/playground-run-sessions', requireAuth, async (request, response, next) => {
     try {

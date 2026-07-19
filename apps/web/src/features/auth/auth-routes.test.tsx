@@ -31,6 +31,13 @@ function createLearningApiClient() {
       entityId: 'dl-p01-neuron-perceptron',
       entityType: 'post',
       localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Seed attribution',
+          vi: 'Seed attribution VI',
+        },
+        externalLinkUrl: null,
+      },
       moduleId: 'dl-m01-neuron-perceptron',
       preview: {
         en: 'Draft preview',
@@ -42,6 +49,34 @@ function createLearningApiClient() {
       title: {
         en: 'Draft title',
         vi: 'Tiêu đề draft',
+      },
+      validationStatus: 'not-run',
+    }),
+    updateAdminContentDraft: vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      metadata: {
+        attribution: {
+          en: 'Updated attribution',
+          vi: 'Updated attribution VI',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Updated draft preview',
+        vi: 'Preview draft đã cập nhật',
+      },
+      revisionVersion: 2,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Updated draft title',
+        vi: 'Tiêu đề draft đã cập nhật',
       },
       validationStatus: 'not-run',
     }),

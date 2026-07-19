@@ -609,6 +609,239 @@ describe('API foundation', () => {
     ]);
   });
 
+  it('updates allowlisted draft text and metadata without changing the published inventory', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const updateResponse = await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        title: {
+          en: 'Draft neuron decision title',
+          vi: 'Tiêu đề draft neuron',
+        },
+        preview: {
+          en: 'Draft-only learner preview copy.',
+          vi: 'Bản preview chỉ nằm trong draft.',
+        },
+        metadata: {
+          attribution: {
+            en: 'Adapted from approved Release 1 sources.',
+            vi: 'Biên soạn từ nguồn Release 1 đã duyệt.',
+          },
+          externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+        },
+      })
+      .expect(200);
+
+    expect(updateResponse.body.success).toBe(true);
+    expect(updateResponse.body.data.draft).toEqual(
+      expect.objectContaining({
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        metadata: {
+          attribution: {
+            en: 'Adapted from approved Release 1 sources.',
+            vi: 'Biên soạn từ nguồn Release 1 đã duyệt.',
+          },
+          externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+        },
+        preview: {
+          en: 'Draft-only learner preview copy.',
+          vi: 'Bản preview chỉ nằm trong draft.',
+        },
+        revisionVersion: 2,
+        title: {
+          en: 'Draft neuron decision title',
+          vi: 'Tiêu đề draft neuron',
+        },
+      }),
+    );
+
+    const inventoryResponse = await request(app)
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'post', courseId: 'course-deep-learning-basic' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(inventoryResponse.body.data.content).toEqual([
+      expect.objectContaining({
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        preview: {
+          en: expect.stringContaining('single neuron'),
+          vi: expect.any(String),
+        },
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        status: 'published',
+      }),
+    ]);
+  });
+
+  it('rejects stale draft edits with optimistic concurrency conflict', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        title: {
+          en: 'First draft title',
+          vi: 'Tiêu đề draft đầu',
+        },
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        title: {
+          en: 'Stale title',
+          vi: 'Tiêu đề stale',
+        },
+      })
+      .expect(409);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_CONTENT_DRAFT_VERSION_CONFLICT',
+        message: 'The draft has changed. Reload it before saving again.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
+  it('rejects student draft edits', async () => {
+    const response = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer local-id-token')
+      .send({
+        revisionVersion: 1,
+        title: {
+          en: 'Student title',
+          vi: 'Tiêu đề learner',
+        },
+      })
+      .expect(403);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_FORBIDDEN',
+        message: 'Admin access is required.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
+  it('rejects structure fields outside the admin draft edit allowlist', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const response = await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        entityId: 'different-stable-id',
+      })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'INVALID_REQUEST_BODY',
+        message: 'Unsupported request body fields: entityId.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
+  it('rejects unsafe external link metadata in draft edits', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const response = await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        metadata: {
+          attribution: {
+            en: 'Valid attribution',
+            vi: 'Attribution hợp lệ',
+          },
+          externalLinkUrl: 'javascript:alert(1)',
+        },
+      })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'INVALID_REQUEST_BODY',
+        message: 'metadata.externalLinkUrl must be an HTTP(S) URL or null.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
   it('rejects creating a second draft for the same seeded content item', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({

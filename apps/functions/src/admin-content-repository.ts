@@ -9,6 +9,11 @@ export interface LocalizedText {
   vi: string;
 }
 
+export interface AdminContentMetadata {
+  attribution: LocalizedText;
+  externalLinkUrl: string | null;
+}
+
 export interface AdminContentSummary {
   courseId: string;
   draftRevisionId: string | null;
@@ -34,8 +39,9 @@ export interface AdminContentDraft {
   localeAvailability: readonly ['en', 'vi'];
   moduleId?: string | undefined;
   postId?: string | undefined;
+  metadata: AdminContentMetadata;
   preview: LocalizedText;
-  revisionVersion: 1;
+  revisionVersion: number;
   sourceStatus: 'seeded';
   status: 'draft';
   title: LocalizedText;
@@ -46,6 +52,19 @@ export interface CreateAdminContentDraftInput {
   createdByUid: string;
   entityId: string;
   entityType: string;
+}
+
+export interface AdminContentDraftPatch {
+  metadata?: AdminContentMetadata | undefined;
+  preview?: LocalizedText | undefined;
+  title?: LocalizedText | undefined;
+}
+
+export interface UpdateAdminContentDraftInput {
+  actorUid: string;
+  patch: AdminContentDraftPatch;
+  revisionId: string;
+  revisionVersion: number;
 }
 
 export interface ListAdminContentInput {
@@ -65,6 +84,12 @@ export interface AdminContentRepository {
   listContent(input: ListAdminContentInput): Promise<{
     data: {
       content: readonly AdminContentSummary[];
+    };
+    statusCode: 200;
+  }>;
+  updateDraft(input: UpdateAdminContentDraftInput): Promise<{
+    data: {
+      draft: AdminContentDraft;
     };
     statusCode: 200;
   }>;
@@ -265,6 +290,16 @@ function createDraftRevisionId(published: AdminContentSummary): string {
   return `draft-${published.entityType}-${published.entityId}-rev-d1`;
 }
 
+function createSeededAdminContentMetadata(): AdminContentMetadata {
+  return {
+    attribution: {
+      en: 'Seeded Release 1 source attribution pending validation.',
+      vi: 'Attribution nguồn Release 1 đã seed, chờ validation.',
+    },
+    externalLinkUrl: null,
+  };
+}
+
 function createDraftFromPublished(published: AdminContentSummary): AdminContentDraft {
   return {
     baseRevisionId: published.publishedRevisionId,
@@ -275,12 +310,37 @@ function createDraftFromPublished(published: AdminContentSummary): AdminContentD
     localeAvailability: ['en', 'vi'],
     ...(published.moduleId !== undefined ? { moduleId: published.moduleId } : {}),
     ...(published.postId !== undefined ? { postId: published.postId } : {}),
+    metadata: createSeededAdminContentMetadata(),
     preview: { ...published.preview },
     revisionVersion: 1,
     sourceStatus: 'seeded',
     status: 'draft',
     title: { ...published.title },
     validationStatus: 'not-run',
+  };
+}
+
+function hasDraftPatchValue(patch: AdminContentDraftPatch): boolean {
+  return patch.title !== undefined || patch.preview !== undefined || patch.metadata !== undefined;
+}
+
+function applyDraftPatch(
+  draft: AdminContentDraft,
+  patch: AdminContentDraftPatch,
+): AdminContentDraft {
+  return {
+    ...draft,
+    ...(patch.metadata !== undefined
+      ? {
+          metadata: {
+            attribution: { ...patch.metadata.attribution },
+            externalLinkUrl: patch.metadata.externalLinkUrl,
+          },
+        }
+      : {}),
+    ...(patch.preview !== undefined ? { preview: { ...patch.preview } } : {}),
+    revisionVersion: draft.revisionVersion + 1,
+    ...(patch.title !== undefined ? { title: { ...patch.title } } : {}),
   };
 }
 
@@ -298,6 +358,10 @@ export function createStaticAdminContentRepository(
   content: readonly AdminContentSummary[] = releaseOneAdminContent,
 ): AdminContentRepository {
   const draftsByContentKey = new Map<string, AdminContentDraft>();
+
+  function findDraftByRevisionId(revisionId: string): AdminContentDraft | undefined {
+    return [...draftsByContentKey.values()].find((draft) => draft.draftRevisionId === revisionId);
+  }
 
   return {
     async createDraft(input) {
@@ -344,6 +408,50 @@ export function createStaticAdminContentRepository(
         data: {
           draft,
           published: withDraftRevision(published, draft),
+        },
+      };
+    },
+    async updateDraft(input) {
+      if (!input.actorUid) {
+        throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
+      }
+
+      const existingDraft = findDraftByRevisionId(input.revisionId);
+
+      if (existingDraft === undefined) {
+        throw new ApiError(
+          404,
+          'ADMIN_CONTENT_DRAFT_NOT_FOUND',
+          'The requested draft revision was not found.',
+        );
+      }
+
+      if (!hasDraftPatchValue(input.patch)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_DRAFT_PATCH_EMPTY',
+          'At least one allowlisted draft field is required.',
+        );
+      }
+
+      if (existingDraft.revisionVersion !== input.revisionVersion) {
+        throw new ApiError(
+          409,
+          'ADMIN_CONTENT_DRAFT_VERSION_CONFLICT',
+          'The draft has changed. Reload it before saving again.',
+        );
+      }
+
+      const updatedDraft = applyDraftPatch(existingDraft, input.patch);
+      draftsByContentKey.set(
+        getContentKey(updatedDraft.entityType, updatedDraft.entityId),
+        updatedDraft,
+      );
+
+      return {
+        statusCode: 200,
+        data: {
+          draft: updatedDraft,
         },
       };
     },
