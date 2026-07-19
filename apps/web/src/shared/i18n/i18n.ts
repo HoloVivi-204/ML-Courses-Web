@@ -139,6 +139,7 @@ const resources = {
       'trial.summary.body':
         'The full course continues from this single unit to Perceptrons, layers, training, ' +
         'and the limits of linear decisions.',
+      'trial.summary.openDemo': 'Open the AND gate demo',
       'trial.summary.back': 'Return to course roadmap',
     },
   },
@@ -278,6 +279,7 @@ const resources = {
       'trial.summary.body':
         'Khóa học đầy đủ đi tiếp từ đơn vị này đến Perceptron, các lớp, quá trình huấn ' +
         'luyện và giới hạn của quyết định tuyến tính.',
+      'trial.summary.openDemo': 'Mở demo AND gate',
       'trial.summary.back': 'Trở về lộ trình khóa học',
     },
   },

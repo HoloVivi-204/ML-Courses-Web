@@ -2153,6 +2153,266 @@ a {
   color: var(--teal);
 }
 
+.learning-demo-page {
+  padding-block: 42px 130px;
+}
+
+.learning-demo-page > .breadcrumb-link {
+  margin-bottom: 34px;
+}
+
+.demo-heading {
+  display: grid;
+  max-width: 980px;
+  padding: 30px 0 58px;
+  border-bottom: 1px solid var(--line-strong);
+  gap: 22px;
+}
+
+.demo-heading h1 {
+  max-width: 780px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(52px, 7vw, 86px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+}
+
+.demo-meta {
+  display: flex;
+  margin: 0;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.demo-meta > div {
+  min-width: 150px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.demo-meta dt {
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.demo-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.and-demo-card {
+  display: grid;
+  margin-top: 58px;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: clamp(28px, 5vw, 58px);
+}
+
+.and-demo-frame,
+.and-demo-copy,
+.demo-completion-card {
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  box-shadow: 0 20px 60px rgb(40 51 47 / 8%);
+}
+
+.and-demo-frame {
+  display: grid;
+  padding: clamp(22px, 4vw, 40px);
+  align-content: start;
+  gap: 24px;
+}
+
+.and-demo-chart {
+  width: 100%;
+  min-height: 330px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px), var(--surface);
+  background-size: 24px 24px;
+}
+
+.axis-line {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.boundary-line {
+  stroke: var(--teal);
+  stroke-dasharray: 6 6;
+  stroke-linecap: round;
+  stroke-width: 4;
+}
+
+.and-point circle {
+  fill: var(--surface-strong);
+  stroke: var(--danger);
+  stroke-width: 3;
+}
+
+.and-point.is-positive circle {
+  stroke: var(--teal);
+}
+
+.and-point text,
+.and-demo-chart > text {
+  fill: var(--ink-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.and-demo-chart > text {
+  fill: var(--teal);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.and-truth-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.and-truth-table caption {
+  margin-bottom: 10px;
+  color: var(--ink-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-align: left;
+}
+
+.and-truth-table th,
+.and-truth-table td {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.and-truth-table th {
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.and-truth-table .is-positive td {
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.and-demo-copy {
+  display: flex;
+  padding: clamp(26px, 4vw, 40px);
+  flex-direction: column;
+}
+
+.demo-step-count {
+  width: fit-content;
+  margin-bottom: 18px;
+  padding: 7px 10px;
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.and-demo-copy h2 {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 5vw, 48px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.and-demo-copy > p {
+  margin: 0 0 24px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.demo-progress {
+  margin-top: auto;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.demo-step-actions {
+  display: flex;
+  margin-top: 22px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.demo-step-actions button {
+  display: inline-flex;
+  min-height: 45px;
+  padding: 0 17px;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.demo-step-actions button:last-child {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: var(--on-accent);
+}
+
+.demo-step-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.demo-completion-card {
+  margin-top: 28px;
+  padding: 18px 22px;
+}
+
+.demo-completion-card:empty {
+  display: none;
+}
+
+.demo-completion-card p {
+  display: flex;
+  margin: 0;
+  align-items: center;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  gap: 9px;
+}
+
+.demo-completion-card [role='alert'] {
+  color: var(--danger);
+}
+
 .not-found {
   display: flex;
   min-height: calc(100vh - 73px);
@@ -2683,6 +2943,14 @@ a {
   .trial-article {
     max-width: 760px;
   }
+
+  .and-demo-card {
+    grid-template-columns: 1fr;
+  }
+
+  .and-demo-chart {
+    min-height: 260px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -2910,6 +3178,27 @@ a {
 
   .trial-contents ol {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .learning-demo-page {
+    padding-block: 30px 82px;
+  }
+
+  .demo-heading {
+    padding: 17px 0 48px;
+  }
+
+  .demo-heading h1 {
+    font-size: clamp(47px, 13vw, 68px);
+  }
+
+  .demo-meta {
+    display: grid;
+  }
+
+  .demo-step-actions button {
+    flex: 1 1 150px;
+    justify-content: center;
   }
 
   .lesson-section {

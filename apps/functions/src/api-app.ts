@@ -10,6 +10,7 @@ import { getAuth } from 'firebase-admin/auth';
 import helmet from 'helmet';
 
 import { ApiError } from './api-error.js';
+import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { createDefaultLearningRepository, type LearningRepository } from './learning-repository.js';
 
@@ -101,6 +102,16 @@ function getRouteParam(request: Request, name: string): string {
   }
 
   return value;
+}
+
+function getStringArrayBodyField(request: Request, name: string): string[] {
+  const value = (request.body as Record<string, unknown> | undefined)?.[name];
+
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || !item.trim())) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a non-empty string array.`);
+  }
+
+  return [...new Set(value.map((item) => item.trim()))];
 }
 
 function createAuthMiddleware(
@@ -229,6 +240,27 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       }
     },
   );
+
+  app.post('/api/v1/demos/:demoId/completions', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const demoId = getRouteParam(request, 'demoId');
+      const viewedStepIds = getStringArrayBodyField(request, 'viewedStepIds');
+      const seed = assertRequiredDemoStepsViewed(demoId, viewedStepIds);
+      const result = await getLearningRepository().completeDemo({
+        demoId,
+        idempotencyKey: getIdempotencyKey(request),
+        moduleId: seed.moduleId,
+        requiredStepIds: seed.requiredStepIds,
+        uid: authUser.uid,
+        viewedStepIds,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.use((_request, response) => {
     sendError(response, 404, {

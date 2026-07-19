@@ -40,6 +40,20 @@ export function hasLearningPostAccess(
   );
 }
 
+export function hasLearningModuleAccess(
+  courseId: string | undefined,
+  moduleId: string | undefined,
+  uid: string | undefined,
+) {
+  if (!courseId || !moduleId || !uid) {
+    return false;
+  }
+
+  return readLearningAccessGrants().some(
+    (grant) => grant.courseId === courseId && grant.moduleId === moduleId && grant.uid === uid,
+  );
+}
+
 function readLearningAccessGrants(): LearningAccessGrant[] {
   try {
     const rawValue = sessionStorage.getItem(STORAGE_KEY);

@@ -23,6 +23,18 @@ function createAuthenticatedGateway(): AuthGateway {
 function createLearningApiClient(): LearningApiClient {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    completeDemo: vi.fn().mockResolvedValue({
+      completion: {
+        demoId: 'demo-perceptron-and-gate',
+        status: 'completed',
+      },
+      event: {
+        demoId: 'demo-perceptron-and-gate',
+        requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+        type: 'demo_completed',
+        viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+      },
+    }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -280,5 +292,67 @@ describe('public learning journey', () => {
       }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/post_dl-p01-neuron-perceptron/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the fixed AND gate demo closed without a module access grant', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/demos/demo-perceptron-and-gate',
+    );
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Demo chưa khả dụng' })).toBeVisible();
+    expect(learningApiClient.completeDemo).not.toHaveBeenCalled();
+  });
+
+  it('lets an enrolled learner complete the fixed AND gate demo after required steps', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: /Mở demo AND gate/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Demo Perceptron: cổng AND' })).toBeVisible();
+    expect(
+      screen.getByRole('img', {
+        name: /Bốn điểm dữ liệu AND và một đường quyết định/i,
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('status', { name: 'Tiến độ demo' })).toHaveTextContent(
+      'Bước bắt buộc 1 / 4',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+
+    expect(await screen.findByText('demo_completed: demo-perceptron-and-gate')).toBeVisible();
+    expect(learningApiClient.completeDemo).toHaveBeenCalledWith({
+      demoId: 'demo-perceptron-and-gate',
+      idToken: 'local-id-token',
+      idempotencyKey: expect.any(String),
+      viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+    });
   });
 });

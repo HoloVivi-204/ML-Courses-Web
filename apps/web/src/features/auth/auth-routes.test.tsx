@@ -8,6 +8,18 @@ import type { AuthGateway } from './auth-context';
 function createLearningApiClient() {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    completeDemo: vi.fn().mockResolvedValue({
+      completion: {
+        demoId: 'demo-perceptron-and-gate',
+        status: 'completed',
+      },
+      event: {
+        demoId: 'demo-perceptron-and-gate',
+        requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+        type: 'demo_completed',
+        viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+      },
+    }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',

@@ -57,6 +57,9 @@ describe('API foundation', () => {
           enrollLearner: async () => {
             throw new Error('Enrollment is not part of this test.');
           },
+          completeDemo: async () => {
+            throw new Error('Demo completion is not part of this test.');
+          },
         },
         verifyAuthToken: async () => ({
           uid: 'learner-01',
@@ -94,6 +97,9 @@ describe('API foundation', () => {
       learningRepository: {
         bootstrapLearner: async () => {
           throw new Error('Bootstrap is not part of this test.');
+        },
+        completeDemo: async () => {
+          throw new Error('Demo completion is not part of this test.');
         },
         enrollLearner: async (input: { courseId: string; idempotencyKey: string; uid: string }) => {
           const requestHash = `${input.uid}:${input.courseId}`;
@@ -160,5 +166,97 @@ describe('API foundation', () => {
     });
     expect(retryResponse.body.data).toEqual(firstResponse.body.data);
     expect(enrollmentKeys).toEqual(new Set(['learner-01:course-deep-learning-basic']));
+  });
+
+  it('rejects demo completion when required steps are missing', async () => {
+    const app = createApiApp({
+      learningRepository: {
+        bootstrapLearner: async () => {
+          throw new Error('Bootstrap is not part of this test.');
+        },
+        completeDemo: async () => {
+          return {
+            data: {
+              error: 'This mock should not decide validation.',
+            },
+            statusCode: 200,
+          };
+        },
+        enrollLearner: async () => {
+          throw new Error('Enrollment is not part of this test.');
+        },
+      },
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/demos/demo-perceptron-and-gate/completions')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', '31d6bb65-a49f-46ff-a213-93902164459b')
+      .send({ viewedStepIds: ['and-problem', 'and-data'] })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('REQUIRED_DEMO_STEPS_MISSING');
+  });
+
+  it('emits an idempotent demo completion event after all required steps are viewed', async () => {
+    const completedKeys = new Set<string>();
+    const app = createApiApp({
+      learningRepository: {
+        bootstrapLearner: async () => {
+          throw new Error('Bootstrap is not part of this test.');
+        },
+        completeDemo: async (input) => {
+          completedKeys.add(`${input.uid}:${input.demoId}`);
+
+          return {
+            statusCode: 200,
+            data: {
+              completion: {
+                demoId: input.demoId,
+                status: 'completed',
+              },
+              event: {
+                type: 'demo_completed',
+                demoId: input.demoId,
+                requiredStepIds: input.requiredStepIds,
+                viewedStepIds: input.viewedStepIds,
+              },
+            },
+          };
+        },
+        enrollLearner: async () => {
+          throw new Error('Enrollment is not part of this test.');
+        },
+      },
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/demos/demo-perceptron-and-gate/completions')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', '3a39749f-d51a-4370-85db-e4f0f8c736da')
+      .send({ viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'] })
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      completion: {
+        demoId: 'demo-perceptron-and-gate',
+        status: 'completed',
+      },
+      event: {
+        type: 'demo_completed',
+        demoId: 'demo-perceptron-and-gate',
+        requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+        viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+      },
+    });
+    expect(completedKeys).toEqual(new Set(['learner-01:demo-perceptron-and-gate']));
   });
 });

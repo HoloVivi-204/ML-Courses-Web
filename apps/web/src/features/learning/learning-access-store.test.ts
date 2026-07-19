@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasLearningPostAccess, rememberLearningAccessGrant } from './learning-access-store';
+import {
+  hasLearningModuleAccess,
+  hasLearningPostAccess,
+  rememberLearningAccessGrant,
+} from './learning-access-store';
 
 describe('learning access store', () => {
   it('remembers a post access grant for the matching course and post', () => {
@@ -14,11 +18,28 @@ describe('learning access store', () => {
     expect(
       hasLearningPostAccess('course-deep-learning-basic', 'dl-p01-neuron-perceptron', 'learner-01'),
     ).toBe(true);
+    expect(
+      hasLearningModuleAccess(
+        'course-deep-learning-basic',
+        'dl-m01-neuron-perceptron',
+        'learner-01',
+      ),
+    ).toBe(true);
     expect(hasLearningPostAccess('course-deep-learning-basic', 'not-granted', 'learner-01')).toBe(
+      false,
+    );
+    expect(hasLearningModuleAccess('course-deep-learning-basic', 'not-granted', 'learner-01')).toBe(
       false,
     );
     expect(
       hasLearningPostAccess('course-deep-learning-basic', 'dl-p01-neuron-perceptron', 'learner-02'),
+    ).toBe(false);
+    expect(
+      hasLearningModuleAccess(
+        'course-deep-learning-basic',
+        'dl-m01-neuron-perceptron',
+        'learner-02',
+      ),
     ).toBe(false);
   });
 
@@ -27,6 +48,13 @@ describe('learning access store', () => {
 
     expect(
       hasLearningPostAccess('course-deep-learning-basic', 'dl-p01-neuron-perceptron', 'learner-01'),
+    ).toBe(false);
+    expect(
+      hasLearningModuleAccess(
+        'course-deep-learning-basic',
+        'dl-m01-neuron-perceptron',
+        'learner-01',
+      ),
     ).toBe(false);
   });
 });

@@ -15,10 +15,23 @@ export interface EnrollLearnerInput {
   uid: string;
 }
 
+export interface CompleteDemoInput {
+  demoId: string;
+  idempotencyKey: string;
+  moduleId: string;
+  requiredStepIds: readonly string[];
+  uid: string;
+  viewedStepIds: readonly string[];
+}
+
 export interface LearningRepository {
   bootstrapLearner(input: BootstrapLearnerInput): Promise<{
     data: unknown;
     statusCode: 200 | 201;
+  }>;
+  completeDemo(input: CompleteDemoInput): Promise<{
+    data: unknown;
+    statusCode: 200;
   }>;
   enrollLearner(input: EnrollLearnerInput): Promise<{
     data: unknown;
@@ -55,6 +68,19 @@ interface EnrollmentResponseData {
     status: 'in-progress';
   };
   nextPath: string;
+}
+
+interface DemoCompletionResponseData {
+  completion: {
+    demoId: string;
+    status: 'completed';
+  };
+  event: {
+    demoId: string;
+    requiredStepIds: readonly string[];
+    type: 'demo_completed';
+    viewedStepIds: readonly string[];
+  };
 }
 
 interface StoredIdempotencyRecord {
@@ -141,6 +167,30 @@ function createEnrollmentRequestHash(input: EnrollLearnerInput): string {
   });
 }
 
+function createDemoCompletionResponseData(input: CompleteDemoInput): DemoCompletionResponseData {
+  return {
+    completion: {
+      demoId: input.demoId,
+      status: 'completed',
+    },
+    event: {
+      type: 'demo_completed',
+      demoId: input.demoId,
+      requiredStepIds: input.requiredStepIds,
+      viewedStepIds: input.viewedStepIds,
+    },
+  };
+}
+
+function createDemoCompletionRequestHash(input: CompleteDemoInput): string {
+  return JSON.stringify({
+    operation: 'demo-completion',
+    uid: input.uid,
+    demoId: input.demoId,
+    viewedStepIds: [...input.viewedStepIds].sort(),
+  });
+}
+
 function isStoredIdempotencyRecord(data: unknown): data is StoredIdempotencyRecord {
   return typeof data === 'object' && data !== null;
 }
@@ -177,6 +227,70 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           statusCode: 201,
           data: { profile },
         };
+      });
+    },
+    async completeDemo(input) {
+      const requestHash = createDemoCompletionRequestHash(input);
+
+      return firestore.runTransaction(async (transaction) => {
+        const accessRef = firestore.doc(
+          `users/${input.uid}/contentAccess/module_${input.moduleId}`,
+        );
+        const completionRef = firestore.doc(`users/${input.uid}/demoCompletions/${input.demoId}`);
+        const idempotencyRef = firestore.doc(
+          `users/${input.uid}/idempotencyKeys/${input.idempotencyKey}`,
+        );
+        const [accessSnapshot, idempotencySnapshot] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(idempotencyRef),
+        ]);
+
+        if (!accessSnapshot.exists) {
+          throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Demo access is required.');
+        }
+
+        if (idempotencySnapshot.exists) {
+          const record = idempotencySnapshot.data();
+
+          if (!isStoredIdempotencyRecord(record) || record.requestHash !== requestHash) {
+            throw new ApiError(
+              409,
+              'IDEMPOTENCY_CONFLICT',
+              'This Idempotency-Key was used for a different request.',
+            );
+          }
+
+          return {
+            statusCode: 200 as const,
+            data: record.responseData ?? createDemoCompletionResponseData(input),
+          };
+        }
+
+        const responseData = createDemoCompletionResponseData(input);
+
+        transaction.set(
+          completionRef,
+          {
+            schemaVersion: 1,
+            status: 'completed',
+            requiredStepIds: input.requiredStepIds,
+            viewedStepIds: input.viewedStepIds,
+            completedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.set(idempotencyRef, {
+          schemaVersion: 1,
+          operation: 'demo-completion',
+          requestHash,
+          responseData,
+          statusCode: 200,
+          createdAt: FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + IDEMPOTENCY_TTL_MS),
+        });
+
+        return { statusCode: 200 as const, data: responseData };
       });
     },
     async enrollLearner(input) {

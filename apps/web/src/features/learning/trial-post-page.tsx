@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
-import { localize, type Locale } from '../catalog/course-data';
+import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
 import { hasLearningPostAccess } from './learning-access-store';
 import { getReadablePost } from './trial-post-data';
@@ -25,6 +25,11 @@ export function TrialPostPage({ locale }: TrialPostPageProps) {
   }
 
   const eyebrowKey = post.accessLevel === 'full' ? 'trial.fullEyebrow' : 'trial.eyebrow';
+  const module = getCourse(post.courseId)?.modules?.find((item) => item.id === post.moduleId);
+  const demoPath =
+    post.accessLevel === 'full' && module?.demoId
+      ? `/learn/${post.courseId}/demos/${module.demoId}`
+      : null;
 
   return (
     <main className="trial-post-page page-shell">
@@ -61,6 +66,12 @@ export function TrialPostPage({ locale }: TrialPostPageProps) {
             <span className="eyebrow">{t('trial.summary.eyebrow')}</span>
             <h2>{t('trial.summary.title')}</h2>
             <p>{t('trial.summary.body')}</p>
+            {demoPath ? (
+              <Link className="primary-link" to={demoPath}>
+                {t('trial.summary.openDemo')}
+                <MoveRight aria-hidden="true" size={17} />
+              </Link>
+            ) : null}
             <Link className="secondary-link" to={`/courses/${post.courseId}`}>
               {t('trial.summary.back')}
               <MoveRight aria-hidden="true" size={17} />

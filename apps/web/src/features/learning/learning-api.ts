@@ -11,8 +11,27 @@ export interface EnrollmentResult {
   nextPath: string;
 }
 
+export interface DemoCompletionResult {
+  completion: {
+    demoId: string;
+    status: 'completed';
+  };
+  event: {
+    demoId: string;
+    requiredStepIds: readonly string[];
+    type: 'demo_completed';
+    viewedStepIds: readonly string[];
+  };
+}
+
 export interface LearningApiClient {
   bootstrapProfile(idToken: string): Promise<void>;
+  completeDemo(input: {
+    demoId: string;
+    idToken: string;
+    idempotencyKey: string;
+    viewedStepIds: readonly string[];
+  }): Promise<DemoCompletionResult>;
   enrollCourse(input: {
     courseId: string;
     idToken: string;
@@ -48,6 +67,19 @@ export function createFetchLearningApiClient(): LearningApiClient {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
+        }),
+      );
+    },
+    async completeDemo({ demoId, idToken, idempotencyKey, viewedStepIds }) {
+      return readSuccessEnvelope<DemoCompletionResult>(
+        await fetch(`/api/v1/demos/${encodeURIComponent(demoId)}/completions`, {
+          body: JSON.stringify({ viewedStepIds }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
         }),
       );
     },

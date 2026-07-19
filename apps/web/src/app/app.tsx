@@ -36,6 +36,12 @@ const LearningCoursePage = lazy(async () => {
   return { default: module.LearningCoursePage };
 });
 
+const LearningDemoPage = lazy(async () => {
+  const module = await import('../features/learning/learning-demo-page');
+
+  return { default: module.LearningDemoPage };
+});
+
 interface AppRoutesProps {
   authGateway?: AuthGateway | undefined;
   learningApiClient?: LearningApiClient | undefined;
@@ -116,6 +122,16 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                   <Suspense fallback={<TrialRouteLoading />}>
                     <TrialPostPage locale={locale} />
                   </Suspense>
+                }
+              />
+              <Route
+                path="/learn/:courseId/demos/:demoId"
+                element={
+                  <RequireAuthenticated>
+                    <Suspense fallback={<TrialRouteLoading />}>
+                      <LearningDemoPage learningApiClient={learningClient} locale={locale} />
+                    </Suspense>
+                  </RequireAuthenticated>
                 }
               />
               <Route path="*" element={<RouteNotFoundPage />} />
