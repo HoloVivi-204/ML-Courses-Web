@@ -1,14 +1,17 @@
 import { ArrowRight, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import type { Locale } from '../catalog/course-data';
+import type { LearningApiClient } from '../learning/learning-api';
+import { getSafeAuthReturnPath } from './auth-return-path';
 import { type SafeAuthErrorCode } from './auth-service';
 import { useAuth } from './auth-context';
 
 export type AuthMode = 'sign-in' | 'sign-up';
 
 interface AuthPageProps {
+  learningApiClient: LearningApiClient;
   locale: Locale;
   mode: AuthMode;
 }
@@ -123,20 +126,60 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
   },
 };
 
-export function AuthPage({ locale, mode }: AuthPageProps) {
+export function AuthPage({ learningApiClient, locale, mode }: AuthPageProps) {
+  const location = useLocation();
   const navigate = useNavigate();
-  const { error, isSubmitting, signInWithEmail, signInWithGoogle, signUpWithEmail, status } =
-    useAuth();
+  const {
+    error,
+    getIdToken,
+    isSubmitting,
+    signInWithEmail,
+    signInWithGoogle,
+    signUpWithEmail,
+    status,
+  } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [profileBootstrapFailed, setProfileBootstrapFailed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const text = copy[locale][mode];
+  const returnPath = useMemo(() => getSafeAuthReturnPath(location.search), [location.search]);
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      navigate('/', { replace: true });
+    if (status !== 'authenticated') {
+      return undefined;
     }
-  }, [navigate, status]);
+
+    let isActive = true;
+
+    async function bootstrapProfileAndReturn() {
+      setProfileBootstrapFailed(false);
+
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Authenticated user is missing an ID token.');
+        }
+
+        await learningApiClient.bootstrapProfile(idToken);
+
+        if (isActive) {
+          navigate(returnPath, { replace: true });
+        }
+      } catch {
+        if (isActive) {
+          setProfileBootstrapFailed(true);
+        }
+      }
+    }
+
+    void bootstrapProfileAndReturn();
+
+    return () => {
+      isActive = false;
+    };
+  }, [getIdToken, learningApiClient, navigate, returnPath, status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -216,6 +259,15 @@ export function AuthPage({ locale, mode }: AuthPageProps) {
             <p className="auth-error" role="alert">
               <LockKeyhole aria-hidden="true" size={16} />
               {text.errors[error.code]}
+            </p>
+          ) : null}
+
+          {profileBootstrapFailed ? (
+            <p className="auth-error" role="alert">
+              <LockKeyhole aria-hidden="true" size={16} />
+              {locale === 'vi'
+                ? 'Chưa thể tạo hồ sơ học viên. Hãy thử lại sau.'
+                : 'We could not prepare your learner profile. Try again later.'}
             </p>
           ) : null}
 

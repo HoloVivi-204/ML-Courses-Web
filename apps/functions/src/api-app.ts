@@ -6,7 +6,18 @@ import express, {
   type Request,
   type Response,
 } from 'express';
+import { getAuth } from 'firebase-admin/auth';
 import helmet from 'helmet';
+
+import { ApiError } from './api-error.js';
+import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { createDefaultLearningRepository, type LearningRepository } from './learning-repository.js';
+
+export interface VerifiedAuthUser {
+  displayName: string;
+  email?: string | undefined;
+  uid: string;
+}
 
 interface ApiErrorBody {
   code: string;
@@ -14,8 +25,23 @@ interface ApiErrorBody {
   message: string;
 }
 
+export interface ApiAppOptions {
+  learningRepository?: LearningRepository | undefined;
+  verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
+}
+
 function getRequestId(response: Response): string {
   return String(response.locals.requestId);
+}
+
+function getAuthUser(response: Response): VerifiedAuthUser {
+  const authUser = response.locals.authUser as VerifiedAuthUser | undefined;
+
+  if (!authUser) {
+    throw new ApiError(401, 'UNAUTHENTICATED', 'Authentication is required.');
+  }
+
+  return authUser;
 }
 
 function addRequestContext(_request: Request, response: Response, next: NextFunction): void {
@@ -34,8 +60,74 @@ function sendError(response: Response, statusCode: number, error: ApiErrorBody):
   });
 }
 
+function sendSuccess(response: Response, statusCode: number, data: unknown): void {
+  response.status(statusCode).json({
+    success: true,
+    data,
+    requestId: getRequestId(response),
+  });
+}
+
 function isInvalidJsonError(error: unknown): boolean {
   return error instanceof SyntaxError && 'body' in error;
+}
+
+function getBearerToken(request: Request): string {
+  const authorization = request.get('authorization') ?? '';
+  const [scheme, token] = authorization.split(' ');
+
+  if (scheme !== 'Bearer' || !token) {
+    throw new ApiError(401, 'UNAUTHENTICATED', 'Authentication is required.');
+  }
+
+  return token;
+}
+
+function getIdempotencyKey(request: Request): string {
+  const idempotencyKey = request.get('idempotency-key')?.trim() ?? '';
+
+  if (!idempotencyKey) {
+    throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key header is required.');
+  }
+
+  return idempotencyKey;
+}
+
+function getRouteParam(request: Request, name: string): string {
+  const value = request.params[name];
+
+  if (typeof value !== 'string' || !value) {
+    throw new ApiError(400, 'INVALID_ROUTE_PARAMETER', `Route parameter ${name} is required.`);
+  }
+
+  return value;
+}
+
+function createAuthMiddleware(
+  verifyAuthToken: (idToken: string) => Promise<VerifiedAuthUser>,
+): express.RequestHandler {
+  return async (request, response, next) => {
+    try {
+      response.locals.authUser = await verifyAuthToken(getBearerToken(request));
+      next();
+    } catch (error) {
+      next(
+        error instanceof ApiError
+          ? error
+          : new ApiError(401, 'UNAUTHENTICATED', 'Authentication is required.'),
+      );
+    }
+  };
+}
+
+async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser> {
+  const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(idToken);
+
+  return {
+    uid: decodedToken.uid,
+    displayName: typeof decodedToken.name === 'string' ? decodedToken.name : 'Learner',
+    email: typeof decodedToken.email === 'string' ? decodedToken.email : undefined,
+  };
 }
 
 const handleApiError: ErrorRequestHandler = (error, request, response, next) => {
@@ -46,6 +138,15 @@ const handleApiError: ErrorRequestHandler = (error, request, response, next) => 
       code: 'INVALID_JSON',
       message: 'The request body must contain valid JSON.',
       details: [],
+    });
+    return;
+  }
+
+  if (error instanceof ApiError) {
+    sendError(response, error.statusCode, {
+      code: error.code,
+      message: error.message,
+      details: error.details,
     });
     return;
   }
@@ -67,8 +168,16 @@ const handleApiError: ErrorRequestHandler = (error, request, response, next) => 
   });
 };
 
-export function createApiApp(): express.Express {
+export function createApiApp(options: ApiAppOptions = {}): express.Express {
   const app = express();
+  let learningRepository = options.learningRepository;
+  const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
+
+  function getLearningRepository(): LearningRepository {
+    learningRepository ??= createDefaultLearningRepository();
+
+    return learningRepository;
+  }
 
   app.disable('x-powered-by');
   app.use(helmet());
@@ -86,6 +195,40 @@ export function createApiApp(): express.Express {
       requestId: getRequestId(response),
     });
   });
+
+  app.post('/api/v1/users/me/bootstrap', requireAuth, async (_request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getLearningRepository().bootstrapLearner({
+        uid: authUser.uid,
+        displayName: authUser.displayName || 'Learner',
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post(
+    '/api/v1/courses/:courseId/enrollments',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getLearningRepository().enrollLearner({
+          courseId: getRouteParam(request, 'courseId'),
+          displayName: authUser.displayName,
+          idempotencyKey: getIdempotencyKey(request),
+          uid: authUser.uid,
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.use((_request, response) => {
     sendError(response, 404, {

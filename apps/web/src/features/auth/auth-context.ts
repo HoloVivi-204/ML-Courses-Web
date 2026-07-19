@@ -8,6 +8,7 @@ export interface AuthUser {
 }
 
 export interface AuthGateway {
+  getIdToken(): Promise<string | null>;
   observe(
     listener: (user: AuthUser | null) => void,
     onError?: (error: unknown) => void,
@@ -22,6 +23,7 @@ export type AuthStatus = 'anonymous' | 'authenticated' | 'loading';
 
 export interface AuthContextValue {
   error: SafeAuthError | null;
+  getIdToken(): Promise<string | null>;
   isSubmitting: boolean;
   signInWithEmail(email: string, password: string): Promise<boolean>;
   signInWithGoogle(): Promise<boolean>;

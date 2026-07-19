@@ -1,12 +1,31 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { App } from '../../app/app';
 import type { AuthGateway } from './auth-context';
 
+function createLearningApiClient() {
+  return {
+    bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    enrollCourse: vi.fn().mockResolvedValue({
+      access: {
+        moduleId: 'dl-m01-neuron-perceptron',
+        postId: 'dl-p01-neuron-perceptron',
+      },
+      enrollment: {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 0,
+        status: 'in-progress',
+      },
+      nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    }),
+  };
+}
+
 function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
   return {
+    getIdToken: vi.fn().mockResolvedValue('local-id-token'),
     observe(listener) {
       listener(null);
       return () => undefined;
@@ -69,5 +88,69 @@ describe('authentication routes', () => {
     await user.click(await screen.findByRole('button', { name: 'Tiếp tục với Google' }));
 
     expect(gateway.signInWithGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it('redirects a guest from the protected learning route to sign in with a safe return path', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const gateway = createGateway();
+
+    render(<App authGateway={gateway} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe('?returnTo=%2Flearn%2Fcourse-deep-learning-basic');
+  });
+
+  it('returns an authenticated learner to the requested relative learning path', async () => {
+    window.history.pushState({}, '', '/login?returnTo=%2Flearn%2Fcourse-deep-learning-basic');
+    const gateway = createGateway({
+      observe(listener) {
+        listener({ email: 'learner@example.test', uid: 'learner-01' });
+        return () => undefined;
+      },
+    });
+    const learningApiClient = createLearningApiClient();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/learn/course-deep-learning-basic'));
+    expect(learningApiClient.bootstrapProfile).toHaveBeenCalledWith('local-id-token');
+  });
+
+  it('drops an absolute external return URL after authentication', async () => {
+    window.history.pushState({}, '', '/login?returnTo=https%3A%2F%2Fevil.example%2Fsteal');
+    const gateway = createGateway({
+      observe(listener) {
+        listener({ email: 'learner@example.test', uid: 'learner-01' });
+        return () => undefined;
+      },
+    });
+    const learningApiClient = createLearningApiClient();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(window.location.href).not.toContain('evil.example');
+  });
+
+  it('enrolls an authenticated learner before opening the protected course path', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const gateway = createGateway({
+      observe(listener) {
+        listener({ email: 'learner@example.test', uid: 'learner-01' });
+        return () => undefined;
+      },
+    });
+    const learningApiClient = createLearningApiClient();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    expect(await screen.findByRole('heading', { name: /Neuron và Perceptron/i })).toBeVisible();
+    await waitFor(() =>
+      expect(learningApiClient.enrollCourse).toHaveBeenCalledWith({
+        courseId: 'course-deep-learning-basic',
+        idToken: 'local-id-token',
+        idempotencyKey: expect.any(String),
+      }),
+    );
   });
 });

@@ -51,6 +51,7 @@ export function AuthProvider({ children, gateway }: AuthProviderProps) {
   const value = useMemo<AuthContextValue>(
     () => ({
       error,
+      getIdToken: () => gateway.getIdToken(),
       isSubmitting,
       signInWithEmail: (email, password) => run(() => gateway.signInWithEmail(email, password)),
       signInWithGoogle: () => run(() => gateway.signInWithGoogle()),

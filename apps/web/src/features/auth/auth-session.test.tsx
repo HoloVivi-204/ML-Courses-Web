@@ -13,6 +13,7 @@ function SessionProbe() {
 describe('authentication session', () => {
   it('restores the Firebase session through the observer without storing a token in UI state', async () => {
     const gateway: AuthGateway = {
+      getIdToken: async () => 'local-id-token',
       observe(listener) {
         listener({ email: 'learner@example.test', uid: 'learner-01' });
         return () => undefined;

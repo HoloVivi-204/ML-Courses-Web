@@ -33,4 +33,132 @@ describe('API foundation', () => {
       requestId: response.headers['x-request-id'],
     });
   });
+
+  it('bootstraps the authenticated learner profile without copying email into Firestore data', async () => {
+    const savedProfiles: unknown[] = [];
+    const response = await request(
+      createApiApp({
+        learningRepository: {
+          bootstrapLearner: async (input) => {
+            const profile = {
+              schemaVersion: 1,
+              uid: input.uid,
+              displayName: input.displayName,
+              avatarUrl: null,
+              locale: 'vi',
+              theme: 'system',
+              status: 'active',
+            };
+
+            savedProfiles.push(profile);
+
+            return { data: { profile }, statusCode: 201 };
+          },
+          enrollLearner: async () => {
+            throw new Error('Enrollment is not part of this test.');
+          },
+        },
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+          email: 'learner@example.test',
+        }),
+      }),
+    )
+      .post('/api/v1/users/me/bootstrap')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(201);
+
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        profile: {
+          schemaVersion: 1,
+          uid: 'learner-01',
+          displayName: 'Local Student',
+          avatarUrl: null,
+          locale: 'vi',
+          theme: 'system',
+          status: 'active',
+        },
+      },
+      requestId: response.headers['x-request-id'],
+    });
+    expect(JSON.stringify(savedProfiles)).not.toContain('learner@example.test');
+  });
+
+  it('enrolls an authenticated learner idempotently and opens the first module path', async () => {
+    const idempotencyRecords = new Map<string, unknown>();
+    const enrollmentKeys = new Set<string>();
+    const app = createApiApp({
+      learningRepository: {
+        bootstrapLearner: async () => {
+          throw new Error('Bootstrap is not part of this test.');
+        },
+        enrollLearner: async (input: { courseId: string; idempotencyKey: string; uid: string }) => {
+          const requestHash = `${input.uid}:${input.courseId}`;
+          const stored = idempotencyRecords.get(input.idempotencyKey);
+
+          if (stored) {
+            return stored as {
+              data: unknown;
+              statusCode: 201;
+            };
+          }
+
+          enrollmentKeys.add(requestHash);
+
+          const result = {
+            statusCode: 201 as const,
+            data: {
+              enrollment: {
+                courseId: input.courseId,
+                status: 'in-progress',
+                progressPercent: 0,
+              },
+              access: {
+                moduleId: 'dl-m01-neuron-perceptron',
+                postId: 'dl-p01-neuron-perceptron',
+              },
+              nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+            },
+          };
+
+          idempotencyRecords.set(input.idempotencyKey, result);
+
+          return result;
+        },
+      },
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const firstResponse = await request(app)
+      .post('/api/v1/courses/course-deep-learning-basic/enrollments')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', '9a7939e4-498e-4646-91db-59f836a6fa2f')
+      .expect(201);
+    const retryResponse = await request(app)
+      .post('/api/v1/courses/course-deep-learning-basic/enrollments')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', '9a7939e4-498e-4646-91db-59f836a6fa2f')
+      .expect(201);
+
+    expect(firstResponse.body.data).toEqual({
+      enrollment: {
+        courseId: 'course-deep-learning-basic',
+        status: 'in-progress',
+        progressPercent: 0,
+      },
+      access: {
+        moduleId: 'dl-m01-neuron-perceptron',
+        postId: 'dl-p01-neuron-perceptron',
+      },
+      nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    });
+    expect(retryResponse.body.data).toEqual(firstResponse.body.data);
+    expect(enrollmentKeys).toEqual(new Set(['learner-01:course-deep-learning-basic']));
+  });
 });

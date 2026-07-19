@@ -1,23 +1,13 @@
-import { useMemo } from 'react';
-
 import type { Locale } from '../catalog/course-data';
-import type { AuthGateway } from './auth-context';
+import type { LearningApiClient } from '../learning/learning-api';
 import { AuthPage, type AuthMode } from './auth-page';
-import { createFirebaseAuthGateway } from './firebase-auth-gateway';
-import { AuthProvider } from './auth-session';
 
 interface AuthEntryProps {
-  authGateway?: AuthGateway | undefined;
+  learningApiClient: LearningApiClient;
   locale: Locale;
   mode: AuthMode;
 }
 
-export function AuthEntry({ authGateway, locale, mode }: AuthEntryProps) {
-  const gateway = useMemo(() => authGateway ?? createFirebaseAuthGateway(), [authGateway]);
-
-  return (
-    <AuthProvider gateway={gateway}>
-      <AuthPage locale={locale} mode={mode} />
-    </AuthProvider>
-  );
+export function AuthEntry({ learningApiClient, locale, mode }: AuthEntryProps) {
+  return <AuthPage learningApiClient={learningApiClient} locale={locale} mode={mode} />;
 }

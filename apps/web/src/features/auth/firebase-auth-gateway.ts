@@ -93,6 +93,7 @@ function createUnavailableGateway(): AuthGateway {
   };
 
   return {
+    getIdToken: async () => null,
     observe(listener) {
       listener(null);
       return () => undefined;
@@ -108,6 +109,9 @@ function createConfiguredGateway(auth: Auth): AuthGateway {
   const googleProvider = new GoogleAuthProvider();
 
   return {
+    async getIdToken() {
+      return auth.currentUser ? auth.currentUser.getIdToken() : null;
+    },
     observe(listener, onError) {
       void getRedirectResult(auth).catch(onError);
       return onAuthStateChanged(auth, (user) => listener(user ? toAuthUser(user) : null), onError);
