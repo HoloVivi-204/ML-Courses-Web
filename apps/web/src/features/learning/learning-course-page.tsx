@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
+import { rememberLearningAccessGrant } from './learning-access-store';
 import type { LearningApiClient } from './learning-api';
 
 interface LearningCoursePageProps {
@@ -20,7 +21,7 @@ function createIdempotencyKey(): string {
 
 export function LearningCoursePage({ learningApiClient, locale }: LearningCoursePageProps) {
   const { t } = useTranslation();
-  const { getIdToken } = useAuth();
+  const { getIdToken, user } = useAuth();
   const { courseId } = useParams();
   const course = getCourse(courseId);
   const firstModule = course?.modules?.[0];
@@ -41,14 +42,21 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
       try {
         const idToken = await getIdToken();
 
-        if (!idToken) {
-          throw new Error('Authenticated user is missing an ID token.');
+        if (!idToken || !user) {
+          throw new Error('Authenticated user is missing an ID token or user identity.');
         }
 
-        await learningApiClient.enrollCourse({
+        const enrollmentResult = await learningApiClient.enrollCourse({
           courseId: selectedCourse.id,
           idToken,
           idempotencyKey: idempotencyKey.current,
+        });
+
+        rememberLearningAccessGrant({
+          courseId: selectedCourse.id,
+          moduleId: enrollmentResult.access.moduleId,
+          postId: enrollmentResult.access.postId,
+          uid: user.uid,
         });
 
         if (isActive) {
@@ -66,7 +74,7 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
     return () => {
       isActive = false;
     };
-  }, [course, getIdToken, learningApiClient]);
+  }, [course, getIdToken, learningApiClient, user]);
 
   if (!course || !firstModule) {
     return (

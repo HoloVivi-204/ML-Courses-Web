@@ -2,6 +2,7 @@ import type { LocalizedText } from '../catalog/course-data';
 import type { ContentBlock } from './content-block-renderer';
 
 export interface TrialPost {
+  accessLevel: 'full' | 'trial';
   blocks: readonly ContentBlock[];
   courseId: string;
   description: LocalizedText;
@@ -267,8 +268,102 @@ const trialBlocks = [
   },
 ] satisfies readonly ContentBlock[];
 
-const trialPosts: readonly TrialPost[] = [
+const fullLessonBlocks = [
+  ...trialBlocks.filter(
+    (block) => block.id !== 'result-thresholds' && block.id !== 'further-reading',
+  ),
   {
+    ...blockDefaults,
+    id: 'xor-linear-limit',
+    locales: {
+      en: {
+        lede:
+          'XOR uses two positive cases that sit across from each other. One straight ' +
+          'decision boundary cannot separate them from the negative cases.',
+        navigationTitle: 'Why XOR breaks the line',
+        title: 'Why does XOR break a single-layer Perceptron?',
+      },
+      vi: {
+        lede:
+          'XOR có hai trường hợp dương nằm chéo nhau. Một ranh giới quyết định thẳng ' +
+          'không thể tách chúng khỏi hai trường hợp âm.',
+        navigationTitle: 'Vì sao XOR phá đường thẳng?',
+        title: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+      },
+    },
+    order: 9,
+    type: 'heading',
+  },
+  {
+    ...blockDefaults,
+    id: 'xor-truth-table',
+    locales: {
+      en: {
+        markdown:
+          'Read the stable XOR target before thinking about weights:\n\n' +
+          '| x1 | x2 | XOR |\n|---:|---:|---:|\n| 0 | 0 | 0 |\n| 0 | 1 | 1 |\n| 1 | 0 | 1 |\n| 1 | 1 | 0 |\n\n' +
+          'The positive points are diagonal, so pushing one side of a line up also ' +
+          'pushes the wrong negative point up.',
+      },
+      vi: {
+        markdown:
+          'Hãy đọc target XOR ổn định trước khi nghĩ về trọng số:\n\n' +
+          '| x1 | x2 | XOR |\n|---:|---:|---:|\n| 0 | 0 | 0 |\n| 0 | 1 | 1 |\n| 1 | 0 | 1 |\n| 1 | 1 | 0 |\n\n' +
+          'Hai điểm dương nằm chéo nhau, nên khi đẩy một phía của đường thẳng lên, ' +
+          'một điểm âm sai cũng bị đẩy lên theo.',
+      },
+    },
+    order: 10,
+    type: 'markdown',
+  },
+  {
+    ...blockDefaults,
+    id: 'stable-content-access',
+    locales: {
+      en: {
+        body:
+          'Full reading is granted by stable content access post_dl-p01-neuron-perceptron. ' +
+          'The grant does not pin a revision, so a safe publish can move the current text forward.',
+        title: 'Stable access, current content',
+      },
+      vi: {
+        body:
+          'Quyền đọc đầy đủ được cấp bằng stable content access post_dl-p01-neuron-perceptron. ' +
+          'Grant này không pin revision, nên một lần publish an toàn vẫn có thể chuyển nội dung hiện tại về phía trước.',
+        title: 'Stable access, nội dung hiện tại',
+      },
+    },
+    order: 11,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...blockDefaults,
+    id: 'from-perceptron-to-next-step',
+    locales: {
+      en: {
+        lede:
+          'The useful failure tells you what to look for next: a hidden layer can bend ' +
+          'the representation before the final decision.',
+        navigationTitle: 'What this unlocks next',
+        title: 'The failure points to the next model',
+      },
+      vi: {
+        lede:
+          'Thất bại hữu ích này cho bạn biết cần quan sát gì tiếp theo: một hidden layer ' +
+          'có thể bẻ cong biểu diễn trước quyết định cuối.',
+        navigationTitle: 'Điều này mở gì tiếp theo?',
+        title: 'Thất bại chỉ sang mô hình kế tiếp',
+      },
+    },
+    order: 12,
+    type: 'heading',
+  },
+] satisfies readonly ContentBlock[];
+
+const trialPosts = [
+  {
+    accessLevel: 'trial',
     blocks: trialBlocks,
     courseId: 'course-deep-learning-basic',
     description: {
@@ -283,8 +378,31 @@ const trialPosts: readonly TrialPost[] = [
       vi: 'Một neuron đưa ra quyết định như thế nào?',
     },
   },
+] satisfies readonly TrialPost[];
+
+const fullLessonPosts: readonly TrialPost[] = [
+  {
+    ...trialPosts[0]!,
+    accessLevel: 'full',
+    blocks: fullLessonBlocks,
+    description: {
+      en: 'Read from a single neuron decision to the XOR limit that motivates the next model.',
+      vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR mở đường cho mô hình kế tiếp.',
+    },
+    durationMinutes: 16,
+  },
 ];
 
 export function getTrialPost(courseId: string | undefined, postId: string | undefined) {
   return trialPosts.find((post) => post.courseId === courseId && post.id === postId);
+}
+
+export function getReadablePost(
+  courseId: string | undefined,
+  postId: string | undefined,
+  isFullAccess: boolean,
+) {
+  const posts = isFullAccess ? fullLessonPosts : trialPosts;
+
+  return posts.find((post) => post.courseId === courseId && post.id === postId);
 }

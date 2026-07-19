@@ -1,8 +1,42 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { App } from './app';
+import type { AuthGateway } from '../features/auth/auth-context';
+import type { LearningApiClient } from '../features/learning/learning-api';
+
+function createAuthenticatedGateway(): AuthGateway {
+  return {
+    getIdToken: vi.fn().mockResolvedValue('local-id-token'),
+    observe(listener) {
+      listener({ email: 'learner@example.test', uid: 'learner-01' });
+      return () => undefined;
+    },
+    signInWithEmail: vi.fn().mockResolvedValue(undefined),
+    signInWithGoogle: vi.fn().mockResolvedValue(undefined),
+    signOut: vi.fn().mockResolvedValue(undefined),
+    signUpWithEmail: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createLearningApiClient(): LearningApiClient {
+  return {
+    bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    enrollCourse: vi.fn().mockResolvedValue({
+      access: {
+        moduleId: 'dl-m01-neuron-perceptron',
+        postId: 'dl-p01-neuron-perceptron',
+      },
+      enrollment: {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 0,
+        status: 'in-progress',
+      },
+      nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    }),
+  };
+}
 
 describe('public learning journey', () => {
   it('does not expose the static lab preview as an interactive run control', () => {
@@ -182,5 +216,69 @@ describe('public learning journey', () => {
     expect(resource).toHaveAttribute('target', '_blank');
     expect(resource).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(/developers\.google\.com/i)).toBeVisible();
+  });
+
+  it('shows the full Perceptron/XOR lesson only to an authenticated learner', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/post_dl-p01-neuron-perceptron/)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Why does XOR break a single-layer Perceptron?',
+      }),
+    ).toBeVisible();
+    expect(screen.getByText('FULL LESSON')).toBeVisible();
+  });
+
+  it('keeps full Perceptron/XOR content closed without a content access grant', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    );
+
+    render(
+      <App
+        authGateway={createAuthenticatedGateway()}
+        learningApiClient={createLearningApiClient()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: /Một neuron đưa ra quyết định như thế nào/i,
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/post_dl-p01-neuron-perceptron/)).not.toBeInTheDocument();
   });
 });

@@ -2,9 +2,11 @@ import { ArrowLeft, Clock3, MoveRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
+import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
-import { getTrialPost } from './trial-post-data';
+import { hasLearningPostAccess } from './learning-access-store';
+import { getReadablePost } from './trial-post-data';
 
 interface TrialPostPageProps {
   locale: Locale;
@@ -12,12 +14,17 @@ interface TrialPostPageProps {
 
 export function TrialPostPage({ locale }: TrialPostPageProps) {
   const { t } = useTranslation();
+  const { status, user } = useAuth();
   const { courseId, postId } = useParams();
-  const post = getTrialPost(courseId, postId);
+  const hasFullAccess =
+    status === 'authenticated' && hasLearningPostAccess(courseId, postId, user?.uid);
+  const post = getReadablePost(courseId, postId, hasFullAccess);
 
   if (!post) {
     return <TrialPostNotFoundPage />;
   }
+
+  const eyebrowKey = post.accessLevel === 'full' ? 'trial.fullEyebrow' : 'trial.eyebrow';
 
   return (
     <main className="trial-post-page page-shell">
@@ -27,7 +34,7 @@ export function TrialPostPage({ locale }: TrialPostPageProps) {
       </Link>
       <header className="trial-post-heading">
         <div className="trial-post-kicker">
-          <span className="eyebrow">{t('trial.eyebrow')}</span>
+          <span className="eyebrow">{t(eyebrowKey)}</span>
           <span className="trial-post-duration">
             <Clock3 aria-hidden="true" size={15} />
             {t('trial.duration', { count: post.durationMinutes })}
