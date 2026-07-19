@@ -468,6 +468,35 @@ function getStatusField(data: FirebaseFirestore.DocumentData | undefined) {
   return status === 'completed' || status === 'in-progress' ? status : null;
 }
 
+type StableContentAccessItem = LearningProgressSnapshot['contentAccess'][number];
+
+function hasRevisionPinField(data: FirebaseFirestore.DocumentData): boolean {
+  return Object.keys(data).some(
+    (fieldName) => fieldName === 'revisionId' || fieldName.endsWith('RevisionId'),
+  );
+}
+
+function toStableContentAccessItem(
+  data: FirebaseFirestore.DocumentData,
+): StableContentAccessItem | null {
+  if (hasRevisionPinField(data)) {
+    return null;
+  }
+
+  if (data.contentType !== 'demo' && data.contentType !== 'module' && data.contentType !== 'post') {
+    return null;
+  }
+
+  if (typeof data.entityId !== 'string' || !data.entityId.trim()) {
+    return null;
+  }
+
+  return {
+    contentType: data.contentType,
+    entityId: data.entityId.trim(),
+  };
+}
+
 function getRequiredPostCompletionIdsForModule(moduleId: string): readonly string[] {
   return getModuleCompletionSeedByModuleId(moduleId)?.requiredPostIds ?? [];
 }
@@ -517,12 +546,8 @@ function createDeepLearningProgressSnapshot(input: {
       : [],
     contentAccess: input.contentAccess
       .filter((data): data is FirebaseFirestore.DocumentData => data !== undefined)
-      .map((data) => ({
-        contentType:
-          data.contentType === 'demo' || data.contentType === 'module' ? data.contentType : 'post',
-        entityId: typeof data.entityId === 'string' ? data.entityId : '',
-      }))
-      .filter((item) => item.entityId.length > 0),
+      .map(toStableContentAccessItem)
+      .filter((item): item is StableContentAccessItem => item !== null),
     demos: [
       {
         demoId: 'demo-perceptron-and-gate',

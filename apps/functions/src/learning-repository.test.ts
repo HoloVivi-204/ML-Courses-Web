@@ -3,6 +3,16 @@ import { describe, expect, it } from 'vitest';
 
 import { createFirestoreLearningRepository } from './learning-repository.js';
 
+const revisionPinFieldNames = [
+  'revisionId',
+  'publishedRevisionId',
+  'courseRevisionId',
+  'moduleRevisionId',
+  'postRevisionId',
+  'demoRevisionId',
+  'quizRevisionId',
+] as const;
+
 interface FakeDocumentReference {
   get(): Promise<FakeDocumentSnapshot>;
   path: string;
@@ -56,6 +66,14 @@ function createSnapshot(data: Record<string, unknown> | undefined): FakeDocument
     exists: data !== undefined,
     data: () => data,
   };
+}
+
+function expectStableContentAccessGrant(data: Record<string, unknown> | undefined) {
+  expect(data).toBeDefined();
+
+  for (const fieldName of revisionPinFieldNames) {
+    expect(data).not.toHaveProperty(fieldName);
+  }
 }
 
 describe('Firestore learning repository progress transitions', () => {
@@ -172,6 +190,9 @@ describe('Firestore learning repository progress transitions', () => {
       entityId: 'dl-m02-mlp',
       reason: 'module-completed',
     });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/module_dl-m02-mlp'),
+    );
     expect(
       documents.get('users/learner-01/contentAccess/post_dl-p02-mlp-forward-activation'),
     ).toMatchObject({
@@ -179,6 +200,9 @@ describe('Firestore learning repository progress transitions', () => {
       entityId: 'dl-p02-mlp-forward-activation',
       reason: 'module-completed',
     });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/post_dl-p02-mlp-forward-activation'),
+    );
   });
 
   it('grants demo access after the required post quiz is passed', async () => {
@@ -227,6 +251,9 @@ describe('Firestore learning repository progress transitions', () => {
       entityId: 'demo-perceptron-and-gate',
       reason: 'post-completed',
     });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/demo_demo-perceptron-and-gate'),
+    );
   });
 
   it('rejects direct demo completion when the post completion has not granted demo access', async () => {
@@ -330,5 +357,41 @@ describe('Firestore learning repository progress transitions', () => {
         moduleId: 'dl-m01-neuron-perceptron',
       },
     ]);
+    expect(result.data.contentAccess).toEqual([
+      {
+        contentType: 'module',
+        entityId: 'dl-m01-neuron-perceptron',
+      },
+      {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+      },
+      {
+        contentType: 'demo',
+        entityId: 'demo-perceptron-and-gate',
+      },
+    ]);
+  });
+
+  it('does not expose revision-pinned content access documents in progress snapshots', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/contentAccess/module_dl-m01-neuron-perceptron': {
+        contentType: 'module',
+        entityId: 'dl-m01-neuron-perceptron',
+        publishedRevisionId: 'module-dl-m01-neuron-perceptron-rev-r1',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.getProgress({ uid: 'learner-01' });
+
+    expect(result.data.contentAccess).toEqual([]);
   });
 });

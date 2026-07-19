@@ -15,6 +15,10 @@ const STORAGE_KEY = 'ml-path-learning-access-grants';
 
 export function rememberLearningAccessGrant(grant: LearningAccessGrant) {
   try {
+    if (!isLearningAccessGrant(grant)) {
+      return;
+    }
+
     const grants = readLearningAccessGrants();
     const nextGrants = [
       ...grants.filter(
@@ -40,12 +44,18 @@ export function rememberLearningContentAccessGrants(input: {
   uid: string;
 }) {
   for (const item of input.contentAccess) {
+    const stableItem = toStableContentAccessItem(item);
+
+    if (!stableItem) {
+      continue;
+    }
+
     rememberLearningAccessGrant({
       courseId: input.courseId,
       uid: input.uid,
-      ...(item.contentType === 'demo' ? { demoId: item.entityId } : {}),
-      ...(item.contentType === 'module' ? { moduleId: item.entityId } : {}),
-      ...(item.contentType === 'post' ? { postId: item.entityId } : {}),
+      ...(stableItem.contentType === 'demo' ? { demoId: stableItem.entityId } : {}),
+      ...(stableItem.contentType === 'module' ? { moduleId: stableItem.entityId } : {}),
+      ...(stableItem.contentType === 'post' ? { postId: stableItem.entityId } : {}),
     });
   }
 }
@@ -112,10 +122,45 @@ function readLearningAccessGrants(): LearningAccessGrant[] {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasRevisionPinField(value: object): boolean {
+  return Object.keys(value).some(
+    (fieldName) => fieldName === 'revisionId' || fieldName.endsWith('RevisionId'),
+  );
+}
+
+function toStableContentAccessItem(value: unknown): LearningContentAccessItem | null {
+  if (!isRecord(value) || hasRevisionPinField(value)) {
+    return null;
+  }
+
+  if (
+    value.contentType !== 'demo' &&
+    value.contentType !== 'module' &&
+    value.contentType !== 'post'
+  ) {
+    return null;
+  }
+
+  if (typeof value.entityId !== 'string' || !value.entityId.trim()) {
+    return null;
+  }
+
+  return {
+    contentType: value.contentType,
+    entityId: value.entityId.trim(),
+  };
+}
+
 function isLearningAccessGrant(value: unknown): value is LearningAccessGrant {
+  if (!isRecord(value) || hasRevisionPinField(value)) {
+    return false;
+  }
+
   return (
-    typeof value === 'object' &&
-    value !== null &&
     'courseId' in value &&
     'uid' in value &&
     typeof value.courseId === 'string' &&
