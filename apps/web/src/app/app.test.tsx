@@ -39,6 +39,27 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
       },
     }),
+    createAdminContentDraft: vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Draft preview',
+        vi: 'Preview draft',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Draft title',
+        vi: 'Tiêu đề draft',
+      },
+      validationStatus: 'not-run',
+    }),
     createQuizAttempt: vi.fn().mockResolvedValue({
       attempt: {
         attemptId: 'attempt-quiz-post-dl-p01-01',
@@ -758,6 +779,7 @@ describe('public learning journey', () => {
     const listAdminContent = vi.fn().mockResolvedValue([
       {
         courseId: 'course-deep-learning-basic',
+        draftRevisionId: null,
         entityId: 'dl-p01-neuron-perceptron',
         entityType: 'post',
         localeAvailability: ['en', 'vi'],
@@ -791,6 +813,78 @@ describe('public learning journey', () => {
     expect(await screen.findByText(/Read from a single neuron decision/i)).toBeVisible();
     expect(document.body).not.toHaveTextContent(/answerKey|correctAnswer|hint/i);
     expect(listAdminContent).toHaveBeenCalledWith({ idToken: 'local-id-token' });
+  });
+
+  it('lets an authenticated admin create and preview a draft without replacing the published preview', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const listAdminContent = vi.fn().mockResolvedValue([
+      {
+        courseId: 'course-deep-learning-basic',
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        localeAvailability: ['en', 'vi'],
+        moduleId: 'dl-m01-neuron-perceptron',
+        preview: {
+          en: 'Published learner copy',
+          vi: 'Báº£n published cho learner',
+        },
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        sourceStatus: 'seeded',
+        status: 'published',
+        title: {
+          en: 'How does a neuron make a decision?',
+          vi: 'Má»™t neuron Ä‘Æ°a ra quyáº¿t Ä‘á»‹nh nhÆ° tháº¿ nÃ o?',
+        },
+        validationStatus: 'not-run',
+      },
+    ]);
+    const createAdminContentDraft = vi.fn().mockResolvedValue({
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      localeAvailability: ['en', 'vi'],
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Draft-only copy',
+        vi: 'Báº£n draft riÃªng',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded',
+      status: 'draft',
+      title: {
+        en: 'Draft title',
+        vi: 'TiÃªu Ä‘á» draft',
+      },
+      validationStatus: 'not-run',
+    });
+    const learningApiClient = {
+      ...createLearningApiClient(),
+      createAdminContentDraft,
+      listAdminContent,
+    };
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Published learner copy')).toBeVisible();
+
+    await user.click(await screen.findByRole('button', { name: /draft/i }));
+
+    expect(createAdminContentDraft).toHaveBeenCalledWith({
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+      idToken: 'local-id-token',
+    });
+    expect(await screen.findAllByText('draft-post-dl-p01-neuron-perceptron-rev-d1')).toHaveLength(
+      2,
+    );
+    expect(screen.getByText('Draft-only copy')).toBeVisible();
+    expect(screen.getByText('Published learner copy')).toBeVisible();
   });
 
   it('shows a safe forbidden state when the admin inventory API rejects access', async () => {

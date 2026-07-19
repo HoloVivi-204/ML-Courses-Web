@@ -499,6 +499,25 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
+  app.post(
+    '/api/v1/admin/content/:entityType/:entityId/drafts',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const result = await getAdminContentRepository().createDraft({
+          createdByUid: adminUser.uid,
+          entityId: getRouteParam(request, 'entityId'),
+          entityType: getRouteParam(request, 'entityType'),
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   app.post('/api/v1/playground-run-sessions', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);

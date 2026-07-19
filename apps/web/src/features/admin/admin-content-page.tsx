@@ -1,11 +1,15 @@
-import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, FilePlus, FileText, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
 import type { Locale } from '../catalog/course-data';
-import type { AdminContentSummary, LearningApiClient } from '../learning/learning-api';
+import type {
+  AdminContentDraft,
+  AdminContentSummary,
+  LearningApiClient,
+} from '../learning/learning-api';
 
 interface AdminContentPageProps {
   learningApiClient: LearningApiClient;
@@ -13,6 +17,12 @@ interface AdminContentPageProps {
 }
 
 type LoadStatus = 'failed' | 'loading' | 'ready';
+type DraftActionStatus = 'creating' | 'failed' | 'idle';
+
+interface DraftActionState {
+  contentKey: string;
+  status: DraftActionStatus;
+}
 
 function getContentKey(item: AdminContentSummary): string {
   return `${item.entityType}:${item.entityId}`;
@@ -22,6 +32,10 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
   const { t } = useTranslation();
   const { getIdToken } = useAuth();
   const [content, setContent] = useState<readonly AdminContentSummary[]>([]);
+  const [draftAction, setDraftAction] = useState<DraftActionState | null>(null);
+  const [draftPreviewsByKey, setDraftPreviewsByKey] = useState<
+    Readonly<Record<string, AdminContentDraft>>
+  >({});
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -65,6 +79,66 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
     return content.find((item) => getContentKey(item) === selectedKey) ?? content[0] ?? null;
   }, [content, selectedKey]);
 
+  const selectedContentKey = selectedContent ? getContentKey(selectedContent) : null;
+  const selectedDraftActionStatus =
+    draftAction?.contentKey === selectedContentKey ? draftAction.status : 'idle';
+  const selectedDraftPreview =
+    selectedContentKey !== null ? (draftPreviewsByKey[selectedContentKey] ?? null) : null;
+
+  async function handleCreateDraft(item: AdminContentSummary) {
+    const contentKey = getContentKey(item);
+    const currentDraftActionStatus =
+      draftAction?.contentKey === contentKey ? draftAction.status : 'idle';
+
+    if (currentDraftActionStatus === 'creating' || item.draftRevisionId) {
+      return;
+    }
+
+    setDraftAction({ contentKey, status: 'creating' });
+
+    try {
+      const idToken = await getIdToken();
+
+      if (!idToken) {
+        throw new Error('Authenticated user is missing an ID token.');
+      }
+
+      const draft = await learningApiClient.createAdminContentDraft({
+        entityId: item.entityId,
+        entityType: item.entityType,
+        idToken,
+      });
+
+      setDraftPreviewsByKey((currentDraftPreviews) => {
+        return {
+          ...currentDraftPreviews,
+          [contentKey]: draft,
+        };
+      });
+      setContent((currentContent) => {
+        return currentContent.map((contentItem) => {
+          if (getContentKey(contentItem) !== contentKey) {
+            return contentItem;
+          }
+
+          return {
+            ...contentItem,
+            draftRevisionId: draft.draftRevisionId,
+          };
+        });
+      });
+      setDraftAction(null);
+    } catch {
+      setDraftPreviewsByKey((currentDraftPreviews) => {
+        const nextDraftPreviews = { ...currentDraftPreviews };
+        delete nextDraftPreviews[contentKey];
+
+        return nextDraftPreviews;
+      });
+      setDraftAction({ contentKey, status: 'failed' });
+    }
+  }
+
   return (
     <main className="admin-content-page page-shell">
       <Link className="breadcrumb-link" to="/">
@@ -105,7 +179,13 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
             selectedKey={selectedContent ? getContentKey(selectedContent) : null}
             onSelect={setSelectedKey}
           />
-          <ContentPreview item={selectedContent} locale={locale} />
+          <ContentPreview
+            draftActionStatus={selectedDraftActionStatus}
+            draftPreview={selectedDraftPreview}
+            item={selectedContent}
+            locale={locale}
+            onCreateDraft={handleCreateDraft}
+          />
         </section>
       ) : null}
     </main>
@@ -150,6 +230,7 @@ function ContentInventoryList({
                   <span>{t(`admin.content.entity.${item.entityType}`)}</span>
                   <strong>{item.title[locale]}</strong>
                   <code>{item.entityId}</code>
+                  {item.draftRevisionId ? <em>{t('admin.content.draftBadge')}</em> : null}
                 </button>
               </li>
             );
@@ -162,7 +243,19 @@ function ContentInventoryList({
   );
 }
 
-function ContentPreview({ item, locale }: { item: AdminContentSummary | null; locale: Locale }) {
+function ContentPreview({
+  draftActionStatus,
+  draftPreview,
+  item,
+  locale,
+  onCreateDraft,
+}: {
+  draftActionStatus: DraftActionStatus;
+  draftPreview: AdminContentDraft | null;
+  item: AdminContentSummary | null;
+  locale: Locale;
+  onCreateDraft: (item: AdminContentSummary) => void;
+}) {
   const { t } = useTranslation();
 
   if (!item) {
@@ -201,6 +294,16 @@ function ContentPreview({ item, locale }: { item: AdminContentSummary | null; lo
           </dd>
         </div>
         <div>
+          <dt>{t('admin.content.draftRevision')}</dt>
+          <dd>
+            {item.draftRevisionId ? (
+              <code>{item.draftRevisionId}</code>
+            ) : (
+              t('admin.content.noDraft')
+            )}
+          </dd>
+        </div>
+        <div>
           <dt>{t('admin.content.locales')}</dt>
           <dd>{item.localeAvailability.join(' / ')}</dd>
         </div>
@@ -218,6 +321,27 @@ function ContentPreview({ item, locale }: { item: AdminContentSummary | null; lo
         </div>
       </dl>
 
+      <div className="admin-content-actions">
+        <button
+          className="admin-content-draft-button"
+          disabled={draftActionStatus === 'creating' || item.draftRevisionId !== null}
+          onClick={() => onCreateDraft(item)}
+          type="button"
+        >
+          <FilePlus aria-hidden="true" size={16} />
+          {draftActionStatus === 'creating'
+            ? t('admin.content.draftCreating')
+            : item.draftRevisionId
+              ? t('admin.content.draftExists')
+              : t('admin.content.createDraft')}
+        </button>
+        {draftActionStatus === 'failed' ? (
+          <p className="admin-content-inline-error" role="alert">
+            {t('admin.content.draftFailed')}
+          </p>
+        ) : null}
+      </div>
+
       <div className="admin-content-preview-copy">
         <article>
           <span>{locale.toUpperCase()}</span>
@@ -228,6 +352,62 @@ function ContentPreview({ item, locale }: { item: AdminContentSummary | null; lo
           <span>{secondaryLocale.toUpperCase()}</span>
           <h4>{item.title[secondaryLocale]}</h4>
           <p>{item.preview[secondaryLocale]}</p>
+        </article>
+      </div>
+
+      {draftPreview ? (
+        <DraftPreview draft={draftPreview} locale={locale} />
+      ) : (
+        <p className="admin-content-muted">{t('admin.content.draftPreviewEmpty')}</p>
+      )}
+    </section>
+  );
+}
+
+function DraftPreview({ draft, locale }: { draft: AdminContentDraft; locale: Locale }) {
+  const { t } = useTranslation();
+  const secondaryLocale: Locale = locale === 'vi' ? 'en' : 'vi';
+
+  return (
+    <section className="admin-content-draft-preview" aria-label={t('admin.content.draftPreview')}>
+      <div className="admin-content-panel-heading">
+        <FilePlus aria-hidden="true" size={18} />
+        <h3>{t('admin.content.draftPreview')}</h3>
+      </div>
+
+      <dl className="admin-content-meta">
+        <div>
+          <dt>{t('admin.content.status')}</dt>
+          <dd>{t('admin.content.status.draft')}</dd>
+        </div>
+        <div>
+          <dt>{t('admin.content.draftRevision')}</dt>
+          <dd>
+            <code>{draft.draftRevisionId}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>{t('admin.content.baseRevision')}</dt>
+          <dd>
+            <code>{draft.baseRevisionId}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>{t('admin.content.revisionVersion')}</dt>
+          <dd>{draft.revisionVersion}</dd>
+        </div>
+      </dl>
+
+      <div className="admin-content-preview-copy">
+        <article>
+          <span>{locale.toUpperCase()}</span>
+          <h4>{draft.title[locale]}</h4>
+          <p>{draft.preview[locale]}</p>
+        </article>
+        <article>
+          <span>{secondaryLocale.toUpperCase()}</span>
+          <h4>{draft.title[secondaryLocale]}</h4>
+          <p>{draft.preview[secondaryLocale]}</p>
         </article>
       </div>
     </section>

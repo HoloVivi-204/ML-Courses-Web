@@ -11,6 +11,7 @@ export interface LocalizedText {
 
 export interface AdminContentSummary {
   courseId: string;
+  draftRevisionId: string | null;
   entityId: string;
   entityType: AdminContentEntityType;
   localeAvailability: readonly ['en', 'vi'];
@@ -24,6 +25,29 @@ export interface AdminContentSummary {
   validationStatus: 'not-run';
 }
 
+export interface AdminContentDraft {
+  baseRevisionId: string;
+  courseId: string;
+  draftRevisionId: string;
+  entityId: string;
+  entityType: AdminContentEntityType;
+  localeAvailability: readonly ['en', 'vi'];
+  moduleId?: string | undefined;
+  postId?: string | undefined;
+  preview: LocalizedText;
+  revisionVersion: 1;
+  sourceStatus: 'seeded';
+  status: 'draft';
+  title: LocalizedText;
+  validationStatus: 'not-run';
+}
+
+export interface CreateAdminContentDraftInput {
+  createdByUid: string;
+  entityId: string;
+  entityType: string;
+}
+
 export interface ListAdminContentInput {
   courseId?: string | undefined;
   entityType?: string | undefined;
@@ -31,6 +55,13 @@ export interface ListAdminContentInput {
 }
 
 export interface AdminContentRepository {
+  createDraft(input: CreateAdminContentDraftInput): Promise<{
+    data: {
+      draft: AdminContentDraft;
+      published: AdminContentSummary;
+    };
+    statusCode: 201;
+  }>;
   listContent(input: ListAdminContentInput): Promise<{
     data: {
       content: readonly AdminContentSummary[];
@@ -42,6 +73,7 @@ export interface AdminContentRepository {
 const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-classical-ml',
+    draftRevisionId: null,
     entityId: 'course-classical-ml',
     entityType: 'course',
     localeAvailability: ['en', 'vi'],
@@ -60,6 +92,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'course-deep-learning-basic',
     entityType: 'course',
     localeAvailability: ['en', 'vi'],
@@ -78,6 +111,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'dl-m01-neuron-perceptron',
     entityType: 'module',
     localeAvailability: ['en', 'vi'],
@@ -97,6 +131,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'dl-m02-mlp',
     entityType: 'module',
     localeAvailability: ['en', 'vi'],
@@ -116,6 +151,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'dl-m03-training-generalization',
     entityType: 'module',
     localeAvailability: ['en', 'vi'],
@@ -135,6 +171,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'dl-p01-neuron-perceptron',
     entityType: 'post',
     localeAvailability: ['en', 'vi'],
@@ -154,6 +191,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'demo-perceptron-and-gate',
     entityType: 'demo',
     localeAvailability: ['en', 'vi'],
@@ -174,6 +212,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'quiz-post-dl-p01',
     entityType: 'quiz',
     localeAvailability: ['en', 'vi'],
@@ -194,6 +233,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
   {
     courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
     entityId: 'quiz-module-dl-m01',
     entityType: 'quiz',
     localeAvailability: ['en', 'vi'],
@@ -217,10 +257,96 @@ function isAdminContentEntityType(value: string): value is AdminContentEntityTyp
   return adminContentEntityTypes.includes(value as AdminContentEntityType);
 }
 
+function getContentKey(entityType: AdminContentEntityType, entityId: string): string {
+  return `${entityType}:${entityId}`;
+}
+
+function createDraftRevisionId(published: AdminContentSummary): string {
+  return `draft-${published.entityType}-${published.entityId}-rev-d1`;
+}
+
+function createDraftFromPublished(published: AdminContentSummary): AdminContentDraft {
+  return {
+    baseRevisionId: published.publishedRevisionId,
+    courseId: published.courseId,
+    draftRevisionId: createDraftRevisionId(published),
+    entityId: published.entityId,
+    entityType: published.entityType,
+    localeAvailability: ['en', 'vi'],
+    ...(published.moduleId !== undefined ? { moduleId: published.moduleId } : {}),
+    ...(published.postId !== undefined ? { postId: published.postId } : {}),
+    preview: { ...published.preview },
+    revisionVersion: 1,
+    sourceStatus: 'seeded',
+    status: 'draft',
+    title: { ...published.title },
+    validationStatus: 'not-run',
+  };
+}
+
+function withDraftRevision(
+  published: AdminContentSummary,
+  draft: AdminContentDraft | undefined,
+): AdminContentSummary {
+  return {
+    ...published,
+    draftRevisionId: draft?.draftRevisionId ?? null,
+  };
+}
+
 export function createStaticAdminContentRepository(
   content: readonly AdminContentSummary[] = releaseOneAdminContent,
 ): AdminContentRepository {
+  const draftsByContentKey = new Map<string, AdminContentDraft>();
+
   return {
+    async createDraft(input) {
+      if (!input.createdByUid) {
+        throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
+      }
+
+      if (!isAdminContentEntityType(input.entityType)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_ENTITY_TYPE_INVALID',
+          'The requested admin content entity type is not supported.',
+        );
+      }
+
+      const contentKey = getContentKey(input.entityType, input.entityId);
+      const existingDraft = draftsByContentKey.get(contentKey);
+
+      if (existingDraft !== undefined) {
+        throw new ApiError(
+          409,
+          'ADMIN_CONTENT_DRAFT_ALREADY_EXISTS',
+          'This content item already has a draft.',
+        );
+      }
+
+      const published = content.find(
+        (item) => item.entityType === input.entityType && item.entityId === input.entityId,
+      );
+
+      if (published === undefined) {
+        throw new ApiError(
+          404,
+          'ADMIN_CONTENT_NOT_FOUND',
+          'The requested admin content item was not found.',
+        );
+      }
+
+      const draft = createDraftFromPublished(published);
+      draftsByContentKey.set(contentKey, draft);
+
+      return {
+        statusCode: 201,
+        data: {
+          draft,
+          published: withDraftRevision(published, draft),
+        },
+      };
+    },
     async listContent(input) {
       if (input.entityType !== undefined && !isAdminContentEntityType(input.entityType)) {
         throw new ApiError(
@@ -233,21 +359,28 @@ export function createStaticAdminContentRepository(
       return {
         statusCode: 200,
         data: {
-          content: content.filter((item) => {
-            if (input.entityType !== undefined && item.entityType !== input.entityType) {
-              return false;
-            }
+          content: content
+            .filter((item) => {
+              if (input.entityType !== undefined && item.entityType !== input.entityType) {
+                return false;
+              }
 
-            if (input.courseId !== undefined && item.courseId !== input.courseId) {
-              return false;
-            }
+              if (input.courseId !== undefined && item.courseId !== input.courseId) {
+                return false;
+              }
 
-            if (input.moduleId !== undefined && item.moduleId !== input.moduleId) {
-              return false;
-            }
+              if (input.moduleId !== undefined && item.moduleId !== input.moduleId) {
+                return false;
+              }
 
-            return true;
-          }),
+              return true;
+            })
+            .map((item) => {
+              return withDraftRevision(
+                item,
+                draftsByContentKey.get(getContentKey(item.entityType, item.entityId)),
+              );
+            }),
         },
       };
     },

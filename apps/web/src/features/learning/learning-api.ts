@@ -134,6 +134,7 @@ export type AdminContentEntityType = 'course' | 'demo' | 'module' | 'post' | 'qu
 
 export interface AdminContentSummary {
   courseId: string;
+  draftRevisionId: string | null;
   entityId: string;
   entityType: AdminContentEntityType;
   localeAvailability: ReadonlyArray<'en' | 'vi'>;
@@ -146,6 +147,29 @@ export interface AdminContentSummary {
   publishedRevisionId: string;
   sourceStatus: 'seeded';
   status: 'published';
+  title: {
+    en: string;
+    vi: string;
+  };
+  validationStatus: 'not-run' | 'valid';
+}
+
+export interface AdminContentDraft {
+  baseRevisionId: string;
+  courseId: string;
+  draftRevisionId: string;
+  entityId: string;
+  entityType: AdminContentEntityType;
+  localeAvailability: ReadonlyArray<'en' | 'vi'>;
+  moduleId?: string | undefined;
+  postId?: string | undefined;
+  preview: {
+    en: string;
+    vi: string;
+  };
+  revisionVersion: number;
+  sourceStatus: 'seeded';
+  status: 'draft';
   title: {
     en: string;
     vi: string;
@@ -220,6 +244,11 @@ export interface LearningApiClient {
     idempotencyKey: string;
     viewedStepIds: readonly string[];
   }): Promise<DemoCompletionResult>;
+  createAdminContentDraft(input: {
+    entityId: string;
+    entityType: AdminContentEntityType;
+    idToken: string;
+  }): Promise<AdminContentDraft>;
   createQuizAttempt(input: { idToken: string; quizId: string }): Promise<QuizAttemptResult>;
   enrollCourse(input: {
     courseId: string;
@@ -438,6 +467,21 @@ export function createFetchLearningApiClient(): LearningApiClient {
       );
 
       return data.content;
+    },
+    async createAdminContentDraft({ entityId, entityType, idToken }) {
+      const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
+        await fetch(
+          `/api/v1/admin/content/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/drafts`,
+          {
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
+            method: 'POST',
+          },
+        ),
+      );
+
+      return data.draft;
     },
     async createPlaygroundRunSession({
       algorithmId,

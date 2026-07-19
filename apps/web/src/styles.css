@@ -1534,6 +1534,18 @@ a {
   font-size: 15px;
 }
 
+.admin-content-card em {
+  justify-self: start;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--teal) 35%, transparent);
+  color: var(--teal);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .admin-content-card code,
 .admin-content-preview-title code,
 .admin-content-meta code {
@@ -1581,6 +1593,40 @@ a {
   font-weight: 800;
 }
 
+.admin-content-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-content-draft-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--teal) 48%, transparent);
+  background: var(--teal);
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  gap: 8px;
+}
+
+.admin-content-draft-button:disabled {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: not-allowed;
+}
+
+.admin-content-inline-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .admin-content-preview-copy {
   display: grid;
   gap: 12px;
@@ -1601,6 +1647,20 @@ a {
 .admin-content-preview-copy p {
   margin: 0;
   color: var(--ink-soft);
+}
+
+.admin-content-draft-preview {
+  display: grid;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--teal) 45%, var(--line));
+  background: color-mix(in srgb, var(--teal) 7%, var(--paper));
+  gap: 14px;
+}
+
+.admin-content-draft-preview h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
 }
 
 .playground-page {

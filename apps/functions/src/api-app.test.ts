@@ -551,6 +551,118 @@ describe('API foundation', () => {
     );
   });
 
+  it('creates a draft from published seeded content without changing the published inventory', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    const createResponse = await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    expect(createResponse.body.success).toBe(true);
+    expect(createResponse.body.data).toEqual({
+      draft: expect.objectContaining({
+        baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        courseId: 'course-deep-learning-basic',
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        moduleId: 'dl-m01-neuron-perceptron',
+        preview: {
+          en: expect.stringContaining('single neuron'),
+          vi: expect.any(String),
+        },
+        revisionVersion: 1,
+        sourceStatus: 'seeded',
+        status: 'draft',
+        validationStatus: 'not-run',
+      }),
+      published: expect.objectContaining({
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        status: 'published',
+      }),
+    });
+    expect(JSON.stringify(createResponse.body.data)).not.toMatch(
+      /correctAnswer|answerKey|explanation|hint/i,
+    );
+
+    const inventoryResponse = await request(app)
+      .get('/api/v1/admin/content')
+      .query({ entityType: 'post', courseId: 'course-deep-learning-basic' })
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(inventoryResponse.body.data.content).toEqual([
+      expect.objectContaining({
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        entityId: 'dl-p01-neuron-perceptron',
+        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        status: 'published',
+      }),
+    ]);
+  });
+
+  it('rejects creating a second draft for the same seeded content item', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const response = await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(409);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_CONTENT_DRAFT_ALREADY_EXISTS',
+        message: 'This content item already has a draft.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
+  it('rejects student draft creation for seeded admin content', async () => {
+    const response = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(403);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_FORBIDDEN',
+        message: 'Admin access is required.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
   it('rejects unsupported admin content entity filters', async () => {
     const response = await request(
       createApiApp({
