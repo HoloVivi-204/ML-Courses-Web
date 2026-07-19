@@ -130,8 +130,35 @@ export interface LearningProgressSnapshot {
   }>;
 }
 
+export interface PlaygroundRunSession {
+  algorithmId: 'perceptron';
+  config: {
+    epochs: number;
+    learningRate: number;
+    seed: number;
+    trainRatio: number;
+  };
+  configHash: string;
+  datasetVersionId: 'ds-xor-noisy-v1';
+  expiresAt: string;
+  scenarioId: 'pg-xor';
+  sessionId: string;
+  status: 'issued';
+  verificationLevel: 'client-computed';
+  workerProtocolVersion: 'ml-worker-v1';
+}
+
+export interface PlaygroundRunSessionCancellation {
+  sessionId: string;
+  status: 'cancelled';
+}
+
 export interface LearningApiClient {
   bootstrapProfile(idToken: string): Promise<void>;
+  cancelPlaygroundRunSession(input: {
+    idToken: string;
+    sessionId: string;
+  }): Promise<PlaygroundRunSessionCancellation>;
   completeDemo(input: {
     demoId: string;
     idToken: string;
@@ -145,6 +172,14 @@ export interface LearningApiClient {
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
+  createPlaygroundRunSession(input: {
+    algorithmId: 'perceptron';
+    config: PlaygroundRunSession['config'];
+    datasetVersionId: 'ds-xor-noisy-v1';
+    deviceProfile: 'desktop' | 'mobile';
+    idToken: string;
+    scenarioId: 'pg-xor';
+  }): Promise<PlaygroundRunSession>;
   submitQuizAttempt(input: {
     answers: readonly QuizAnswer[];
     attemptId: string;
@@ -182,6 +217,19 @@ export function createFetchLearningApiClient(): LearningApiClient {
             authorization: `Bearer ${idToken}`,
           },
         }),
+      );
+    },
+    async cancelPlaygroundRunSession({ idToken, sessionId }) {
+      return readSuccessEnvelope<PlaygroundRunSessionCancellation>(
+        await fetch(
+          `/api/v1/playground-run-sessions/${encodeURIComponent(sessionId)}/cancellations`,
+          {
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
+            method: 'POST',
+          },
+        ),
       );
     },
     async completeDemo({ demoId, idToken, idempotencyKey, viewedStepIds }) {
@@ -224,6 +272,31 @@ export function createFetchLearningApiClient(): LearningApiClient {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
+        }),
+      );
+    },
+    async createPlaygroundRunSession({
+      algorithmId,
+      config,
+      datasetVersionId,
+      deviceProfile,
+      idToken,
+      scenarioId,
+    }) {
+      return readSuccessEnvelope<PlaygroundRunSession>(
+        await fetch('/api/v1/playground-run-sessions', {
+          body: JSON.stringify({
+            scenarioId,
+            algorithmId,
+            datasetVersionId,
+            deviceProfile,
+            config,
+          }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
         }),
       );
     },

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createApiApp } from './api-app.js';
 import type { LearningRepository } from './learning-repository.js';
+import type { PlaygroundRepository } from './playground-repository.js';
 
 function createLearningRepository(overrides: Partial<LearningRepository>): LearningRepository {
   return {
@@ -23,6 +24,20 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     },
     submitQuizAttempt: async () => {
       throw new Error('Quiz submission is not part of this test.');
+    },
+    ...overrides,
+  };
+}
+
+function createPlaygroundRepository(
+  overrides: Partial<PlaygroundRepository>,
+): PlaygroundRepository {
+  return {
+    cancelRunSession: async () => {
+      throw new Error('Playground run session cancellation is not part of this test.');
+    },
+    createRunSession: async () => {
+      throw new Error('Playground run session creation is not part of this test.');
     },
     ...overrides,
   };
@@ -453,5 +468,104 @@ describe('API foundation', () => {
       },
     ]);
     expect(progressReads).toEqual(new Set(['learner-01']));
+  });
+
+  it('creates a playground run session through the authenticated learner boundary', async () => {
+    const createdSessions = new Set<string>();
+    const app = createApiApp({
+      playgroundRepository: createPlaygroundRepository({
+        createRunSession: async (input) => {
+          createdSessions.add(
+            `${input.uid}:${input.scenarioId}:${input.algorithmId}:${input.datasetVersionId}:${input.deviceProfile}`,
+          );
+
+          return {
+            statusCode: 201,
+            data: {
+              sessionId: 'session-pg-xor-01',
+              scenarioId: 'pg-xor',
+              algorithmId: 'perceptron',
+              datasetVersionId: 'ds-xor-noisy-v1',
+              config: {
+                learningRate: 0.1,
+                epochs: 100,
+                trainRatio: 0.75,
+                seed: 42,
+              },
+              configHash: '9'.repeat(64),
+              expiresAt: '2026-07-19T14:00:00.000Z',
+              status: 'issued',
+              verificationLevel: 'client-computed',
+              workerProtocolVersion: 'ml-worker-v1',
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/playground-run-sessions')
+      .set('authorization', 'Bearer local-id-token')
+      .send({
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        deviceProfile: 'mobile',
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+      })
+      .expect(201);
+
+    expect(response.body.data).toMatchObject({
+      sessionId: 'session-pg-xor-01',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      verificationLevel: 'client-computed',
+    });
+    expect(createdSessions).toEqual(
+      new Set(['learner-01:pg-xor:perceptron:ds-xor-noisy-v1:mobile']),
+    );
+  });
+
+  it('cancels a playground run session through the owner boundary', async () => {
+    const cancelledSessions = new Set<string>();
+    const app = createApiApp({
+      playgroundRepository: createPlaygroundRepository({
+        cancelRunSession: async (input) => {
+          cancelledSessions.add(`${input.uid}:${input.sessionId}`);
+
+          return {
+            statusCode: 200,
+            data: {
+              sessionId: input.sessionId,
+              status: 'cancelled',
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/playground-run-sessions/session-pg-xor-01/cancellations')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      sessionId: 'session-pg-xor-01',
+      status: 'cancelled',
+    });
+    expect(cancelledSessions).toEqual(new Set(['learner-01:session-pg-xor-01']));
   });
 });

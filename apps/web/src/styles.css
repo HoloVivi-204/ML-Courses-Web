@@ -1390,6 +1390,211 @@ a {
   font-weight: 800;
 }
 
+.playground-page {
+  display: grid;
+  gap: 24px;
+  padding-bottom: 64px;
+  padding-top: 32px;
+}
+
+.playground-hero,
+.playground-workspace,
+.playground-locked {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.playground-hero {
+  display: grid;
+  align-items: end;
+  padding: clamp(24px, 4vw, 44px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+}
+
+.playground-hero h1,
+.playground-locked h1 {
+  margin: 8px 0;
+  color: var(--ink);
+  font-size: clamp(32px, 5vw, 58px);
+}
+
+.playground-hero p,
+.playground-locked p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.playground-identity {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.playground-identity code,
+.playground-limit {
+  padding: 7px 10px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.playground-workspace {
+  display: grid;
+  padding: clamp(16px, 3vw, 24px);
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.playground-controls,
+.playground-output,
+.playground-result {
+  display: grid;
+  gap: 16px;
+}
+
+.playground-controls {
+  align-content: start;
+  padding: 18px;
+  background: var(--paper);
+}
+
+.playground-number-field {
+  display: grid;
+  gap: 6px;
+}
+
+.playground-number-field span {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.playground-number-field input {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.playground-run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.playground-run-actions button {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 14px;
+  border: 0;
+  background: var(--paper-strong);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 900;
+  gap: 7px;
+}
+
+.playground-run-actions button:first-child {
+  background: var(--teal);
+  color: white;
+}
+
+.playground-run-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.playground-status,
+.playground-error {
+  margin: 0;
+  padding: 12px 14px;
+  font-weight: 900;
+}
+
+.playground-status {
+  background: color-mix(in srgb, var(--teal) 14%, transparent);
+  color: var(--ink);
+}
+
+.playground-error {
+  background: color-mix(in srgb, #d92d20 12%, transparent);
+  color: #b42318;
+}
+
+.playground-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.playground-metrics span {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.playground-metrics strong {
+  color: var(--ink);
+  font-size: clamp(28px, 5vw, 48px);
+}
+
+.playground-chart {
+  max-width: 420px;
+  width: 100%;
+}
+
+.playground-chart rect {
+  fill: var(--paper);
+}
+
+.playground-chart line {
+  stroke: color-mix(in srgb, var(--ink-soft) 35%, transparent);
+  stroke-width: 2;
+}
+
+.playground-chart .boundary {
+  stroke: var(--teal);
+  stroke-width: 4;
+}
+
+.playground-chart circle {
+  stroke: var(--surface);
+  stroke-width: 3;
+}
+
+.playground-chart .class-zero {
+  fill: #f97316;
+}
+
+.playground-chart .class-one {
+  fill: #14b8a6;
+}
+
+.playground-feedback {
+  display: grid;
+  margin: 0;
+  padding-left: 20px;
+  gap: 8px;
+}
+
+.playground-locked {
+  padding: clamp(24px, 5vw, 44px);
+}
+
+@media (max-width: 820px) {
+  .playground-hero,
+  .playground-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .playground-identity {
+    justify-items: start;
+  }
+}
+
 .module-content > p {
   max-width: 690px;
   margin: 15px 0 23px;

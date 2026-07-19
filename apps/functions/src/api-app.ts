@@ -13,6 +13,10 @@ import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { createDefaultLearningRepository, type LearningRepository } from './learning-repository.js';
+import {
+  createDefaultPlaygroundRepository,
+  type PlaygroundRepository,
+} from './playground-repository.js';
 import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
 
 export interface VerifiedAuthUser {
@@ -29,6 +33,7 @@ interface ApiErrorBody {
 
 export interface ApiAppOptions {
   learningRepository?: LearningRepository | undefined;
+  playgroundRepository?: PlaygroundRepository | undefined;
   verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
 }
 
@@ -113,6 +118,32 @@ function getStringArrayBodyField(request: Request, name: string): string[] {
   }
 
   return [...new Set(value.map((item) => item.trim()))];
+}
+
+function getObjectBody(request: Request): Record<string, unknown> {
+  const body = request.body;
+
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'Request body must be an object.');
+  }
+
+  return body as Record<string, unknown>;
+}
+
+function getStringBodyField(request: Request, name: string): string {
+  const value = getObjectBody(request)[name];
+
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a non-empty string.`);
+  }
+
+  return value.trim();
+}
+
+function getDeviceProfileBodyField(request: Request): 'desktop' | 'mobile' {
+  const value = getObjectBody(request).deviceProfile;
+
+  return value === 'mobile' ? 'mobile' : 'desktop';
 }
 
 function getQuizAnswersBodyField(request: Request): QuizAnswer[] {
@@ -241,12 +272,19 @@ const handleApiError: ErrorRequestHandler = (error, request, response, next) => 
 export function createApiApp(options: ApiAppOptions = {}): express.Express {
   const app = express();
   let learningRepository = options.learningRepository;
+  let playgroundRepository = options.playgroundRepository;
   const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
 
   function getLearningRepository(): LearningRepository {
     learningRepository ??= createDefaultLearningRepository();
 
     return learningRepository;
+  }
+
+  function getPlaygroundRepository(): PlaygroundRepository {
+    playgroundRepository ??= createDefaultPlaygroundRepository();
+
+    return playgroundRepository;
   }
 
   app.disable('x-powered-by');
@@ -367,6 +405,43 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       next(error);
     }
   });
+
+  app.post('/api/v1/playground-run-sessions', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const body = getObjectBody(request);
+      const result = await getPlaygroundRepository().createRunSession({
+        uid: authUser.uid,
+        scenarioId: getStringBodyField(request, 'scenarioId'),
+        algorithmId: getStringBodyField(request, 'algorithmId'),
+        datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
+        config: body.config,
+        deviceProfile: getDeviceProfileBodyField(request),
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post(
+    '/api/v1/playground-run-sessions/:sessionId/cancellations',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getPlaygroundRepository().cancelRunSession({
+          uid: authUser.uid,
+          sessionId: getRouteParam(request, 'sessionId'),
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.use((_request, response) => {
     sendError(response, 404, {

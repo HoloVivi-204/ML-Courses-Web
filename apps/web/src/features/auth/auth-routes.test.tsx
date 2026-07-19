@@ -8,6 +8,10 @@ import type { AuthGateway } from './auth-context';
 function createLearningApiClient() {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    cancelPlaygroundRunSession: vi.fn().mockResolvedValue({
+      sessionId: 'session-pg-xor-01',
+      status: 'cancelled',
+    }),
     completeDemo: vi.fn().mockResolvedValue({
       completion: {
         demoId: 'demo-perceptron-and-gate',
@@ -38,6 +42,23 @@ function createLearningApiClient() {
         vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
       },
       questions: [],
+    }),
+    createPlaygroundRunSession: vi.fn().mockResolvedValue({
+      sessionId: 'session-pg-xor-01',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+      configHash: '9'.repeat(64),
+      expiresAt: '2026-07-19T14:00:00.000Z',
+      status: 'issued',
+      verificationLevel: 'client-computed',
+      workerProtocolVersion: 'ml-worker-v1',
     }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {

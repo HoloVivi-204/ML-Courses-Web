@@ -23,6 +23,10 @@ function createAuthenticatedGateway(): AuthGateway {
 function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): LearningApiClient {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    cancelPlaygroundRunSession: vi.fn().mockResolvedValue({
+      sessionId: 'session-pg-xor-01',
+      status: 'cancelled',
+    }),
     completeDemo: vi.fn().mockResolvedValue({
       completion: {
         demoId: 'demo-perceptron-and-gate',
@@ -125,6 +129,23 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       ],
     }),
+    createPlaygroundRunSession: vi.fn().mockResolvedValue({
+      sessionId: 'session-pg-xor-01',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+      configHash: '9'.repeat(64),
+      expiresAt: '2026-07-19T14:00:00.000Z',
+      status: 'issued',
+      verificationLevel: 'client-computed',
+      workerProtocolVersion: 'ml-worker-v1',
+    }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -216,6 +237,155 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
     }),
     ...overrides,
   };
+}
+
+function createUnlockedProgressSnapshot() {
+  return {
+    algorithmUnlocks: [
+      {
+        algorithmId: 'perceptron',
+        moduleId: 'dl-m01-neuron-perceptron',
+      },
+    ],
+    contentAccess: [
+      {
+        contentType: 'module',
+        entityId: 'dl-m01-neuron-perceptron',
+      },
+      {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+      },
+      {
+        contentType: 'demo',
+        entityId: 'demo-perceptron-and-gate',
+      },
+    ],
+    demos: [
+      {
+        completed: true,
+        demoId: 'demo-perceptron-and-gate',
+      },
+    ],
+    enrollment: {
+      courseId: 'course-deep-learning-basic',
+      progressPercent: 33,
+      status: 'in-progress',
+    },
+    modules: [
+      {
+        completedStepCount: 3,
+        moduleId: 'dl-m01-neuron-perceptron',
+        progressPercent: 100,
+        requiredStepCount: 3,
+        status: 'completed',
+      },
+    ],
+    posts: [
+      {
+        bestScore: 100,
+        completed: true,
+        postId: 'dl-p01-neuron-perceptron',
+        quizId: 'quiz-post-dl-p01',
+        quizPassed: true,
+      },
+    ],
+    quizzes: [
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post',
+      },
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: 'quiz-module-dl-m01',
+        quizKind: 'module',
+      },
+    ],
+  };
+}
+
+function installImmediatePlaygroundWorker() {
+  class ImmediatePlaygroundWorker {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+
+    postMessage(message: unknown) {
+      const workerRequest = message as {
+        request?: { runId: string };
+        type: string;
+      };
+
+      if (workerRequest.type !== 'RUN' || !workerRequest.request) {
+        return;
+      }
+
+      queueMicrotask(() => {
+        const runId = workerRequest.request?.runId ?? 'run-unknown';
+
+        this.onmessage?.({
+          data: {
+            type: 'PROGRESS',
+            event: {
+              runId,
+              epoch: 100,
+              totalEpochs: 100,
+              loss: 0.5,
+            },
+          },
+        } as MessageEvent);
+        this.onmessage?.({
+          data: {
+            type: 'RESULT',
+            result: {
+              runId,
+              scenarioId: 'pg-xor',
+              algorithmId: 'perceptron',
+              datasetVersionId: 'ds-xor-noisy-v1',
+              boundary: {
+                weights: [0.1, -0.1],
+                bias: 0,
+              },
+              determinism: 'exact',
+              feedback: ['linear-limit', 'non-convergence'],
+              lossCurve: [{ epoch: 100, loss: 0.5 }],
+              metrics: {
+                accuracy: 0.5,
+                testAccuracy: 0.5,
+                trainAccuracy: 0.5,
+                loss: 0.5,
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+    }
+
+    terminate() {
+      return undefined;
+    }
+  }
+
+  vi.stubGlobal('Worker', ImmediatePlaygroundWorker);
+}
+
+function installNonAcknowledgingPlaygroundWorker() {
+  class NonAcknowledgingPlaygroundWorker {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+
+    postMessage() {
+      return undefined;
+    }
+
+    terminate() {
+      return undefined;
+    }
+  }
+
+  vi.stubGlobal('Worker', NonAcknowledgingPlaygroundWorker);
 }
 
 describe('public learning journey', () => {
@@ -510,7 +680,92 @@ describe('public learning journey', () => {
     expect(await screen.findByText('Tiến độ đã xác minh: 33%')).toBeVisible();
     expect(screen.getByText('Module hoàn thành: 3/3 bước')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
+    expect(screen.getByRole('link', { name: /Mở Playground XOR/i })).toHaveAttribute(
+      'href',
+      '/playground/pg-xor',
+    );
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+  });
+
+  it('keeps pg-xor Playground locked until backend progress unlocks Perceptron', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Playground chưa mở khóa' })).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+  });
+
+  it('runs pg-xor Perceptron through a verified run session and worker result', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    installImmediatePlaygroundWorker();
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+    expect(await screen.findByText('Đã chạy xong')).toBeVisible();
+    expect(screen.getByText('50%')).toBeVisible();
+    expect(
+      screen.getByText('Giới hạn tuyến tính: một ranh giới thẳng không tách được XOR.'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Không hội tụ: tăng epoch không xóa được mâu thuẫn XOR.'),
+    ).toBeVisible();
+    expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      deviceProfile: 'desktop',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('stops pg-xor without saving a successful worker result', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    installNonAcknowledgingPlaygroundWorker();
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+    await user.click(await screen.findByRole('button', { name: 'Dừng' }));
+
+    expect(await screen.findByText('Run đã bị hủy')).toBeVisible();
+    expect(screen.queryByTestId('playground-result')).not.toBeInTheDocument();
+    expect(learningApiClient.cancelPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      sessionId: 'session-pg-xor-01',
+    });
+    vi.unstubAllGlobals();
   });
 
   it('keeps full Perceptron/XOR content closed without a content access grant', async () => {

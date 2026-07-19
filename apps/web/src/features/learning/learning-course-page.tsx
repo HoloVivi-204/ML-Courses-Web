@@ -161,15 +161,23 @@ function VerifiedProgressPanel({
         </p>
       ) : null}
       {unlockedAlgorithms.length ? (
-        <ul>
-          {unlockedAlgorithms.map((unlock) => (
-            <li key={unlock.algorithmId}>
-              {t('learning.progress.algorithmUnlocked', {
-                algorithm: formatAlgorithmName(unlock.algorithmId),
-              })}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul>
+            {unlockedAlgorithms.map((unlock) => (
+              <li key={unlock.algorithmId}>
+                {t('learning.progress.algorithmUnlocked', {
+                  algorithm: formatAlgorithmName(unlock.algorithmId),
+                })}
+              </li>
+            ))}
+          </ul>
+          {unlockedAlgorithms.some((unlock) => unlock.algorithmId === 'perceptron') ? (
+            <Link className="module-trial-link" to="/playground/pg-xor">
+              {t('learning.progress.openPlayground')}
+              <ArrowRight aria-hidden="true" size={17} />
+            </Link>
+          ) : null}
+        </>
       ) : null}
     </section>
   );
