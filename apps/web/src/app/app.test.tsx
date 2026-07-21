@@ -1053,6 +1053,8 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText('Published learner copy')).toBeVisible();
+    expect(await screen.findByText('Thiếu source/license review')).toBeVisible();
+    expect(screen.queryByText('Google Machine Learning Crash Course')).not.toBeInTheDocument();
 
     await user.click(await screen.findByRole('button', { name: /draft/i }));
 

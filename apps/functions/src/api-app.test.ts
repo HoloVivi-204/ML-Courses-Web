@@ -617,6 +617,61 @@ describe('API foundation', () => {
     );
   });
 
+  it('returns reviewed source metadata per seeded content family without a global fallback', async () => {
+    const response = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'admin-01',
+          displayName: 'Operator',
+          role: 'admin',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/content')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    const sourceByEntityId = new Map(
+      response.body.data.content.map(
+        (item: { entityId: string; sourceReview: AdminContentSummary['sourceReview'] }) => [
+          item.entityId,
+          item.sourceReview,
+        ],
+      ),
+    );
+
+    expect(sourceByEntityId.get('course-classical-ml')).toEqual(
+      expect.objectContaining({
+        license: {
+          name: 'CC BY-NC-SA 4.0',
+          url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
+        },
+        sourceId: 'source-mit-ocw-6036',
+        title: 'MIT OpenCourseWare 6.036 Introduction to Machine Learning',
+      }),
+    );
+    expect(sourceByEntityId.get('course-deep-learning-basic')).toEqual(
+      expect.objectContaining({
+        license: {
+          name: 'CC BY-SA 4.0',
+          url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        },
+        sourceId: 'source-d2l-vi',
+        title: 'Dive into Deep Learning - Vietnamese',
+      }),
+    );
+    expect(sourceByEntityId.get('dl-p01-neuron-perceptron')).toEqual(
+      expect.objectContaining({
+        license: {
+          name: 'CC BY 4.0',
+          url: 'https://creativecommons.org/licenses/by/4.0/',
+        },
+        sourceId: 'source-google-ml-crash-course',
+        title: 'Google Machine Learning Crash Course',
+      }),
+    );
+  });
+
   it('creates a draft from published seeded content without changing the published inventory', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({

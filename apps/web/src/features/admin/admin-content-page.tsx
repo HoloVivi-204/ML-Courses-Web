@@ -57,29 +57,8 @@ function createFallbackMetadata(): AdminContentMetadata {
   };
 }
 
-function createFallbackSourceReview(): AdminContentSourceReview {
-  return {
-    attribution: {
-      en: 'Seeded Release 1 source attribution pending validation.',
-      vi: 'Attribution nguồn Release 1 đã seed, chờ validation.',
-    },
-    license: {
-      name: 'CC BY 4.0',
-      url: 'https://creativecommons.org/licenses/by/4.0/',
-    },
-    sourceId: 'source-google-ml-crash-course',
-    title: 'Google Machine Learning Crash Course',
-  };
-}
-
 function getDraftMetadata(draft: AdminContentDraft): AdminContentMetadata {
   return draft.metadata ?? createFallbackMetadata();
-}
-
-function getSourceReview(
-  item: Pick<AdminContentDraft | AdminContentSummary, 'sourceReview'>,
-): AdminContentSourceReview {
-  return item.sourceReview ?? createFallbackSourceReview();
 }
 
 function createDraftFormState(draft: AdminContentDraft): DraftFormState {
@@ -118,6 +97,52 @@ function createDraftEditableFields(formState: DraftFormState): DraftEditableFiel
 
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
+}
+
+function SourceReviewMeta({
+  locale,
+  sourceReview,
+}: {
+  locale: Locale;
+  sourceReview?: AdminContentSourceReview | undefined;
+}) {
+  const { t } = useTranslation();
+
+  if (!sourceReview) {
+    return (
+      <div>
+        <dt>{t('admin.content.sourceReview')}</dt>
+        <dd>{t('admin.content.sourceReviewMissing')}</dd>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div>
+        <dt>{t('admin.content.sourceTitle')}</dt>
+        <dd>{sourceReview.title}</dd>
+      </div>
+      <div>
+        <dt>{t('admin.content.sourceId')}</dt>
+        <dd>
+          <code>{sourceReview.sourceId}</code>
+        </dd>
+      </div>
+      <div>
+        <dt>{t('admin.content.license')}</dt>
+        <dd>{sourceReview.license.name}</dd>
+      </div>
+      <div>
+        <dt>{t('admin.content.licenseUrl')}</dt>
+        <dd>{sourceReview.license.url}</dd>
+      </div>
+      <div>
+        <dt>{t('admin.content.sourceAttribution')}</dt>
+        <dd>{sourceReview.attribution[locale]}</dd>
+      </div>
+    </>
+  );
 }
 
 export function AdminContentPage({ learningApiClient, locale }: AdminContentPageProps) {
@@ -469,7 +494,6 @@ function ContentPreview({
   }
 
   const secondaryLocale: Locale = locale === 'vi' ? 'en' : 'vi';
-  const sourceReview = getSourceReview(item);
 
   return (
     <section className="admin-content-preview">
@@ -525,28 +549,7 @@ function ContentPreview({
           <dt>{t('admin.content.source')}</dt>
           <dd>{item.sourceStatus}</dd>
         </div>
-        <div>
-          <dt>{t('admin.content.sourceTitle')}</dt>
-          <dd>{sourceReview.title}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.sourceId')}</dt>
-          <dd>
-            <code>{sourceReview.sourceId}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.license')}</dt>
-          <dd>{sourceReview.license.name}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.licenseUrl')}</dt>
-          <dd>{sourceReview.license.url}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.sourceAttribution')}</dt>
-          <dd>{sourceReview.attribution[locale]}</dd>
-        </div>
+        <SourceReviewMeta locale={locale} sourceReview={item.sourceReview} />
         <div>
           <dt>{t('admin.content.validation')}</dt>
           <dd>{item.validationStatus}</dd>
@@ -625,7 +628,6 @@ function DraftPreview({
   const { t } = useTranslation();
   const secondaryLocale: Locale = locale === 'vi' ? 'en' : 'vi';
   const metadata = getDraftMetadata(draft);
-  const sourceReview = getSourceReview(draft);
 
   return (
     <section className="admin-content-draft-preview" aria-label={t('admin.content.draftPreview')}>
@@ -663,28 +665,7 @@ function DraftPreview({
           <dt>{t('admin.content.externalLink')}</dt>
           <dd>{metadata.externalLinkUrl ?? t('admin.content.noExternalLink')}</dd>
         </div>
-        <div>
-          <dt>{t('admin.content.sourceTitle')}</dt>
-          <dd>{sourceReview.title}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.sourceId')}</dt>
-          <dd>
-            <code>{sourceReview.sourceId}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.license')}</dt>
-          <dd>{sourceReview.license.name}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.licenseUrl')}</dt>
-          <dd>{sourceReview.license.url}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.sourceAttribution')}</dt>
-          <dd>{sourceReview.attribution[locale]}</dd>
-        </div>
+        <SourceReviewMeta locale={locale} sourceReview={draft.sourceReview} />
       </dl>
 
       <div className="admin-content-preview-copy">

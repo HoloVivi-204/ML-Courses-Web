@@ -60,7 +60,7 @@ export interface AdminContentSummary {
   previousPublishedRevisionId?: string | null | undefined;
   preview: LocalizedText;
   publishedRevisionId: string;
-  sourceReview?: AdminContentSourceReview | undefined;
+  sourceReview: AdminContentSourceReview;
   sourceStatus: 'seeded';
   status: 'published' | 'unpublished';
   title: LocalizedText;
@@ -185,6 +185,48 @@ export interface AdminContentRepository {
   }>;
 }
 
+const releaseOneSourceReviews: Record<
+  'd2lVi' | 'googleMlcc' | 'mitOcw6036',
+  AdminContentSourceReview
+> = {
+  d2lVi: {
+    attribution: {
+      en: 'Dive into Deep Learning Vietnamese edition, licensed under CC BY-SA 4.0.',
+      vi: 'Dive into Deep Learning bản tiếng Việt, license CC BY-SA 4.0.',
+    },
+    license: {
+      name: 'CC BY-SA 4.0',
+      url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    },
+    sourceId: 'source-d2l-vi',
+    title: 'Dive into Deep Learning - Vietnamese',
+  },
+  googleMlcc: {
+    attribution: {
+      en: 'Google Machine Learning Crash Course, licensed under CC BY 4.0.',
+      vi: 'Google Machine Learning Crash Course, license CC BY 4.0.',
+    },
+    license: {
+      name: 'CC BY 4.0',
+      url: 'https://creativecommons.org/licenses/by/4.0/',
+    },
+    sourceId: 'source-google-ml-crash-course',
+    title: 'Google Machine Learning Crash Course',
+  },
+  mitOcw6036: {
+    attribution: {
+      en: 'MIT OpenCourseWare 6.036 Introduction to Machine Learning, licensed under CC BY-NC-SA 4.0.',
+      vi: 'MIT OpenCourseWare 6.036 Introduction to Machine Learning, license CC BY-NC-SA 4.0.',
+    },
+    license: {
+      name: 'CC BY-NC-SA 4.0',
+      url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
+    },
+    sourceId: 'source-mit-ocw-6036',
+    title: 'MIT OpenCourseWare 6.036 Introduction to Machine Learning',
+  },
+};
+
 const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-classical-ml',
@@ -197,6 +239,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Hồi quy, phân loại, phân cụm và cách đánh giá một mô hình.',
     },
     publishedRevisionId: 'course-classical-ml-rev-r1',
+    sourceReview: releaseOneSourceReviews.mitOcw6036,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -216,6 +259,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Từ một neuron đến mạng nhiều lớp, với từng quyết định được trực quan hóa.',
     },
     publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+    sourceReview: releaseOneSourceReviews.d2lVi,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -236,6 +280,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Hiểu trực giác về neuron, ranh giới quyết định và giới hạn tuyến tính.',
     },
     publishedRevisionId: 'module-dl-m01-neuron-perceptron-rev-r1',
+    sourceReview: releaseOneSourceReviews.googleMlcc,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -256,6 +301,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Kết hợp nhiều lớp và hàm kích hoạt để học mẫu mà đường thẳng không tách được.',
     },
     publishedRevisionId: 'module-dl-m02-mlp-rev-r1',
+    sourceReview: releaseOneSourceReviews.d2lVi,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -276,6 +322,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Đọc đường học, nhận biết overfitting và suy luận về khả năng tổng quát.',
     },
     publishedRevisionId: 'module-dl-m03-training-generalization-rev-r1',
+    sourceReview: releaseOneSourceReviews.googleMlcc,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -296,6 +343,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR mở đường cho mô hình kế tiếp.',
     },
     publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+    sourceReview: releaseOneSourceReviews.googleMlcc,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -317,6 +365,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Quan sát ranh giới AND cố định bằng Perceptron, không lấy mẫu ngẫu nhiên live.',
     },
     publishedRevisionId: 'demo-perceptron-and-gate-rev-r1',
+    sourceReview: releaseOneSourceReviews.googleMlcc,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -338,6 +387,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Quiz mastery của bài học gồm 3 câu. Dữ liệu chấm riêng chỉ nằm phía server.',
     },
     publishedRevisionId: 'quiz-post-dl-p01-rev-r1',
+    sourceReview: releaseOneSourceReviews.googleMlcc,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -358,6 +408,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       vi: 'Quiz mastery của module gồm 6 câu. Dữ liệu phản hồi riêng không xuất hiện trong inventory.',
     },
     publishedRevisionId: 'quiz-module-dl-m01-rev-r1',
+    sourceReview: releaseOneSourceReviews.googleMlcc,
     sourceStatus: 'seeded',
     status: 'published',
     title: {
@@ -390,21 +441,6 @@ function createSeededAdminContentMetadata(): AdminContentMetadata {
   };
 }
 
-function createSeededSourceReview(): AdminContentSourceReview {
-  return {
-    attribution: {
-      en: 'Google Machine Learning Crash Course, licensed under CC BY 4.0.',
-      vi: 'Google Machine Learning Crash Course, license CC BY 4.0.',
-    },
-    license: {
-      name: 'CC BY 4.0',
-      url: 'https://creativecommons.org/licenses/by/4.0/',
-    },
-    sourceId: 'source-google-ml-crash-course',
-    title: 'Google Machine Learning Crash Course',
-  };
-}
-
 function createDraftFromPublished(published: AdminContentSummary): AdminContentDraft {
   return {
     baseRevisionId: published.publishedRevisionId,
@@ -418,7 +454,7 @@ function createDraftFromPublished(published: AdminContentSummary): AdminContentD
     metadata: createSeededAdminContentMetadata(),
     preview: { ...published.preview },
     revisionVersion: 1,
-    sourceReview: published.sourceReview ?? createSeededSourceReview(),
+    sourceReview: published.sourceReview,
     sourceStatus: 'seeded',
     status: 'draft',
     title: { ...published.title },
@@ -607,7 +643,6 @@ function withDraftRevision(
   return {
     ...published,
     draftRevisionId: draft?.draftRevisionId ?? null,
-    sourceReview: published.sourceReview ?? createSeededSourceReview(),
   };
 }
 

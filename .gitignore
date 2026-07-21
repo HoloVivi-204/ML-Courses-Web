@@ -17,6 +17,7 @@ ui-debug.log*
 # Local environment and secrets
 .env
 .env.*
+!apps/web/.env.example
 *.local
 *.pem
 *.key
