@@ -549,9 +549,39 @@ function withDraftRevision(
   };
 }
 
+function assertReleaseOnePublishedRevisionLimits(content: readonly AdminContentSummary[]): void {
+  const contentKeys = new Set<string>();
+  const publishedRevisionIds = new Set<string>();
+
+  for (const item of content) {
+    const contentKey = getContentKey(item.entityType, item.entityId);
+
+    if (contentKeys.has(contentKey)) {
+      throw new ApiError(
+        500,
+        'ADMIN_CONTENT_CURRENT_POINTER_DUPLICATE',
+        'Release 1 supports exactly one current published pointer per content entity.',
+      );
+    }
+
+    if (publishedRevisionIds.has(item.publishedRevisionId)) {
+      throw new ApiError(
+        500,
+        'ADMIN_CONTENT_REVISION_ID_DUPLICATE',
+        'Published revision IDs must be unique across Release 1 content.',
+      );
+    }
+
+    contentKeys.add(contentKey);
+    publishedRevisionIds.add(item.publishedRevisionId);
+  }
+}
+
 export function createStaticAdminContentRepository(
   content: readonly AdminContentSummary[] = releaseOneAdminContent,
 ): AdminContentRepository {
+  assertReleaseOnePublishedRevisionLimits(content);
+
   const draftsByContentKey = new Map<string, AdminContentDraft>();
   const publishedByContentKey = new Map<string, AdminContentSummary>();
   const publishedRevisionsByRevisionId = new Map<string, AdminContentSummary>(

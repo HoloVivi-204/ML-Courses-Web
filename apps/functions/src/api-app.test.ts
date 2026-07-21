@@ -2,6 +2,10 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { createApiApp } from './api-app.js';
+import {
+  createStaticAdminContentRepository,
+  type AdminContentSummary,
+} from './admin-content-repository.js';
 import type { LearningRepository } from './learning-repository.js';
 import type { PlaygroundRepository } from './playground-repository.js';
 
@@ -63,6 +67,27 @@ function createPlaygroundRepository(
     ...overrides,
   };
 }
+
+const releaseOneContentFixture: AdminContentSummary = {
+  courseId: 'course-deep-learning-basic',
+  draftRevisionId: null,
+  entityId: 'dl-p01-neuron-perceptron',
+  entityType: 'post',
+  localeAvailability: ['en', 'vi'],
+  moduleId: 'dl-m01-neuron-perceptron',
+  preview: {
+    en: 'Seeded learner preview.',
+    vi: 'Preview seeded.',
+  },
+  publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+  sourceStatus: 'seeded',
+  status: 'published',
+  title: {
+    en: 'Seeded title',
+    vi: 'Tiêu đề seeded',
+  },
+  validationStatus: 'not-run',
+};
 
 describe('API foundation', () => {
   it('returns the canonical success envelope from the public health endpoint', async () => {
@@ -1248,6 +1273,49 @@ describe('API foundation', () => {
       },
       requestId: response.headers['x-request-id'],
     });
+  });
+
+  it('rejects admin content seeds with a second current published pointer for the same entity', () => {
+    expect(() =>
+      createStaticAdminContentRepository([
+        releaseOneContentFixture,
+        {
+          ...releaseOneContentFixture,
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r2',
+          title: {
+            en: 'Conflicting current title',
+            vi: 'Tiêu đề current mâu thuẫn',
+          },
+        },
+      ]),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'ADMIN_CONTENT_CURRENT_POINTER_DUPLICATE',
+        statusCode: 500,
+      }),
+    );
+  });
+
+  it('rejects admin content seeds that reuse a published revision id across entities', () => {
+    expect(() =>
+      createStaticAdminContentRepository([
+        releaseOneContentFixture,
+        {
+          ...releaseOneContentFixture,
+          entityId: 'dl-p02-mlp-forward-activation',
+          publishedRevisionId: releaseOneContentFixture.publishedRevisionId,
+          title: {
+            en: 'Different entity reusing a revision',
+            vi: 'Entity khác dùng lại revision',
+          },
+        },
+      ]),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'ADMIN_CONTENT_REVISION_ID_DUPLICATE',
+        statusCode: 500,
+      }),
+    );
   });
 
   it('creates a playground run session through the authenticated learner boundary', async () => {
