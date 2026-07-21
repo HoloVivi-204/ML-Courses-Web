@@ -80,6 +80,18 @@ const releaseOneContentFixture: AdminContentSummary = {
     vi: 'Preview seeded.',
   },
   publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+  sourceReview: {
+    attribution: {
+      en: 'Google Machine Learning Crash Course, licensed under CC BY 4.0.',
+      vi: 'Google Machine Learning Crash Course, license CC BY 4.0.',
+    },
+    license: {
+      name: 'CC BY 4.0',
+      url: 'https://creativecommons.org/licenses/by/4.0/',
+    },
+    sourceId: 'source-google-ml-crash-course',
+    title: 'Google Machine Learning Crash Course',
+  },
   sourceStatus: 'seeded',
   status: 'published',
   title: {
@@ -88,6 +100,23 @@ const releaseOneContentFixture: AdminContentSummary = {
   },
   validationStatus: 'not-run',
 };
+
+async function setReviewedDraftSourceMetadata(app: ReturnType<typeof createApiApp>) {
+  await request(app)
+    .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+    .set('authorization', 'Bearer admin-id-token')
+    .send({
+      revisionVersion: 1,
+      metadata: {
+        attribution: {
+          en: 'Reviewed source attribution.',
+          vi: 'Attribution source reviewed.',
+        },
+        externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+      },
+    })
+    .expect(200);
+}
 
 describe('API foundation', () => {
   it('returns the canonical success envelope from the public health endpoint', async () => {
@@ -563,6 +592,18 @@ describe('API foundation', () => {
         courseId: 'course-deep-learning-basic',
         moduleId: 'dl-m01-neuron-perceptron',
         publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        sourceReview: {
+          attribution: {
+            en: expect.stringContaining('Google Machine Learning Crash Course'),
+            vi: expect.stringContaining('Google Machine Learning Crash Course'),
+          },
+          license: {
+            name: 'CC BY 4.0',
+            url: 'https://creativecommons.org/licenses/by/4.0/',
+          },
+          sourceId: 'source-google-ml-crash-course',
+          title: 'Google Machine Learning Crash Course',
+        },
         status: 'published',
         localeAvailability: ['en', 'vi'],
         preview: {
@@ -604,6 +645,14 @@ describe('API foundation', () => {
           vi: expect.any(String),
         },
         revisionVersion: 1,
+        sourceReview: expect.objectContaining({
+          license: {
+            name: 'CC BY 4.0',
+            url: 'https://creativecommons.org/licenses/by/4.0/',
+          },
+          sourceId: 'source-google-ml-crash-course',
+          title: 'Google Machine Learning Crash Course',
+        }),
         sourceStatus: 'seeded',
         status: 'draft',
         validationStatus: 'not-run',
@@ -687,6 +736,14 @@ describe('API foundation', () => {
           vi: 'Bản preview chỉ nằm trong draft.',
         },
         revisionVersion: 2,
+        sourceReview: expect.objectContaining({
+          license: {
+            name: 'CC BY 4.0',
+            url: 'https://creativecommons.org/licenses/by/4.0/',
+          },
+          sourceId: 'source-google-ml-crash-course',
+          title: 'Google Machine Learning Crash Course',
+        }),
         title: {
           en: 'Draft neuron decision title',
           vi: 'Tiêu đề draft neuron',
@@ -867,6 +924,36 @@ describe('API foundation', () => {
     });
   });
 
+  it('fails draft validation when required source, license, attribution, or external link evidence is missing', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const response = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expect(response.body.error.code).toBe('ADMIN_CONTENT_DRAFT_VALIDATION_FAILED');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checkId: 'external-link',
+          status: 'failed',
+        }),
+      ]),
+    );
+  });
+
   it('validates and publishes a draft revision atomically without leaving a second draft pointer', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({
@@ -880,6 +967,21 @@ describe('API foundation', () => {
       .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
       .set('authorization', 'Bearer admin-id-token')
       .expect(201);
+
+    await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        metadata: {
+          attribution: {
+            en: 'Reviewed source attribution.',
+            vi: 'Attribution source reviewed.',
+          },
+          externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+        },
+      })
+      .expect(200);
 
     const validateResponse = await request(app)
       .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
@@ -1023,6 +1125,7 @@ describe('API foundation', () => {
       .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
       .set('authorization', 'Bearer admin-id-token')
       .expect(201);
+    await setReviewedDraftSourceMetadata(app);
     await request(app)
       .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
       .set('authorization', 'Bearer admin-id-token')
@@ -1101,6 +1204,7 @@ describe('API foundation', () => {
 
     expect(firstPublishResponse.body.error.code).toBe('ADMIN_CONTENT_VALIDATION_REQUIRED');
 
+    await setReviewedDraftSourceMetadata(app);
     await request(app)
       .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
       .set('authorization', 'Bearer admin-id-token')
@@ -1110,7 +1214,7 @@ describe('API foundation', () => {
       .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
       .set('authorization', 'Bearer admin-id-token')
       .send({
-        revisionVersion: 1,
+        revisionVersion: 2,
         title: {
           en: 'Edited after validation',
           vi: 'Tiêu đề sửa sau validation',
@@ -1120,7 +1224,7 @@ describe('API foundation', () => {
 
     expect(editResponse.body.data.draft).toEqual(
       expect.objectContaining({
-        revisionVersion: 2,
+        revisionVersion: 3,
         validationStatus: 'not-run',
       }),
     );
@@ -1148,6 +1252,7 @@ describe('API foundation', () => {
       .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
       .set('authorization', 'Bearer admin-id-token')
       .expect(201);
+    await setReviewedDraftSourceMetadata(app);
     await request(app)
       .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
       .set('authorization', 'Bearer admin-id-token')

@@ -14,6 +14,16 @@ export interface AdminContentMetadata {
   externalLinkUrl: string | null;
 }
 
+export interface AdminContentSourceReview {
+  attribution: LocalizedText;
+  license: {
+    name: string;
+    url: string;
+  };
+  sourceId: string;
+  title: string;
+}
+
 export type AdminContentValidationStatus = 'not-run' | 'valid';
 
 export interface AdminContentValidationCheck {
@@ -50,6 +60,7 @@ export interface AdminContentSummary {
   previousPublishedRevisionId?: string | null | undefined;
   preview: LocalizedText;
   publishedRevisionId: string;
+  sourceReview?: AdminContentSourceReview | undefined;
   sourceStatus: 'seeded';
   status: 'published' | 'unpublished';
   title: LocalizedText;
@@ -68,6 +79,7 @@ export interface AdminContentDraft {
   metadata: AdminContentMetadata;
   preview: LocalizedText;
   revisionVersion: number;
+  sourceReview: AdminContentSourceReview;
   sourceStatus: 'seeded';
   status: 'draft';
   title: LocalizedText;
@@ -378,6 +390,21 @@ function createSeededAdminContentMetadata(): AdminContentMetadata {
   };
 }
 
+function createSeededSourceReview(): AdminContentSourceReview {
+  return {
+    attribution: {
+      en: 'Google Machine Learning Crash Course, licensed under CC BY 4.0.',
+      vi: 'Google Machine Learning Crash Course, license CC BY 4.0.',
+    },
+    license: {
+      name: 'CC BY 4.0',
+      url: 'https://creativecommons.org/licenses/by/4.0/',
+    },
+    sourceId: 'source-google-ml-crash-course',
+    title: 'Google Machine Learning Crash Course',
+  };
+}
+
 function createDraftFromPublished(published: AdminContentSummary): AdminContentDraft {
   return {
     baseRevisionId: published.publishedRevisionId,
@@ -391,6 +418,7 @@ function createDraftFromPublished(published: AdminContentSummary): AdminContentD
     metadata: createSeededAdminContentMetadata(),
     preview: { ...published.preview },
     revisionVersion: 1,
+    sourceReview: published.sourceReview ?? createSeededSourceReview(),
     sourceStatus: 'seeded',
     status: 'draft',
     title: { ...published.title },
@@ -425,6 +453,26 @@ function applyDraftPatch(
 
 function hasLocalizedText(value: LocalizedText): boolean {
   return Boolean(value.en.trim()) && Boolean(value.vi.trim());
+}
+
+function hasHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function hasSourceReview(value: AdminContentSourceReview): boolean {
+  return (
+    Boolean(value.sourceId.trim()) &&
+    Boolean(value.title.trim()) &&
+    hasLocalizedText(value.attribution) &&
+    Boolean(value.license.name.trim()) &&
+    hasHttpUrl(value.license.url)
+  );
 }
 
 function createValidationCheck(input: {
@@ -462,9 +510,21 @@ function createValidationChecks(draft: AdminContentDraft): readonly AdminContent
       message: 'Draft must come from the Release 1 seeded source pipeline.',
     }),
     createValidationCheck({
+      checkId: 'source-license',
+      isPassed: hasSourceReview(draft.sourceReview),
+      message: 'Draft must keep a reviewed source and license reference.',
+    }),
+    createValidationCheck({
       checkId: 'attribution',
       isPassed: hasLocalizedText(draft.metadata.attribution),
       message: 'Draft attribution must be present in both locales.',
+    }),
+    createValidationCheck({
+      checkId: 'external-link',
+      isPassed:
+        typeof draft.metadata.externalLinkUrl === 'string' &&
+        hasHttpUrl(draft.metadata.externalLinkUrl),
+      message: 'Draft external source link must be present and use HTTP(S).',
     }),
   ];
 }
@@ -504,6 +564,7 @@ function createPublishedContentFromDraft(input: {
     previousPublishedRevisionId: input.previousPublishedRevisionId,
     preview: { ...input.draft.preview },
     publishedRevisionId: input.draft.draftRevisionId,
+    sourceReview: input.draft.sourceReview,
     sourceStatus: input.draft.sourceStatus,
     status: 'published',
     title: { ...input.draft.title },
@@ -546,6 +607,7 @@ function withDraftRevision(
   return {
     ...published,
     draftRevisionId: draft?.draftRevisionId ?? null,
+    sourceReview: published.sourceReview ?? createSeededSourceReview(),
   };
 }
 

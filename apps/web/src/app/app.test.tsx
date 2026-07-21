@@ -4,9 +4,24 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { App } from './app';
 import type { AuthGateway } from '../features/auth/auth-context';
-import type { LearningApiClient } from '../features/learning/learning-api';
+import type {
+  AdminContentSourceReview,
+  LearningApiClient,
+} from '../features/learning/learning-api';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
+const seedSourceReview: AdminContentSourceReview = {
+  attribution: {
+    en: 'Google Machine Learning Crash Course, licensed under CC BY 4.0.',
+    vi: 'Google Machine Learning Crash Course, license CC BY 4.0.',
+  },
+  license: {
+    name: 'CC BY 4.0',
+    url: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+  sourceId: 'source-google-ml-crash-course',
+  title: 'Google Machine Learning Crash Course',
+};
 
 function createAuthenticatedGateway(): AuthGateway {
   return {
@@ -943,6 +958,7 @@ describe('public learning journey', () => {
           vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR.',
         },
         publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        sourceReview: seedSourceReview,
         sourceStatus: 'seeded',
         status: 'published',
         title: {
@@ -965,6 +981,10 @@ describe('public learning journey', () => {
     expect(await screen.findAllByText('dl-p01-neuron-perceptron')).toHaveLength(2);
     expect(await screen.findByText('post-dl-p01-neuron-perceptron-rev-r1')).toBeVisible();
     expect(await screen.findByText(/Read from a single neuron decision/i)).toBeVisible();
+    expect(await screen.findByText('Google Machine Learning Crash Course')).toBeVisible();
+    expect(await screen.findByText('source-google-ml-crash-course')).toBeVisible();
+    expect(await screen.findByText('CC BY 4.0')).toBeVisible();
+    expect(await screen.findByText('https://creativecommons.org/licenses/by/4.0/')).toBeVisible();
     expect(document.body).not.toHaveTextContent(/answerKey|correctAnswer|hint/i);
     expect(listAdminContent).toHaveBeenCalledWith({ idToken: 'local-id-token' });
   });

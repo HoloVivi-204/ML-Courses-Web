@@ -140,6 +140,19 @@ export interface AdminContentMetadata {
   externalLinkUrl: string | null;
 }
 
+export interface AdminContentSourceReview {
+  attribution: {
+    en: string;
+    vi: string;
+  };
+  license: {
+    name: string;
+    url: string;
+  };
+  sourceId: string;
+  title: string;
+}
+
 export interface AdminContentSummary {
   courseId: string;
   draftRevisionId: string | null;
@@ -154,6 +167,7 @@ export interface AdminContentSummary {
     vi: string;
   };
   publishedRevisionId: string;
+  sourceReview?: AdminContentSourceReview | undefined;
   sourceStatus: 'seeded';
   status: 'published' | 'unpublished';
   title: {
@@ -178,6 +192,7 @@ export interface AdminContentDraft {
     vi: string;
   };
   revisionVersion: number;
+  sourceReview?: AdminContentSourceReview | undefined;
   sourceStatus: 'seeded';
   status: 'draft';
   title: {
