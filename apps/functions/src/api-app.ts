@@ -16,6 +16,10 @@ import {
   type AdminContentRepository,
   type LocalizedText,
 } from './admin-content-repository.js';
+import {
+  createDefaultAdminReportRepository,
+  type AdminReportRepository,
+} from './admin-report-repository.js';
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
@@ -42,6 +46,7 @@ interface ApiErrorBody {
 
 export interface ApiAppOptions {
   adminContentRepository?: AdminContentRepository | undefined;
+  adminReportRepository?: AdminReportRepository | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
@@ -522,6 +527,7 @@ const handleApiError: ErrorRequestHandler = (error, request, response, next) => 
 export function createApiApp(options: ApiAppOptions = {}): express.Express {
   const app = express();
   let adminContentRepository = options.adminContentRepository;
+  let adminReportRepository = options.adminReportRepository;
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
   const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
@@ -530,6 +536,12 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     adminContentRepository ??= createDefaultAdminContentRepository();
 
     return adminContentRepository;
+  }
+
+  function getAdminReportRepository(): AdminReportRepository {
+    adminReportRepository ??= createDefaultAdminReportRepository();
+
+    return adminReportRepository;
   }
 
   function getLearningRepository(): LearningRepository {
@@ -671,6 +683,19 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         entityType: getOptionalStringQueryField(request, 'entityType'),
         courseId: getOptionalStringQueryField(request, 'courseId'),
         moduleId: getOptionalStringQueryField(request, 'moduleId'),
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/v1/admin/reports/summary', requireAuth, async (_request, response, next) => {
+    try {
+      const adminUser = requireAdminUser(response);
+      const result = await getAdminReportRepository().getSummary({
+        actorUid: adminUser.uid,
       });
 
       sendSuccess(response, result.statusCode, result.data);

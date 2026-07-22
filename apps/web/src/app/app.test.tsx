@@ -393,6 +393,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       ],
     }),
+    getAdminReportSummary: vi.fn().mockResolvedValue(createAdminReportSummaryFixture()),
     listAdminContent: vi.fn().mockResolvedValue([]),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
@@ -421,6 +422,79 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       score: 100,
     }),
     ...overrides,
+  };
+}
+
+function createAdminReportSummaryFixture() {
+  return {
+    generatedAt: '2026-07-23T01:00:00.000Z',
+    learningVerified: {
+      verificationLevel: 'server-verified' as const,
+      learnerCount: 4,
+      courseProgress: [
+        {
+          courseId: 'course-deep-learning-basic',
+          enrolledCount: 3,
+          startedCount: 2,
+          completedCount: 1,
+          averageProgressPercent: 42,
+        },
+      ],
+      moduleProgress: [
+        {
+          moduleId: 'dl-m01-neuron-perceptron',
+          startedCount: 2,
+          completedCount: 1,
+          completionRate: 0.5,
+        },
+      ],
+      postProgress: [
+        {
+          postId: 'dl-p01-neuron-perceptron',
+          startedCount: 3,
+          completedCount: 2,
+          completionRate: 0.67,
+        },
+      ],
+      quizSummary: {
+        averageScorePercent: 81,
+        passedAttemptCount: 5,
+        totalAttemptCount: 6,
+        commonWrongQuestions: [
+          {
+            quizId: 'quiz-module-dl-m01',
+            questionId: 'q-dl-m01-xor-limit',
+            wrongCount: 3,
+          },
+        ],
+      },
+      algorithmUnlocks: [
+        {
+          algorithmId: 'perceptron',
+          unlockedLearnerCount: 2,
+        },
+      ],
+    },
+    playgroundClientReported: {
+      verificationLevel: 'client-computed' as const,
+      runCount: 9,
+      failedRunCount: 1,
+      errorRate: 0.11,
+      scenarioActivity: [
+        {
+          scenarioId: 'pg-xor',
+          algorithmId: 'perceptron',
+          runCount: 9,
+          failedRunCount: 1,
+        },
+      ],
+    },
+    contentLifecycle: {
+      publishedCount: 8,
+      draftCount: 1,
+      validationPendingCount: 1,
+      unpublishedCount: 0,
+    },
   };
 }
 
@@ -1086,6 +1160,41 @@ describe('public learning journey', () => {
       idToken: 'local-id-token',
       scenarioId: 'pg-xor',
     });
+  });
+
+  it('shows an admin report summary with learning and Playground trust domains separated', async () => {
+    window.history.pushState({}, '', '/admin/reports');
+    const getAdminReportSummary = vi.fn().mockResolvedValue(createAdminReportSummaryFixture());
+    const learningApiClient = createLearningApiClient({
+      getAdminReportSummary,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Dashboard tiến độ Admin' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
+    expect(screen.getByText('4 học viên')).toBeVisible();
+    expect(screen.getByText('course-deep-learning-basic')).toBeVisible();
+    expect(screen.getByText('3 ghi danh · 2 bắt đầu · 1 hoàn thành')).toBeVisible();
+    expect(screen.getByText('Điểm quiz trung bình 81%')).toBeVisible();
+    expect(screen.getByText('q-dl-m01-xor-limit · 3 câu sai')).toBeVisible();
+    expect(screen.getByText('Hoạt động Playground client-computed')).toBeVisible();
+    expect(screen.getByText('9 run · 1 lỗi')).toBeVisible();
+    expect(screen.getByText('Tỷ lệ lỗi 11%')).toBeVisible();
+    expect(screen.getByText('pg-xor · Perceptron · 9 run')).toBeVisible();
+    expect(screen.getByText('Published 8 · Draft 1 · Pending 1')).toBeVisible();
+    expect(
+      screen.queryByText(/điểm thành tích|achievement score|overall score/i),
+    ).not.toBeInTheDocument();
+    expect(getAdminReportSummary).toHaveBeenCalledWith({ idToken: 'local-id-token' });
   });
 
   it('lets an authenticated admin preview the seeded content inventory', async () => {

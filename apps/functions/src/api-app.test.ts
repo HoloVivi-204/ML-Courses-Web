@@ -590,6 +590,144 @@ describe('API foundation', () => {
     });
   });
 
+  it('rejects student access to the admin progress summary', async () => {
+    const response = await request(
+      createApiApp({
+        adminReportRepository: {
+          getSummary: async () => {
+            throw new Error('Report repository should not run for student access.');
+          },
+        },
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/reports/summary')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(403);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'ADMIN_FORBIDDEN',
+        message: 'Admin access is required.',
+        details: [],
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
+  it('returns an admin progress summary with separated trust domains', async () => {
+    const reportReads = new Set<string>();
+    const app = createApiApp({
+      adminReportRepository: {
+        getSummary: async (input: { actorUid: string }) => {
+          reportReads.add(input.actorUid);
+
+          return {
+            statusCode: 200 as const,
+            data: {
+              generatedAt: '2026-07-23T01:00:00.000Z',
+              learningVerified: {
+                verificationLevel: 'server-verified',
+                learnerCount: 4,
+                courseProgress: [
+                  {
+                    courseId: 'course-deep-learning-basic',
+                    enrolledCount: 3,
+                    startedCount: 2,
+                    completedCount: 1,
+                    averageProgressPercent: 42,
+                  },
+                ],
+                moduleProgress: [
+                  {
+                    moduleId: 'dl-m01-neuron-perceptron',
+                    startedCount: 2,
+                    completedCount: 1,
+                    completionRate: 0.5,
+                  },
+                ],
+                postProgress: [
+                  {
+                    postId: 'dl-p01-neuron-perceptron',
+                    startedCount: 3,
+                    completedCount: 2,
+                    completionRate: 0.67,
+                  },
+                ],
+                quizSummary: {
+                  averageScorePercent: 81,
+                  passedAttemptCount: 5,
+                  totalAttemptCount: 6,
+                  commonWrongQuestions: [
+                    {
+                      quizId: 'quiz-module-dl-m01',
+                      questionId: 'q-dl-m01-xor-limit',
+                      wrongCount: 3,
+                    },
+                  ],
+                },
+                algorithmUnlocks: [
+                  {
+                    algorithmId: 'perceptron',
+                    unlockedLearnerCount: 2,
+                  },
+                ],
+              },
+              playgroundClientReported: {
+                verificationLevel: 'client-computed',
+                runCount: 9,
+                failedRunCount: 1,
+                errorRate: 0.11,
+                scenarioActivity: [
+                  {
+                    scenarioId: 'pg-xor',
+                    algorithmId: 'perceptron',
+                    runCount: 9,
+                    failedRunCount: 1,
+                  },
+                ],
+              },
+              contentLifecycle: {
+                publishedCount: 8,
+                draftCount: 1,
+                validationPendingCount: 1,
+                unpublishedCount: 0,
+              },
+            },
+          };
+        },
+      },
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    const response = await request(app)
+      .get('/api/v1/admin/reports/summary')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(response.body.data.learningVerified.verificationLevel).toBe('server-verified');
+    expect(response.body.data.playgroundClientReported.verificationLevel).toBe('client-computed');
+    expect(response.body.data.learningVerified.courseProgress).toEqual([
+      {
+        courseId: 'course-deep-learning-basic',
+        enrolledCount: 3,
+        startedCount: 2,
+        completedCount: 1,
+        averageProgressPercent: 42,
+      },
+    ]);
+    expect(JSON.stringify(response.body.data)).not.toMatch(/email|@example|displayName/i);
+    expect(reportReads).toEqual(new Set(['admin-01']));
+  });
+
   it('lists seeded admin content without leaking quiz keys or hints', async () => {
     const response = await request(
       createApiApp({

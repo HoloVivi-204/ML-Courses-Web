@@ -202,6 +202,65 @@ export interface AdminContentDraft {
   validationStatus: 'not-run' | 'valid';
 }
 
+export interface AdminReportSummary {
+  contentLifecycle: {
+    draftCount: number;
+    publishedCount: number;
+    unpublishedCount: number;
+    validationPendingCount: number;
+  };
+  generatedAt: string;
+  learningVerified: {
+    algorithmUnlocks: ReadonlyArray<{
+      algorithmId: string;
+      unlockedLearnerCount: number;
+    }>;
+    courseProgress: ReadonlyArray<{
+      averageProgressPercent: number;
+      completedCount: number;
+      courseId: string;
+      enrolledCount: number;
+      startedCount: number;
+    }>;
+    learnerCount: number;
+    moduleProgress: ReadonlyArray<{
+      completedCount: number;
+      completionRate: number;
+      moduleId: string;
+      startedCount: number;
+    }>;
+    postProgress: ReadonlyArray<{
+      completedCount: number;
+      completionRate: number;
+      postId: string;
+      startedCount: number;
+    }>;
+    quizSummary: {
+      averageScorePercent: number;
+      commonWrongQuestions: ReadonlyArray<{
+        questionId: string;
+        quizId: string;
+        wrongCount: number;
+      }>;
+      passedAttemptCount: number;
+      totalAttemptCount: number;
+    };
+    verificationLevel: 'server-verified';
+  };
+  playgroundClientReported: {
+    errorRate: number;
+    failedRunCount: number;
+    runCount: number;
+    scenarioActivity: ReadonlyArray<{
+      algorithmId: string;
+      failedRunCount: number;
+      runCount: number;
+      scenarioId: string;
+    }>;
+    verificationLevel: 'client-computed';
+  };
+}
+
 export interface UpdateAdminContentDraftInput {
   idToken: string;
   metadata: AdminContentMetadata;
@@ -316,6 +375,7 @@ export interface LearningApiClient {
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
+  getAdminReportSummary(input: { idToken: string }): Promise<AdminReportSummary>;
   listAdminContent(input: {
     courseId?: string | undefined;
     entityType?: AdminContentEntityType | undefined;
@@ -537,6 +597,15 @@ export function createFetchLearningApiClient(): LearningApiClient {
     async getProgress(idToken) {
       return readSuccessEnvelope<LearningProgressSnapshot>(
         await fetch('/api/v1/users/me/progress', {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+    },
+    async getAdminReportSummary({ idToken }) {
+      return readSuccessEnvelope<AdminReportSummary>(
+        await fetch('/api/v1/admin/reports/summary', {
           headers: {
             authorization: `Bearer ${idToken}`,
           },

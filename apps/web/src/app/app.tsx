@@ -36,6 +36,12 @@ const AdminContentPage = lazy(async () => {
   return { default: module.AdminContentPage };
 });
 
+const AdminReportsPage = lazy(async () => {
+  const module = await import('../features/admin/admin-reports-page');
+
+  return { default: module.AdminReportsPage };
+});
+
 const LearningCoursePage = lazy(async () => {
   const module = await import('../features/learning/learning-course-page');
 
@@ -146,6 +152,16 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                   <RequireAuthenticated>
                     <Suspense fallback={<TrialRouteLoading />}>
                       <AdminContentPage learningApiClient={learningClient} locale={locale} />
+                    </Suspense>
+                  </RequireAuthenticated>
+                }
+              />
+              <Route
+                path="/admin/reports"
+                element={
+                  <RequireAuthenticated>
+                    <Suspense fallback={<TrialRouteLoading />}>
+                      <AdminReportsPage learningApiClient={learningClient} />
                     </Suspense>
                   </RequireAuthenticated>
                 }
