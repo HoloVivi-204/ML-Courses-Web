@@ -1041,6 +1041,47 @@ describe('public learning journey', () => {
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
   });
 
+  it('shows a learner dashboard with server-verified progress separate from client-computed runs', async () => {
+    window.history.pushState({}, '', '/dashboard');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundRuns: vi.fn().mockResolvedValue([
+        createSavedPlaygroundRunFixture({
+          runId: 'run-history-01',
+        }),
+      ]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Dashboard học viên' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
+    expect(screen.getByText('Tiến độ khóa học 33%')).toBeVisible();
+    expect(screen.getByText('Module hoàn thành 3/3 bước')).toBeVisible();
+    expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
+    expect(screen.getByText('Perceptron đã mở')).toBeVisible();
+    expect(screen.getByText('Hoạt động Playground client-computed')).toBeVisible();
+    expect(screen.getByText('run-history-01')).toBeVisible();
+    expect(screen.getByText('Độ chính xác 50%')).toBeVisible();
+    expect(screen.getByText('client-computed')).toBeVisible();
+    expect(
+      screen.queryByText(/điểm thành tích|achievement score|overall score/i),
+    ).not.toBeInTheDocument();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+    });
+  });
+
   it('lets an authenticated admin preview the seeded content inventory', async () => {
     window.history.pushState({}, '', '/admin/content');
     const listAdminContent = vi.fn().mockResolvedValue([

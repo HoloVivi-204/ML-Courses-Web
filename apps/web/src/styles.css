@@ -1402,6 +1402,197 @@ a {
   color: var(--teal);
 }
 
+.student-dashboard-page {
+  display: grid;
+  padding-block: 42px 96px;
+  gap: 28px;
+}
+
+.student-dashboard-heading {
+  display: grid;
+  max-width: 850px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line-strong);
+  gap: 14px;
+}
+
+.student-dashboard-heading h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(46px, 6vw, 72px);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.student-dashboard-heading p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.dashboard-trust-grid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 20px;
+}
+
+.dashboard-panel {
+  display: grid;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  gap: 20px;
+}
+
+.dashboard-panel-verified {
+  border-color: color-mix(in srgb, var(--teal) 32%, var(--line));
+}
+
+.dashboard-panel-client {
+  border-color: color-mix(in srgb, var(--amber) 34%, var(--line));
+}
+
+.dashboard-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.dashboard-panel-heading svg {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  color: var(--teal);
+}
+
+.dashboard-panel-client .dashboard-panel-heading svg {
+  color: var(--amber);
+}
+
+.dashboard-panel-heading h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 600;
+  line-height: 1.08;
+}
+
+.dashboard-panel-heading p {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-metric-grid p,
+.dashboard-run-list li {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+}
+
+.dashboard-metric-grid p {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dashboard-list,
+.dashboard-chip-list,
+.dashboard-run-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 10px;
+}
+
+.dashboard-list li {
+  display: flex;
+  min-width: 0;
+  padding: 12px 14px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+  gap: 9px;
+}
+
+.dashboard-list svg {
+  flex: 0 0 auto;
+  color: var(--teal);
+}
+
+.dashboard-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.dashboard-chip-list li,
+.dashboard-run-list span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dashboard-run-list li {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-run-list div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dashboard-run-list strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.dashboard-run-list span {
+  flex: 0 0 auto;
+  border-color: color-mix(in srgb, var(--amber) 42%, transparent);
+  background: var(--amber-soft);
+  color: var(--ink);
+}
+
+.dashboard-run-list p,
+.dashboard-muted {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.dashboard-error {
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+  font-weight: 800;
+}
+
 .admin-content-page {
   display: grid;
   gap: 24px;
@@ -3847,6 +4038,10 @@ a {
   .and-demo-chart {
     min-height: 260px;
   }
+
+  .dashboard-trust-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -4074,6 +4269,27 @@ a {
 
   .trial-contents ol {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .student-dashboard-page {
+    padding-block: 30px 72px;
+  }
+
+  .student-dashboard-heading h1 {
+    font-size: clamp(42px, 13vw, 62px);
+  }
+
+  .dashboard-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-panel-heading {
+    gap: 10px;
+  }
+
+  .dashboard-run-list div {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .learning-demo-page {

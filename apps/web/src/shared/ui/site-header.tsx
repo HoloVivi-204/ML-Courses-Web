@@ -42,6 +42,9 @@ export function SiteHeader({ locale, onLocaleChange, onThemeChange, theme }: Sit
           <NavLink className={getNavClassName} to="/courses">
             {t('nav.courses')}
           </NavLink>
+          <NavLink className={getNavClassName} to="/dashboard">
+            {t('nav.dashboard')}
+          </NavLink>
           <a className="site-nav-link" href="/#method">
             {t('nav.method')}
           </a>

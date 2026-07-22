@@ -400,6 +400,16 @@ describe('authentication routes', () => {
     expect(window.location.search).toBe('?returnTo=%2Flearn%2Fcourse-deep-learning-basic');
   });
 
+  it('redirects a guest from the learner dashboard to sign in with a safe return path', async () => {
+    window.history.pushState({}, '', '/dashboard');
+    const gateway = createGateway();
+
+    render(<App authGateway={gateway} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe('?returnTo=%2Fdashboard');
+  });
+
   it('returns an authenticated learner to the requested relative learning path', async () => {
     window.history.pushState({}, '', '/login?returnTo=%2Flearn%2Fcourse-deep-learning-basic');
     const gateway = createGateway({
