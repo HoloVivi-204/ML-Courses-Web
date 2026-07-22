@@ -1009,6 +1009,206 @@ describe('API foundation', () => {
     );
   });
 
+  it('fails draft validation when locale coverage is not exactly English and Vietnamese', async () => {
+    const app = createApiApp({
+      adminContentRepository: createStaticAdminContentRepository([
+        {
+          ...releaseOneContentFixture,
+          localeAvailability: ['en', 'en'],
+        } as unknown as AdminContentSummary,
+      ]),
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+    await setReviewedDraftSourceMetadata(app);
+
+    const response = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expect(response.body.error.code).toBe('ADMIN_CONTENT_DRAFT_VALIDATION_FAILED');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checkId: 'locale-coverage',
+          status: 'failed',
+        }),
+      ]),
+    );
+  });
+
+  it('fails draft validation before publish when Release 1 hard limits are exceeded', async () => {
+    const app = createApiApp({
+      adminContentRepository: createStaticAdminContentRepository([
+        ...Array.from({ length: 18 }, (_, index): AdminContentSummary => ({
+          ...releaseOneContentFixture,
+          entityId: `dl-p${String(index + 1).padStart(2, '0')}-post`,
+          publishedRevisionId: `post-dl-p${String(index + 1).padStart(2, '0')}-rev-r1`,
+        })),
+        {
+          ...releaseOneContentFixture,
+          entityId: 'dl-p19-over-limit',
+          publishedRevisionId: 'post-dl-p19-over-limit-rev-r1',
+        },
+      ]),
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-post/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+    await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-post-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        metadata: {
+          attribution: {
+            en: 'Reviewed source attribution.',
+            vi: 'Attribution source reviewed.',
+          },
+          externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+        },
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-post-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expect(response.body.error.code).toBe('ADMIN_CONTENT_DRAFT_VALIDATION_FAILED');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checkId: 'release-hard-limits',
+          status: 'failed',
+        }),
+      ]),
+    );
+  });
+
+  it('fails draft validation before publish when a demo problem id conflicts with the problem registry', async () => {
+    const app = createApiApp({
+      adminContentRepository: createStaticAdminContentRepository([
+        {
+          ...releaseOneContentFixture,
+          entityId: 'demo-xor-conflict',
+          entityType: 'demo',
+          publishedRevisionId: 'demo-xor-conflict-rev-r1',
+          validationManifest: {
+            problemId: 'problem-pg-xor',
+          },
+        } as AdminContentSummary,
+      ]),
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/demo/demo-xor-conflict/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+    await request(app)
+      .patch('/api/v1/admin/revisions/draft-demo-demo-xor-conflict-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        metadata: {
+          attribution: {
+            en: 'Reviewed source attribution.',
+            vi: 'Attribution source reviewed.',
+          },
+          externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+        },
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post('/api/v1/admin/revisions/draft-demo-demo-xor-conflict-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expect(response.body.error.code).toBe('ADMIN_CONTENT_DRAFT_VALIDATION_FAILED');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checkId: 'problem-registry',
+          status: 'failed',
+        }),
+      ]),
+    );
+  });
+
+  it('fails draft validation before publish when task fingerprints are duplicated', async () => {
+    const app = createApiApp({
+      adminContentRepository: createStaticAdminContentRepository([
+        {
+          ...releaseOneContentFixture,
+          entityId: 'dl-p01-neuron-perceptron',
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          validationManifest: {
+            blockCount: 12,
+            taskFingerprints: ['tf-duplicate-semantic-task-v1'],
+          },
+        },
+        {
+          ...releaseOneContentFixture,
+          entityId: 'quiz-post-dl-p01',
+          entityType: 'quiz',
+          publishedRevisionId: 'quiz-post-dl-p01-rev-r1',
+          validationManifest: {
+            questionCount: 3,
+            taskFingerprints: ['tf-duplicate-semantic-task-v1'],
+          },
+        } as AdminContentSummary,
+      ]),
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+    await setReviewedDraftSourceMetadata(app);
+
+    const response = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expect(response.body.error.code).toBe('ADMIN_CONTENT_DRAFT_VALIDATION_FAILED');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checkId: 'task-fingerprint-registry',
+          status: 'failed',
+        }),
+      ]),
+    );
+  });
+
   it('validates and publishes a draft revision atomically without leaving a second draft pointer', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({

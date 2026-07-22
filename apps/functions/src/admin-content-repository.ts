@@ -24,6 +24,13 @@ export interface AdminContentSourceReview {
   title: string;
 }
 
+export interface AdminContentValidationManifest {
+  blockCount?: number | undefined;
+  problemId?: string | undefined;
+  questionCount?: number | undefined;
+  taskFingerprints?: readonly string[] | undefined;
+}
+
 export type AdminContentValidationStatus = 'not-run' | 'valid';
 
 export interface AdminContentValidationCheck {
@@ -64,6 +71,7 @@ export interface AdminContentSummary {
   sourceStatus: 'seeded';
   status: 'published' | 'unpublished';
   title: LocalizedText;
+  validationManifest?: AdminContentValidationManifest | undefined;
   validationStatus: AdminContentValidationStatus;
 }
 
@@ -83,6 +91,7 @@ export interface AdminContentDraft {
   sourceStatus: 'seeded';
   status: 'draft';
   title: LocalizedText;
+  validationManifest?: AdminContentValidationManifest | undefined;
   validationStatus: AdminContentValidationStatus;
 }
 
@@ -227,6 +236,28 @@ const releaseOneSourceReviews: Record<
   },
 };
 
+const releaseOneContentHardLimits = {
+  courses: 2,
+  demos: 10,
+  modules: 13,
+  postBlockCount: 12,
+  posts: 18,
+  quizQuestions: 160,
+} as const;
+
+const releaseOnePlaygroundProblemIds = new Set([
+  'problem-pg-house-price',
+  'problem-pg-insurance-cost',
+  'problem-pg-spam-detection',
+  'problem-pg-customer-churn',
+  'problem-pg-credit-risk',
+  'problem-pg-wine-cultivar',
+  'problem-pg-retail-segments',
+  'problem-pg-country-indicators',
+  'problem-pg-xor',
+  'problem-pg-moons-2d',
+]);
+
 const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-classical-ml',
@@ -350,6 +381,10 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       en: 'How does a neuron make a decision?',
       vi: 'Một neuron đưa ra quyết định như thế nào?',
     },
+    validationManifest: {
+      blockCount: 12,
+      taskFingerprints: ['tf-dl-p01-neuron-perceptron-example-v1'],
+    },
     validationStatus: 'not-run',
   },
   {
@@ -371,6 +406,9 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
     title: {
       en: 'AND gate decision boundary',
       vi: 'Ranh giới quyết định cổng AND',
+    },
+    validationManifest: {
+      problemId: 'problem-demo-perceptron-and-gate',
     },
     validationStatus: 'not-run',
   },
@@ -394,6 +432,14 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       en: 'Neuron and Perceptron lesson quiz',
       vi: 'Quiz bài Neuron và Perceptron',
     },
+    validationManifest: {
+      questionCount: 3,
+      taskFingerprints: [
+        'tf-dl-p01-neuron-perceptron-quiz-01-v1',
+        'tf-dl-p01-neuron-perceptron-quiz-02-v1',
+        'tf-dl-p01-neuron-perceptron-quiz-03-v1',
+      ],
+    },
     validationStatus: 'not-run',
   },
   {
@@ -415,6 +461,17 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       en: 'Perceptron module quiz',
       vi: 'Quiz module Perceptron',
     },
+    validationManifest: {
+      questionCount: 6,
+      taskFingerprints: [
+        'tf-dl-m01-neuron-perceptron-quiz-01-v1',
+        'tf-dl-m01-neuron-perceptron-quiz-02-v1',
+        'tf-dl-m01-neuron-perceptron-quiz-03-v1',
+        'tf-dl-m01-neuron-perceptron-quiz-04-v1',
+        'tf-dl-m01-neuron-perceptron-quiz-05-v1',
+        'tf-dl-m01-neuron-perceptron-quiz-06-v1',
+      ],
+    },
     validationStatus: 'not-run',
   },
 ];
@@ -429,6 +486,23 @@ function getContentKey(entityType: AdminContentEntityType, entityId: string): st
 
 function createDraftRevisionId(published: AdminContentSummary): string {
   return `draft-${published.entityType}-${published.entityId}-rev-d1`;
+}
+
+function cloneValidationManifest(
+  manifest: AdminContentValidationManifest | undefined,
+): AdminContentValidationManifest | undefined {
+  if (manifest === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(manifest.blockCount !== undefined ? { blockCount: manifest.blockCount } : {}),
+    ...(manifest.problemId !== undefined ? { problemId: manifest.problemId } : {}),
+    ...(manifest.questionCount !== undefined ? { questionCount: manifest.questionCount } : {}),
+    ...(manifest.taskFingerprints !== undefined
+      ? { taskFingerprints: [...manifest.taskFingerprints] }
+      : {}),
+  };
 }
 
 function createSeededAdminContentMetadata(): AdminContentMetadata {
@@ -448,7 +522,7 @@ function createDraftFromPublished(published: AdminContentSummary): AdminContentD
     draftRevisionId: createDraftRevisionId(published),
     entityId: published.entityId,
     entityType: published.entityType,
-    localeAvailability: ['en', 'vi'],
+    localeAvailability: published.localeAvailability,
     ...(published.moduleId !== undefined ? { moduleId: published.moduleId } : {}),
     ...(published.postId !== undefined ? { postId: published.postId } : {}),
     metadata: createSeededAdminContentMetadata(),
@@ -458,6 +532,7 @@ function createDraftFromPublished(published: AdminContentSummary): AdminContentD
     sourceStatus: 'seeded',
     status: 'draft',
     title: { ...published.title },
+    validationManifest: cloneValidationManifest(published.validationManifest),
     validationStatus: 'not-run',
   };
 }
@@ -523,11 +598,110 @@ function createValidationCheck(input: {
   };
 }
 
-function createValidationChecks(draft: AdminContentDraft): readonly AdminContentValidationCheck[] {
+function hasExactSupportedLocales(value: readonly string[]): boolean {
+  return value.length === 2 && value.includes('en') && value.includes('vi');
+}
+
+function countContentByType(
+  content: readonly AdminContentSummary[],
+  entityType: AdminContentEntityType,
+): number {
+  return content.filter((item) => item.entityType === entityType).length;
+}
+
+function getTotalQuizQuestionCount(content: readonly AdminContentSummary[]): number {
+  return content.reduce((total, item) => total + (item.validationManifest?.questionCount ?? 0), 0);
+}
+
+function hasPostBlockCountsWithinLimit(content: readonly AdminContentSummary[]): boolean {
+  return content.every(
+    (item) =>
+      item.entityType !== 'post' ||
+      (item.validationManifest?.blockCount !== undefined &&
+        item.validationManifest.blockCount <= releaseOneContentHardLimits.postBlockCount),
+  );
+}
+
+function hasQuizQuestionCounts(content: readonly AdminContentSummary[]): boolean {
+  return content.every(
+    (item) => item.entityType !== 'quiz' || item.validationManifest?.questionCount !== undefined,
+  );
+}
+
+function hasReleaseOneHardLimits(content: readonly AdminContentSummary[]): boolean {
+  return (
+    countContentByType(content, 'course') <= releaseOneContentHardLimits.courses &&
+    countContentByType(content, 'demo') <= releaseOneContentHardLimits.demos &&
+    countContentByType(content, 'module') <= releaseOneContentHardLimits.modules &&
+    countContentByType(content, 'post') <= releaseOneContentHardLimits.posts &&
+    getTotalQuizQuestionCount(content) <= releaseOneContentHardLimits.quizQuestions &&
+    hasQuizQuestionCounts(content) &&
+    hasPostBlockCountsWithinLimit(content)
+  );
+}
+
+function hasUniqueValues(values: readonly string[]): boolean {
+  return new Set(values).size === values.length;
+}
+
+function getDemoProblemIds(content: readonly AdminContentSummary[]): readonly string[] {
+  return content
+    .filter((item) => item.entityType === 'demo')
+    .map((item) => item.validationManifest?.problemId?.trim() ?? '')
+    .filter(Boolean);
+}
+
+function hasValidProblemRegistry(content: readonly AdminContentSummary[]): boolean {
+  const demoProblemIds = getDemoProblemIds(content);
+
+  return (
+    demoProblemIds.length === countContentByType(content, 'demo') &&
+    hasUniqueValues(demoProblemIds) &&
+    demoProblemIds.every((problemId) => !releaseOnePlaygroundProblemIds.has(problemId))
+  );
+}
+
+function getTaskFingerprints(content: readonly AdminContentSummary[]): readonly string[] {
+  return content.flatMap((item) => item.validationManifest?.taskFingerprints ?? []);
+}
+
+function hasValidTaskFingerprintRegistry(content: readonly AdminContentSummary[]): boolean {
+  const taskFingerprints = getTaskFingerprints(content).map((fingerprint) => fingerprint.trim());
+
+  const contentHasRequiredFingerprints = content.every((item) => {
+    if (item.entityType !== 'post' && item.entityType !== 'quiz') {
+      return true;
+    }
+
+    const fingerprints = item.validationManifest?.taskFingerprints ?? [];
+
+    if (item.entityType === 'post') {
+      return fingerprints.length > 0;
+    }
+
+    return (
+      item.validationManifest?.questionCount !== undefined &&
+      fingerprints.length === item.validationManifest.questionCount
+    );
+  });
+
+  return (
+    contentHasRequiredFingerprints &&
+    taskFingerprints.every(Boolean) &&
+    hasUniqueValues(taskFingerprints)
+  );
+}
+
+function createValidationChecks(input: {
+  draft: AdminContentDraft;
+  publishCandidateContent: readonly AdminContentSummary[];
+}): readonly AdminContentValidationCheck[] {
+  const { draft, publishCandidateContent } = input;
+
   return [
     createValidationCheck({
       checkId: 'locale-coverage',
-      isPassed: draft.localeAvailability.includes('en') && draft.localeAvailability.includes('vi'),
+      isPassed: hasExactSupportedLocales(draft.localeAvailability),
       message: 'Draft must include both English and Vietnamese locales.',
     }),
     createValidationCheck({
@@ -562,11 +736,31 @@ function createValidationChecks(draft: AdminContentDraft): readonly AdminContent
         hasHttpUrl(draft.metadata.externalLinkUrl),
       message: 'Draft external source link must be present and use HTTP(S).',
     }),
+    createValidationCheck({
+      checkId: 'release-hard-limits',
+      isPassed: hasReleaseOneHardLimits(publishCandidateContent),
+      message:
+        'Publish candidate must stay within Release 1 hard limits for modules, posts, blocks, quizzes, and demos.',
+    }),
+    createValidationCheck({
+      checkId: 'problem-registry',
+      isPassed: hasValidProblemRegistry(publishCandidateContent),
+      message:
+        'Demo problem IDs must be present and unique outside the Playground problem registry.',
+    }),
+    createValidationCheck({
+      checkId: 'task-fingerprint-registry',
+      isPassed: hasValidTaskFingerprintRegistry(publishCandidateContent),
+      message: 'Example and quiz task fingerprints must be present and unique.',
+    }),
   ];
 }
 
-function createValidationResult(draft: AdminContentDraft): AdminContentValidationResult {
-  const checks = createValidationChecks(draft);
+function createValidationResult(input: {
+  draft: AdminContentDraft;
+  publishCandidateContent: readonly AdminContentSummary[];
+}): AdminContentValidationResult {
+  const checks = createValidationChecks(input);
   const failedChecks = checks.filter((check) => check.status === 'failed');
 
   if (failedChecks.length > 0) {
@@ -580,7 +774,7 @@ function createValidationResult(draft: AdminContentDraft): AdminContentValidatio
 
   return {
     checks,
-    revisionId: draft.draftRevisionId,
+    revisionId: input.draft.draftRevisionId,
     status: 'valid',
   };
 }
@@ -604,6 +798,7 @@ function createPublishedContentFromDraft(input: {
     sourceStatus: input.draft.sourceStatus,
     status: 'published',
     title: { ...input.draft.title },
+    validationManifest: cloneValidationManifest(input.draft.validationManifest),
     validationStatus: 'valid',
   };
 }
@@ -718,6 +913,29 @@ export function createStaticAdminContentRepository(
     return (
       publishedByContentKey.get(getContentKey(seededContent.entityType, seededContent.entityId)) ??
       seededContent
+    );
+  }
+
+  function listCurrentPublishedContent(): readonly AdminContentSummary[] {
+    return content.map(
+      (item) => publishedByContentKey.get(getContentKey(item.entityType, item.entityId)) ?? item,
+    );
+  }
+
+  function createPublishCandidateContent(
+    draft: AdminContentDraft,
+    currentPublishedContent: AdminContentSummary,
+  ): readonly AdminContentSummary[] {
+    const draftContentKey = getContentKey(draft.entityType, draft.entityId);
+    const draftPublishedContent = createPublishedContentFromDraft({
+      draft,
+      previousPublishedRevisionId: currentPublishedContent.publishedRevisionId,
+    });
+
+    return listCurrentPublishedContent().map((item) =>
+      getContentKey(item.entityType, item.entityId) === draftContentKey
+        ? draftPublishedContent
+        : item,
     );
   }
 
@@ -1027,7 +1245,26 @@ export function createStaticAdminContentRepository(
         );
       }
 
-      const validation = createValidationResult(existingDraft);
+      const currentPublishedContent = findCurrentPublishedContent(
+        existingDraft.entityType,
+        existingDraft.entityId,
+      );
+
+      if (currentPublishedContent === undefined) {
+        throw new ApiError(
+          404,
+          'ADMIN_CONTENT_NOT_FOUND',
+          'The requested admin content item was not found.',
+        );
+      }
+
+      const validation = createValidationResult({
+        draft: existingDraft,
+        publishCandidateContent: createPublishCandidateContent(
+          existingDraft,
+          currentPublishedContent,
+        ),
+      });
       const validatedDraft: AdminContentDraft = {
         ...existingDraft,
         validationStatus: 'valid',
