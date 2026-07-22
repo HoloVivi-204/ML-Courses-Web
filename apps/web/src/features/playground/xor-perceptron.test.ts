@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { runXorPerceptron, validateXorPerceptronConfig } from './xor-perceptron';
+import xorPerceptronGoldenFixture from './fixtures/xor-perceptron-v1.json';
 
 const defaultConfig = {
   learningRate: 0.1,
@@ -18,6 +19,17 @@ describe('XOR Perceptron engine', () => {
     expect(firstResult.metrics.accuracy).toBeLessThanOrEqual(0.75);
     expect(firstResult.feedback).toEqual(['linear-limit', 'non-convergence']);
     expect(firstResult.determinism).toBe('exact');
+  });
+
+  it('matches the pg-xor Perceptron golden fixture for the default seed', async () => {
+    const result = await runXorPerceptron(xorPerceptronGoldenFixture.config, {
+      runId: 'run-golden',
+    });
+
+    expect(result).toMatchObject({
+      runId: 'run-golden',
+      ...xorPerceptronGoldenFixture.result,
+    });
   });
 
   it('emits monotonic progress events without changing the deterministic result', async () => {

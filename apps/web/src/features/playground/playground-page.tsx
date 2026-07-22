@@ -57,6 +57,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   const [safeError, setSafeError] = useState<string | null>(null);
   const activeRunRef = useRef<{ runId: string; sessionId: string } | null>(null);
   const isStoppingRef = useRef(false);
+  const resetSequenceRef = useRef(0);
 
   const readRequiredIdToken = useCallback(async (): Promise<string> => {
     const idToken = await getIdToken();
@@ -263,6 +264,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
     setStatus('stopping');
     isStoppingRef.current = true;
+    const resetSequence = resetSequenceRef.current;
     const idToken = await readRequiredIdToken();
 
     await Promise.allSettled([
@@ -273,6 +275,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       }),
     ]);
 
+    if (resetSequenceRef.current !== resetSequence) {
+      isStoppingRef.current = false;
+      return;
+    }
+
     activeRunRef.current = null;
     isStoppingRef.current = false;
     setResult(null);
@@ -280,6 +287,8 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   }
 
   async function handleReset() {
+    resetSequenceRef.current += 1;
+
     if (status === 'running') {
       await handleStop();
     }

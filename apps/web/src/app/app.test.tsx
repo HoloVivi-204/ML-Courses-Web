@@ -10,6 +10,7 @@ import type {
 } from '../features/learning/learning-api';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
+const STOP_FALLBACK_SETTLE_MS = 300;
 const seedSourceReview: AdminContentSourceReview = {
   attribution: {
     en: 'Google Machine Learning Crash Course, licensed under CC BY 4.0.',
@@ -656,6 +657,23 @@ function installNonAcknowledgingPlaygroundWorker() {
   }
 
   vi.stubGlobal('Worker', NonAcknowledgingPlaygroundWorker);
+}
+
+function installMobileViewport() {
+  vi.stubGlobal('innerWidth', 390);
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches: true,
+      media: '(max-width: 767px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  );
 }
 
 describe('public learning journey', () => {
@@ -1619,6 +1637,91 @@ describe('public learning journey', () => {
       sessionId: 'session-pg-xor-01',
     });
     expect(learningApiClient.savePlaygroundRun).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('resets pg-xor while stopping without letting the cancelled run overwrite idle state', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    installNonAcknowledgingPlaygroundWorker();
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '200');
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+    await user.click(await screen.findByRole('button', { name: 'Dừng' }));
+    expect(await screen.findByText('Đang dừng worker')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+
+    expect(screen.getByRole('spinbutton', { name: 'Epochs' })).toHaveValue(100);
+    await new Promise((resolve) => {
+      setTimeout(resolve, STOP_FALLBACK_SETTLE_MS);
+    });
+    expect(screen.getByText('Sẵn sàng chạy')).toBeVisible();
+    expect(screen.queryByText('Run đã bị hủy')).not.toBeInTheDocument();
+    expect(learningApiClient.cancelPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      sessionId: 'session-pg-xor-01',
+    });
+    expect(learningApiClient.savePlaygroundRun).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses mobile pg-xor limits before requesting a Perceptron run session', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    installMobileViewport();
+    installImmediatePlaygroundWorker();
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    expect(screen.getByText('Giới hạn mobile: epochs ≤ 200')).toBeVisible();
+    expect(screen.getByRole('spinbutton', { name: 'Epochs' })).toHaveAttribute('max', '200');
+
+    await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '201');
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+    expect(await screen.findByText('epochs must be between 10 and 200 for mobile.')).toBeVisible();
+    expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+    expect(learningApiClient.savePlaygroundRun).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '200');
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+    expect(await screen.findByText('Đã chạy xong')).toBeVisible();
+    expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      deviceProfile: 'mobile',
+      config: {
+        learningRate: 0.1,
+        epochs: 200,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+    });
     vi.unstubAllGlobals();
   });
 

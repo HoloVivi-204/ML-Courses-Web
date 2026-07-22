@@ -234,7 +234,9 @@ function gaussian(random: () => number): number {
 }
 
 function roundMetric(value: number): number {
-  return Number(value.toFixed(4));
+  const rounded = Number(value.toFixed(4));
+
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 async function yieldToWorkerQueue(): Promise<void> {
