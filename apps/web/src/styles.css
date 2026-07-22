@@ -1390,6 +1390,18 @@ a {
   font-weight: 800;
 }
 
+.learning-progress-quiz-list li {
+  border-color: color-mix(in srgb, var(--line-strong) 55%, transparent);
+  background: var(--surface-strong);
+  color: var(--ink-soft);
+}
+
+.learning-progress-quiz-list li.is-passed {
+  border-color: color-mix(in srgb, var(--teal) 32%, var(--line));
+  background: color-mix(in srgb, var(--teal-soft) 55%, var(--surface));
+  color: var(--teal);
+}
+
 .admin-content-page {
   display: grid;
   gap: 24px;

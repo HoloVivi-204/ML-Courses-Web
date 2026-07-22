@@ -143,7 +143,7 @@ function VerifiedProgressPanel({
 }: {
   progressSnapshot: LearningProgressSnapshot;
 }) {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const firstModule = progressSnapshot.modules[0];
   const unlockedAlgorithms = progressSnapshot.algorithmUnlocks;
 
@@ -160,9 +160,26 @@ function VerifiedProgressPanel({
           })}
         </p>
       ) : null}
+      {progressSnapshot.quizzes.length ? (
+        <ul aria-label={t('learning.progress.quiz.label')} className="learning-progress-quiz-list">
+          {progressSnapshot.quizzes.map((quiz) => (
+            <li className={quiz.passed ? 'is-passed' : ''} key={quiz.quizId}>
+              {t(`learning.progress.quiz.${quiz.quizKind}`, {
+                attempts: formatQuizAttemptCount(quiz.attemptCount, i18n.resolvedLanguage),
+                score: formatQuizScore(quiz.bestScore),
+                status: t(
+                  quiz.passed
+                    ? 'learning.progress.quiz.passed'
+                    : 'learning.progress.quiz.notPassed',
+                ),
+              })}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {unlockedAlgorithms.length ? (
         <>
-          <ul>
+          <ul className="learning-progress-algorithm-list">
             {unlockedAlgorithms.map((unlock) => (
               <li key={unlock.algorithmId}>
                 {t('learning.progress.algorithmUnlocked', {
@@ -189,4 +206,20 @@ function formatAlgorithmName(algorithmId: string): string {
   }
 
   return algorithmId;
+}
+
+function formatQuizAttemptCount(attemptCount: number, resolvedLanguage: string | undefined) {
+  if (resolvedLanguage === 'vi') {
+    return `${attemptCount} lần làm`;
+  }
+
+  return attemptCount === 1 ? `${attemptCount} attempt` : `${attemptCount} attempts`;
+}
+
+function formatQuizScore(score: number) {
+  if (Number.isInteger(score)) {
+    return `${score}`;
+  }
+
+  return score.toFixed(2).replace(/\.?0+$/, '');
 }

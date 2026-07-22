@@ -1011,6 +1011,8 @@ describe('public learning journey', () => {
 
     expect(await screen.findByText('Tiến độ đã xác minh: 33%')).toBeVisible();
     expect(screen.getByText('Module hoàn thành: 3/3 bước')).toBeVisible();
+    expect(screen.getByText('Quiz bài học: 100% · đạt · 1 lần làm')).toBeVisible();
+    expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
     expect(screen.getByRole('link', { name: /Mở Playground XOR/i })).toHaveAttribute(
       'href',

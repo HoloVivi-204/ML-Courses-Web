@@ -293,8 +293,7 @@ describe('Firestore learning repository', () => {
       },
     });
     const repository = createFirestoreLearningRepository(firestore);
-
-    const result = await repository.submitQuizAttempt({
+    const moduleQuizPassInput = {
       attemptId: 'attempt-module-quiz-01',
       idempotencyKey: 'module-quiz-pass-key',
       uid: 'learner-01',
@@ -309,13 +308,17 @@ describe('Firestore learning repository', () => {
         },
         { questionId: 'q-dl-m01-hidden-layer', value: 'true' },
       ],
-    });
+    };
+
+    const result = await repository.submitQuizAttempt(moduleQuizPassInput);
+    const retryResult = await repository.submitQuizAttempt(moduleQuizPassInput);
 
     expect(result.data).toMatchObject({
       passed: true,
       score: 100,
       newlyUnlocked: [{ id: 'perceptron', type: 'algorithm' }],
     });
+    expect(retryResult.data).toEqual(result.data);
     expect(
       documents.get('users/learner-01/moduleCompletions/dl-m01-neuron-perceptron'),
     ).toMatchObject({
@@ -350,6 +353,57 @@ describe('Firestore learning repository', () => {
     expectStableContentAccessGrant(
       documents.get('users/learner-01/contentAccess/post_dl-p02-mlp-forward-activation'),
     );
+  });
+
+  it('rejects direct module quiz completion when required post and demo completion are missing', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/quizAttempts/attempt-module-quiz-direct': {
+        attemptNumber: 1,
+        expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+        questionIds: [
+          'q-dl-m01-boundary',
+          'q-dl-m01-inputs',
+          'q-dl-m01-xor-linearly-separable',
+          'q-dl-m01-bias',
+          'q-dl-m01-and-xor',
+          'q-dl-m01-hidden-layer',
+        ],
+        quizId: 'quiz-module-dl-m01',
+        quizRevisionId: 'quiz-module-dl-m01-rev-r1',
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/quizProgress/quiz-module-dl-m01': {
+        attemptCount: 1,
+        bestScore: 0,
+        passed: false,
+        schemaVersion: 1,
+        wrongCounts: {},
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.submitQuizAttempt({
+        attemptId: 'attempt-module-quiz-direct',
+        idempotencyKey: 'module-quiz-direct-bypass-key',
+        uid: 'learner-01',
+        answers: [
+          { questionId: 'q-dl-m01-boundary', value: 'opt-boundary' },
+          { questionId: 'q-dl-m01-inputs', value: ['opt-x1', 'opt-x2'] },
+          { questionId: 'q-dl-m01-xor-linearly-separable', value: 'false' },
+          { questionId: 'q-dl-m01-bias', value: 'opt-bias-shift' },
+          {
+            questionId: 'q-dl-m01-and-xor',
+            value: ['opt-and-separable', 'opt-xor-not-separable'],
+          },
+          { questionId: 'q-dl-m01-hidden-layer', value: 'true' },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: 'MODULE_COMPLETION_PREREQUISITES_REQUIRED',
+      statusCode: 403,
+    });
   });
 
   it('grants demo access after the required post quiz is passed', async () => {
