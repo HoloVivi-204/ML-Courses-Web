@@ -148,7 +148,7 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                 path="/learn/:courseId/posts/:postId"
                 element={
                   <Suspense fallback={<TrialRouteLoading />}>
-                    <TrialPostPage locale={locale} />
+                    <TrialPostPage learningApiClient={learningClient} locale={locale} />
                   </Suspense>
                 }
               />

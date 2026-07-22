@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Clock3, MoveRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
@@ -5,20 +6,95 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
-import { hasLearningPostAccess } from './learning-access-store';
+import {
+  hasLearningPostAccess,
+  rememberLearningContentAccessGrants,
+} from './learning-access-store';
+import type { LearningApiClient } from './learning-api';
 import { getReadablePost } from './trial-post-data';
 
 interface TrialPostPageProps {
+  learningApiClient: LearningApiClient;
   locale: Locale;
 }
 
-export function TrialPostPage({ locale }: TrialPostPageProps) {
+export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps) {
   const { t } = useTranslation();
-  const { status, user } = useAuth();
+  const { getIdToken, status, user } = useAuth();
   const { courseId, postId } = useParams();
-  const hasFullAccess =
-    status === 'authenticated' && hasLearningPostAccess(courseId, postId, user?.uid);
+  const uid = user?.uid;
+  const accessKey =
+    status === 'authenticated' && courseId && postId && uid ? `${uid}:${courseId}:${postId}` : null;
+  const [verifiedAccessKey, setVerifiedAccessKey] = useState<string | null>(null);
+  const hasStoredFullAccess =
+    status === 'authenticated' && hasLearningPostAccess(courseId, postId, uid);
+  const hasBackendFullAccess = accessKey !== null && verifiedAccessKey === accessKey;
+  const hasFullAccess = hasStoredFullAccess || hasBackendFullAccess;
   const post = getReadablePost(courseId, postId, hasFullAccess);
+
+  useEffect(() => {
+    if (
+      status !== 'authenticated' ||
+      !accessKey ||
+      !courseId ||
+      !postId ||
+      !uid ||
+      hasStoredFullAccess
+    ) {
+      return undefined;
+    }
+
+    let isActive = true;
+    const activeAccessKey = accessKey;
+    const activeCourseId = courseId;
+    const activePostId = postId;
+    const activeUid = uid;
+
+    async function loadPostAccess() {
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Authenticated user is missing an ID token.');
+        }
+
+        const progressSnapshot = await learningApiClient.getProgress(idToken);
+
+        rememberLearningContentAccessGrants({
+          contentAccess: progressSnapshot.contentAccess,
+          courseId: activeCourseId,
+          uid: activeUid,
+        });
+
+        const hasProgressPostAccess = progressSnapshot.contentAccess.some(
+          (item) => item.contentType === 'post' && item.entityId === activePostId,
+        );
+
+        if (isActive) {
+          setVerifiedAccessKey(hasProgressPostAccess ? activeAccessKey : null);
+        }
+      } catch {
+        if (isActive) {
+          setVerifiedAccessKey(null);
+        }
+      }
+    }
+
+    void loadPostAccess();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    accessKey,
+    courseId,
+    getIdToken,
+    hasStoredFullAccess,
+    learningApiClient,
+    postId,
+    status,
+    uid,
+  ]);
 
   if (!post) {
     return <TrialPostNotFoundPage />;

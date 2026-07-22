@@ -857,6 +857,40 @@ describe('public learning journey', () => {
     expect(screen.getByText('FULL LESSON')).toBeVisible();
   });
 
+  it('opens the full Perceptron/XOR lesson on authenticated deep links with backend access', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    );
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/post_dl-p01-neuron-perceptron/)).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+
+    await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Why does XOR break a single-layer Perceptron?',
+      }),
+    ).toBeVisible();
+  });
+
   it('shows backend-verified progress and unlocked algorithms on the learning path', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     const learningApiClient = createLearningApiClient({
@@ -1550,12 +1584,15 @@ describe('public learning journey', () => {
       '',
       '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     );
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        contentAccess: [],
+      }),
+    });
 
     render(
-      <App
-        authGateway={createAuthenticatedGateway()}
-        learningApiClient={createLearningApiClient()}
-      />,
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
     expect(
@@ -1567,6 +1604,9 @@ describe('public learning journey', () => {
         { timeout: 3_000 },
       ),
     ).toBeVisible();
+    await waitFor(() =>
+      expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token'),
+    );
     expect(
       screen.queryByRole('heading', {
         name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
