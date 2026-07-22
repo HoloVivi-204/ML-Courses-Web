@@ -53,6 +53,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   const [savedConfigs, setSavedConfigs] = useState<PlaygroundConfigRecord[]>([]);
   const [isPersistenceLoading, setIsPersistenceLoading] = useState(false);
   const [configName, setConfigName] = useState(DEFAULT_CONFIG_NAME);
+  const [configNameDrafts, setConfigNameDrafts] = useState<Record<string, string>>({});
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [safeError, setSafeError] = useState<string | null>(null);
   const activeRunRef = useRef<{ runId: string; sessionId: string } | null>(null);
@@ -322,6 +323,10 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
       setConfigName(savedConfig.name);
       setSavedConfigs((currentConfigs) => upsertSavedConfig(currentConfigs, savedConfig));
+      setConfigNameDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [savedConfig.configId]: savedConfig.name,
+      }));
     } catch {
       setPersistenceError(t('playground.error.persistence'));
     }
@@ -337,6 +342,68 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     setResult(null);
     setSafeError(null);
     setStatus('idle');
+  }
+
+  function getSavedConfigDraftName(savedConfig: PlaygroundConfigRecord) {
+    return configNameDrafts[savedConfig.configId] ?? savedConfig.name;
+  }
+
+  async function handleRenameConfig(savedConfig: PlaygroundConfigRecord) {
+    if (
+      savedConfig.compatibilityStatus !== 'compatible' ||
+      status === 'running' ||
+      status === 'stopping'
+    ) {
+      return;
+    }
+
+    try {
+      const idToken = await readRequiredIdToken();
+      const updatedConfig = await learningApiClient.updatePlaygroundConfig({
+        idToken,
+        configId: savedConfig.configId,
+        name: getSavedConfigDraftName(savedConfig),
+      });
+
+      setSavedConfigs((currentConfigs) => upsertSavedConfig(currentConfigs, updatedConfig));
+      setConfigNameDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [updatedConfig.configId]: updatedConfig.name,
+      }));
+      setPersistenceError(null);
+    } catch {
+      setPersistenceError(t('playground.error.persistence'));
+    }
+  }
+
+  async function handleUpdateConfig(savedConfig: PlaygroundConfigRecord) {
+    if (
+      savedConfig.compatibilityStatus !== 'compatible' ||
+      status === 'running' ||
+      status === 'stopping'
+    ) {
+      return;
+    }
+
+    try {
+      validateXorPerceptronConfig(config, deviceProfile);
+      const idToken = await readRequiredIdToken();
+      const updatedConfig = await learningApiClient.updatePlaygroundConfig({
+        idToken,
+        configId: savedConfig.configId,
+        name: getSavedConfigDraftName(savedConfig),
+        config,
+      });
+
+      setSavedConfigs((currentConfigs) => upsertSavedConfig(currentConfigs, updatedConfig));
+      setConfigNameDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [updatedConfig.configId]: updatedConfig.name,
+      }));
+      setPersistenceError(null);
+    } catch {
+      setPersistenceError(t('playground.error.persistence'));
+    }
   }
 
   async function handleDeleteRun(runId: string) {
@@ -359,6 +426,13 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       setSavedConfigs((currentConfigs) =>
         currentConfigs.filter((savedConfig) => savedConfig.configId !== configId),
       );
+      setConfigNameDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts };
+
+        delete nextDrafts[configId];
+
+        return nextDrafts;
+      });
       setPersistenceError(null);
     } catch {
       setPersistenceError(t('playground.error.persistence'));
@@ -531,6 +605,28 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                       {savedConfig.compatibilityReason ?? t('playground.configs.incompatible')}
                     </p>
                   ) : null}
+                  <label className="playground-config-edit">
+                    <span>{t('playground.configs.savedName')}</span>
+                    <input
+                      aria-label={t('playground.configs.savedName')}
+                      disabled={
+                        savedConfig.compatibilityStatus !== 'compatible' ||
+                        status === 'running' ||
+                        status === 'stopping'
+                      }
+                      maxLength={80}
+                      onChange={(event) => {
+                        const nextName = event.currentTarget.value;
+
+                        setConfigNameDrafts((currentDrafts) => ({
+                          ...currentDrafts,
+                          [savedConfig.configId]: nextName,
+                        }));
+                      }}
+                      type="text"
+                      value={getSavedConfigDraftName(savedConfig)}
+                    />
+                  </label>
                   <div className="playground-card-actions">
                     <button
                       aria-label={`${t('playground.configs.restore')} ${savedConfig.name}`}
@@ -543,6 +639,30 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                       type="button"
                     >
                       {t('playground.configs.restore')}
+                    </button>
+                    <button
+                      aria-label={`${t('playground.configs.rename')} ${savedConfig.name}`}
+                      disabled={
+                        savedConfig.compatibilityStatus !== 'compatible' ||
+                        status === 'running' ||
+                        status === 'stopping'
+                      }
+                      onClick={() => void handleRenameConfig(savedConfig)}
+                      type="button"
+                    >
+                      {t('playground.configs.rename')}
+                    </button>
+                    <button
+                      aria-label={`${t('playground.configs.updateCurrent')} ${savedConfig.name}`}
+                      disabled={
+                        savedConfig.compatibilityStatus !== 'compatible' ||
+                        status === 'running' ||
+                        status === 'stopping'
+                      }
+                      onClick={() => void handleUpdateConfig(savedConfig)}
+                      type="button"
+                    >
+                      {t('playground.configs.updateCurrent')}
                     </button>
                     <button
                       onClick={() => void handleDeleteConfig(savedConfig.configId)}

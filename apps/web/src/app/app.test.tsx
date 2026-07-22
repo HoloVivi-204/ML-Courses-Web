@@ -317,6 +317,12 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
     ),
     deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
+    updatePlaygroundConfig: vi.fn().mockResolvedValue(
+      createSavedPlaygroundConfigFixture({
+        configId: 'config-pg-xor-01',
+        name: 'XOR baseline',
+      }),
+    ),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -1617,6 +1623,97 @@ describe('public learning journey', () => {
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
   });
 
+  it('renames and updates a saved pg-xor config without creating a duplicate', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const updatePlaygroundConfig = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createSavedPlaygroundConfigFixture({
+          configId: 'config-pg-xor-01',
+          name: 'Renamed XOR baseline',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createSavedPlaygroundConfigFixture({
+          configId: 'config-pg-xor-01',
+          name: 'Renamed XOR baseline',
+          config: {
+            learningRate: 0.3,
+            epochs: 150,
+            trainRatio: 0.85,
+            seed: 9,
+          },
+        }),
+      );
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundConfigs: vi.fn().mockResolvedValue([
+        createSavedPlaygroundConfigFixture({
+          configId: 'config-pg-xor-01',
+          name: 'XOR tuned',
+        }),
+      ]),
+      updatePlaygroundConfig,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('XOR tuned')).toBeVisible();
+    const initialCard = screen.getByText('XOR tuned').closest('li');
+
+    expect(initialCard).not.toBeNull();
+    await user.clear(within(initialCard!).getByLabelText('Tên config đã lưu'));
+    await user.type(
+      within(initialCard!).getByLabelText('Tên config đã lưu'),
+      'Renamed XOR baseline',
+    );
+    await user.click(within(initialCard!).getByRole('button', { name: /Đổi tên XOR tuned/i }));
+
+    expect(await screen.findByText('Renamed XOR baseline')).toBeVisible();
+    expect(screen.getAllByText('Renamed XOR baseline')).toHaveLength(1);
+    expect(updatePlaygroundConfig).toHaveBeenNthCalledWith(1, {
+      idToken: 'local-id-token',
+      configId: 'config-pg-xor-01',
+      name: 'Renamed XOR baseline',
+    });
+
+    await user.clear(screen.getByRole('spinbutton', { name: 'Tốc độ học' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Tốc độ học' }), '0.3');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '150');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Tỷ lệ train' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Tỷ lệ train' }), '0.85');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Seed' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Seed' }), '9');
+
+    const renamedCard = screen.getByText('Renamed XOR baseline').closest('li');
+
+    expect(renamedCard).not.toBeNull();
+    await user.click(
+      within(renamedCard!).getByRole('button', {
+        name: /Cập nhật thông số Renamed XOR baseline/i,
+      }),
+    );
+
+    expect(await screen.findByText(/lr 0\.3/)).toBeVisible();
+    expect(updatePlaygroundConfig).toHaveBeenNthCalledWith(2, {
+      idToken: 'local-id-token',
+      configId: 'config-pg-xor-01',
+      name: 'Renamed XOR baseline',
+      config: {
+        learningRate: 0.3,
+        epochs: 150,
+        trainRatio: 0.85,
+        seed: 9,
+      },
+    });
+    expect(screen.getAllByText('Renamed XOR baseline')).toHaveLength(1);
+    expect(learningApiClient.createPlaygroundConfig).not.toHaveBeenCalled();
+  });
+
   it('keeps reloaded pg-xor saved artifacts owner-scoped and marks incompatible configs read-only', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
     const user = userEvent.setup();
@@ -1648,6 +1745,8 @@ describe('public learning journey', () => {
       screen.getByText('Current parameter bounds no longer accept this saved config.'),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: /Khôi phục XOR legacy/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Đổi tên XOR legacy/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Cập nhật thông số XOR legacy/i })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Xóa run' }));
     await waitFor(() => expect(screen.queryByText('run-history-01')).not.toBeInTheDocument());

@@ -222,6 +222,21 @@ function createLearningApiClient() {
     }),
     deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
+    updatePlaygroundConfig: vi.fn().mockResolvedValue({
+      configId: 'config-pg-xor-01',
+      name: 'XOR baseline',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+      compatibilityStatus: 'compatible',
+      compatibilityReason: null,
+    }),
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',

@@ -351,6 +351,12 @@ export interface LearningApiClient {
   }): Promise<PlaygroundConfigRecord>;
   deletePlaygroundConfig(input: { configId: string; idToken: string }): Promise<void>;
   deletePlaygroundRun(input: { idToken: string; runId: string }): Promise<void>;
+  updatePlaygroundConfig(input: {
+    config?: PlaygroundRunSession['config'] | undefined;
+    configId: string;
+    idToken: string;
+    name?: string | undefined;
+  }): Promise<PlaygroundConfigRecord>;
   listPlaygroundConfigs(input: {
     idToken: string;
     scenarioId: 'pg-xor';
@@ -492,6 +498,30 @@ export function createFetchLearningApiClient(): LearningApiClient {
           method: 'DELETE',
         }),
       );
+    },
+    async updatePlaygroundConfig({ config, configId, idToken, name }) {
+      const body: { config?: PlaygroundRunSession['config']; name?: string } = {};
+
+      if (name !== undefined) {
+        body.name = name;
+      }
+
+      if (config !== undefined) {
+        body.config = config;
+      }
+
+      const data = await readSuccessEnvelope<{ config: PlaygroundConfigRecord }>(
+        await fetch(`/api/v1/playground-configs/${encodeURIComponent(configId)}`, {
+          body: JSON.stringify(body),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'PATCH',
+        }),
+      );
+
+      return data.config;
     },
     async enrollCourse({ courseId, idToken, idempotencyKey }) {
       return readSuccessEnvelope<EnrollmentResult>(
