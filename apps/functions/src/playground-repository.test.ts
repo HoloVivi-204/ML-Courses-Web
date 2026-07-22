@@ -326,6 +326,38 @@ describe('Firestore playground repository run sessions', () => {
     });
   });
 
+  it('lists valid saved runs when an older stored run is no longer compatible', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/playgroundRuns/run-valid-01': createStoredRunDocument({
+        createdAtIso: '2026-07-19T14:00:00.000Z',
+        runId: 'run-valid-01',
+      }),
+      'users/learner-01/playgroundRuns/run-legacy-invalid': createStoredRunDocument({
+        config: {
+          learningRate: 0.1,
+          epochs: 900,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+        createdAtIso: '2026-07-18T14:00:00.000Z',
+        runId: 'run-legacy-invalid',
+      }),
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const result = await repository.listRuns({
+      uid: 'learner-01',
+      scenarioId: 'pg-xor',
+    });
+
+    expect(result.data.runs).toEqual([
+      expect.objectContaining({
+        runId: 'run-valid-01',
+        verificationLevel: 'client-computed',
+      }),
+    ]);
+  });
+
   it('rejects saving a successful run through a cancelled session', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/algorithmUnlocks/perceptron': {
@@ -486,5 +518,42 @@ function createCompletedRunResult() {
       bias: 0,
     },
     lossCurve: [{ epoch: 100, loss: 0.5 }],
+  };
+}
+
+function createStoredRunDocument(input: {
+  config?: { epochs: number; learningRate: number; seed: number; trainRatio: number };
+  createdAtIso: string;
+  runId: string;
+}): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    runId: input.runId,
+    scenarioId: 'pg-xor',
+    algorithmId: 'perceptron',
+    datasetVersionId: 'ds-xor-noisy-v1',
+    config: input.config ?? {
+      learningRate: 0.1,
+      epochs: 100,
+      trainRatio: 0.75,
+      seed: 42,
+    },
+    metrics: {
+      accuracy: 0.5,
+      loss: 0.5,
+      testAccuracy: 0.5,
+      trainAccuracy: 0.5,
+    },
+    chartSummary: {
+      feedback: ['linear-limit'],
+      lossCurve: [{ epoch: 100, loss: 0.5 }],
+    },
+    durationMs: 1234,
+    targetReached: null,
+    targetVersionId: null,
+    verificationLevel: 'client-computed',
+    isPinned: false,
+    createdAtIso: input.createdAtIso,
+    createdAtMillis: Date.parse(input.createdAtIso),
   };
 }

@@ -443,21 +443,29 @@ function toRunRecord(documentId: string, data: unknown): PlaygroundRunRecord | n
 
   const chartSummary = isRecord(stored.chartSummary) ? stored.chartSummary : {};
 
-  return {
-    runId: typeof stored.runId === 'string' ? stored.runId : documentId,
-    scenarioId: 'pg-xor',
-    algorithmId: 'perceptron',
-    datasetVersionId: 'ds-xor-noisy-v1',
-    config: normalizePerceptronPlaygroundConfig(stored.config, 'desktop'),
-    durationMs: typeof stored.durationMs === 'number' ? stored.durationMs : 0,
-    feedback: normalizeFeedback(chartSummary.feedback ?? stored.feedback),
-    metrics: normalizeRunMetrics(stored.metrics),
-    isPinned: false,
-    createdAt: typeof stored.createdAtIso === 'string' ? stored.createdAtIso : '',
-    targetVersionId: null,
-    targetReached: null,
-    verificationLevel: 'client-computed',
-  };
+  try {
+    return {
+      runId: typeof stored.runId === 'string' ? stored.runId : documentId,
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      config: normalizePerceptronPlaygroundConfig(stored.config, 'desktop'),
+      durationMs: typeof stored.durationMs === 'number' ? stored.durationMs : 0,
+      feedback: normalizeFeedback(chartSummary.feedback ?? stored.feedback),
+      metrics: normalizeRunMetrics(stored.metrics),
+      isPinned: false,
+      createdAt: typeof stored.createdAtIso === 'string' ? stored.createdAtIso : '',
+      targetVersionId: null,
+      targetReached: null,
+      verificationLevel: 'client-computed',
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 function normalizeConfigName(name: string): string {

@@ -447,6 +447,8 @@ function createSavedPlaygroundRunFixture(input: { runId: string }) {
 }
 
 function createSavedPlaygroundConfigFixture(input: {
+  compatibilityReason?: string | null;
+  compatibilityStatus?: 'compatible' | 'incompatible';
   config?: { epochs: number; learningRate: number; seed: number; trainRatio: number };
   configId: string;
   name: string;
@@ -463,8 +465,8 @@ function createSavedPlaygroundConfigFixture(input: {
       trainRatio: 0.75,
       seed: 42,
     },
-    compatibilityStatus: 'compatible' as const,
-    compatibilityReason: null,
+    compatibilityStatus: input.compatibilityStatus ?? ('compatible' as const),
+    compatibilityReason: input.compatibilityReason ?? null,
   };
 }
 
@@ -1570,6 +1572,54 @@ describe('public learning journey', () => {
     expect(learningApiClient.listPlaygroundConfigs).toHaveBeenCalledWith({
       idToken: 'local-id-token',
       scenarioId: 'pg-xor',
+    });
+    expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps reloaded pg-xor saved artifacts owner-scoped and marks incompatible configs read-only', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundConfigs: vi.fn().mockResolvedValue([
+        createSavedPlaygroundConfigFixture({
+          compatibilityReason: 'Current parameter bounds no longer accept this saved config.',
+          compatibilityStatus: 'incompatible',
+          configId: 'config-pg-xor-legacy',
+          name: 'XOR legacy',
+        }),
+      ]),
+      listPlaygroundRuns: vi.fn().mockResolvedValue([
+        createSavedPlaygroundRunFixture({
+          runId: 'run-history-01',
+        }),
+      ]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('run-history-01')).toBeVisible();
+    expect(screen.getByText('client-computed')).toBeVisible();
+    expect(screen.getByText('XOR legacy')).toBeVisible();
+    expect(
+      screen.getByText('Current parameter bounds no longer accept this saved config.'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: /Khôi phục XOR legacy/i })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Xóa run' }));
+    await waitFor(() => expect(screen.queryByText('run-history-01')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Xóa' }));
+
+    await waitFor(() => expect(screen.queryByText('XOR legacy')).not.toBeInTheDocument());
+    expect(learningApiClient.deletePlaygroundRun).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      runId: 'run-history-01',
+    });
+    expect(learningApiClient.deletePlaygroundConfig).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      configId: 'config-pg-xor-legacy',
     });
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
   });
