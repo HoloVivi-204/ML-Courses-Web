@@ -199,6 +199,27 @@ describe('API foundation', () => {
     expect(JSON.stringify(savedProfiles)).not.toContain('learner@example.test');
   });
 
+  it('requires an idempotency key before enrolling a learner', async () => {
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        enrollLearner: async () => {
+          throw new Error('Enrollment repository should not run without an idempotency key.');
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/courses/course-deep-learning-basic/enrollments')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(400);
+
+    expect(response.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+  });
+
   it('enrolls an authenticated learner idempotently and opens the first module path', async () => {
     const idempotencyRecords = new Map<string, unknown>();
     const enrollmentKeys = new Set<string>();

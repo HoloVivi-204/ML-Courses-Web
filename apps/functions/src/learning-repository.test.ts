@@ -76,7 +76,154 @@ function expectStableContentAccessGrant(data: Record<string, unknown> | undefine
   }
 }
 
-describe('Firestore learning repository progress transitions', () => {
+describe('Firestore learning repository', () => {
+  it('bootstraps a learner profile idempotently without storing email fields', async () => {
+    const { documents, firestore } = createFakeFirestore();
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const firstResult = await repository.bootstrapLearner({
+      uid: 'learner-01',
+      displayName: '  Local Student  ',
+    });
+    const retryResult = await repository.bootstrapLearner({
+      uid: 'learner-01',
+      displayName: 'Changed Name',
+    });
+
+    expect(firstResult).toEqual({
+      statusCode: 201,
+      data: {
+        profile: {
+          uid: 'learner-01',
+          schemaVersion: 1,
+          displayName: 'Local Student',
+          avatarUrl: null,
+          locale: 'vi',
+          theme: 'system',
+          status: 'active',
+        },
+      },
+    });
+    expect(retryResult).toEqual({
+      statusCode: 200,
+      data: {
+        profile: {
+          uid: 'learner-01',
+          schemaVersion: 1,
+          displayName: 'Local Student',
+          avatarUrl: null,
+          locale: 'vi',
+          theme: 'system',
+          status: 'active',
+        },
+      },
+    });
+    expect(documents.get('users/learner-01')).toMatchObject({
+      schemaVersion: 1,
+      displayName: 'Local Student',
+      avatarUrl: null,
+      locale: 'vi',
+      theme: 'system',
+      status: 'active',
+    });
+    expect(documents.get('users/learner-01')).not.toHaveProperty('email');
+  });
+
+  it('enrolls a learner idempotently and grants stable first module access', async () => {
+    const { documents, firestore } = createFakeFirestore();
+    const repository = createFirestoreLearningRepository(firestore);
+    const enrollmentInput = {
+      uid: 'learner-01',
+      displayName: 'Local Student',
+      courseId: 'course-deep-learning-basic',
+      idempotencyKey: 'enroll-course-key-01',
+    };
+
+    const firstResult = await repository.enrollLearner(enrollmentInput);
+    const retryResult = await repository.enrollLearner(enrollmentInput);
+
+    expect(firstResult).toEqual({
+      statusCode: 201,
+      data: {
+        enrollment: {
+          courseId: 'course-deep-learning-basic',
+          status: 'in-progress',
+          progressPercent: 0,
+        },
+        access: {
+          moduleId: 'dl-m01-neuron-perceptron',
+          postId: 'dl-p01-neuron-perceptron',
+        },
+        nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+      },
+    });
+    expect(retryResult).toEqual(firstResult);
+    expect(documents.get('users/learner-01')).toMatchObject({
+      schemaVersion: 1,
+      displayName: 'Local Student',
+      avatarUrl: null,
+      locale: 'vi',
+      theme: 'system',
+      status: 'active',
+    });
+    expect(documents.get('users/learner-01')).not.toHaveProperty('email');
+    expect(documents.get('users/learner-01/enrollments/course-deep-learning-basic')).toMatchObject({
+      schemaVersion: 1,
+      status: 'in-progress',
+      progressPercent: 0,
+      courseRevisionId: 'course-deep-learning-basic-rev-r1',
+    });
+    expect(
+      documents.get('users/learner-01/contentAccess/module_dl-m01-neuron-perceptron'),
+    ).toMatchObject({
+      schemaVersion: 1,
+      contentType: 'module',
+      entityId: 'dl-m01-neuron-perceptron',
+      reason: 'course-enrollment',
+      sourceProgressId: 'enrollments/course-deep-learning-basic',
+    });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/module_dl-m01-neuron-perceptron'),
+    );
+    expect(
+      documents.get('users/learner-01/contentAccess/post_dl-p01-neuron-perceptron'),
+    ).toMatchObject({
+      schemaVersion: 1,
+      contentType: 'post',
+      entityId: 'dl-p01-neuron-perceptron',
+      reason: 'course-enrollment',
+      sourceProgressId: 'enrollments/course-deep-learning-basic',
+    });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/post_dl-p01-neuron-perceptron'),
+    );
+  });
+
+  it('rejects enrollment when an idempotency key belongs to another request', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/idempotencyKeys/enroll-conflict-key': {
+        schemaVersion: 1,
+        operation: 'course-enrollment',
+        requestHash: 'different-request',
+        responseData: {},
+        statusCode: 201,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.enrollLearner({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+        courseId: 'course-deep-learning-basic',
+        idempotencyKey: 'enroll-conflict-key',
+      }),
+    ).rejects.toMatchObject({
+      code: 'IDEMPOTENCY_CONFLICT',
+      statusCode: 409,
+    });
+  });
+
   it('keeps the module quiz closed until the required post quiz is passed', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/contentAccess/module_dl-m01-neuron-perceptron': {
