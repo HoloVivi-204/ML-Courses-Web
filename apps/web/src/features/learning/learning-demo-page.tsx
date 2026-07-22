@@ -5,7 +5,10 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
 import { andGateDemo, getFixedDemo, type DemoStep } from './and-gate-demo-data';
-import { hasLearningDemoAccess } from './learning-access-store';
+import {
+  hasLearningDemoAccess,
+  rememberLearningContentAccessGrants,
+} from './learning-access-store';
 import type { DemoCompletionResult, LearningApiClient } from './learning-api';
 
 interface LearningDemoPageProps {
@@ -96,11 +99,19 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   const idempotencyKey = useRef(createIdempotencyKey());
   const completionStarted = useRef(false);
   const text = copy[locale];
-  const hasAccess =
+  const uid = user?.uid;
+  const accessKey =
+    status === 'authenticated' && courseId && demo?.demoId && uid
+      ? `${uid}:${courseId}:${demo.demoId}`
+      : null;
+  const [verifiedAccessKey, setVerifiedAccessKey] = useState<string | null>(null);
+  const hasStoredAccess =
     status === 'authenticated' &&
     demo !== undefined &&
     demo.courseId === courseId &&
-    hasLearningDemoAccess(courseId, demo.demoId, user?.uid);
+    hasLearningDemoAccess(courseId, demo.demoId, uid);
+  const hasBackendAccess = accessKey !== null && verifiedAccessKey === accessKey;
+  const hasAccess = hasStoredAccess || hasBackendAccess;
   const currentStep = demo?.steps[stepIndex];
   const requiredStepIds = useMemo(() => new Set(demo?.requiredStepIds ?? []), [demo]);
   const requiredViewedCount = viewedStepIds.filter((stepId) => requiredStepIds.has(stepId)).length;
@@ -122,6 +133,54 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
       );
     }
   }
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !accessKey || !courseId || !demo || !uid || hasStoredAccess) {
+      return undefined;
+    }
+
+    let isActive = true;
+    const activeAccessKey = accessKey;
+    const activeCourseId = courseId;
+    const activeDemoId = demo.demoId;
+    const activeUid = uid;
+
+    async function loadDemoAccess() {
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Authenticated user is missing an ID token.');
+        }
+
+        const progressSnapshot = await learningApiClient.getProgress(idToken);
+
+        rememberLearningContentAccessGrants({
+          contentAccess: progressSnapshot.contentAccess,
+          courseId: activeCourseId,
+          uid: activeUid,
+        });
+
+        const hasProgressDemoAccess = progressSnapshot.contentAccess.some(
+          (item) => item.contentType === 'demo' && item.entityId === activeDemoId,
+        );
+
+        if (isActive) {
+          setVerifiedAccessKey(hasProgressDemoAccess ? activeAccessKey : null);
+        }
+      } catch {
+        if (isActive) {
+          setVerifiedAccessKey(null);
+        }
+      }
+    }
+
+    void loadDemoAccess();
+
+    return () => {
+      isActive = false;
+    };
+  }, [accessKey, courseId, demo, getIdToken, hasStoredAccess, learningApiClient, status, uid]);
 
   useEffect(() => {
     if (!demo || !hasAccess || !isComplete || completionStarted.current) {

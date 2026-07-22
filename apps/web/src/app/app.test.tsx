@@ -1658,6 +1658,38 @@ describe('public learning journey', () => {
     expect(learningApiClient.completeDemo).not.toHaveBeenCalled();
   });
 
+  it('opens the fixed AND gate demo on authenticated deep links with backend access', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/demos/demo-perceptron-and-gate',
+    );
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        demos: [
+          {
+            completed: false,
+            demoId: 'demo-perceptron-and-gate',
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Demo Perceptron: cổng AND' })).toBeVisible();
+    expect(
+      screen.getByRole('img', {
+        name: /Bốn điểm dữ liệu AND và một đường quyết định/i,
+      }),
+    ).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.completeDemo).not.toHaveBeenCalled();
+  });
+
   it('lets an enrolled learner complete the fixed AND gate demo after required steps', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     const user = userEvent.setup();
