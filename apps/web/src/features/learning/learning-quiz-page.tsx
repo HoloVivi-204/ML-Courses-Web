@@ -4,11 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
-import {
-  hasLearningModuleAccess,
-  hasLearningPostAccess,
-  rememberLearningContentAccessGrants,
-} from './learning-access-store';
+import { rememberLearningContentAccessGrants } from './learning-access-store';
 import type {
   LearningApiClient,
   LearningProgressSnapshot,
@@ -99,13 +95,10 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   const progressLoadStarted = useRef(false);
   const attemptStarted = useRef(false);
   const idempotencyKey = useRef(createIdempotencyKey());
-  const hasStoredAccess =
-    status === 'authenticated' &&
-    quizRoute !== undefined &&
-    quizRoute.courseId === courseId &&
-    hasQuizAccess(quizRoute, user?.uid);
+  const hasKnownQuizRoute = quizRoute !== undefined && quizRoute.courseId === courseId;
+  const canVerifyBackendProgress = status === 'authenticated' && user !== null && hasKnownQuizRoute;
   const hasAccess =
-    hasStoredAccess &&
+    canVerifyBackendProgress &&
     progressStatus === 'ready' &&
     progressSnapshot !== null &&
     hasVerifiedQuizProgress(quizRoute, progressSnapshot);
@@ -117,7 +110,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   const isAttemptClosed = submissionResult !== null;
 
   useEffect(() => {
-    if (!quizRoute || !hasStoredAccess || progressLoadStarted.current) {
+    if (!quizRoute || !canVerifyBackendProgress || progressLoadStarted.current) {
       return;
     }
 
@@ -159,7 +152,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     return () => {
       isActive = false;
     };
-  }, [getIdToken, hasStoredAccess, learningApiClient, quizRoute, user]);
+  }, [canVerifyBackendProgress, getIdToken, learningApiClient, quizRoute, user]);
 
   useEffect(() => {
     if (!quizRoute || !hasAccess || attemptStarted.current) {
@@ -206,7 +199,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     };
   }, [attemptRequestIndex, getIdToken, hasAccess, learningApiClient, quizRoute]);
 
-  if (!quizRoute || !hasStoredAccess) {
+  if (!quizRoute || !canVerifyBackendProgress) {
     return <QuizNotFoundPage locale={locale} />;
   }
 
@@ -394,14 +387,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   );
 }
 
-function hasQuizAccess(quizRoute: PublicQuizRoute, uid: string | undefined): boolean {
-  if (quizRoute.quizKind === 'post' && quizRoute.postId) {
-    return hasLearningPostAccess(quizRoute.courseId, quizRoute.postId, uid);
-  }
-
-  return hasLearningModuleAccess(quizRoute.courseId, quizRoute.moduleId, uid);
-}
-
 function hasVerifiedQuizProgress(
   quizRoute: PublicQuizRoute | undefined,
   progressSnapshot: LearningProgressSnapshot,
@@ -416,6 +401,9 @@ function hasVerifiedQuizProgress(
     );
   }
 
+  const hasModuleAccess = progressSnapshot.contentAccess.some(
+    (item) => item.contentType === 'module' && item.entityId === quizRoute.moduleId,
+  );
   const requiredPostCompleted = progressSnapshot.posts.some(
     (post) => post.postId === 'dl-p01-neuron-perceptron' && post.completed,
   );
@@ -423,7 +411,7 @@ function hasVerifiedQuizProgress(
     (demo) => demo.demoId === 'demo-perceptron-and-gate' && demo.completed,
   );
 
-  return requiredPostCompleted && requiredDemoCompleted;
+  return hasModuleAccess && requiredPostCompleted && requiredDemoCompleted;
 }
 
 function toAnswerList(

@@ -467,6 +467,48 @@ function createSavedPlaygroundConfigFixture(input: {
   };
 }
 
+function createModuleQuizAttemptResult() {
+  return {
+    attempt: {
+      attemptId: 'attempt-quiz-module-dl-m01-01',
+      attemptNumber: 1,
+      expiresAt: '2026-07-19T13:00:00.000Z',
+      passingScorePercent: 70,
+      questionCount: 6,
+      quizId: 'quiz-module-dl-m01',
+      quizKind: 'module' as const,
+      quizRevisionId: 'quiz-module-dl-m01-rev-r1',
+      requiredCorrectCount: null,
+      shuffleSeed: null,
+    },
+    mastery: {
+      en: 'Score at least 70% to complete the module and unlock the Perceptron playground.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module và mở Playground Perceptron.',
+    },
+    questions: [
+      {
+        options: [
+          {
+            optionId: 'opt-boundary',
+            text: { en: 'Decision boundary', vi: 'Ranh giới quyết định' },
+          },
+          {
+            optionId: 'opt-chatbot',
+            text: { en: 'Chatbot memory', vi: 'Bộ nhớ chatbot' },
+          },
+        ],
+        prompt: {
+          en: 'What does the Perceptron line represent?',
+          vi: 'Đường Perceptron biểu diễn gì?',
+        },
+        questionId: 'q-dl-m01-boundary',
+        sourceId: 'quiz-module-dl-m01-q01',
+        type: 'single-choice' as const,
+      },
+    ],
+  };
+}
+
 function createUnlockedProgressSnapshot() {
   return {
     algorithmUnlocks: [
@@ -1801,14 +1843,45 @@ describe('public learning journey', () => {
 
   it('keeps the post quiz closed without a post access grant', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
-    const learningApiClient = createLearningApiClient();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        contentAccess: [
+          {
+            contentType: 'module',
+            entityId: 'dl-m01-neuron-perceptron',
+          },
+        ],
+      }),
+    });
 
     render(
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
     expect(await screen.findByRole('heading', { name: 'Quiz chưa khả dụng' })).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
     expect(learningApiClient.createQuizAttempt).not.toHaveBeenCalled();
+  });
+
+  it('opens the post mastery quiz on authenticated deep links with backend access', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible();
+    expect(screen.getByText('Cần trả lời đúng cả 3 câu để hoàn thành bài.')).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      quizId: 'quiz-post-dl-p01',
+    });
+    expect(screen.getByTestId('quiz-attempt')).not.toHaveTextContent(
+      /correctAnswer|hint|explanation/i,
+    );
   });
 
   it('keeps the module quiz closed until backend progress verifies post and demo completion', async () => {
@@ -1834,7 +1907,36 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Quiz chưa khả dụng' })).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
     expect(learningApiClient.createQuizAttempt).not.toHaveBeenCalled();
+  });
+
+  it('opens the module quiz on authenticated deep links after backend verifies post and demo completion', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/quizzes/quiz-module-dl-m01',
+    );
+    const learningApiClient = createLearningApiClient({
+      createQuizAttempt: vi.fn().mockResolvedValue(createModuleQuizAttemptResult()),
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByText('Đạt ít nhất 70% để hoàn thành module và mở Playground Perceptron.'),
+    ).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      quizId: 'quiz-module-dl-m01',
+    });
+    expect(screen.getByTestId('quiz-attempt')).not.toHaveTextContent(
+      /correctAnswer|hint|explanation/i,
+    );
   });
 
   it('lets an enrolled learner pass the post mastery quiz with server-side scoring', async () => {
