@@ -13,6 +13,7 @@ const resources = {
       'nav.method': 'Method',
       'nav.login': 'Sign in',
       'nav.register': 'Create account',
+      'nav.signOut': 'Sign out',
       'nav.start': 'Start learning',
       'landing.eyebrow': 'SEE IT. CHANGE IT. UNDERSTAND IT.',
       'landing.title':
@@ -339,6 +340,7 @@ const resources = {
       'nav.method': 'Phương pháp',
       'nav.login': 'Đăng nhập',
       'nav.register': 'Tạo tài khoản',
+      'nav.signOut': 'Đăng xuất',
       'nav.start': 'Bắt đầu học',
       'landing.eyebrow': 'QUAN SÁT. THAY ĐỔI. THẤU HIỂU.',
       'landing.title':

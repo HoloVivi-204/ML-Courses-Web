@@ -1,5 +1,5 @@
 import { Button } from 'antd';
-import { Languages, Moon, Sun } from 'lucide-react';
+import { Languages, LogOut, Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
 
@@ -7,8 +7,11 @@ import type { Locale } from '../../features/catalog/course-data';
 import type { Theme } from '../theme/use-theme';
 
 interface SiteHeaderProps {
+  isAuthenticated: boolean;
+  isAuthActionPending: boolean;
   locale: Locale;
   onLocaleChange: () => void;
+  onSignOut: () => void;
   onThemeChange: () => void;
   theme: Theme;
 }
@@ -17,7 +20,15 @@ function getNavClassName({ isActive }: { isActive: boolean }): string {
   return isActive ? 'site-nav-link is-active' : 'site-nav-link';
 }
 
-export function SiteHeader({ locale, onLocaleChange, onThemeChange, theme }: SiteHeaderProps) {
+export function SiteHeader({
+  isAuthenticated,
+  isAuthActionPending,
+  locale,
+  onLocaleChange,
+  onSignOut,
+  onThemeChange,
+  theme,
+}: SiteHeaderProps) {
   const { t } = useTranslation();
   const themeLabel = t(theme === 'dark' ? 'theme.enableLight' : 'theme.enableDark');
 
@@ -73,12 +84,26 @@ export function SiteHeader({ locale, onLocaleChange, onThemeChange, theme }: Sit
             }
             onClick={onThemeChange}
           />
-          <Link className="header-login" to="/login">
-            {t('nav.login')}
-          </Link>
-          <Link className="header-cta" to="/register">
-            {t('nav.register')}
-          </Link>
+          {isAuthenticated ? (
+            <Button
+              className="header-logout"
+              disabled={isAuthActionPending}
+              icon={<LogOut aria-hidden="true" size={16} />}
+              onClick={onSignOut}
+              type="text"
+            >
+              {t('nav.signOut')}
+            </Button>
+          ) : (
+            <>
+              <Link className="header-login" to="/login">
+                {t('nav.login')}
+              </Link>
+              <Link className="header-cta" to="/register">
+                {t('nav.register')}
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

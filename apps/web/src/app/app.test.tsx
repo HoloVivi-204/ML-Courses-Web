@@ -858,6 +858,34 @@ describe('public learning journey', () => {
     );
   });
 
+  it('lets an authenticated learner sign out from the current device', async () => {
+    window.history.pushState({}, '', '/dashboard');
+    let authListener: ((user: { email: string | null; uid: string } | null) => void) | null = null;
+    const signOut = vi.fn(async () => authListener?.(null));
+    const gateway: AuthGateway = {
+      ...createAuthenticatedGateway(),
+      observe(listener) {
+        authListener = listener;
+        listener({ email: 'learner@example.test', uid: 'learner-01' });
+        return () => undefined;
+      },
+      signOut,
+    };
+    const learningApiClient = createLearningApiClient();
+    const user = userEvent.setup();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    expect(await screen.findByRole('button', { name: 'Đăng xuất' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Đăng nhập' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe('?returnTo=%2Fdashboard');
+  });
+
   it('shows a safe not-found state for an unknown course', () => {
     window.history.pushState({}, '', '/courses/not-a-course');
 

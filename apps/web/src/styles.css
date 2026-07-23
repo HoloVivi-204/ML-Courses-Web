@@ -297,7 +297,15 @@ a {
   font-weight: 700;
 }
 
-.header-login:hover {
+.header-logout {
+  min-height: 38px;
+  color: var(--ink-soft) !important;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.header-login:hover,
+.header-logout:hover:not(:disabled) {
   color: var(--teal);
 }
 

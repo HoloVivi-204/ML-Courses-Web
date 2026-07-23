@@ -272,7 +272,7 @@ function PreferenceAwareHeader({
   setThemePreference,
   theme,
 }: PreferenceAwareHeaderProps) {
-  const { getIdToken, status } = useAuth();
+  const { getIdToken, isSubmitting, signOut, status } = useAuth();
 
   const syncPreferences = useCallback(
     async (preferences: {
@@ -313,8 +313,13 @@ function PreferenceAwareHeader({
 
   return (
     <SiteHeader
+      isAuthenticated={status === 'authenticated'}
+      isAuthActionPending={isSubmitting}
       locale={locale}
       onLocaleChange={handleLocaleChange}
+      onSignOut={() => {
+        void signOut();
+      }}
       onThemeChange={handleThemeChange}
       theme={theme}
     />
