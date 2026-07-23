@@ -1,4 +1,4 @@
-import { ArrowRight, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, LockKeyhole, MailCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
@@ -12,7 +12,7 @@ import { getSafeAuthReturnPath } from './auth-return-path';
 import { type SafeAuthErrorCode } from './auth-service';
 import { useAuth } from './auth-context';
 
-export type AuthMode = 'sign-in' | 'sign-up';
+export type AuthMode = 'forgot-password' | 'sign-in' | 'sign-up';
 
 interface AuthPageProps {
   learningApiClient: LearningApiClient;
@@ -28,9 +28,11 @@ interface AuthCopy {
   alternatePath: string;
   email: string;
   errors: Readonly<Record<SafeAuthErrorCode, string>>;
-  google: string;
+  forgotPasswordAction?: string;
+  google?: string;
   lead: string;
-  password: string;
+  password?: string;
+  resetSuccess?: string;
   signal: string;
   status: string;
   submit: string;
@@ -46,6 +48,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       email: 'Email',
       errors: {
         'account-exists': 'This email is already registered. Try signing in instead.',
+        'invalid-email': 'Enter a valid email address.',
         'invalid-credentials': 'Email or password is not correct.',
         network: 'We could not reach the authentication service. Try again.',
         'popup-blocked':
@@ -55,6 +58,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       },
       google: 'Continue with Google',
       lead: 'Keep your learning path, progress, and next experiment in one place.',
+      forgotPasswordAction: 'Forgot password?',
       password: 'Password',
       signal: 'AUTHENTICATION / STUDENT ACCESS',
       status: 'Signing you in…',
@@ -68,6 +72,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       email: 'Email',
       errors: {
         'account-exists': 'This email is already registered. Try signing in instead.',
+        'invalid-email': 'Enter a valid email address.',
         'invalid-credentials': 'Check the email and password, then try again.',
         network: 'We could not reach the authentication service. Try again.',
         'popup-blocked':
@@ -83,6 +88,28 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       submit: 'Create account',
       title: 'Turn the first question into a path.',
     },
+    'forgot-password': {
+      alternateAction: 'Sign in',
+      alternateLead: 'Remembered your password?',
+      alternatePath: '/login',
+      email: 'Email',
+      errors: {
+        'account-exists': 'This email is already registered. Try signing in instead.',
+        'invalid-email': 'Enter a valid email address.',
+        'invalid-credentials': 'We could not send a reset link. Try again.',
+        network: 'We could not reach the authentication service. Try again.',
+        'popup-blocked':
+          'Your browser blocked the sign-in window. Continue with the redirect flow.',
+        'rate-limited': 'Too many attempts. Please wait a moment and try again.',
+        unavailable: 'Authentication is not available right now. Try again later.',
+      },
+      lead: 'Request a reset link for your learning account.',
+      resetSuccess: 'If this email belongs to an ML Path account, a reset link will be sent.',
+      signal: 'ACCOUNT RECOVERY',
+      status: 'Sending reset link…',
+      submit: 'Send reset link',
+      title: 'Reset access to ML Path.',
+    },
   },
   vi: {
     'sign-in': {
@@ -92,6 +119,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       email: 'Email',
       errors: {
         'account-exists': 'Email này đã có tài khoản. Hãy thử đăng nhập.',
+        'invalid-email': 'Hãy nhập email hợp lệ.',
         'invalid-credentials': 'Email hoặc mật khẩu chưa đúng.',
         network: 'Không thể kết nối dịch vụ xác thực. Hãy thử lại.',
         'popup-blocked':
@@ -101,6 +129,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       },
       google: 'Tiếp tục với Google',
       lead: 'Giữ lộ trình, tiến độ và thử nghiệm tiếp theo của bạn ở cùng một nơi.',
+      forgotPasswordAction: 'Quên mật khẩu?',
       password: 'Mật khẩu',
       signal: 'XÁC THỰC / TRUY CẬP HỌC VIÊN',
       status: 'Đang đăng nhập…',
@@ -114,6 +143,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       email: 'Email',
       errors: {
         'account-exists': 'Email này đã có tài khoản. Hãy thử đăng nhập.',
+        'invalid-email': 'Hãy nhập email hợp lệ.',
         'invalid-credentials': 'Hãy kiểm tra lại email và mật khẩu.',
         network: 'Không thể kết nối dịch vụ xác thực. Hãy thử lại.',
         'popup-blocked':
@@ -128,6 +158,28 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
       status: 'Đang tạo tài khoản…',
       submit: 'Tạo tài khoản',
       title: 'Biến câu hỏi đầu tiên thành một lộ trình.',
+    },
+    'forgot-password': {
+      alternateAction: 'Đăng nhập',
+      alternateLead: 'Đã nhớ mật khẩu?',
+      alternatePath: '/login',
+      email: 'Email',
+      errors: {
+        'account-exists': 'Email này đã có tài khoản. Hãy thử đăng nhập.',
+        'invalid-email': 'Hãy nhập email hợp lệ.',
+        'invalid-credentials': 'Chưa thể gửi liên kết đặt lại. Hãy thử lại.',
+        network: 'Không thể kết nối dịch vụ xác thực. Hãy thử lại.',
+        'popup-blocked':
+          'Trình duyệt đã chặn cửa sổ đăng nhập. Hãy tiếp tục bằng luồng chuyển trang.',
+        'rate-limited': 'Bạn đã thử quá nhiều lần. Hãy chờ một chút rồi thử lại.',
+        unavailable: 'Xác thực tạm thời chưa sẵn sàng. Hãy thử lại sau.',
+      },
+      lead: 'Yêu cầu liên kết đặt lại cho tài khoản học tập của bạn.',
+      resetSuccess: 'Nếu email thuộc tài khoản ML Path, liên kết đặt lại mật khẩu sẽ được gửi.',
+      signal: 'KHÔI PHỤC TÀI KHOẢN',
+      status: 'Đang gửi liên kết…',
+      submit: 'Gửi liên kết đặt lại',
+      title: 'Đặt lại quyền truy cập ML Path.',
     },
   },
 };
@@ -145,6 +197,7 @@ export function AuthPage({
     error,
     getIdToken,
     isSubmitting,
+    requestPasswordReset,
     signInWithEmail,
     signInWithGoogle,
     signUpWithEmail,
@@ -153,17 +206,24 @@ export function AuthPage({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [profileBootstrapFailed, setProfileBootstrapFailed] = useState(false);
+  const [resetRequested, setResetRequested] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const bootstrapAttemptedRef = useRef(false);
   const bootstrapPreferencesRef = useRef({ locale, theme: themePreference });
   const text = copy[locale][mode];
   const returnPath = useMemo(() => getSafeAuthReturnPath(location.search), [location.search]);
+  const alternatePath =
+    mode === 'forgot-password' && location.search ? `/login${location.search}` : text.alternatePath;
 
   useEffect(() => {
     bootstrapPreferencesRef.current = { locale, theme: themePreference };
   }, [locale, themePreference]);
 
   useEffect(() => {
+    if (mode === 'forgot-password') {
+      return undefined;
+    }
+
     if (status !== 'authenticated') {
       bootstrapAttemptedRef.current = false;
       return undefined;
@@ -211,11 +271,30 @@ export function AuthPage({
     return () => {
       isActive = false;
     };
-  }, [getIdToken, learningApiClient, navigate, onProfilePreferencesLoaded, returnPath, status]);
+  }, [
+    getIdToken,
+    learningApiClient,
+    mode,
+    navigate,
+    onProfilePreferencesLoaded,
+    returnPath,
+    status,
+  ]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitted(true);
+    setResetRequested(false);
+
+    if (mode === 'forgot-password') {
+      const completed = await requestPasswordReset(email.trim(), returnPath);
+
+      if (completed) {
+        setResetRequested(true);
+      }
+
+      return;
+    }
 
     const completed =
       mode === 'sign-up'
@@ -274,23 +353,40 @@ export function AuthPage({
             value={email}
           />
 
-          <label htmlFor="auth-password">{text.password}</label>
-          <input
-            autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
-            disabled={isSubmitting}
-            id="auth-password"
-            minLength={6}
-            name="password"
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            type="password"
-            value={password}
-          />
+          {mode !== 'forgot-password' ? (
+            <>
+              <label htmlFor="auth-password">{text.password}</label>
+              <input
+                autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
+                disabled={isSubmitting}
+                id="auth-password"
+                minLength={6}
+                name="password"
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                type="password"
+                value={password}
+              />
+
+              {mode === 'sign-in' && text.forgotPasswordAction ? (
+                <Link className="auth-secondary-link" to={`/forgot-password${location.search}`}>
+                  {text.forgotPasswordAction}
+                </Link>
+              ) : null}
+            </>
+          ) : null}
 
           {submitted && error ? (
             <p className="auth-error" role="alert">
               <LockKeyhole aria-hidden="true" size={16} />
               {text.errors[error.code]}
+            </p>
+          ) : null}
+
+          {resetRequested && text.resetSuccess ? (
+            <p className="auth-success" role="status">
+              <MailCheck aria-hidden="true" size={16} />
+              {text.resetSuccess}
             </p>
           ) : null}
 
@@ -309,24 +405,28 @@ export function AuthPage({
           </button>
         </form>
 
-        <div className="auth-divider">
-          <span>{locale === 'vi' ? 'hoặc' : 'or'}</span>
-        </div>
+        {mode !== 'forgot-password' && text.google ? (
+          <>
+            <div className="auth-divider">
+              <span>{locale === 'vi' ? 'hoặc' : 'or'}</span>
+            </div>
 
-        <button
-          className="auth-google"
-          disabled={isSubmitting}
-          onClick={handleGoogleSignIn}
-          type="button"
-        >
-          <span aria-hidden="true" className="auth-google-mark">
-            G
-          </span>
-          {text.google}
-        </button>
+            <button
+              className="auth-google"
+              disabled={isSubmitting}
+              onClick={handleGoogleSignIn}
+              type="button"
+            >
+              <span aria-hidden="true" className="auth-google-mark">
+                G
+              </span>
+              {text.google}
+            </button>
+          </>
+        ) : null}
 
         <p className="auth-alternate">
-          {text.alternateLead} <Link to={text.alternatePath}>{text.alternateAction}</Link>
+          {text.alternateLead} <Link to={alternatePath}>{text.alternateAction}</Link>
         </p>
 
         <p className="auth-security-note">

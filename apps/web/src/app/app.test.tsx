@@ -50,6 +50,7 @@ function createAuthenticatedGateway(): AuthGateway {
     },
     signInWithEmail: vi.fn().mockResolvedValue(undefined),
     signInWithGoogle: vi.fn().mockResolvedValue(undefined),
+    requestPasswordReset: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
     signUpWithEmail: vi.fn().mockResolvedValue(undefined),
   };

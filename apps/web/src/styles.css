@@ -3904,6 +3904,15 @@ a {
   box-shadow: 4px 4px 0 var(--teal-soft);
 }
 
+.auth-secondary-link {
+  justify-self: end;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .auth-submit,
 .auth-google {
   display: inline-flex;
@@ -3952,7 +3961,21 @@ a {
   gap: 8px;
 }
 
-.auth-error svg {
+.auth-success {
+  display: flex;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  align-items: flex-start;
+  border-left: 2px solid var(--teal);
+  background: var(--teal-soft);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.auth-error svg,
+.auth-success svg {
   flex: 0 0 auto;
   margin-top: 2px;
 }

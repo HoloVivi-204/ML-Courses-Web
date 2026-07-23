@@ -154,6 +154,20 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                   </Suspense>
                 }
               />
+              <Route
+                path="/forgot-password"
+                element={
+                  <Suspense fallback={<AuthRouteLoading />}>
+                    <AuthEntry
+                      learningApiClient={learningClient}
+                      locale={locale}
+                      mode="forgot-password"
+                      onProfilePreferencesLoaded={applyProfilePreferences}
+                      themePreference={themePreference}
+                    />
+                  </Suspense>
+                }
+              />
               <Route path="/courses" element={<CourseCatalogPage locale={locale} />} />
               <Route path="/courses/:courseId" element={<CoursePage locale={locale} />} />
               <Route

@@ -15,6 +15,7 @@ export interface AuthGateway {
   ): () => void;
   signInWithEmail(email: string, password: string): Promise<void>;
   signInWithGoogle(): Promise<void>;
+  requestPasswordReset(email: string, continuePath: string): Promise<void>;
   signOut(): Promise<void>;
   signUpWithEmail(email: string, password: string): Promise<void>;
 }
@@ -25,6 +26,7 @@ export interface AuthContextValue {
   error: SafeAuthError | null;
   getIdToken(): Promise<string | null>;
   isSubmitting: boolean;
+  requestPasswordReset(email: string, continuePath: string): Promise<boolean>;
   signInWithEmail(email: string, password: string): Promise<boolean>;
   signInWithGoogle(): Promise<boolean>;
   signOut(): Promise<boolean>;

@@ -1,5 +1,6 @@
 export type SafeAuthErrorCode =
   | 'account-exists'
+  | 'invalid-email'
   | 'invalid-credentials'
   | 'network'
   | 'popup-blocked'
@@ -16,8 +17,11 @@ interface AuthErrorLike {
 
 const safeErrorCodes: Readonly<Record<string, SafeAuthErrorCode>> = {
   'auth/email-already-in-use': 'account-exists',
+  'auth/invalid-email': 'invalid-email',
   'auth/invalid-credential': 'invalid-credentials',
   'auth/invalid-login-credentials': 'invalid-credentials',
+  'auth/user-not-found': 'invalid-credentials',
+  'auth/wrong-password': 'invalid-credentials',
   'auth/network-request-failed': 'network',
   'auth/popup-blocked': 'popup-blocked',
   'auth/too-many-requests': 'rate-limited',

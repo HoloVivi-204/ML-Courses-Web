@@ -395,6 +395,7 @@ function createGateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
     },
     signInWithEmail: vi.fn().mockResolvedValue(undefined),
     signInWithGoogle: vi.fn().mockResolvedValue(undefined),
+    requestPasswordReset: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
     signUpWithEmail: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -451,6 +452,37 @@ describe('authentication routes', () => {
     await user.click(await screen.findByRole('button', { name: 'Tiếp tục với Google' }));
 
     expect(gateway.signInWithGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a guest request a password reset with a safe relative continue path', async () => {
+    window.history.pushState({}, '', '/forgot-password?returnTo=%2Fdashboard');
+    const gateway = createGateway();
+    const user = userEvent.setup();
+
+    render(<App authGateway={gateway} />);
+
+    await user.type(await screen.findByLabelText('Email'), 'learner@example.test');
+    expect(screen.queryByLabelText('Mật khẩu')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Gửi liên kết đặt lại' }));
+
+    expect(gateway.requestPasswordReset).toHaveBeenCalledWith('learner@example.test', '/dashboard');
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Nếu email thuộc tài khoản ML Path, liên kết đặt lại mật khẩu sẽ được gửi.',
+    );
+  });
+
+  it('drops an external reset continue URL before calling Firebase', async () => {
+    window.history.pushState({}, '', '/forgot-password?returnTo=https%3A%2F%2Fevil.example');
+    const gateway = createGateway();
+    const user = userEvent.setup();
+
+    render(<App authGateway={gateway} />);
+
+    await user.type(await screen.findByLabelText('Email'), 'learner@example.test');
+    await user.click(screen.getByRole('button', { name: 'Gửi liên kết đặt lại' }));
+
+    expect(gateway.requestPasswordReset).toHaveBeenCalledWith('learner@example.test', '/');
   });
 
   it('redirects a guest from the protected learning route to sign in with a safe return path', async () => {

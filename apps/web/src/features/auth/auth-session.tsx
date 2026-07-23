@@ -48,11 +48,32 @@ export function AuthProvider({ children, gateway }: AuthProviderProps) {
     }
   }
 
+  async function runPasswordReset(action: () => Promise<void>): Promise<boolean> {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await action();
+      return true;
+    } catch (caughtError) {
+      if (isMissingResetAccount(caughtError)) {
+        return true;
+      }
+
+      setError(toSafeAuthError(caughtError));
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const value = useMemo<AuthContextValue>(
     () => ({
       error,
       getIdToken: () => gateway.getIdToken(),
       isSubmitting,
+      requestPasswordReset: (email, continuePath) =>
+        runPasswordReset(() => gateway.requestPasswordReset(email, continuePath)),
       signInWithEmail: (email, password) => run(() => gateway.signInWithEmail(email, password)),
       signInWithGoogle: () => run(() => gateway.signInWithGoogle()),
       signOut: () => run(() => gateway.signOut()),
@@ -64,4 +85,13 @@ export function AuthProvider({ children, gateway }: AuthProviderProps) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function isMissingResetAccount(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'auth/user-not-found'
+  );
 }

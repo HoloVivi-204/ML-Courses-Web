@@ -12,6 +12,7 @@ import {
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  sendPasswordResetEmail as sendFirebasePasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -87,6 +88,33 @@ function shouldUseRedirect(): boolean {
   return window.matchMedia?.('(pointer: coarse)').matches ?? false;
 }
 
+export function toPasswordResetContinueUrl(continuePath: string): string {
+  const fallbackUrl = new URL('/', window.location.origin).href;
+
+  if (
+    !continuePath.startsWith('/') ||
+    continuePath.startsWith('//') ||
+    continuePath.includes('\\')
+  ) {
+    return fallbackUrl;
+  }
+
+  try {
+    const continueUrl = new URL(continuePath, window.location.origin);
+
+    if (
+      continueUrl.origin !== window.location.origin ||
+      continueUrl.protocol !== window.location.protocol
+    ) {
+      return fallbackUrl;
+    }
+
+    return continueUrl.href;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 function createUnavailableGateway(): AuthGateway {
   const unavailable = async (): Promise<void> => {
     throw { code: 'auth/unavailable' };
@@ -100,6 +128,7 @@ function createUnavailableGateway(): AuthGateway {
     },
     signInWithEmail: unavailable,
     signInWithGoogle: unavailable,
+    requestPasswordReset: unavailable,
     signOut: unavailable,
     signUpWithEmail: unavailable,
   };
@@ -134,6 +163,12 @@ function createConfiguredGateway(auth: Auth): AuthGateway {
 
         await signInWithRedirect(auth, googleProvider);
       }
+    },
+    async requestPasswordReset(email, continuePath) {
+      await sendFirebasePasswordResetEmail(auth, email, {
+        handleCodeInApp: false,
+        url: toPasswordResetContinueUrl(continuePath),
+      });
     },
     async signOut() {
       await signOut(auth);
