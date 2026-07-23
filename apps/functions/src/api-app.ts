@@ -23,7 +23,12 @@ import {
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
-import { createDefaultLearningRepository, type LearningRepository } from './learning-repository.js';
+import {
+  createDefaultLearningRepository,
+  type LearnerLocalePreference,
+  type LearnerThemePreference,
+  type LearningRepository,
+} from './learning-repository.js';
 import {
   createDefaultPlaygroundRepository,
   type PlaygroundRepository,
@@ -384,6 +389,77 @@ function getAdminContentLifecycleReasonBody(request: Request): string {
   return getTrimmedStringValue(body.reason, 'reason', 240);
 }
 
+function getOptionalObjectBody(request: Request): Record<string, unknown> {
+  if (request.body === undefined) {
+    return {};
+  }
+
+  return getObjectBody(request);
+}
+
+function getOptionalLearnerLocalePreference(
+  body: Record<string, unknown>,
+): LearnerLocalePreference | undefined {
+  const value = body.locale;
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value !== 'en' && value !== 'vi') {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'locale must be either en or vi.');
+  }
+
+  return value;
+}
+
+function getOptionalLearnerThemePreference(
+  body: Record<string, unknown>,
+): LearnerThemePreference | undefined {
+  const value = body.theme;
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value !== 'dark' && value !== 'light' && value !== 'system') {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'theme must be dark, light, or system.');
+  }
+
+  return value;
+}
+
+function getOptionalLearnerPreferencesBody(request: Request): {
+  locale?: LearnerLocalePreference | undefined;
+  theme?: LearnerThemePreference | undefined;
+} {
+  const body = getOptionalObjectBody(request);
+
+  assertBodyFieldsAllowlisted(body, ['locale', 'theme']);
+
+  return {
+    locale: getOptionalLearnerLocalePreference(body),
+    theme: getOptionalLearnerThemePreference(body),
+  };
+}
+
+function getLearnerPreferencesPatchBody(request: Request): {
+  locale?: LearnerLocalePreference | undefined;
+  theme?: LearnerThemePreference | undefined;
+} {
+  const preferences = getOptionalLearnerPreferencesBody(request);
+
+  if (preferences.locale === undefined && preferences.theme === undefined) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'At least one learner preference must be provided.',
+    );
+  }
+
+  return preferences;
+}
+
 function getBodyField(request: Request, name: string): unknown {
   const body = getObjectBody(request);
 
@@ -573,12 +649,32 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     });
   });
 
-  app.post('/api/v1/users/me/bootstrap', requireAuth, async (_request, response, next) => {
+  app.post('/api/v1/users/me/bootstrap', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);
+      const preferences = getOptionalLearnerPreferencesBody(request);
       const result = await getLearningRepository().bootstrapLearner({
         uid: authUser.uid,
         displayName: authUser.displayName || 'Learner',
+        locale: preferences.locale,
+        theme: preferences.theme,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch('/api/v1/users/me/preferences', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const preferences = getLearnerPreferencesPatchBody(request);
+      const result = await getLearningRepository().updateLearnerPreferences({
+        uid: authUser.uid,
+        displayName: authUser.displayName || 'Learner',
+        locale: preferences.locale,
+        theme: preferences.theme,
       });
 
       sendSuccess(response, result.statusCode, result.data);

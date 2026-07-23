@@ -24,6 +24,23 @@ const seedSourceReview: AdminContentSourceReview = {
   title: 'Google Machine Learning Crash Course',
 };
 
+function createLearnerProfileFixture(
+  input: {
+    locale?: 'en' | 'vi';
+    theme?: 'dark' | 'light' | 'system';
+  } = {},
+) {
+  return {
+    uid: 'learner-01',
+    schemaVersion: 1 as const,
+    displayName: 'Local Student',
+    avatarUrl: null,
+    locale: input.locale ?? ('vi' as const),
+    theme: input.theme ?? ('system' as const),
+    status: 'active' as const,
+  };
+}
+
 function createAuthenticatedGateway(): AuthGateway {
   return {
     getIdToken: vi.fn().mockResolvedValue('local-id-token'),
@@ -40,7 +57,7 @@ function createAuthenticatedGateway(): AuthGateway {
 
 function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): LearningApiClient {
   return {
-    bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    bootstrapProfile: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
     cancelPlaygroundRunSession: vi.fn().mockResolvedValue({
       sessionId: 'session-pg-xor-01',
       status: 'cancelled',
@@ -421,6 +438,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       passed: true,
       score: 100,
     }),
+    updatePreferences: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
     ...overrides,
   };
 }
@@ -814,6 +832,31 @@ describe('public learning journey', () => {
     expect(localStorage.getItem('ml-path-theme')).toBe('dark');
   });
 
+  it('syncs authenticated locale and theme changes to learner preferences', async () => {
+    window.history.pushState({}, '', '/');
+    const gateway = createAuthenticatedGateway();
+    const learningApiClient = createLearningApiClient();
+    const user = userEvent.setup();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    await user.click(screen.getByRole('button', { name: /tiếng Anh/i }));
+    await waitFor(() =>
+      expect(learningApiClient.updatePreferences).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        locale: 'en',
+      }),
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Enable dark theme' }));
+    await waitFor(() =>
+      expect(learningApiClient.updatePreferences).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        theme: 'dark',
+      }),
+    );
+  });
+
   it('shows a safe not-found state for an unknown course', () => {
     window.history.pushState({}, '', '/courses/not-a-course');
 
@@ -826,50 +869,58 @@ describe('public learning journey', () => {
     );
   });
 
-  it('lets a guest start the designated trial lesson from the course roadmap', async () => {
-    window.history.pushState({}, '', '/courses/course-deep-learning-basic');
-    const user = userEvent.setup();
+  it(
+    'lets a guest start the designated trial lesson from the course roadmap',
+    async () => {
+      window.history.pushState({}, '', '/courses/course-deep-learning-basic');
+      const user = userEvent.setup();
 
-    render(<App />);
+      render(<App />);
 
-    await user.click(screen.getByRole('link', { name: /học thử neuron và perceptron/i }));
+      await user.click(screen.getByRole('link', { name: /học thử neuron và perceptron/i }));
 
-    expect(
-      await screen.findByRole(
-        'heading',
-        {
-          name: /một neuron đưa ra quyết định như thế nào/i,
-        },
-        { timeout: LAZY_ROUTE_TIMEOUT_MS },
-      ),
-    ).toBeVisible();
-    expect(window.location.pathname).toBe(
-      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
-    );
-  });
+      expect(
+        await screen.findByRole(
+          'heading',
+          {
+            name: /một neuron đưa ra quyết định như thế nào/i,
+          },
+          { timeout: LAZY_ROUTE_TIMEOUT_MS },
+        ),
+      ).toBeVisible();
+      expect(window.location.pathname).toBe(
+        '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+      );
+    },
+    LAZY_ROUTE_TIMEOUT_MS,
+  );
 
-  it('lets a guest change neuron inputs and observe the resulting decision', async () => {
-    window.history.pushState(
-      {},
-      '',
-      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
-    );
-    const user = userEvent.setup();
+  it(
+    'lets a guest change neuron inputs and observe the resulting decision',
+    async () => {
+      window.history.pushState(
+        {},
+        '',
+        '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+      );
+      const user = userEvent.setup();
 
-    render(<App />);
+      render(<App />);
 
-    expect(
-      await screen.findByText('Neuron chưa kích hoạt: 0', undefined, {
-        timeout: LAZY_ROUTE_TIMEOUT_MS,
-      }),
-    ).toBeVisible();
+      expect(
+        await screen.findByText('Neuron chưa kích hoạt: 0', undefined, {
+          timeout: LAZY_ROUTE_TIMEOUT_MS,
+        }),
+      ).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Đầu vào x1, hiện tại 0' }));
-    await user.click(screen.getByRole('button', { name: 'Đầu vào x2, hiện tại 0' }));
+      await user.click(screen.getByRole('button', { name: 'Đầu vào x1, hiện tại 0' }));
+      await user.click(screen.getByRole('button', { name: 'Đầu vào x2, hiện tại 0' }));
 
-    expect(screen.getByRole('status')).toHaveTextContent('Neuron kích hoạt: 1');
-    expect(screen.getByText('0.7 × 1 + 0.7 × 1 − 1.0 = 0.4')).toBeVisible();
-  });
+      expect(screen.getByRole('status')).toHaveTextContent('Neuron kích hoạt: 1');
+      expect(screen.getByText('0.7 × 1 + 0.7 × 1 − 1.0 = 0.4')).toBeVisible();
+    },
+    LAZY_ROUTE_TIMEOUT_MS,
+  );
 
   it('presents the trial lesson as a navigable learning sequence', async () => {
     window.history.pushState(

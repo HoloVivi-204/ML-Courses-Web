@@ -5,9 +5,26 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../app/app';
 import type { AuthGateway } from './auth-context';
 
+function createLearnerProfileFixture(
+  input: {
+    locale?: 'en' | 'vi';
+    theme?: 'dark' | 'light' | 'system';
+  } = {},
+) {
+  return {
+    uid: 'learner-01',
+    schemaVersion: 1 as const,
+    displayName: 'Local Student',
+    avatarUrl: null,
+    locale: input.locale ?? ('vi' as const),
+    theme: input.theme ?? ('system' as const),
+    status: 'active' as const,
+  };
+}
+
 function createLearningApiClient() {
   return {
-    bootstrapProfile: vi.fn().mockResolvedValue(undefined),
+    bootstrapProfile: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
     cancelPlaygroundRunSession: vi.fn().mockResolvedValue({
       sessionId: 'session-pg-xor-01',
       status: 'cancelled',
@@ -365,6 +382,7 @@ function createLearningApiClient() {
       passed: true,
       score: 100,
     }),
+    updatePreferences: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
   };
 }
 
@@ -468,7 +486,35 @@ describe('authentication routes', () => {
     render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
 
     await waitFor(() => expect(window.location.pathname).toBe('/learn/course-deep-learning-basic'));
-    expect(learningApiClient.bootstrapProfile).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.bootstrapProfile).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      locale: 'vi',
+      theme: 'system',
+    });
+  });
+
+  it('uses local preferences for bootstrap and then applies the returned profile preferences', async () => {
+    window.history.pushState({}, '', '/login');
+    localStorage.setItem('ml-path-locale', 'en');
+    localStorage.setItem('ml-path-theme', 'dark');
+    const gateway = createGateway({
+      observe(listener) {
+        listener({ email: 'learner@example.test', uid: 'learner-01' });
+        return () => undefined;
+      },
+    });
+    const learningApiClient = createLearningApiClient();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(learningApiClient.bootstrapProfile).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      locale: 'en',
+      theme: 'dark',
+    });
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('lang', 'vi'));
+    await waitFor(() => expect(localStorage.getItem('ml-path-theme')).toBe('system'));
   });
 
   it('drops an absolute external return URL after authentication', async () => {

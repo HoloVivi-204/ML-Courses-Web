@@ -1,5 +1,6 @@
 import { ConfigProvider, theme as antTheme } from 'antd';
-import { lazy, type ReactNode, Suspense, useEffect, useMemo } from 'react';
+import type { i18n as I18nInstance } from 'i18next';
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from 'react';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -12,10 +13,12 @@ import { AuthProvider } from '../features/auth/auth-session';
 import { LandingPage } from '../features/landing/landing-page';
 import {
   createFetchLearningApiClient,
+  type LearnerProfile,
+  type LearnerThemePreference,
   type LearningApiClient,
 } from '../features/learning/learning-api';
 import { createAppI18n } from '../shared/i18n/i18n';
-import { useTheme } from '../shared/theme/use-theme';
+import { type Theme, useTheme } from '../shared/theme/use-theme';
 import { SiteHeader } from '../shared/ui/site-header';
 
 const TrialPostPage = lazy(async () => {
@@ -79,7 +82,7 @@ interface AppRoutesProps {
 
 function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
   const { i18n } = useTranslation();
-  const { theme, toggleTheme } = useTheme();
+  const { setThemePreference, theme, themePreference } = useTheme();
   const locale: Locale = i18n.resolvedLanguage === 'en' ? 'en' : 'vi';
   const gateway = useMemo(() => authGateway ?? createFirebaseAuthGateway(), [authGateway]);
   const learningClient = useMemo(
@@ -92,9 +95,13 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
     localStorage.setItem('ml-path-locale', locale);
   }, [locale]);
 
-  async function switchLocale() {
-    await i18n.changeLanguage(locale === 'vi' ? 'en' : 'vi');
-  }
+  const applyProfilePreferences = useCallback(
+    (profile: LearnerProfile) => {
+      setThemePreference(profile.theme);
+      void i18n.changeLanguage(profile.locale);
+    },
+    [i18n, setThemePreference],
+  );
 
   return (
     <ConfigProvider
@@ -110,10 +117,11 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
       <AuthProvider gateway={gateway}>
         <BrowserRouter>
           <div className="app-shell">
-            <SiteHeader
+            <PreferenceAwareHeader
+              i18n={i18n}
+              learningApiClient={learningClient}
               locale={locale}
-              onLocaleChange={switchLocale}
-              onThemeChange={toggleTheme}
+              setThemePreference={setThemePreference}
               theme={theme}
             />
             <Routes>
@@ -122,7 +130,13 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                 path="/login"
                 element={
                   <Suspense fallback={<AuthRouteLoading />}>
-                    <AuthEntry learningApiClient={learningClient} locale={locale} mode="sign-in" />
+                    <AuthEntry
+                      learningApiClient={learningClient}
+                      locale={locale}
+                      mode="sign-in"
+                      onProfilePreferencesLoaded={applyProfilePreferences}
+                      themePreference={themePreference}
+                    />
                   </Suspense>
                 }
               />
@@ -130,7 +144,13 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                 path="/register"
                 element={
                   <Suspense fallback={<AuthRouteLoading />}>
-                    <AuthEntry learningApiClient={learningClient} locale={locale} mode="sign-up" />
+                    <AuthEntry
+                      learningApiClient={learningClient}
+                      locale={locale}
+                      mode="sign-up"
+                      onProfilePreferencesLoaded={applyProfilePreferences}
+                      themePreference={themePreference}
+                    />
                   </Suspense>
                 }
               />
@@ -220,6 +240,70 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
         </BrowserRouter>
       </AuthProvider>
     </ConfigProvider>
+  );
+}
+
+interface PreferenceAwareHeaderProps {
+  i18n: I18nInstance;
+  learningApiClient: LearningApiClient;
+  locale: Locale;
+  setThemePreference: (themePreference: LearnerThemePreference) => void;
+  theme: Theme;
+}
+
+function PreferenceAwareHeader({
+  i18n,
+  learningApiClient,
+  locale,
+  setThemePreference,
+  theme,
+}: PreferenceAwareHeaderProps) {
+  const { getIdToken, status } = useAuth();
+
+  const syncPreferences = useCallback(
+    async (preferences: {
+      locale?: Locale | undefined;
+      theme?: LearnerThemePreference | undefined;
+    }) => {
+      if (status !== 'authenticated') {
+        return;
+      }
+
+      const idToken = await getIdToken();
+
+      if (!idToken) {
+        return;
+      }
+
+      await learningApiClient.updatePreferences({
+        idToken,
+        ...preferences,
+      });
+    },
+    [getIdToken, learningApiClient, status],
+  );
+
+  async function handleLocaleChange() {
+    const nextLocale: Locale = locale === 'vi' ? 'en' : 'vi';
+
+    await i18n.changeLanguage(nextLocale);
+    void syncPreferences({ locale: nextLocale }).catch(() => undefined);
+  }
+
+  function handleThemeChange() {
+    const nextTheme: LearnerThemePreference = theme === 'dark' ? 'light' : 'dark';
+
+    setThemePreference(nextTheme);
+    void syncPreferences({ theme: nextTheme }).catch(() => undefined);
+  }
+
+  return (
+    <SiteHeader
+      locale={locale}
+      onLocaleChange={handleLocaleChange}
+      onThemeChange={handleThemeChange}
+      theme={theme}
+    />
   );
 }
 

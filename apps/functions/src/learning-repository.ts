@@ -12,8 +12,13 @@ import {
   type StoredQuestionWrongCounts,
 } from './quiz-manifest.js';
 
+export type LearnerLocalePreference = 'en' | 'vi';
+export type LearnerThemePreference = 'dark' | 'light' | 'system';
+
 export interface BootstrapLearnerInput {
   displayName: string;
+  locale?: LearnerLocalePreference | undefined;
+  theme?: LearnerThemePreference | undefined;
   uid: string;
 }
 
@@ -46,6 +51,13 @@ export interface SubmitQuizAttemptInput {
   answers: readonly QuizAnswer[];
   attemptId: string;
   idempotencyKey: string;
+  uid: string;
+}
+
+export interface UpdateLearnerPreferencesInput {
+  displayName: string;
+  locale?: LearnerLocalePreference | undefined;
+  theme?: LearnerThemePreference | undefined;
   uid: string;
 }
 
@@ -115,6 +127,10 @@ export interface LearningRepository {
     data: unknown;
     statusCode: 200;
   }>;
+  updateLearnerPreferences(input: UpdateLearnerPreferencesInput): Promise<{
+    data: unknown;
+    statusCode: 200;
+  }>;
 }
 
 interface EnrollmentSeed {
@@ -146,10 +162,10 @@ interface DemoAccessSeed {
 interface LearnerProfilePayload {
   avatarUrl: string | null;
   displayName: string;
-  locale: 'en' | 'vi';
+  locale: LearnerLocalePreference;
   schemaVersion: 1;
   status: 'active' | 'anonymized' | 'deletion-pending';
-  theme: 'dark' | 'light' | 'system';
+  theme: LearnerThemePreference;
   uid: string;
 }
 
@@ -279,8 +295,8 @@ function createProfilePayload(input: BootstrapLearnerInput): LearnerProfilePaylo
     schemaVersion: 1,
     displayName: normalizeDisplayName(input.displayName),
     avatarUrl: null,
-    locale: 'vi',
-    theme: 'system',
+    locale: input.locale ?? 'vi',
+    theme: input.theme ?? 'system',
     status: 'active',
   };
 }
@@ -629,6 +645,44 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
 
         return {
           statusCode: 201,
+          data: { profile },
+        };
+      });
+    },
+    async updateLearnerPreferences(input) {
+      return firestore.runTransaction(async (transaction) => {
+        const profileRef = firestore.doc(`users/${input.uid}`);
+        const profileSnapshot = await transaction.get(profileRef);
+        const currentProfile = profileSnapshot.exists
+          ? toProfileResponse(input.uid, profileSnapshot.data() ?? {})
+          : createProfilePayload(input);
+        const profile: LearnerProfilePayload = {
+          ...currentProfile,
+          locale: input.locale ?? currentProfile.locale,
+          theme: input.theme ?? currentProfile.theme,
+        };
+
+        transaction.set(
+          profileRef,
+          {
+            ...(profileSnapshot.exists
+              ? {}
+              : {
+                  schemaVersion: profile.schemaVersion,
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                  status: profile.status,
+                  createdAt: FieldValue.serverTimestamp(),
+                }),
+            locale: profile.locale,
+            theme: profile.theme,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        return {
+          statusCode: 200 as const,
           data: { profile },
         };
       });

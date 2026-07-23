@@ -1,9 +1,13 @@
 import { ArrowRight, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import type { Locale } from '../catalog/course-data';
-import type { LearningApiClient } from '../learning/learning-api';
+import type {
+  LearnerProfile,
+  LearnerThemePreference,
+  LearningApiClient,
+} from '../learning/learning-api';
 import { getSafeAuthReturnPath } from './auth-return-path';
 import { type SafeAuthErrorCode } from './auth-service';
 import { useAuth } from './auth-context';
@@ -14,6 +18,8 @@ interface AuthPageProps {
   learningApiClient: LearningApiClient;
   locale: Locale;
   mode: AuthMode;
+  onProfilePreferencesLoaded: (profile: LearnerProfile) => void;
+  themePreference: LearnerThemePreference;
 }
 
 interface AuthCopy {
@@ -126,7 +132,13 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
   },
 };
 
-export function AuthPage({ learningApiClient, locale, mode }: AuthPageProps) {
+export function AuthPage({
+  learningApiClient,
+  locale,
+  mode,
+  onProfilePreferencesLoaded,
+  themePreference,
+}: AuthPageProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -142,15 +154,27 @@ export function AuthPage({ learningApiClient, locale, mode }: AuthPageProps) {
   const [password, setPassword] = useState('');
   const [profileBootstrapFailed, setProfileBootstrapFailed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const bootstrapAttemptedRef = useRef(false);
+  const bootstrapPreferencesRef = useRef({ locale, theme: themePreference });
   const text = copy[locale][mode];
   const returnPath = useMemo(() => getSafeAuthReturnPath(location.search), [location.search]);
 
   useEffect(() => {
+    bootstrapPreferencesRef.current = { locale, theme: themePreference };
+  }, [locale, themePreference]);
+
+  useEffect(() => {
     if (status !== 'authenticated') {
+      bootstrapAttemptedRef.current = false;
+      return undefined;
+    }
+
+    if (bootstrapAttemptedRef.current) {
       return undefined;
     }
 
     let isActive = true;
+    bootstrapAttemptedRef.current = true;
 
     async function bootstrapProfileAndReturn() {
       setProfileBootstrapFailed(false);
@@ -162,7 +186,15 @@ export function AuthPage({ learningApiClient, locale, mode }: AuthPageProps) {
           throw new Error('Authenticated user is missing an ID token.');
         }
 
-        await learningApiClient.bootstrapProfile(idToken);
+        const profile = await learningApiClient.bootstrapProfile({
+          idToken,
+          locale: bootstrapPreferencesRef.current.locale,
+          theme: bootstrapPreferencesRef.current.theme,
+        });
+
+        if (isActive) {
+          onProfilePreferencesLoaded(profile);
+        }
 
         if (isActive) {
           navigate(returnPath, { replace: true });
@@ -179,7 +211,7 @@ export function AuthPage({ learningApiClient, locale, mode }: AuthPageProps) {
     return () => {
       isActive = false;
     };
-  }, [getIdToken, learningApiClient, navigate, returnPath, status]);
+  }, [getIdToken, learningApiClient, navigate, onProfilePreferencesLoaded, returnPath, status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -7,6 +7,106 @@ describe('fetch learning API client', () => {
     vi.unstubAllGlobals();
   });
 
+  it('bootstraps the learner profile with the current local preferences', async () => {
+    const profile = {
+      uid: 'learner-01',
+      schemaVersion: 1,
+      displayName: 'Local Student',
+      avatarUrl: null,
+      locale: 'en',
+      theme: 'dark',
+      status: 'active',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            profile,
+          },
+        }),
+        {
+          headers: {
+            'content-type': 'application/json',
+          },
+          status: 201,
+        },
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    const result = await client.bootstrapProfile({
+      idToken: 'local-id-token',
+      locale: 'en',
+      theme: 'dark',
+    });
+
+    expect(result).toEqual(profile);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me/bootstrap', {
+      body: JSON.stringify({
+        locale: 'en',
+        theme: 'dark',
+      }),
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+  });
+
+  it('patches authenticated learner preferences with the owner bearer token', async () => {
+    const profile = {
+      uid: 'learner-01',
+      schemaVersion: 1,
+      displayName: 'Local Student',
+      avatarUrl: null,
+      locale: 'en',
+      theme: 'system',
+      status: 'active',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            profile,
+          },
+        }),
+        {
+          headers: {
+            'content-type': 'application/json',
+          },
+          status: 200,
+        },
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    const result = await client.updatePreferences({
+      idToken: 'local-id-token',
+      locale: 'en',
+      theme: 'system',
+    });
+
+    expect(result).toEqual(profile);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me/preferences', {
+      body: JSON.stringify({
+        locale: 'en',
+        theme: 'system',
+      }),
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'content-type': 'application/json',
+      },
+      method: 'PATCH',
+    });
+  });
+
   it('fetches the admin report summary with the admin bearer token', async () => {
     const reportSummary = {
       generatedAt: '2026-07-23T01:00:00.000Z',

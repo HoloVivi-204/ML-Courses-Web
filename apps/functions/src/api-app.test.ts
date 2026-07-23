@@ -29,6 +29,9 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     submitQuizAttempt: async () => {
       throw new Error('Quiz submission is not part of this test.');
     },
+    updateLearnerPreferences: async () => {
+      throw new Error('Learner preference update is not part of this test.');
+    },
     ...overrides,
   };
 }
@@ -197,6 +200,101 @@ describe('API foundation', () => {
       requestId: response.headers['x-request-id'],
     });
     expect(JSON.stringify(savedProfiles)).not.toContain('learner@example.test');
+  });
+
+  it('updates authenticated learner preferences without accepting extra profile fields', async () => {
+    const updatedProfiles: unknown[] = [];
+    const response = await request(
+      createApiApp({
+        learningRepository: createLearningRepository({
+          updateLearnerPreferences: async (input) => {
+            const profile = {
+              schemaVersion: 1,
+              uid: input.uid,
+              displayName: input.displayName,
+              avatarUrl: null,
+              locale: input.locale ?? 'vi',
+              theme: input.theme ?? 'system',
+              status: 'active',
+            };
+
+            updatedProfiles.push(profile);
+
+            return { data: { profile }, statusCode: 200 };
+          },
+        }),
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+          email: 'learner@example.test',
+        }),
+      }),
+    )
+      .patch('/api/v1/users/me/preferences')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ locale: 'en', theme: 'dark' })
+      .expect(200);
+
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        profile: {
+          schemaVersion: 1,
+          uid: 'learner-01',
+          displayName: 'Local Student',
+          avatarUrl: null,
+          locale: 'en',
+          theme: 'dark',
+          status: 'active',
+        },
+      },
+      requestId: response.headers['x-request-id'],
+    });
+    expect(JSON.stringify(updatedProfiles)).not.toContain('learner@example.test');
+  });
+
+  it('rejects invalid learner preference values before calling the repository', async () => {
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        updateLearnerPreferences: async () => {
+          throw new Error('Preference repository should not run for invalid values.');
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/users/me/preferences')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ locale: 'fr', theme: 'dark' })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
+  });
+
+  it('rejects unsupported learner preference fields before calling the repository', async () => {
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        updateLearnerPreferences: async () => {
+          throw new Error('Preference repository should not run for unsupported fields.');
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .patch('/api/v1/users/me/preferences')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ email: 'learner@example.test', locale: 'en' })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
   });
 
   it('requires an idempotency key before enrolling a learner', async () => {

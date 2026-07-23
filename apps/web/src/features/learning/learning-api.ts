@@ -1,3 +1,16 @@
+export type LearnerLocalePreference = 'en' | 'vi';
+export type LearnerThemePreference = 'dark' | 'light' | 'system';
+
+export interface LearnerProfile {
+  avatarUrl: string | null;
+  displayName: string;
+  locale: LearnerLocalePreference;
+  schemaVersion: 1;
+  status: 'active' | 'anonymized' | 'deletion-pending';
+  theme: LearnerThemePreference;
+  uid: string;
+}
+
 export interface EnrollmentResult {
   access: {
     moduleId: string;
@@ -352,7 +365,11 @@ export interface PlaygroundConfigRecord {
 }
 
 export interface LearningApiClient {
-  bootstrapProfile(idToken: string): Promise<void>;
+  bootstrapProfile(input: {
+    idToken: string;
+    locale: LearnerLocalePreference;
+    theme: LearnerThemePreference;
+  }): Promise<LearnerProfile>;
   cancelPlaygroundRunSession(input: {
     idToken: string;
     sessionId: string;
@@ -437,6 +454,11 @@ export interface LearningApiClient {
     idToken: string;
     idempotencyKey: string;
   }): Promise<QuizSubmissionResult>;
+  updatePreferences(input: {
+    idToken: string;
+    locale?: LearnerLocalePreference | undefined;
+    theme?: LearnerThemePreference | undefined;
+  }): Promise<LearnerProfile>;
 }
 
 interface SuccessEnvelope<TData> {
@@ -466,15 +488,22 @@ async function ensureSuccessResponse(response: Response): Promise<void> {
 
 export function createFetchLearningApiClient(): LearningApiClient {
   return {
-    async bootstrapProfile(idToken) {
-      await readSuccessEnvelope(
+    async bootstrapProfile({ idToken, locale, theme }) {
+      const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(
         await fetch('/api/v1/users/me/bootstrap', {
+          body: JSON.stringify({
+            locale,
+            theme,
+          }),
           method: 'POST',
           headers: {
             authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
           },
         }),
       );
+
+      return data.profile;
     },
     async cancelPlaygroundRunSession({ idToken, sessionId }) {
       return readSuccessEnvelope<PlaygroundRunSessionCancellation>(
@@ -808,6 +837,33 @@ export function createFetchLearningApiClient(): LearningApiClient {
           method: 'POST',
         }),
       );
+    },
+    async updatePreferences({ idToken, locale, theme }) {
+      const body: {
+        locale?: LearnerLocalePreference;
+        theme?: LearnerThemePreference;
+      } = {};
+
+      if (locale !== undefined) {
+        body.locale = locale;
+      }
+
+      if (theme !== undefined) {
+        body.theme = theme;
+      }
+
+      const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(
+        await fetch('/api/v1/users/me/preferences', {
+          body: JSON.stringify(body),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'PATCH',
+        }),
+      );
+
+      return data.profile;
     },
   };
 }

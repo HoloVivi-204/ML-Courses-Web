@@ -129,6 +129,93 @@ describe('Firestore learning repository', () => {
     expect(documents.get('users/learner-01')).not.toHaveProperty('email');
   });
 
+  it('updates learner locale and theme on the owner profile only', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01': {
+        schemaVersion: 1,
+        displayName: 'Local Student',
+        avatarUrl: null,
+        locale: 'vi',
+        theme: 'system',
+        status: 'active',
+      },
+      'users/learner-02': {
+        schemaVersion: 1,
+        displayName: 'Other Student',
+        avatarUrl: null,
+        locale: 'vi',
+        theme: 'light',
+        status: 'active',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.updateLearnerPreferences({
+      uid: 'learner-01',
+      displayName: 'Ignored Replacement',
+      locale: 'en',
+      theme: 'dark',
+    });
+
+    expect(result).toEqual({
+      statusCode: 200,
+      data: {
+        profile: {
+          uid: 'learner-01',
+          schemaVersion: 1,
+          displayName: 'Local Student',
+          avatarUrl: null,
+          locale: 'en',
+          theme: 'dark',
+          status: 'active',
+        },
+      },
+    });
+    expect(documents.get('users/learner-01')).toMatchObject({
+      displayName: 'Local Student',
+      locale: 'en',
+      theme: 'dark',
+      status: 'active',
+    });
+    expect(documents.get('users/learner-02')).toMatchObject({
+      locale: 'vi',
+      theme: 'light',
+    });
+  });
+
+  it('creates a learner profile from preference sync without storing email fields', async () => {
+    const { documents, firestore } = createFakeFirestore();
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.updateLearnerPreferences({
+      uid: 'learner-01',
+      displayName: 'Local Student',
+      locale: 'en',
+      theme: 'system',
+    });
+
+    expect(result.data).toEqual({
+      profile: {
+        uid: 'learner-01',
+        schemaVersion: 1,
+        displayName: 'Local Student',
+        avatarUrl: null,
+        locale: 'en',
+        theme: 'system',
+        status: 'active',
+      },
+    });
+    expect(documents.get('users/learner-01')).toMatchObject({
+      schemaVersion: 1,
+      displayName: 'Local Student',
+      avatarUrl: null,
+      locale: 'en',
+      theme: 'system',
+      status: 'active',
+    });
+    expect(documents.get('users/learner-01')).not.toHaveProperty('email');
+  });
+
   it('enrolls a learner idempotently and grants stable first module access', async () => {
     const { documents, firestore } = createFakeFirestore();
     const repository = createFirestoreLearningRepository(firestore);
