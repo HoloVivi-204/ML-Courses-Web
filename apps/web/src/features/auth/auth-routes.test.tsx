@@ -237,6 +237,7 @@ function createLearningApiClient() {
       compatibilityStatus: 'compatible',
       compatibilityReason: null,
     }),
+    deleteAccount: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
     updatePlaygroundConfig: vi.fn().mockResolvedValue({

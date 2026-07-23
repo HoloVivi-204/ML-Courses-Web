@@ -496,6 +496,55 @@ describe('Firestore playground repository run sessions', () => {
       documents.has(`users/learner-01/playgroundConfigs/${createdConfig.data.config.configId}`),
     ).toBe(false);
   });
+
+  it('deletes only the owner Playground data for account deletion', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/playgroundRuns/run-01': {
+        runId: 'run-01',
+        scenarioId: 'pg-xor',
+      },
+      'users/learner-01/playgroundConfigs/config-01': {
+        configId: 'config-01',
+        scenarioId: 'pg-xor',
+      },
+      'playgroundRunSessions/session-01': {
+        uid: 'learner-01',
+        status: 'issued',
+      },
+      'playgroundRunSessions/session-02': {
+        uid: 'learner-02',
+        status: 'issued',
+      },
+      'users/learner-02/playgroundRuns/run-02': {
+        runId: 'run-02',
+        scenarioId: 'pg-xor',
+      },
+      'users/learner-02/playgroundConfigs/config-02': {
+        configId: 'config-02',
+        scenarioId: 'pg-xor',
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const firstResult = await repository.deleteLearnerPlaygroundData({ uid: 'learner-01' });
+    const retryResult = await repository.deleteLearnerPlaygroundData({ uid: 'learner-01' });
+
+    expect(firstResult).toEqual({ statusCode: 204, data: null });
+    expect(retryResult).toEqual(firstResult);
+    expect(documents.has('users/learner-01/playgroundRuns/run-01')).toBe(false);
+    expect(documents.has('users/learner-01/playgroundConfigs/config-01')).toBe(false);
+    expect(documents.has('playgroundRunSessions/session-01')).toBe(false);
+    expect(documents.get('playgroundRunSessions/session-02')).toMatchObject({
+      uid: 'learner-02',
+      status: 'issued',
+    });
+    expect(documents.get('users/learner-02/playgroundRuns/run-02')).toMatchObject({
+      runId: 'run-02',
+    });
+    expect(documents.get('users/learner-02/playgroundConfigs/config-02')).toMatchObject({
+      configId: 'config-02',
+    });
+  });
 });
 
 function createCompletedRunResult() {

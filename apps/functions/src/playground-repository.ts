@@ -70,6 +70,10 @@ export interface DeletePlaygroundConfigInput {
   uid: string;
 }
 
+export interface DeleteLearnerPlaygroundDataInput {
+  uid: string;
+}
+
 export interface PlaygroundRunSessionData {
   algorithmId: 'perceptron';
   config: PerceptronPlaygroundConfig;
@@ -138,6 +142,10 @@ export interface PlaygroundRepository {
     statusCode: 204;
   }>;
   deleteRun(input: DeletePlaygroundRunInput): Promise<{
+    data: null;
+    statusCode: 204;
+  }>;
+  deleteLearnerPlaygroundData(input: DeleteLearnerPlaygroundDataInput): Promise<{
     data: null;
     statusCode: 204;
   }>;
@@ -219,6 +227,8 @@ const RUN_SESSION_TTL_MS = 15 * 60 * 1_000;
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
 const RUN_RETENTION_LIMIT = 50;
 const ADAPTER_VERSION = 'perceptron-js-v1';
+const FIRESTORE_BATCH_DELETE_LIMIT = 450;
+const LEARNER_PLAYGROUND_SUBCOLLECTIONS = ['playgroundConfigs', 'playgroundRuns'] as const;
 
 function createExpiresAt(): { expiresAt: Timestamp; expiresAtIso: string } {
   const expiresAt = Timestamp.fromMillis(Date.now() + RUN_SESSION_TTL_MS);
@@ -377,6 +387,40 @@ function getTimestampMillis(value: unknown): number | null {
   }
 
   return null;
+}
+
+async function listLearnerPlaygroundDocumentRefs(
+  firestore: Firestore,
+  uid: string,
+): Promise<FirebaseFirestore.DocumentReference[]> {
+  const [ownedSnapshots, runSessionSnapshot] = await Promise.all([
+    Promise.all(
+      LEARNER_PLAYGROUND_SUBCOLLECTIONS.map((collectionName) =>
+        firestore.collection(`users/${uid}/${collectionName}`).get(),
+      ),
+    ),
+    firestore.collection('playgroundRunSessions').where('uid', '==', uid).get(),
+  ]);
+
+  return [
+    ...ownedSnapshots.flatMap((snapshot) => snapshot.docs.map((doc) => doc.ref)),
+    ...runSessionSnapshot.docs.map((doc) => doc.ref),
+  ];
+}
+
+async function deleteDocumentsInBatches(
+  firestore: Firestore,
+  documentRefs: readonly FirebaseFirestore.DocumentReference[],
+): Promise<void> {
+  for (let index = 0; index < documentRefs.length; index += FIRESTORE_BATCH_DELETE_LIMIT) {
+    const batch = firestore.batch();
+
+    for (const reference of documentRefs.slice(index, index + FIRESTORE_BATCH_DELETE_LIMIT)) {
+      batch.delete(reference);
+    }
+
+    await batch.commit();
+  }
 }
 
 function getStoredSessionConfig(data: StoredPlaygroundRunSession): PerceptronPlaygroundConfig {
@@ -723,6 +767,16 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           data: null,
         };
       });
+    },
+    async deleteLearnerPlaygroundData(input) {
+      const ownedDocumentRefs = await listLearnerPlaygroundDocumentRefs(firestore, input.uid);
+
+      await deleteDocumentsInBatches(firestore, ownedDocumentRefs);
+
+      return {
+        statusCode: 204 as const,
+        data: null,
+      };
     },
     async listConfigs(input) {
       if (input.scenarioId !== 'pg-xor') {

@@ -107,6 +107,23 @@ describe('fetch learning API client', () => {
     });
   });
 
+  it('deletes the authenticated learner account with the owner bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+
+    await client.deleteAccount({ idToken: 'local-id-token' });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me', {
+      headers: {
+        authorization: 'Bearer local-id-token',
+      },
+      method: 'DELETE',
+    });
+  });
+
   it('fetches the admin report summary with the admin bearer token', async () => {
     const reportSummary = {
       generatedAt: '2026-07-23T01:00:00.000Z',

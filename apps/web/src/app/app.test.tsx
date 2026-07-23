@@ -333,6 +333,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         name: 'XOR baseline',
       }),
     ),
+    deleteAccount: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
     updatePlaygroundConfig: vi.fn().mockResolvedValue(
@@ -884,6 +885,68 @@ describe('public learning journey', () => {
     expect(signOut).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(window.location.pathname).toBe('/login'));
     expect(window.location.search).toBe('?returnTo=%2Fdashboard');
+  });
+
+  it('lets an authenticated learner request account deletion from the profile route', async () => {
+    window.history.pushState({}, '', '/profile');
+    let authListener: ((user: { email: string | null; uid: string } | null) => void) | null = null;
+    const signOut = vi.fn(async () => authListener?.(null));
+    const gateway: AuthGateway = {
+      ...createAuthenticatedGateway(),
+      observe(listener) {
+        authListener = listener;
+        listener({ email: 'learner@example.test', uid: 'learner-01' });
+        return () => undefined;
+      },
+      signOut,
+    };
+    const deleteAccount = vi.fn().mockResolvedValue(undefined);
+    const learningApiClient = createLearningApiClient({ deleteAccount });
+    const user = userEvent.setup();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    expect(await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' })).toBeVisible();
+    expect(screen.getByText('learner@example.test')).toBeVisible();
+
+    const deleteButton = screen.getByRole('button', { name: 'Xóa tài khoản' });
+
+    expect(deleteButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Nhập DELETE để xác nhận'), 'DELETE');
+    await user.click(deleteButton);
+
+    await waitFor(() =>
+      expect(deleteAccount).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+      }),
+    );
+    expect(signOut).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+  });
+
+  it('keeps the learner signed in when account deletion fails before cleanup completes', async () => {
+    window.history.pushState({}, '', '/profile');
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    const gateway: AuthGateway = {
+      ...createAuthenticatedGateway(),
+      signOut,
+    };
+    const deleteAccount = vi.fn().mockRejectedValue(new Error('Recent sign-in required.'));
+    const learningApiClient = createLearningApiClient({ deleteAccount });
+    const user = userEvent.setup();
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' });
+    await user.type(screen.getByLabelText('Nhập DELETE để xác nhận'), 'DELETE');
+    await user.click(screen.getByRole('button', { name: 'Xóa tài khoản' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Chưa thể xóa tài khoản. Hãy đăng nhập lại rồi thử lại bằng phiên đăng nhập mới.',
+    );
+    expect(signOut).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/profile');
   });
 
   it('shows a safe not-found state for an unknown course', () => {

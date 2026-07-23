@@ -47,6 +47,10 @@ export interface GetProgressInput {
   uid: string;
 }
 
+export interface DeleteLearnerAccountInput {
+  uid: string;
+}
+
 export interface SubmitQuizAttemptInput {
   answers: readonly QuizAnswer[];
   attemptId: string;
@@ -114,6 +118,10 @@ export interface LearningRepository {
   createQuizAttempt(input: CreateQuizAttemptInput): Promise<{
     data: unknown;
     statusCode: 201;
+  }>;
+  deleteLearnerAccount(input: DeleteLearnerAccountInput): Promise<{
+    data: null;
+    statusCode: 204;
   }>;
   enrollLearner(input: EnrollLearnerInput): Promise<{
     data: unknown;
@@ -227,6 +235,19 @@ interface StoredQuizProgress {
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
 const QUIZ_ATTEMPT_TTL_MS = 2 * 60 * 60 * 1_000;
+const FIRESTORE_BATCH_DELETE_LIMIT = 450;
+const LEARNER_ACCOUNT_SUBCOLLECTIONS = [
+  'algorithmUnlocks',
+  'contentAccess',
+  'demoCompletions',
+  'enrollments',
+  'idempotencyKeys',
+  'moduleCompletions',
+  'moduleProgress',
+  'postCompletions',
+  'quizAttempts',
+  'quizProgress',
+] as const;
 const releaseOneEnrollmentSeeds: Readonly<Record<string, EnrollmentSeed>> = {
   'course-deep-learning-basic': {
     courseId: 'course-deep-learning-basic',
@@ -299,6 +320,45 @@ function createProfilePayload(input: BootstrapLearnerInput): LearnerProfilePaylo
     theme: input.theme ?? 'system',
     status: 'active',
   };
+}
+
+function createAnonymizedProfilePayload(): Omit<LearnerProfilePayload, 'uid'> {
+  return {
+    schemaVersion: 1,
+    displayName: 'Deleted learner',
+    avatarUrl: null,
+    locale: 'vi',
+    theme: 'system',
+    status: 'anonymized',
+  };
+}
+
+async function listLearnerSubcollectionDocumentRefs(
+  firestore: Firestore,
+  uid: string,
+): Promise<FirebaseFirestore.DocumentReference[]> {
+  const documentRefsByCollection = await Promise.all(
+    LEARNER_ACCOUNT_SUBCOLLECTIONS.map((collectionName) =>
+      firestore.collection(`users/${uid}/${collectionName}`).listDocuments(),
+    ),
+  );
+
+  return documentRefsByCollection.flat();
+}
+
+async function deleteDocumentsInBatches(
+  firestore: Firestore,
+  documentRefs: readonly FirebaseFirestore.DocumentReference[],
+): Promise<void> {
+  for (let index = 0; index < documentRefs.length; index += FIRESTORE_BATCH_DELETE_LIMIT) {
+    const batch = firestore.batch();
+
+    for (const reference of documentRefs.slice(index, index + FIRESTORE_BATCH_DELETE_LIMIT)) {
+      batch.delete(reference);
+    }
+
+    await batch.commit();
+  }
 }
 
 function toProfileResponse(
@@ -864,6 +924,23 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
 
         return { statusCode: 201 as const, data: responseData };
       });
+    },
+    async deleteLearnerAccount(input) {
+      const ownedDocumentRefs = await listLearnerSubcollectionDocumentRefs(firestore, input.uid);
+
+      await deleteDocumentsInBatches(firestore, ownedDocumentRefs);
+      await firestore.runTransaction(async (transaction) => {
+        transaction.set(firestore.doc(`users/${input.uid}`), {
+          ...createAnonymizedProfilePayload(),
+          anonymizedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      return {
+        statusCode: 204 as const,
+        data: null,
+      };
     },
     async enrollLearner(input) {
       const seed = getEnrollmentSeed(input.courseId);

@@ -1,5 +1,5 @@
 import { Button } from 'antd';
-import { Languages, LogOut, Moon, Sun } from 'lucide-react';
+import { Languages, LogOut, Moon, Sun, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
 
@@ -85,15 +85,21 @@ export function SiteHeader({
             onClick={onThemeChange}
           />
           {isAuthenticated ? (
-            <Button
-              className="header-logout"
-              disabled={isAuthActionPending}
-              icon={<LogOut aria-hidden="true" size={16} />}
-              onClick={onSignOut}
-              type="text"
-            >
-              {t('nav.signOut')}
-            </Button>
+            <>
+              <Link className="header-profile" to="/profile">
+                <UserRound aria-hidden="true" size={16} />
+                <span>{t('nav.profile')}</span>
+              </Link>
+              <Button
+                className="header-logout"
+                disabled={isAuthActionPending}
+                icon={<LogOut aria-hidden="true" size={16} />}
+                onClick={onSignOut}
+                type="text"
+              >
+                {t('nav.signOut')}
+              </Button>
+            </>
           ) : (
             <>
               <Link className="header-login" to="/login">

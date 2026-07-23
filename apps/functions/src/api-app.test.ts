@@ -20,6 +20,9 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     createQuizAttempt: async () => {
       throw new Error('Quiz attempt creation is not part of this test.');
     },
+    deleteLearnerAccount: async () => {
+      throw new Error('Learner account deletion is not part of this test.');
+    },
     enrollLearner: async () => {
       throw new Error('Enrollment is not part of this test.');
     },
@@ -54,6 +57,9 @@ function createPlaygroundRepository(
     },
     deleteRun: async () => {
       throw new Error('Playground run deletion is not part of this test.');
+    },
+    deleteLearnerPlaygroundData: async () => {
+      throw new Error('Playground account cleanup is not part of this test.');
     },
     listConfigs: async () => {
       throw new Error('Playground config listing is not part of this test.');
@@ -295,6 +301,153 @@ describe('API foundation', () => {
       .expect(400);
 
     expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
+  });
+
+  it('deletes the recent authenticated learner account using only the token owner', async () => {
+    const deletedAuthUsers: string[] = [];
+    const deletedLearningAccounts: string[] = [];
+    const deletedPlaygroundAccounts: string[] = [];
+    const deletionSteps: string[] = [];
+    const app = createApiApp({
+      deleteAuthUser: async (uid) => {
+        deletedAuthUsers.push(uid);
+        deletionSteps.push(`auth:${uid}`);
+      },
+      learningRepository: createLearningRepository({
+        deleteLearnerAccount: async (input) => {
+          deletedLearningAccounts.push(input.uid);
+          deletionSteps.push(`learning:${input.uid}`);
+
+          return { data: null, statusCode: 204 };
+        },
+      }),
+      playgroundRepository: createPlaygroundRepository({
+        deleteLearnerPlaygroundData: async (input) => {
+          deletedPlaygroundAccounts.push(input.uid);
+          deletionSteps.push(`playground:${input.uid}`);
+
+          return { data: null, statusCode: 204 };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+        authTime: Math.floor(Date.now() / 1000),
+      }),
+    });
+
+    await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(204);
+
+    expect(deletedAuthUsers).toEqual(['learner-01']);
+    expect(deletedLearningAccounts).toEqual(['learner-01']);
+    expect(deletedPlaygroundAccounts).toEqual(['learner-01']);
+    expect(deletionSteps).toEqual([
+      'auth:learner-01',
+      'learning:learner-01',
+      'playground:learner-01',
+    ]);
+  });
+
+  it('rejects learner account deletion bodies before any destructive work', async () => {
+    const app = createApiApp({
+      deleteAuthUser: async () => {
+        throw new Error('Auth user deletion should not run when the body is unsupported.');
+      },
+      learningRepository: createLearningRepository({
+        deleteLearnerAccount: async () => {
+          throw new Error('Learning cleanup should not run when the body is unsupported.');
+        },
+      }),
+      playgroundRepository: createPlaygroundRepository({
+        deleteLearnerPlaygroundData: async () => {
+          throw new Error('Playground cleanup should not run when the body is unsupported.');
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+        authTime: Math.floor(Date.now() / 1000),
+      }),
+    });
+
+    const response = await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ uid: 'attacker-uid' })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
+  });
+
+  it('requires recent authentication before deleting a learner account', async () => {
+    const app = createApiApp({
+      deleteAuthUser: async () => {
+        throw new Error('Auth user deletion should not run without recent sign-in.');
+      },
+      learningRepository: createLearningRepository({
+        deleteLearnerAccount: async () => {
+          throw new Error('Learning cleanup should not run without recent sign-in.');
+        },
+      }),
+      playgroundRepository: createPlaygroundRepository({
+        deleteLearnerPlaygroundData: async () => {
+          throw new Error('Playground cleanup should not run without recent sign-in.');
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+        authTime: Math.floor(Date.now() / 1000) - 301,
+      }),
+    });
+
+    const response = await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(401);
+
+    expect(response.body.error.code).toBe('RECENT_SIGN_IN_REQUIRED');
+  });
+
+  it('continues learner data cleanup when the Firebase Auth user is already deleted', async () => {
+    const cleanedUpLearners: string[] = [];
+    const app = createApiApp({
+      deleteAuthUser: async () => {
+        const error = new Error('User not found.') as Error & { code: string };
+
+        error.code = 'auth/user-not-found';
+        throw error;
+      },
+      learningRepository: createLearningRepository({
+        deleteLearnerAccount: async (input) => {
+          cleanedUpLearners.push(`learning:${input.uid}`);
+
+          return { data: null, statusCode: 204 };
+        },
+      }),
+      playgroundRepository: createPlaygroundRepository({
+        deleteLearnerPlaygroundData: async (input) => {
+          cleanedUpLearners.push(`playground:${input.uid}`);
+
+          return { data: null, statusCode: 204 };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+        authTime: Math.floor(Date.now() / 1000),
+      }),
+    });
+
+    await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(204);
+
+    expect(cleanedUpLearners).toEqual(['learning:learner-01', 'playground:learner-01']);
   });
 
   it('requires an idempotency key before enrolling a learner', async () => {

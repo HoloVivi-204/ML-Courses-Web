@@ -37,6 +37,7 @@ import {
 import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
 
 export interface VerifiedAuthUser {
+  authTime?: number | undefined;
   displayName: string;
   email?: string | undefined;
   role?: 'admin' | undefined;
@@ -52,10 +53,13 @@ interface ApiErrorBody {
 export interface ApiAppOptions {
   adminContentRepository?: AdminContentRepository | undefined;
   adminReportRepository?: AdminReportRepository | undefined;
+  deleteAuthUser?: ((uid: string) => Promise<void>) | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
 }
+
+const RECENT_AUTHENTICATION_WINDOW_SECONDS = 5 * 60;
 
 function getRequestId(response: Response): string {
   return String(response.locals.requestId);
@@ -397,6 +401,10 @@ function getOptionalObjectBody(request: Request): Record<string, unknown> {
   return getObjectBody(request);
 }
 
+function assertNoAccountDeletionBody(request: Request): void {
+  assertBodyFieldsAllowlisted(getOptionalObjectBody(request), []);
+}
+
 function getOptionalLearnerLocalePreference(
   body: Record<string, unknown>,
 ): LearnerLocalePreference | undefined {
@@ -556,10 +564,58 @@ async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser
 
   return {
     uid: decodedToken.uid,
+    authTime:
+      typeof decodedToken.auth_time === 'number' && Number.isFinite(decodedToken.auth_time)
+        ? decodedToken.auth_time
+        : undefined,
     displayName: typeof decodedToken.name === 'string' ? decodedToken.name : 'Learner',
     email: typeof decodedToken.email === 'string' ? decodedToken.email : undefined,
     role: decodedToken.role === 'admin' ? 'admin' : undefined,
   };
+}
+
+async function defaultDeleteAuthUser(uid: string): Promise<void> {
+  await getAuth(getFirebaseAdminApp()).deleteUser(uid);
+}
+
+function requireRecentAuthentication(authUser: VerifiedAuthUser): void {
+  const authTime = authUser.authTime;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  if (
+    typeof authTime !== 'number' ||
+    !Number.isFinite(authTime) ||
+    authTime > nowSeconds + 30 ||
+    nowSeconds - authTime > RECENT_AUTHENTICATION_WINDOW_SECONDS
+  ) {
+    throw new ApiError(
+      401,
+      'RECENT_SIGN_IN_REQUIRED',
+      'Recent authentication is required before deleting this account.',
+    );
+  }
+}
+
+function isAuthUserNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'auth/user-not-found'
+  );
+}
+
+async function deleteAuthUserIdempotently(
+  deleteAuthUser: (uid: string) => Promise<void>,
+  uid: string,
+): Promise<void> {
+  try {
+    await deleteAuthUser(uid);
+  } catch (error) {
+    if (!isAuthUserNotFoundError(error)) {
+      throw error;
+    }
+  }
 }
 
 const handleApiError: ErrorRequestHandler = (error, request, response, next) => {
@@ -606,6 +662,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   let adminReportRepository = options.adminReportRepository;
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
+  const deleteAuthUser = options.deleteAuthUser ?? defaultDeleteAuthUser;
   const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
 
   function getAdminContentRepository(): AdminContentRepository {
@@ -678,6 +735,22 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       });
 
       sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete('/api/v1/users/me', requireAuth, async (request, response, next) => {
+    try {
+      assertNoAccountDeletionBody(request);
+
+      const authUser = getAuthUser(response);
+      requireRecentAuthentication(authUser);
+      await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
+      await getLearningRepository().deleteLearnerAccount({ uid: authUser.uid });
+      await getPlaygroundRepository().deleteLearnerPlaygroundData({ uid: authUser.uid });
+
+      sendNoContent(response);
     } catch (error) {
       next(error);
     }

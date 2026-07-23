@@ -426,6 +426,7 @@ export interface LearningApiClient {
     name: string;
     scenarioId: 'pg-xor';
   }): Promise<PlaygroundConfigRecord>;
+  deleteAccount(input: { idToken: string }): Promise<void>;
   deletePlaygroundConfig(input: { configId: string; idToken: string }): Promise<void>;
   deletePlaygroundRun(input: { idToken: string; runId: string }): Promise<void>;
   updatePlaygroundConfig(input: {
@@ -567,6 +568,16 @@ export function createFetchLearningApiClient(): LearningApiClient {
       );
 
       return data.config;
+    },
+    async deleteAccount({ idToken }) {
+      await ensureSuccessResponse(
+        await fetch('/api/v1/users/me', {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+          method: 'DELETE',
+        }),
+      );
     },
     async deletePlaygroundConfig({ configId, idToken }) {
       await ensureSuccessResponse(

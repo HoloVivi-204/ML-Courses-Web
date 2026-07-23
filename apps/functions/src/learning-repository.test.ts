@@ -18,12 +18,18 @@ interface FakeDocumentReference {
   path: string;
 }
 
+interface FakeCollectionReference {
+  listDocuments(): Promise<FakeDocumentReference[]>;
+  path: string;
+}
+
 interface FakeDocumentSnapshot {
   exists: boolean;
   data(): Record<string, unknown> | undefined;
 }
 
 interface FakeTransaction {
+  delete(reference: FakeDocumentReference): void;
   get(reference: FakeDocumentReference): Promise<FakeDocumentSnapshot>;
   set(
     reference: FakeDocumentReference,
@@ -35,16 +41,44 @@ interface FakeTransaction {
 function createFakeFirestore(initialDocuments: Record<string, Record<string, unknown>> = {}) {
   const documents = new Map<string, Record<string, unknown>>(Object.entries(initialDocuments));
   const firestore = {
-    doc(path: string): FakeDocumentReference {
+    batch() {
+      const deletes: string[] = [];
+
       return {
-        path,
-        async get() {
-          return createSnapshot(documents.get(path));
+        delete(reference: FakeDocumentReference) {
+          deletes.push(reference.path);
+        },
+        async commit() {
+          for (const path of deletes) {
+            documents.delete(path);
+          }
         },
       };
     },
+    collection(path: string): FakeCollectionReference {
+      return {
+        path,
+        async listDocuments() {
+          const prefix = `${path}/`;
+
+          return [...documents.keys()]
+            .filter((documentPath) => {
+              const suffix = documentPath.slice(prefix.length);
+
+              return documentPath.startsWith(prefix) && suffix.length > 0 && !suffix.includes('/');
+            })
+            .map((documentPath) => createDocumentReference(documents, documentPath));
+        },
+      };
+    },
+    doc(path: string): FakeDocumentReference {
+      return createDocumentReference(documents, path);
+    },
     async runTransaction<TResult>(callback: (transaction: FakeTransaction) => Promise<TResult>) {
       const transaction: FakeTransaction = {
+        delete(reference) {
+          documents.delete(reference.path);
+        },
         async get(reference) {
           return createSnapshot(documents.get(reference.path));
         },
@@ -56,9 +90,21 @@ function createFakeFirestore(initialDocuments: Record<string, Record<string, unk
 
       return callback(transaction);
     },
-  } as Firestore;
+  } as unknown as Firestore;
 
   return { documents, firestore };
+}
+
+function createDocumentReference(
+  documents: Map<string, Record<string, unknown>>,
+  path: string,
+): FakeDocumentReference {
+  return {
+    path,
+    async get() {
+      return createSnapshot(documents.get(path));
+    },
+  };
 }
 
 function createSnapshot(data: Record<string, unknown> | undefined): FakeDocumentSnapshot {
@@ -214,6 +260,86 @@ describe('Firestore learning repository', () => {
       status: 'active',
     });
     expect(documents.get('users/learner-01')).not.toHaveProperty('email');
+  });
+
+  it('anonymizes the learner profile and deletes only the owner learning records', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01': {
+        schemaVersion: 1,
+        displayName: 'Local Student',
+        email: 'learner@example.test',
+        avatarUrl: 'https://example.test/avatar.png',
+        locale: 'en',
+        theme: 'dark',
+        status: 'active',
+      },
+      'users/learner-01/enrollments/course-deep-learning-basic': {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 33,
+      },
+      'users/learner-01/contentAccess/module_dl-m01-neuron-perceptron': {
+        contentType: 'module',
+      },
+      'users/learner-01/demoCompletions/demo-perceptron-and-gate': {
+        status: 'completed',
+      },
+      'users/learner-01/quizAttempts/attempt-01': {
+        quizId: 'quiz-module-dl-m01',
+      },
+      'users/learner-01/quizProgress/quiz-module-dl-m01': {
+        bestScore: 100,
+      },
+      'users/learner-01/moduleCompletions/dl-m01-neuron-perceptron': {
+        status: 'completed',
+      },
+      'users/learner-01/moduleProgress/dl-m01-neuron-perceptron': {
+        status: 'completed',
+      },
+      'users/learner-01/postCompletions/dl-p01-neuron-perceptron': {
+        status: 'completed',
+      },
+      'users/learner-01/algorithmUnlocks/perceptron': {
+        algorithmId: 'perceptron',
+      },
+      'users/learner-01/idempotencyKeys/delete-key': {
+        operation: 'course-enrollment',
+      },
+      'users/learner-02': {
+        schemaVersion: 1,
+        displayName: 'Other Student',
+        status: 'active',
+      },
+      'users/learner-02/enrollments/course-deep-learning-basic': {
+        courseId: 'course-deep-learning-basic',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.deleteLearnerAccount({ uid: 'learner-01' });
+    const retryResult = await repository.deleteLearnerAccount({ uid: 'learner-01' });
+
+    expect(result).toEqual({ statusCode: 204, data: null });
+    expect(retryResult).toEqual(result);
+    expect(documents.get('users/learner-01')).toMatchObject({
+      schemaVersion: 1,
+      displayName: 'Deleted learner',
+      avatarUrl: null,
+      locale: 'vi',
+      theme: 'system',
+      status: 'anonymized',
+    });
+    expect(documents.get('users/learner-01')).not.toHaveProperty('email');
+    expect(documents.get('users/learner-01')).not.toHaveProperty('uid');
+    expect([...documents.keys()].filter((path) => path.startsWith('users/learner-01/'))).toEqual(
+      [],
+    );
+    expect(documents.get('users/learner-02')).toMatchObject({
+      displayName: 'Other Student',
+      status: 'active',
+    });
+    expect(documents.get('users/learner-02/enrollments/course-deep-learning-basic')).toMatchObject({
+      courseId: 'course-deep-learning-basic',
+    });
   });
 
   it('enrolls a learner idempotently and grants stable first module access', async () => {
