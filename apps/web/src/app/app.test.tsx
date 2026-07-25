@@ -612,6 +612,135 @@ function createModuleQuizAttemptResult() {
   };
 }
 
+function createInitialProgressSnapshot() {
+  return {
+    algorithmUnlocks: [],
+    contentAccess: [
+      {
+        contentType: 'module' as const,
+        entityId: 'dl-m01-neuron-perceptron',
+      },
+      {
+        contentType: 'post' as const,
+        entityId: 'dl-p01-neuron-perceptron',
+      },
+    ],
+    demos: [
+      {
+        completed: false,
+        demoId: 'demo-perceptron-and-gate',
+      },
+    ],
+    enrollment: {
+      courseId: 'course-deep-learning-basic',
+      progressPercent: 0,
+      status: 'in-progress' as const,
+    },
+    modules: [
+      {
+        completedStepCount: 0,
+        moduleId: 'dl-m01-neuron-perceptron',
+        progressPercent: 0,
+        requiredStepCount: 3,
+        status: 'in-progress' as const,
+      },
+    ],
+    posts: [
+      {
+        bestScore: 0,
+        completed: false,
+        postId: 'dl-p01-neuron-perceptron',
+        quizId: 'quiz-post-dl-p01',
+        quizPassed: false,
+      },
+    ],
+    quizzes: [
+      {
+        attemptCount: 0,
+        bestScore: 0,
+        passed: false,
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post' as const,
+      },
+      {
+        attemptCount: 0,
+        bestScore: 0,
+        passed: false,
+        quizId: 'quiz-module-dl-m01',
+        quizKind: 'module' as const,
+      },
+    ],
+  };
+}
+
+function createPostPassedProgressSnapshot() {
+  return {
+    ...createInitialProgressSnapshot(),
+    contentAccess: [
+      ...createInitialProgressSnapshot().contentAccess,
+      {
+        contentType: 'demo' as const,
+        entityId: 'demo-perceptron-and-gate',
+      },
+    ],
+    modules: [
+      {
+        completedStepCount: 1,
+        moduleId: 'dl-m01-neuron-perceptron',
+        progressPercent: 33,
+        requiredStepCount: 3,
+        status: 'in-progress' as const,
+      },
+    ],
+    posts: [
+      {
+        bestScore: 100,
+        completed: true,
+        postId: 'dl-p01-neuron-perceptron',
+        quizId: 'quiz-post-dl-p01',
+        quizPassed: true,
+      },
+    ],
+    quizzes: [
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post' as const,
+      },
+      {
+        attemptCount: 0,
+        bestScore: 0,
+        passed: false,
+        quizId: 'quiz-module-dl-m01',
+        quizKind: 'module' as const,
+      },
+    ],
+  };
+}
+
+function createDemoCompletedProgressSnapshot() {
+  return {
+    ...createPostPassedProgressSnapshot(),
+    demos: [
+      {
+        completed: true,
+        demoId: 'demo-perceptron-and-gate',
+      },
+    ],
+    modules: [
+      {
+        completedStepCount: 2,
+        moduleId: 'dl-m01-neuron-perceptron',
+        progressPercent: 67,
+        requiredStepCount: 3,
+        status: 'in-progress' as const,
+      },
+    ],
+  };
+}
+
 function createUnlockedProgressSnapshot() {
   return {
     algorithmUnlocks: [
@@ -2537,5 +2666,191 @@ describe('public learning journey', () => {
       idToken: 'local-id-token',
       idempotencyKey: expect.any(String),
     });
+  });
+
+  it('proves the learner baseline from enrollment through unlock, Playground persistence, and dashboard', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    installImmediatePlaygroundWorker();
+    const user = userEvent.setup();
+    const initialProgress = createInitialProgressSnapshot();
+    const postPassedProgress = createPostPassedProgressSnapshot();
+    const demoCompletedProgress = createDemoCompletedProgressSnapshot();
+    const unlockedProgress = createUnlockedProgressSnapshot();
+    const savedRuns = new Map<string, ReturnType<typeof createSavedPlaygroundRunFixture>>();
+    const savedConfigs = new Map<string, ReturnType<typeof createSavedPlaygroundConfigFixture>>();
+    const getProgress = vi
+      .fn()
+      .mockResolvedValueOnce(initialProgress)
+      .mockResolvedValueOnce(initialProgress)
+      .mockResolvedValueOnce(postPassedProgress)
+      .mockResolvedValueOnce(demoCompletedProgress)
+      .mockResolvedValueOnce(unlockedProgress)
+      .mockResolvedValue(unlockedProgress);
+    const baseLearningApiClient = createLearningApiClient();
+    const createQuizAttempt = vi.fn((input: { idToken: string; quizId: string }) => {
+      if (input.quizId === 'quiz-module-dl-m01') {
+        return Promise.resolve(createModuleQuizAttemptResult());
+      }
+
+      return baseLearningApiClient.createQuizAttempt(input);
+    });
+    const submitQuizAttempt = vi.fn(
+      (input: {
+        answers: readonly { questionId: string; value: readonly string[] | string }[];
+        attemptId: string;
+        idToken: string;
+        idempotencyKey: string;
+      }) => {
+        if (input.attemptId === 'attempt-quiz-module-dl-m01-01') {
+          return Promise.resolve({
+            bestScore: 100,
+            feedback: [
+              {
+                correctAnswer: 'opt-boundary',
+                explanation: {
+                  en: 'A Perceptron line is the decision boundary.',
+                  vi: 'Đường Perceptron là ranh giới quyết định.',
+                },
+                hint: null,
+                hintLevel: 0 as const,
+                isCorrect: true,
+                questionId: 'q-dl-m01-boundary',
+              },
+            ],
+            newlyUnlocked: [{ id: 'perceptron', type: 'algorithm' as const }],
+            passed: true,
+            score: 100,
+          });
+        }
+
+        return baseLearningApiClient.submitQuizAttempt(input);
+      },
+    );
+    const createPlaygroundConfig = vi.fn(
+      async (input: {
+        config: { epochs: number; learningRate: number; seed: number; trainRatio: number };
+        name: string;
+      }) => {
+        const savedConfig = createSavedPlaygroundConfigFixture({
+          config: input.config,
+          configId: 'config-pg-xor-baseline',
+          name: input.name,
+        });
+
+        savedConfigs.set(savedConfig.configId, savedConfig);
+
+        return savedConfig;
+      },
+    );
+    const savePlaygroundRun = vi.fn(async () => {
+      const savedRun = createSavedPlaygroundRunFixture({ runId: 'run-pg-xor-baseline' });
+
+      savedRuns.set(savedRun.runId, savedRun);
+
+      return savedRun;
+    });
+    const learningApiClient = createLearningApiClient({
+      createPlaygroundConfig,
+      createQuizAttempt,
+      getProgress,
+      listPlaygroundConfigs: vi.fn(async () => [...savedConfigs.values()]),
+      listPlaygroundRuns: vi.fn(async () => [...savedRuns.values()]),
+      savePlaygroundRun,
+      submitQuizAttempt,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    expect(screen.getByText('Module hoàn thành: 0/3 bước')).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+      }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: /Mở quiz bài học/i }));
+    expect(await screen.findByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible();
+    await user.click(
+      screen.getByRole('radio', {
+        name: 'Ranh giới quyết định thẳng có một giới hạn rõ.',
+      }),
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Tổng có trọng số kèm độ lệch' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Hàm bước trả về 0 hoặc 1' }));
+    await user.click(screen.getByRole('radio', { name: 'Đúng' }));
+    await user.click(screen.getByRole('button', { name: 'Nộp quiz' }));
+
+    expect(await screen.findByText('quiz_passed: quiz-post-dl-p01')).toBeVisible();
+    expect(screen.queryByText('Perceptron đã mở')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Quay lại bài học' }));
+    await user.click(await screen.findByRole('link', { name: /Mở demo AND gate/i }));
+    expect(await screen.findByRole('heading', { name: 'Demo Perceptron: cổng AND' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+
+    expect(await screen.findByText('demo_completed: demo-perceptron-and-gate')).toBeVisible();
+    await user.click(screen.getByRole('link', { name: 'Mở quiz module' }));
+
+    expect(
+      await screen.findByText('Đạt ít nhất 70% để hoàn thành module và mở Playground Perceptron.'),
+    ).toBeVisible();
+    await user.click(screen.getByRole('radio', { name: 'Ranh giới quyết định' }));
+    await user.click(screen.getByRole('button', { name: 'Nộp quiz' }));
+
+    expect(await screen.findByText('quiz_passed: quiz-module-dl-m01')).toBeVisible();
+    expect(submitQuizAttempt).toHaveBeenLastCalledWith({
+      answers: [{ questionId: 'q-dl-m01-boundary', value: 'opt-boundary' }],
+      attemptId: 'attempt-quiz-module-dl-m01-01',
+      idToken: 'local-id-token',
+      idempotencyKey: expect.any(String),
+    });
+
+    window.history.pushState({}, '', '/playground/pg-xor');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+    expect(await screen.findByText('run-pg-xor-baseline')).toBeVisible();
+    await user.clear(screen.getByLabelText('Tên cấu hình'));
+    await user.type(screen.getByLabelText('Tên cấu hình'), 'XOR baseline proof');
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+    expect(await screen.findByText('XOR baseline proof')).toBeVisible();
+
+    await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '120');
+    await user.click(screen.getByRole('button', { name: /Khôi phục XOR baseline proof/i }));
+    expect(screen.getByRole('spinbutton', { name: 'Epochs' })).toHaveValue(100);
+    expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      deviceProfile: 'desktop',
+      config: {
+        learningRate: 0.1,
+        epochs: 100,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+    });
+
+    await user.click(screen.getByRole('link', { name: 'Dashboard' }));
+    expect(await screen.findByRole('heading', { name: 'Dashboard học viên' })).toBeVisible();
+    expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
+    expect(screen.getByText('Perceptron đã mở')).toBeVisible();
+    expect(screen.getByText('run-pg-xor-baseline')).toBeVisible();
+    expect(screen.getByText('client-computed')).toBeVisible();
+
+    vi.unstubAllGlobals();
   });
 });
