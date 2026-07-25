@@ -92,7 +92,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   const [submitStatus, setSubmitStatus] = useState<QuizSubmitStatus>('idle');
   const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
   const [attemptRequestIndex, setAttemptRequestIndex] = useState(0);
-  const progressLoadStarted = useRef(false);
   const attemptStarted = useRef(false);
   const idempotencyKey = useRef(createIdempotencyKey());
   const hasKnownQuizRoute = quizRoute !== undefined && quizRoute.courseId === courseId;
@@ -110,13 +109,12 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   const isAttemptClosed = submissionResult !== null;
 
   useEffect(() => {
-    if (!quizRoute || !canVerifyBackendProgress || progressLoadStarted.current) {
+    if (!quizRoute || !canVerifyBackendProgress) {
       return;
     }
 
     let isActive = true;
     const activeQuizRoute = quizRoute;
-    progressLoadStarted.current = true;
 
     async function loadProgress() {
       setProgressStatus('loading');
@@ -161,7 +159,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
 
     let isActive = true;
     const activeQuizRoute = quizRoute;
-    attemptStarted.current = true;
 
     async function createAttempt() {
       setPageStatus('loading');
@@ -173,6 +170,11 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
           throw new Error('Authenticated user is missing an ID token.');
         }
 
+        if (!isActive) {
+          return;
+        }
+
+        attemptStarted.current = true;
         const nextAttempt = await learningApiClient.createQuizAttempt({
           idToken,
           quizId: activeQuizRoute.quizId,

@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { App } from './app';
@@ -2558,6 +2559,30 @@ describe('public learning journey', () => {
     expect(screen.getByTestId('quiz-attempt')).not.toHaveTextContent(
       /correctAnswer|hint|explanation/i,
     );
+  });
+
+  it('opens the post mastery quiz under React StrictMode after auth context settles', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <StrictMode>
+        <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />
+      </StrictMode>,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Quiz Perceptron/XOR' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      quizId: 'quiz-post-dl-p01',
+    });
   });
 
   it('keeps the module quiz closed until backend progress verifies post and demo completion', async () => {
