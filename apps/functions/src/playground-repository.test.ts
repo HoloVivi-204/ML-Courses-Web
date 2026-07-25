@@ -230,6 +230,155 @@ describe('Firestore playground repository run sessions', () => {
     });
   });
 
+  it('persists a non-XOR submission pair with generic metric and config version metadata', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/pca': {
+        algorithmId: 'pca',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const session = await repository.createRunSession({
+      uid: 'learner-01',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      deviceProfile: 'desktop',
+      config: {
+        components: 2,
+        scale: true,
+      },
+    });
+    const savedRun = await repository.saveRun({
+      uid: 'learner-01',
+      idempotencyKey: 'save-pca-run-key-01',
+      sessionId: session.data.sessionId,
+      result: {
+        runId: 'client-run-pca-01',
+        scenarioId: 'pg-country-indicators',
+        algorithmId: 'pca',
+        datasetVersionId: 'ds-country-indicators-v1',
+        configHash: session.data.configHash,
+        durationMs: 900,
+        metrics: {
+          'explained-variance': 0.82,
+          'reconstruction-error': 0.18,
+        },
+        feedback: ['low-variance'],
+        chartSummary: {
+          projection: '2d',
+        },
+        textAlternative: {
+          en: 'Two principal components explain 82% of variance.',
+          vi: 'Hai thành phần chính giải thích 82% phương sai.',
+        },
+      },
+    });
+    const savedConfig = await repository.createConfig({
+      uid: 'learner-01',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      name: '  PCA default  ',
+      config: session.data.config,
+    });
+    const listedRuns = await repository.listRuns({
+      uid: 'learner-01',
+      scenarioId: 'pg-country-indicators',
+    });
+    const listedConfigs = await repository.listConfigs({
+      uid: 'learner-01',
+      scenarioId: 'pg-country-indicators',
+    });
+
+    expect(session.data).toMatchObject({
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      config: {
+        components: 2,
+        scale: true,
+      },
+      adapterVersion: 'pca-js-v1',
+      configSchemaVersion: 1,
+      workerProtocolVersion: 'ml-worker-v1',
+    });
+    expect(savedRun.data.run).toMatchObject({
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      adapterVersion: 'pca-js-v1',
+      configSchemaVersion: 1,
+      metrics: {
+        'explained-variance': 0.82,
+        'reconstruction-error': 0.18,
+      },
+      feedback: ['low-variance'],
+      verificationLevel: 'client-computed',
+    });
+    expect(savedConfig.data.config).toMatchObject({
+      name: 'PCA default',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      adapterVersion: 'pca-js-v1',
+      configSchemaVersion: 1,
+      compatibilityStatus: 'compatible',
+    });
+    expect(listedRuns.data.runs).toHaveLength(1);
+    expect(listedRuns.data.runs[0]).toMatchObject(savedRun.data.run);
+    expect(listedConfigs.data.configs).toHaveLength(1);
+    expect(listedConfigs.data.configs[0]).toMatchObject(savedConfig.data.config);
+  });
+
+  it('rejects run results with metrics outside the pair manifest', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/pca': {
+        algorithmId: 'pca',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const session = await repository.createRunSession({
+      uid: 'learner-01',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      deviceProfile: 'desktop',
+      config: {
+        components: 2,
+        scale: true,
+      },
+    });
+
+    await expect(
+      repository.saveRun({
+        uid: 'learner-01',
+        idempotencyKey: 'save-pca-run-key-unknown-metric',
+        sessionId: session.data.sessionId,
+        result: {
+          runId: 'client-run-pca-unknown-metric',
+          scenarioId: 'pg-country-indicators',
+          algorithmId: 'pca',
+          datasetVersionId: 'ds-country-indicators-v1',
+          configHash: session.data.configHash,
+          durationMs: 900,
+          metrics: {
+            'explained-variance': 0.82,
+            'reconstruction-error': 0.18,
+            accuracy: 0.99,
+          },
+          feedback: ['low-variance'],
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'PLAYGROUND_RUN_RESULT_INVALID',
+      statusCode: 400,
+    });
+  });
+
   it('cancels an owner run session idempotently', async () => {
     const { documents, firestore } = createFakeFirestore({
       'playgroundRunSessions/session-01': {

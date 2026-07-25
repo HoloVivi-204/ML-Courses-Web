@@ -309,18 +309,18 @@ export interface AdminContentUnpublishEntityInput {
   reason: string;
 }
 
+export type PlaygroundConfig = Record<string, unknown>;
+export type PlaygroundMetrics = Record<string, number | null>;
+
 export interface PlaygroundRunSession {
-  algorithmId: 'perceptron';
-  config: {
-    epochs: number;
-    learningRate: number;
-    seed: number;
-    trainRatio: number;
-  };
+  adapterVersion?: string | undefined;
+  algorithmId: string;
+  config: PlaygroundConfig;
   configHash: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  configSchemaVersion?: 1 | undefined;
+  datasetVersionId: string;
   expiresAt: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
   sessionId: string;
   status: 'issued';
   verificationLevel: 'client-computed';
@@ -333,35 +333,34 @@ export interface PlaygroundRunSessionCancellation {
 }
 
 export interface PlaygroundRunRecord {
-  algorithmId: 'perceptron';
+  adapterVersion?: string | undefined;
+  algorithmId: string;
   config: PlaygroundRunSession['config'];
+  configSchemaVersion?: 1 | undefined;
   createdAt: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  datasetVersionId: string;
   durationMs: number;
-  feedback: readonly ('linear-limit' | 'non-convergence')[];
+  feedback: readonly string[];
   isPinned: false;
-  metrics: {
-    accuracy: number;
-    loss: number;
-    testAccuracy: number;
-    trainAccuracy: number;
-  };
+  metrics: PlaygroundMetrics;
   runId: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
   targetReached: null;
   targetVersionId: null;
   verificationLevel: 'client-computed';
 }
 
 export interface PlaygroundConfigRecord {
-  algorithmId: 'perceptron';
+  adapterVersion?: string | undefined;
+  algorithmId: string;
   compatibilityReason: string | null;
   compatibilityStatus: 'compatible' | 'incompatible';
   config: PlaygroundRunSession['config'];
   configId: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  configSchemaVersion?: 1 | undefined;
+  datasetVersionId: string;
   name: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
 }
 
 export interface LearningApiClient {
@@ -411,20 +410,20 @@ export interface LearningApiClient {
   updateAdminContentDraft(input: UpdateAdminContentDraftInput): Promise<AdminContentDraft>;
   validateAdminContentDraft(input: AdminContentDraftRevisionInput): Promise<AdminContentDraft>;
   createPlaygroundRunSession(input: {
-    algorithmId: 'perceptron';
+    algorithmId: string;
     config: PlaygroundRunSession['config'];
-    datasetVersionId: 'ds-xor-noisy-v1';
+    datasetVersionId: string;
     deviceProfile: 'desktop' | 'mobile';
     idToken: string;
-    scenarioId: 'pg-xor';
+    scenarioId: string;
   }): Promise<PlaygroundRunSession>;
   createPlaygroundConfig(input: {
-    algorithmId: 'perceptron';
+    algorithmId: string;
     config: PlaygroundRunSession['config'];
-    datasetVersionId: 'ds-xor-noisy-v1';
+    datasetVersionId: string;
     idToken: string;
     name: string;
-    scenarioId: 'pg-xor';
+    scenarioId: string;
   }): Promise<PlaygroundConfigRecord>;
   deleteAccount(input: { idToken: string }): Promise<void>;
   deletePlaygroundConfig(input: { configId: string; idToken: string }): Promise<void>;
@@ -437,11 +436,11 @@ export interface LearningApiClient {
   }): Promise<PlaygroundConfigRecord>;
   listPlaygroundConfigs(input: {
     idToken: string;
-    scenarioId: 'pg-xor';
+    scenarioId: string;
   }): Promise<PlaygroundConfigRecord[]>;
   listPlaygroundRuns(input: {
     idToken: string;
-    scenarioId: 'pg-xor';
+    scenarioId: string;
   }): Promise<PlaygroundRunRecord[]>;
   savePlaygroundRun(input: {
     idToken: string;

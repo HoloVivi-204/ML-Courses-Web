@@ -7,6 +7,7 @@ import type { Locale } from '../catalog/course-data';
 import { useAuth } from '../auth/auth-context';
 import type {
   LearningApiClient,
+  PlaygroundConfig,
   PlaygroundConfigRecord,
   PlaygroundRunRecord,
 } from '../learning/learning-api';
@@ -198,25 +199,25 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         algorithmId: PLAYGROUND_ALGORITHM_ID,
         datasetVersionId: PLAYGROUND_DATASET_VERSION_ID,
         deviceProfile,
-        config,
+        config: config as unknown as PlaygroundConfig,
       });
       const runId = createRunId();
       const startedAt = Date.now();
 
       activeRunRef.current = { runId, sessionId: session.sessionId };
 
-      const runResult = await controller.run(
+      const runResult = (await controller.run(
         {
           runId,
           sessionId: session.sessionId,
           scenarioId: session.scenarioId,
           algorithmId: session.algorithmId,
           datasetVersionId: session.datasetVersionId,
-          config: session.config,
+          config: session.config as Record<string, unknown>,
           configHash: session.configHash,
         },
-        setProgress,
-      );
+        (progressEvent) => setProgress(progressEvent as XorPerceptronProgressEvent),
+      )) as XorPerceptronResult;
 
       if (activeRunRef.current?.runId === runResult.runId) {
         setResult(runResult);
@@ -318,7 +319,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         scenarioId: PLAYGROUND_SCENARIO_ID,
         algorithmId: PLAYGROUND_ALGORITHM_ID,
         datasetVersionId: PLAYGROUND_DATASET_VERSION_ID,
-        config,
+        config: config as unknown as PlaygroundConfig,
       });
 
       setConfigName(savedConfig.name);
@@ -337,7 +338,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       return;
     }
 
-    setConfig(savedConfig.config);
+    setConfig(savedConfig.config as unknown as XorPerceptronConfig);
     setProgress(null);
     setResult(null);
     setSafeError(null);
@@ -392,7 +393,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         idToken,
         configId: savedConfig.configId,
         name: getSavedConfigDraftName(savedConfig),
-        config,
+        config: config as unknown as PlaygroundConfig,
       });
 
       setSavedConfigs((currentConfigs) => upsertSavedConfig(currentConfigs, updatedConfig));
@@ -568,7 +569,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                   </div>
                   <p>
                     {t('playground.history.accuracy', {
-                      accuracy: formatPercent(savedRun.metrics.accuracy),
+                      accuracy: formatOptionalPercent(savedRun.metrics.accuracy),
                     })}{' '}
                     ·{' '}
                     {t('playground.history.duration', {
@@ -596,10 +597,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                     <strong>{savedConfig.name}</strong>
                     <span>{savedConfig.compatibilityStatus}</span>
                   </div>
-                  <p>
-                    lr {savedConfig.config.learningRate} · epochs {savedConfig.config.epochs} · seed{' '}
-                    {savedConfig.config.seed}
-                  </p>
+                  <p>{formatSavedConfigSummary(savedConfig.config)}</p>
                   {savedConfig.compatibilityStatus === 'incompatible' ? (
                     <p className="playground-error">
                       {savedConfig.compatibilityReason ?? t('playground.configs.incompatible')}
@@ -792,6 +790,45 @@ function upsertSavedConfig(
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatOptionalPercent(value: number | null | undefined): string {
+  return typeof value === 'number' ? formatPercent(value) : '—';
+}
+
+function formatSavedConfigSummary(config: PlaygroundConfig): string {
+  const record = config as Record<string, unknown>;
+  const summaryParts: string[] = [];
+
+  if (typeof record.learningRate === 'number') {
+    summaryParts.push(`lr ${record.learningRate}`);
+  }
+
+  if (typeof record.epochs === 'number') {
+    summaryParts.push(`epochs ${record.epochs}`);
+  }
+
+  if (Array.isArray(record.hiddenLayers)) {
+    summaryParts.push(`layers ${record.hiddenLayers.join('-')}`);
+  }
+
+  if (typeof record.components === 'number') {
+    summaryParts.push(`components ${record.components}`);
+  }
+
+  if (typeof record.k === 'number') {
+    summaryParts.push(`k ${record.k}`);
+  }
+
+  if (typeof record.maxDepth === 'number') {
+    summaryParts.push(`depth ${record.maxDepth}`);
+  }
+
+  if (typeof record.seed === 'number') {
+    summaryParts.push(`seed ${record.seed}`);
+  }
+
+  return summaryParts.length > 0 ? summaryParts.join(' · ') : 'custom parameters';
 }
 
 function formatFeedback(feedbackId: 'linear-limit' | 'non-convergence', locale: Locale): string {

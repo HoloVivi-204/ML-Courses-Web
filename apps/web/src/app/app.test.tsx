@@ -8,6 +8,7 @@ import type { AuthGateway } from '../features/auth/auth-context';
 import type {
   AdminContentSourceReview,
   LearningApiClient,
+  PlaygroundConfig,
 } from '../features/learning/learning-api';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
@@ -550,7 +551,7 @@ function createSavedPlaygroundRunFixture(input: { runId: string }) {
 function createSavedPlaygroundConfigFixture(input: {
   compatibilityReason?: string | null;
   compatibilityStatus?: 'compatible' | 'incompatible';
-  config?: { epochs: number; learningRate: number; seed: number; trainRatio: number };
+  config?: PlaygroundConfig;
   configId: string;
   name: string;
 }) {
@@ -2695,7 +2696,6 @@ describe('public learning journey', () => {
 
   it('proves the learner baseline from enrollment through unlock, Playground persistence, and dashboard', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
-    installImmediatePlaygroundWorker();
     const user = userEvent.setup();
     const initialProgress = createInitialProgressSnapshot();
     const postPassedProgress = createPostPassedProgressSnapshot();
@@ -2752,10 +2752,7 @@ describe('public learning journey', () => {
       },
     );
     const createPlaygroundConfig = vi.fn(
-      async (input: {
-        config: { epochs: number; learningRate: number; seed: number; trainRatio: number };
-        name: string;
-      }) => {
+      async (input: { config: PlaygroundConfig; name: string }) => {
         const savedConfig = createSavedPlaygroundConfigFixture({
           config: input.config,
           configId: 'config-pg-xor-baseline',
@@ -2793,9 +2790,13 @@ describe('public learning journey', () => {
 
     await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
     expect(
-      await screen.findByRole('heading', {
-        name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
-      }),
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
     ).toBeVisible();
 
     await user.click(screen.getByRole('link', { name: /Mở quiz bài học/i }));
@@ -2837,6 +2838,7 @@ describe('public learning journey', () => {
       idempotencyKey: expect.any(String),
     });
 
+    installImmediatePlaygroundWorker();
     window.history.pushState({}, '', '/playground/pg-xor');
     window.dispatchEvent(new PopStateEvent('popstate'));
 
@@ -2877,5 +2879,5 @@ describe('public learning journey', () => {
     expect(screen.getByText('client-computed')).toBeVisible();
 
     vi.unstubAllGlobals();
-  });
+  }, 15_000);
 });

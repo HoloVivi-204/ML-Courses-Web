@@ -6,11 +6,16 @@ import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import {
   assertSupportedPlaygroundPair,
-  hashPerceptronPlaygroundConfig,
-  normalizePerceptronPlaygroundConfig,
-  type PerceptronPlaygroundConfig,
+  getAllowedPlaygroundMetricIds,
+  getPlaygroundMetricIds,
+  getSubmissionPlaygroundPairManifests,
+  hashPlaygroundConfig,
+  normalizePlaygroundConfig,
+  type PlaygroundConfig,
   type PlaygroundDeviceProfile,
-  xorPerceptronManifest,
+  type PlaygroundMetricValue,
+  type PlaygroundMetrics,
+  type PlaygroundPairManifest,
 } from './playground-manifest.js';
 
 export interface CreatePlaygroundRunSessionInput {
@@ -75,12 +80,14 @@ export interface DeleteLearnerPlaygroundDataInput {
 }
 
 export interface PlaygroundRunSessionData {
-  algorithmId: 'perceptron';
-  config: PerceptronPlaygroundConfig;
+  adapterVersion?: string;
+  algorithmId: string;
+  config: PlaygroundConfig;
   configHash: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  configSchemaVersion?: 1;
+  datasetVersionId: string;
   expiresAt: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
   sessionId: string;
   status: 'issued';
   verificationLevel: 'client-computed';
@@ -93,35 +100,34 @@ export interface PlaygroundRunSessionCancellationData {
 }
 
 export interface PlaygroundRunRecord {
-  algorithmId: 'perceptron';
-  config: PerceptronPlaygroundConfig;
+  adapterVersion?: string;
+  algorithmId: string;
+  config: PlaygroundConfig;
+  configSchemaVersion?: 1;
   createdAt: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  datasetVersionId: string;
   durationMs: number;
-  feedback: readonly ('linear-limit' | 'non-convergence')[];
+  feedback: readonly string[];
   isPinned: false;
-  metrics: {
-    accuracy: number;
-    loss: number;
-    testAccuracy: number;
-    trainAccuracy: number;
-  };
+  metrics: PlaygroundMetrics;
   runId: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
   targetReached: null;
   targetVersionId: null;
   verificationLevel: 'client-computed';
 }
 
 export interface PlaygroundConfigRecord {
-  algorithmId: 'perceptron';
+  adapterVersion?: string;
+  algorithmId: string;
   compatibilityReason: string | null;
   compatibilityStatus: 'compatible' | 'incompatible';
-  config: PerceptronPlaygroundConfig;
+  config: PlaygroundConfig;
   configId: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  configSchemaVersion?: 1;
+  datasetVersionId: string;
   name: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
 }
 
 export interface PlaygroundRepository {
@@ -168,9 +174,11 @@ export interface PlaygroundRepository {
 }
 
 interface StoredPlaygroundRunSession {
+  adapterVersion?: unknown;
   algorithmId?: unknown;
   config?: unknown;
   configHash?: unknown;
+  configSchemaVersion?: unknown;
   datasetVersionId?: unknown;
   expiresAt?: unknown;
   scenarioId?: unknown;
@@ -185,22 +193,26 @@ interface StoredIdempotencyRecord {
 }
 
 interface NormalizedRunResult {
-  algorithmId: 'perceptron';
-  boundary: Record<string, unknown>;
+  algorithmId: string;
+  chartSummary: Record<string, unknown>;
   configHash: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  datasetVersionId: string;
   durationMs: number;
-  feedback: readonly ('linear-limit' | 'non-convergence')[];
-  lossCurve: ReadonlyArray<Record<string, unknown>>;
-  metrics: PlaygroundRunRecord['metrics'];
+  feedback: readonly string[];
+  manifest: PlaygroundPairManifest;
+  metrics: PlaygroundMetrics;
   runId: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
+  textAlternative: Record<string, unknown>;
 }
 
 interface StoredPlaygroundRunDocument {
+  algorithmAdapterVersion?: unknown;
+  adapterVersion?: unknown;
   algorithmId?: unknown;
   chartSummary?: unknown;
   config?: unknown;
+  configSchemaVersion?: unknown;
   createdAtIso?: unknown;
   datasetVersionId?: unknown;
   durationMs?: unknown;
@@ -215,8 +227,10 @@ interface StoredPlaygroundRunDocument {
 }
 
 interface StoredPlaygroundConfigDocument {
+  adapterVersion?: unknown;
   algorithmId?: unknown;
   config?: unknown;
+  configSchemaVersion?: unknown;
   configId?: unknown;
   datasetVersionId?: unknown;
   name?: unknown;
@@ -226,7 +240,6 @@ interface StoredPlaygroundConfigDocument {
 const RUN_SESSION_TTL_MS = 15 * 60 * 1_000;
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
 const RUN_RETENTION_LIMIT = 50;
-const ADAPTER_VERSION = 'perceptron-js-v1';
 const FIRESTORE_BATCH_DELETE_LIMIT = 450;
 const LEARNER_PLAYGROUND_SUBCOLLECTIONS = ['playgroundConfigs', 'playgroundRuns'] as const;
 
@@ -265,22 +278,14 @@ function normalizeRunResult(value: unknown): NormalizedRunResult {
     throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'Run result must be an object.');
   }
 
-  const metrics = normalizeRunMetrics(value.metrics);
-  const feedback = normalizeFeedback(value.feedback);
-  const lossCurve = normalizeLossCurve(value.lossCurve);
-  const boundary = isRecord(value.boundary) ? value.boundary : {};
-
-  if (value.scenarioId !== 'pg-xor') {
-    throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'scenarioId is invalid.');
-  }
-
-  if (value.algorithmId !== 'perceptron') {
-    throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'algorithmId is invalid.');
-  }
-
-  if (value.datasetVersionId !== 'ds-xor-noisy-v1') {
-    throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'datasetVersionId is invalid.');
-  }
+  const scenarioId = getRunResultString(value.scenarioId, 'scenarioId');
+  const algorithmId = getRunResultString(value.algorithmId, 'algorithmId');
+  const datasetVersionId = getRunResultString(value.datasetVersionId, 'datasetVersionId');
+  const manifest = assertSupportedPlaygroundPair({ scenarioId, algorithmId, datasetVersionId });
+  const metrics = normalizeRunMetrics(value.metrics, manifest);
+  const feedback = normalizeFeedback(value.feedback, manifest);
+  const chartSummary = normalizeChartSummary(value);
+  const textAlternative = isRecord(value.textAlternative) ? value.textAlternative : {};
 
   if (typeof value.runId !== 'string' || !value.runId.trim()) {
     throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'runId is required.');
@@ -298,40 +303,92 @@ function normalizeRunResult(value: unknown): NormalizedRunResult {
 
   return {
     runId: value.runId.trim(),
-    scenarioId: 'pg-xor',
-    algorithmId: 'perceptron',
-    datasetVersionId: 'ds-xor-noisy-v1',
+    scenarioId,
+    algorithmId,
+    datasetVersionId,
     configHash: value.configHash,
     durationMs,
     metrics,
     feedback,
-    boundary,
-    lossCurve,
+    manifest,
+    chartSummary,
+    textAlternative,
   };
 }
 
-function normalizeRunMetrics(value: unknown): PlaygroundRunRecord['metrics'] {
+function normalizeRunMetrics(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+): PlaygroundRunRecord['metrics'] {
   if (!isRecord(value)) {
     throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'metrics must be an object.');
   }
 
-  return {
-    accuracy: getMetric(value.accuracy, 'accuracy'),
-    loss: getMetric(value.loss, 'loss'),
-    testAccuracy: getMetric(value.testAccuracy, 'testAccuracy'),
-    trainAccuracy: getMetric(value.trainAccuracy, 'trainAccuracy'),
-  };
+  const normalizedMetrics: PlaygroundMetrics = {};
+
+  for (const requiredMetricId of getPlaygroundMetricIds(manifest)) {
+    if (!(requiredMetricId in value)) {
+      throw new ApiError(
+        400,
+        'PLAYGROUND_RUN_RESULT_INVALID',
+        `${requiredMetricId} metric is required.`,
+      );
+    }
+  }
+
+  const allowedMetricIds = new Set(getAllowedPlaygroundMetricIds(manifest));
+
+  for (const [metricId, metricValue] of Object.entries(value)) {
+    if (!allowedMetricIds.has(metricId)) {
+      throw new ApiError(
+        400,
+        'PLAYGROUND_RUN_RESULT_INVALID',
+        `${metricId} metric is not allowed for this pair.`,
+      );
+    }
+
+    normalizedMetrics[metricId] = normalizeMetricValue(metricValue, metricId);
+  }
+
+  return normalizedMetrics;
 }
 
-function getMetric(value: unknown, fieldName: string): number {
-  const metric = getFiniteNumber(value, fieldName);
+function normalizeMetricValue(value: unknown, metricId: string): PlaygroundMetricValue {
+  if (value === null && metricId === 'r2') {
+    return null;
+  }
 
-  if (metric < 0 || metric > 1) {
+  const metric = getFiniteNumber(value, metricId);
+
+  if (
+    [
+      'accuracy',
+      'explained-variance',
+      'f1',
+      'precision',
+      'recall',
+      'testAccuracy',
+      'trainAccuracy',
+    ].includes(metricId) &&
+    (metric < 0 || metric > 1)
+  ) {
     throw new ApiError(
       400,
       'PLAYGROUND_RUN_RESULT_INVALID',
-      `${fieldName} must be between 0 and 1.`,
+      `${metricId} must be between 0 and 1.`,
     );
+  }
+
+  if (metricId === 'silhouette' && (metric < -1 || metric > 1)) {
+    throw new ApiError(
+      400,
+      'PLAYGROUND_RUN_RESULT_INVALID',
+      'silhouette must be between -1 and 1.',
+    );
+  }
+
+  if (['inertia', 'loss', 'mae', 'reconstruction-error', 'rmse'].includes(metricId) && metric < 0) {
+    throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', `${metricId} must be non-negative.`);
   }
 
   return metric;
@@ -345,15 +402,42 @@ function getFiniteNumber(value: unknown, fieldName: string): number {
   return value;
 }
 
-function normalizeFeedback(value: unknown): readonly ('linear-limit' | 'non-convergence')[] {
+function getRunResultString(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', `${fieldName} is required.`);
+  }
+
+  return value.trim();
+}
+
+function normalizeFeedback(value: unknown, manifest: PlaygroundPairManifest): readonly string[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value.filter(
-    (item): item is 'linear-limit' | 'non-convergence' =>
-      item === 'linear-limit' || item === 'non-convergence',
-  );
+  return value.map((item) => {
+    if (typeof item !== 'string' || !manifest.feedbackRules.includes(item)) {
+      throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'feedback contains invalid ids.');
+    }
+
+    return item;
+  });
+}
+
+function normalizeChartSummary(value: Record<string, unknown>): Record<string, unknown> {
+  const chartSummary = isRecord(value.chartSummary) ? { ...value.chartSummary } : {};
+
+  if (isRecord(value.boundary)) {
+    chartSummary.boundary = value.boundary;
+  }
+
+  const lossCurve = normalizeLossCurve(value.lossCurve);
+
+  if (lossCurve.length > 0) {
+    chartSummary.lossCurve = lossCurve;
+  }
+
+  return chartSummary;
 }
 
 function normalizeLossCurve(value: unknown): ReadonlyArray<Record<string, unknown>> {
@@ -423,8 +507,36 @@ async function deleteDocumentsInBatches(
   }
 }
 
-function getStoredSessionConfig(data: StoredPlaygroundRunSession): PerceptronPlaygroundConfig {
-  return normalizePerceptronPlaygroundConfig(data.config, 'desktop');
+function getStoredSessionManifest(data: StoredPlaygroundRunSession): PlaygroundPairManifest {
+  if (
+    typeof data.scenarioId !== 'string' ||
+    typeof data.algorithmId !== 'string' ||
+    typeof data.datasetVersionId !== 'string'
+  ) {
+    throw new ApiError(
+      409,
+      'PLAYGROUND_RUN_SESSION_INVALID',
+      'Run session pair metadata is invalid.',
+    );
+  }
+
+  return assertSupportedPlaygroundPair({
+    scenarioId: data.scenarioId,
+    algorithmId: data.algorithmId,
+    datasetVersionId: data.datasetVersionId,
+  });
+}
+
+function getStoredSessionConfig(data: StoredPlaygroundRunSession): PlaygroundConfig {
+  const manifest = getStoredSessionManifest(data);
+
+  return normalizePlaygroundConfig({
+    scenarioId: manifest.scenarioId,
+    algorithmId: manifest.algorithmId,
+    datasetVersionId: manifest.datasetVersionId,
+    config: data.config,
+    deviceProfile: 'desktop',
+  });
 }
 
 function assertSessionMatchesRunResult(
@@ -445,8 +557,39 @@ function assertSessionMatchesRunResult(
   }
 }
 
+function getConfigSeed(config: PlaygroundConfig): number | null {
+  return typeof config.seed === 'number' && Number.isInteger(config.seed) ? config.seed : null;
+}
+
+function createSplitMetadata(
+  manifest: PlaygroundPairManifest,
+  config: PlaygroundConfig,
+): { testCount: number; trainCount: number; trainRatio: number } | null {
+  if (typeof config.trainRatio !== 'number') {
+    return null;
+  }
+
+  const sampleCount = manifest.datasetVersionId === 'ds-xor-noisy-v1' ? 400 : null;
+
+  if (sampleCount === null) {
+    return {
+      trainRatio: config.trainRatio,
+      trainCount: 0,
+      testCount: 0,
+    };
+  }
+
+  const trainCount = Math.floor(sampleCount * config.trainRatio);
+
+  return {
+    trainRatio: config.trainRatio,
+    trainCount,
+    testCount: sampleCount - trainCount,
+  };
+}
+
 function createRunRecord(input: {
-  config: PerceptronPlaygroundConfig;
+  config: PlaygroundConfig;
   createdAtIso: string;
   result: NormalizedRunResult;
   runId: string;
@@ -456,6 +599,8 @@ function createRunRecord(input: {
     scenarioId: input.result.scenarioId,
     algorithmId: input.result.algorithmId,
     datasetVersionId: input.result.datasetVersionId,
+    adapterVersion: input.result.manifest.adapterVersion,
+    configSchemaVersion: input.result.manifest.configSchemaVersion,
     config: input.config,
     durationMs: input.result.durationMs,
     feedback: input.result.feedback,
@@ -474,29 +619,32 @@ function toRunRecord(documentId: string, data: unknown): PlaygroundRunRecord | n
   }
 
   const stored = data as StoredPlaygroundRunDocument;
-
-  if (
-    stored.scenarioId !== 'pg-xor' ||
-    stored.algorithmId !== 'perceptron' ||
-    stored.datasetVersionId !== 'ds-xor-noisy-v1' ||
-    stored.verificationLevel !== 'client-computed' ||
-    !isRecord(stored.metrics)
-  ) {
-    return null;
-  }
+  const manifest = getStoredDocumentManifest(stored);
 
   const chartSummary = isRecord(stored.chartSummary) ? stored.chartSummary : {};
 
   try {
+    if (!manifest || stored.verificationLevel !== 'client-computed' || !isRecord(stored.metrics)) {
+      return null;
+    }
+
     return {
       runId: typeof stored.runId === 'string' ? stored.runId : documentId,
-      scenarioId: 'pg-xor',
-      algorithmId: 'perceptron',
-      datasetVersionId: 'ds-xor-noisy-v1',
-      config: normalizePerceptronPlaygroundConfig(stored.config, 'desktop'),
+      scenarioId: manifest.scenarioId,
+      algorithmId: manifest.algorithmId,
+      datasetVersionId: manifest.datasetVersionId,
+      adapterVersion: getStoredAdapterVersion(stored, manifest),
+      configSchemaVersion: getStoredConfigSchemaVersion(stored),
+      config: normalizePlaygroundConfig({
+        scenarioId: manifest.scenarioId,
+        algorithmId: manifest.algorithmId,
+        datasetVersionId: manifest.datasetVersionId,
+        config: stored.config,
+        deviceProfile: 'desktop',
+      }),
       durationMs: typeof stored.durationMs === 'number' ? stored.durationMs : 0,
-      feedback: normalizeFeedback(chartSummary.feedback ?? stored.feedback),
-      metrics: normalizeRunMetrics(stored.metrics),
+      feedback: normalizeFeedback(chartSummary.feedback ?? stored.feedback, manifest),
+      metrics: normalizeRunMetrics(stored.metrics, manifest),
       isPinned: false,
       createdAt: typeof stored.createdAtIso === 'string' ? stored.createdAtIso : '',
       targetVersionId: null,
@@ -515,7 +663,7 @@ function toRunRecord(documentId: string, data: unknown): PlaygroundRunRecord | n
 function normalizeConfigName(name: string): string {
   const trimmed = name.trim().replace(/\s+/g, ' ');
 
-  return (trimmed || 'pg-xor Perceptron').slice(0, 80);
+  return (trimmed || 'Playground config').slice(0, 80);
 }
 
 function toConfigRecord(documentId: string, data: unknown): PlaygroundConfigRecord | null {
@@ -524,42 +672,107 @@ function toConfigRecord(documentId: string, data: unknown): PlaygroundConfigReco
   }
 
   const stored = data as StoredPlaygroundConfigDocument;
+  const manifest = getStoredDocumentManifest(stored);
 
-  if (
-    stored.scenarioId !== 'pg-xor' ||
-    stored.algorithmId !== 'perceptron' ||
-    stored.datasetVersionId !== 'ds-xor-noisy-v1'
-  ) {
+  if (!manifest) {
     return null;
   }
 
   try {
     return {
       configId: typeof stored.configId === 'string' ? stored.configId : documentId,
-      name: typeof stored.name === 'string' ? stored.name : 'pg-xor Perceptron',
-      scenarioId: 'pg-xor',
-      algorithmId: 'perceptron',
-      datasetVersionId: 'ds-xor-noisy-v1',
-      config: normalizePerceptronPlaygroundConfig(stored.config, 'desktop'),
+      name: typeof stored.name === 'string' ? stored.name : 'Playground config',
+      scenarioId: manifest.scenarioId,
+      algorithmId: manifest.algorithmId,
+      datasetVersionId: manifest.datasetVersionId,
+      adapterVersion: getStoredAdapterVersion(stored, manifest),
+      configSchemaVersion: getStoredConfigSchemaVersion(stored),
+      config: normalizePlaygroundConfig({
+        scenarioId: manifest.scenarioId,
+        algorithmId: manifest.algorithmId,
+        datasetVersionId: manifest.datasetVersionId,
+        config: stored.config,
+        deviceProfile: 'desktop',
+      }),
       compatibilityStatus: 'compatible',
       compatibilityReason: null,
     };
   } catch {
     return {
       configId: typeof stored.configId === 'string' ? stored.configId : documentId,
-      name: typeof stored.name === 'string' ? stored.name : 'pg-xor Perceptron',
-      scenarioId: 'pg-xor',
-      algorithmId: 'perceptron',
-      datasetVersionId: 'ds-xor-noisy-v1',
-      config: xorPerceptronManifest.defaultConfig,
+      name: typeof stored.name === 'string' ? stored.name : 'Playground config',
+      scenarioId: manifest.scenarioId,
+      algorithmId: manifest.algorithmId,
+      datasetVersionId: manifest.datasetVersionId,
+      adapterVersion: getStoredAdapterVersion(stored, manifest),
+      configSchemaVersion: getStoredConfigSchemaVersion(stored),
+      config: manifest.defaultConfig,
       compatibilityStatus: 'incompatible',
       compatibilityReason: 'Current parameter bounds no longer accept this saved config.',
     };
   }
 }
 
+function getStoredDocumentManifest(
+  stored: StoredPlaygroundConfigDocument | StoredPlaygroundRunDocument,
+): PlaygroundPairManifest | null {
+  if (
+    typeof stored.scenarioId !== 'string' ||
+    typeof stored.algorithmId !== 'string' ||
+    typeof stored.datasetVersionId !== 'string'
+  ) {
+    return null;
+  }
+
+  try {
+    return assertSupportedPlaygroundPair({
+      scenarioId: stored.scenarioId,
+      algorithmId: stored.algorithmId,
+      datasetVersionId: stored.datasetVersionId,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function getStoredAdapterVersion(
+  stored: StoredPlaygroundConfigDocument | StoredPlaygroundRunDocument,
+  manifest: PlaygroundPairManifest,
+): string {
+  const storedVersion =
+    'adapterVersion' in stored && typeof stored.adapterVersion === 'string'
+      ? stored.adapterVersion
+      : null;
+  const legacyRunVersion =
+    'algorithmAdapterVersion' in stored && typeof stored.algorithmAdapterVersion === 'string'
+      ? stored.algorithmAdapterVersion
+      : null;
+
+  return storedVersion ?? legacyRunVersion ?? manifest.adapterVersion;
+}
+
+function getStoredConfigSchemaVersion(
+  stored: StoredPlaygroundConfigDocument | StoredPlaygroundRunDocument,
+): 1 {
+  return stored.configSchemaVersion === 1 ? 1 : 1;
+}
+
+function assertSupportedPlaygroundScenario(scenarioId: string): void {
+  const isSupportedScenario = getSubmissionPlaygroundPairManifests().some(
+    (manifest) => manifest.scenarioId === scenarioId,
+  );
+
+  if (!isSupportedScenario) {
+    throw new ApiError(400, 'PLAYGROUND_SCENARIO_UNSUPPORTED', 'Scenario is not supported.');
+  }
+}
+
 export function createFirestorePlaygroundRepository(firestore: Firestore): PlaygroundRepository {
-  async function enforceRunRetention(input: { scenarioId: 'pg-xor'; uid: string }) {
+  async function enforceRunRetention(input: { scenarioId: string; uid: string }) {
     const snapshot = await firestore
       .collection(`users/${input.uid}/playgroundRuns`)
       .where('scenarioId', '==', input.scenarioId)
@@ -632,7 +845,13 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
     },
     async createConfig(input) {
       const manifest = assertSupportedPlaygroundPair(input);
-      const config = normalizePerceptronPlaygroundConfig(input.config, 'desktop');
+      const config = normalizePlaygroundConfig({
+        scenarioId: manifest.scenarioId,
+        algorithmId: manifest.algorithmId,
+        datasetVersionId: manifest.datasetVersionId,
+        config: input.config,
+        deviceProfile: 'desktop',
+      });
       const configId = randomUUID();
       const name = normalizeConfigName(input.name);
       const nowMillis = Date.now();
@@ -643,6 +862,8 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
         scenarioId: manifest.scenarioId,
         algorithmId: manifest.algorithmId,
         datasetVersionId: manifest.datasetVersionId,
+        adapterVersion: manifest.adapterVersion,
+        configSchemaVersion: manifest.configSchemaVersion,
         config,
         compatibilityStatus: 'compatible',
         compatibilityReason: null,
@@ -656,15 +877,12 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           scenarioId: manifest.scenarioId,
           algorithmId: manifest.algorithmId,
           datasetVersionId: manifest.datasetVersionId,
-          adapterVersion: ADAPTER_VERSION,
+          adapterVersion: manifest.adapterVersion,
+          configSchemaVersion: manifest.configSchemaVersion,
           config,
           parameters: config,
-          seed: config.seed,
-          split: {
-            trainRatio: config.trainRatio,
-            trainCount: Math.floor(400 * config.trainRatio),
-            testCount: 400 - Math.floor(400 * config.trainRatio),
-          },
+          seed: getConfigSeed(config),
+          split: createSplitMetadata(manifest, config),
           createdAt: FieldValue.serverTimestamp(),
           createdAtMillis: nowMillis,
           updatedAt: FieldValue.serverTimestamp(),
@@ -679,8 +897,19 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
     },
     async createRunSession(input) {
       const manifest = assertSupportedPlaygroundPair(input);
-      const config = normalizePerceptronPlaygroundConfig(input.config, input.deviceProfile);
-      const configHash = hashPerceptronPlaygroundConfig(config);
+      const config = normalizePlaygroundConfig({
+        scenarioId: manifest.scenarioId,
+        algorithmId: manifest.algorithmId,
+        datasetVersionId: manifest.datasetVersionId,
+        config: input.config,
+        deviceProfile: input.deviceProfile,
+      });
+      const configHash = hashPlaygroundConfig({
+        scenarioId: manifest.scenarioId,
+        algorithmId: manifest.algorithmId,
+        datasetVersionId: manifest.datasetVersionId,
+        config,
+      });
       const sessionId = randomUUID();
       const { expiresAt, expiresAtIso } = createExpiresAt();
 
@@ -704,6 +933,8 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           scenarioId: manifest.scenarioId,
           algorithmId: manifest.algorithmId,
           datasetVersionId: manifest.datasetVersionId,
+          adapterVersion: manifest.adapterVersion,
+          configSchemaVersion: manifest.configSchemaVersion,
           config,
           configHash,
           expiresAt: expiresAtIso,
@@ -718,6 +949,8 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           scenarioId: data.scenarioId,
           algorithmId: data.algorithmId,
           datasetVersionId: data.datasetVersionId,
+          adapterVersion: data.adapterVersion,
+          configSchemaVersion: data.configSchemaVersion,
           config: data.config,
           configHash: data.configHash,
           status: data.status,
@@ -779,9 +1012,7 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
       };
     },
     async listConfigs(input) {
-      if (input.scenarioId !== 'pg-xor') {
-        throw new ApiError(400, 'PLAYGROUND_SCENARIO_UNSUPPORTED', 'Scenario is not supported.');
-      }
+      assertSupportedPlaygroundScenario(input.scenarioId);
 
       const snapshot = await firestore
         .collection(`users/${input.uid}/playgroundConfigs`)
@@ -797,9 +1028,7 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
       };
     },
     async listRuns(input) {
-      if (input.scenarioId !== 'pg-xor') {
-        throw new ApiError(400, 'PLAYGROUND_SCENARIO_UNSUPPORTED', 'Scenario is not supported.');
-      }
+      assertSupportedPlaygroundScenario(input.scenarioId);
 
       const snapshot = await firestore
         .collection(`users/${input.uid}/playgroundRuns`)
@@ -910,21 +1139,19 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           scenarioId: result.scenarioId,
           datasetVersionId: result.datasetVersionId,
           algorithmId: result.algorithmId,
-          algorithmAdapterVersion: ADAPTER_VERSION,
+          adapterVersion: result.manifest.adapterVersion,
+          algorithmAdapterVersion: result.manifest.adapterVersion,
+          configSchemaVersion: result.manifest.configSchemaVersion,
           targetVersionId: null,
           config,
           parameters: config,
-          seed: config.seed,
-          split: {
-            trainRatio: config.trainRatio,
-            trainCount: Math.floor(400 * config.trainRatio),
-            testCount: 400 - Math.floor(400 * config.trainRatio),
-          },
+          seed: getConfigSeed(config),
+          split: createSplitMetadata(result.manifest, config),
           metrics: result.metrics,
           chartSummary: {
-            boundary: result.boundary,
             feedback: result.feedback,
-            lossCurve: result.lossCurve,
+            textAlternative: result.textAlternative,
+            ...result.chartSummary,
           },
           durationMs: result.durationMs,
           targetReached: null,
@@ -983,8 +1210,15 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           throw new ApiError(409, 'PLAYGROUND_CONFIG_INVALID', 'Saved config is invalid.');
         }
 
+        const manifest = assertSupportedPlaygroundPair(currentConfig);
         const nextConfig = input.config
-          ? normalizePerceptronPlaygroundConfig(input.config, 'desktop')
+          ? normalizePlaygroundConfig({
+              scenarioId: manifest.scenarioId,
+              algorithmId: manifest.algorithmId,
+              datasetVersionId: manifest.datasetVersionId,
+              config: input.config,
+              deviceProfile: 'desktop',
+            })
           : currentConfig.config;
         const nextName = input.name ? normalizeConfigName(input.name) : currentConfig.name;
         const nowMillis = Date.now();
@@ -1002,12 +1236,8 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
             name: nextName,
             config: nextConfig,
             parameters: nextConfig,
-            seed: nextConfig.seed,
-            split: {
-              trainRatio: nextConfig.trainRatio,
-              trainCount: Math.floor(400 * nextConfig.trainRatio),
-              testCount: 400 - Math.floor(400 * nextConfig.trainRatio),
-            },
+            seed: getConfigSeed(nextConfig),
+            split: createSplitMetadata(manifest, nextConfig),
             updatedAt: FieldValue.serverTimestamp(),
             updatedAtMillis: nowMillis,
           },

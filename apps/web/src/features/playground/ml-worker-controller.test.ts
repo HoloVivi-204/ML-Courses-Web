@@ -18,7 +18,7 @@ function createFakeWorker(handler: (worker: Worker, message: MlWorkerRequest) =>
 let terminated = false;
 
 describe('ML worker controller', () => {
-  it('resolves a RUN from the matching worker RESULT', async () => {
+  it('resolves a generic RUN from the matching worker RESULT', async () => {
     const controller = createMlWorkerController({
       createWorker: () =>
         createFakeWorker((worker, message) => {
@@ -32,18 +32,19 @@ describe('ML worker controller', () => {
                 type: 'RESULT',
                 result: {
                   runId: message.request.runId,
-                  scenarioId: 'pg-xor',
-                  algorithmId: 'perceptron',
-                  datasetVersionId: 'ds-xor-noisy-v1',
-                  boundary: { weights: [0, 0], bias: 0 },
+                  scenarioId: 'pg-country-indicators',
+                  algorithmId: 'pca',
+                  datasetVersionId: 'ds-country-indicators-v1',
+                  chartSummary: { projection: '2d' },
                   determinism: 'exact',
-                  feedback: ['linear-limit', 'non-convergence'],
-                  lossCurve: [],
+                  feedback: ['low-variance'],
                   metrics: {
-                    accuracy: 0.5,
-                    testAccuracy: 0.5,
-                    trainAccuracy: 0.5,
-                    loss: 0.5,
+                    'explained-variance': 0.82,
+                    'reconstruction-error': 0.18,
+                  },
+                  textAlternative: {
+                    en: 'Two principal components explain 82% of variance.',
+                    vi: 'Hai thành phần chính giải thích 82% phương sai.',
                   },
                 },
               } satisfies MlWorkerResponse,
@@ -57,22 +58,24 @@ describe('ML worker controller', () => {
         {
           runId: 'run-01',
           sessionId: 'session-01',
-          scenarioId: 'pg-xor',
-          algorithmId: 'perceptron',
-          datasetVersionId: 'ds-xor-noisy-v1',
+          scenarioId: 'pg-country-indicators',
+          algorithmId: 'pca',
+          datasetVersionId: 'ds-country-indicators-v1',
           configHash: '9'.repeat(64),
           config: {
-            learningRate: 0.1,
-            epochs: 100,
-            trainRatio: 0.75,
-            seed: 42,
+            components: 2,
+            scale: true,
           },
         },
         () => undefined,
       ),
     ).resolves.toMatchObject({
       runId: 'run-01',
-      feedback: ['linear-limit', 'non-convergence'],
+      feedback: ['low-variance'],
+      metrics: {
+        'explained-variance': 0.82,
+        'reconstruction-error': 0.18,
+      },
     });
   });
 

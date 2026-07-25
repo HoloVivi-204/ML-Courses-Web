@@ -1,3 +1,5 @@
+import type { MlMetrics, MlProgressEvent, MlRunResult } from './ml-engine-contract';
+
 export interface XorPerceptronConfig {
   epochs: number;
   learningRate: number;
@@ -5,14 +7,14 @@ export interface XorPerceptronConfig {
   trainRatio: number;
 }
 
-export interface XorPerceptronProgressEvent {
+export interface XorPerceptronProgressEvent extends MlProgressEvent {
   epoch: number;
   loss: number;
   runId: string;
   totalEpochs: number;
 }
 
-export interface XorPerceptronResult {
+export interface XorPerceptronResult extends MlRunResult {
   algorithmId: 'perceptron';
   boundary: {
     bias: number;
@@ -25,7 +27,7 @@ export interface XorPerceptronResult {
     epoch: number;
     loss: number;
   }>;
-  metrics: {
+  metrics: MlMetrics & {
     accuracy: number;
     loss: number;
     testAccuracy: number;

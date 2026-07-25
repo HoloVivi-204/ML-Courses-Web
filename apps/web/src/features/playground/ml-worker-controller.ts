@@ -1,5 +1,5 @@
 import type { MlRunRequest, MlWorkerRequest, MlWorkerResponse } from './ml-worker-protocol';
-import type { XorPerceptronProgressEvent, XorPerceptronResult } from './xor-perceptron';
+import type { MlProgressEvent, MlRunResult } from './ml-engine-contract';
 
 interface MlWorkerControllerOptions {
   createWorker?: (() => Worker) | undefined;
@@ -7,18 +7,15 @@ interface MlWorkerControllerOptions {
 }
 
 interface PendingRun {
-  onProgress: (event: XorPerceptronProgressEvent) => void;
+  onProgress: (event: MlProgressEvent) => void;
   reject: (reason?: unknown) => void;
-  resolve: (result: XorPerceptronResult) => void;
+  resolve: (result: MlRunResult) => void;
   runId: string;
 }
 
 export interface MlWorkerController {
   dispose(): void;
-  run(
-    request: MlRunRequest,
-    onProgress: (event: XorPerceptronProgressEvent) => void,
-  ): Promise<XorPerceptronResult>;
+  run(request: MlRunRequest, onProgress: (event: MlProgressEvent) => void): Promise<MlRunResult>;
   stop(runId: string): Promise<{ mode: 'cooperative' | 'terminated'; runId: string }>;
 }
 
@@ -120,7 +117,7 @@ export function createMlWorkerController(
 
       const activeWorker = ensureWorker();
 
-      return new Promise<XorPerceptronResult>((resolve, reject) => {
+      return new Promise<MlRunResult>((resolve, reject) => {
         pendingRun = {
           runId: request.runId,
           onProgress,

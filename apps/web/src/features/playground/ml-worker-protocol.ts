@@ -1,16 +1,14 @@
-import type {
-  XorPerceptronConfig,
-  XorPerceptronProgressEvent,
-  XorPerceptronResult,
-} from './xor-perceptron';
+import type { MlConfig, MlProgressEvent, MlRunResult } from './ml-engine-contract';
 
 export interface MlRunRequest {
-  algorithmId: 'perceptron';
-  config: XorPerceptronConfig;
+  adapterVersion?: string | undefined;
+  algorithmId: string;
+  config: MlConfig;
   configHash: string;
-  datasetVersionId: 'ds-xor-noisy-v1';
+  configSchemaVersion?: 1 | undefined;
+  datasetVersionId: string;
   runId: string;
-  scenarioId: 'pg-xor';
+  scenarioId: string;
   sessionId: string;
 }
 
@@ -22,7 +20,7 @@ export type MlWorkerRequest =
 
 export type MlWorkerResponse =
   | { backend: string; type: 'READY' }
-  | { event: XorPerceptronProgressEvent; type: 'PROGRESS' }
-  | { result: XorPerceptronResult; type: 'RESULT' }
+  | { event: MlProgressEvent; type: 'PROGRESS' }
+  | { result: MlRunResult; type: 'RESULT' }
   | { runId: string; type: 'CANCELLED' }
   | { code: string; runId?: string; safeMessage: string; type: 'ERROR' };

@@ -201,7 +201,9 @@ function ClientComputedRunsPanel({ runs }: { runs: readonly PlaygroundRunRecord[
                 <span>{run.verificationLevel}</span>
               </div>
               <p>
-                {t('dashboard.client.accuracy', { accuracy: formatPercent(run.metrics.accuracy) })}
+                {t('dashboard.client.accuracy', {
+                  accuracy: formatOptionalPercent(run.metrics.accuracy),
+                })}
               </p>
               <p>{t('dashboard.client.duration', { duration: run.durationMs })}</p>
             </li>
@@ -229,6 +231,10 @@ function formatAlgorithmName(algorithmId: string): string {
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatOptionalPercent(value: number | null | undefined): string {
+  return typeof value === 'number' ? formatPercent(value) : '—';
 }
 
 function formatQuizAttemptCount(attemptCount: number, resolvedLanguage: string | undefined) {

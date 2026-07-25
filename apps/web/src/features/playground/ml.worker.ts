@@ -3,6 +3,7 @@ import {
   runXorPerceptron,
   XorPerceptronCancelledError,
   validateXorPerceptronConfig,
+  type XorPerceptronConfig,
 } from './xor-perceptron';
 
 const workerScope = self as unknown as {
@@ -42,9 +43,26 @@ workerScope.onmessage = (event: MessageEvent<MlWorkerRequest>) => {
 async function handleRun(request: Extract<MlWorkerRequest, { type: 'RUN' }>['request']) {
   try {
     cancelledRunIds.delete(request.runId);
-    validateXorPerceptronConfig(request.config, 'desktop');
 
-    const result = await runXorPerceptron(request.config, {
+    if (
+      request.scenarioId !== 'pg-xor' ||
+      request.algorithmId !== 'perceptron' ||
+      request.datasetVersionId !== 'ds-xor-noisy-v1'
+    ) {
+      postResponse({
+        type: 'ERROR',
+        runId: request.runId,
+        code: 'PLAYGROUND_WORKER_PAIR_UNSUPPORTED',
+        safeMessage: 'The selected playground pair is not available in this worker yet.',
+      });
+      return;
+    }
+
+    const config = request.config as unknown as XorPerceptronConfig;
+
+    validateXorPerceptronConfig(config, 'desktop');
+
+    const result = await runXorPerceptron(config, {
       runId: request.runId,
       onProgress: (progressEvent) => postResponse({ type: 'PROGRESS', event: progressEvent }),
       shouldCancel: () => cancelledRunIds.has(request.runId),

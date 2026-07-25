@@ -2,11 +2,112 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertSupportedPlaygroundPair,
+  getSubmissionPlaygroundPairManifests,
   hashPerceptronPlaygroundConfig,
+  hashPlaygroundConfig,
+  normalizePlaygroundConfig,
   normalizePerceptronPlaygroundConfig,
 } from './playground-manifest.js';
 
 describe('playground manifest validation', () => {
+  it('exposes exactly the seven submission Playground pairs as the baseline runtime manifest', () => {
+    const manifests = getSubmissionPlaygroundPairManifests();
+
+    expect(manifests.map((manifest) => `${manifest.scenarioId}/${manifest.algorithmId}`)).toEqual([
+      'pg-xor/perceptron',
+      'pg-xor/mlp',
+      'pg-house-price/linear-regression',
+      'pg-spam-detection/logistic-regression',
+      'pg-credit-risk/decision-tree',
+      'pg-retail-segments/kmeans',
+      'pg-country-indicators/pca',
+    ]);
+    expect(manifests).toHaveLength(7);
+    expect(
+      manifests.every(
+        (manifest) =>
+          manifest.scopePriority === 'must' &&
+          manifest.owner === undefined &&
+          manifest.implementationStatus === undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it('normalizes every submission pair default config and hashes it deterministically', () => {
+    for (const manifest of getSubmissionPlaygroundPairManifests()) {
+      const config = normalizePlaygroundConfig({
+        algorithmId: manifest.algorithmId,
+        config: manifest.defaultConfig,
+        datasetVersionId: manifest.datasetVersionId,
+        deviceProfile: 'desktop',
+        scenarioId: manifest.scenarioId,
+      });
+
+      expect(config).toEqual(manifest.defaultConfig);
+      expect(
+        hashPlaygroundConfig({
+          algorithmId: manifest.algorithmId,
+          config,
+          datasetVersionId: manifest.datasetVersionId,
+          scenarioId: manifest.scenarioId,
+        }),
+      ).toMatch(/^[a-f0-9]{64}$/);
+    }
+  });
+
+  it('rejects unknown config fields for every submission pair', () => {
+    for (const manifest of getSubmissionPlaygroundPairManifests()) {
+      expect(() =>
+        normalizePlaygroundConfig({
+          algorithmId: manifest.algorithmId,
+          config: {
+            ...manifest.defaultConfig,
+            unexpectedParameter: true,
+          },
+          datasetVersionId: manifest.datasetVersionId,
+          deviceProfile: 'desktop',
+          scenarioId: manifest.scenarioId,
+        }),
+      ).toThrowError(/unsupported config fields/i);
+    }
+  });
+
+  it('enforces the TDD desktop MLP hard limits over looser matrix planning limits', () => {
+    const baseConfig = {
+      hiddenLayers: [4],
+      activation: 'tanh',
+      learningRate: 0.05,
+      epochs: 300,
+      trainRatio: 0.75,
+      seed: 42,
+    };
+
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'mlp',
+        config: {
+          ...baseConfig,
+          hiddenLayers: [33],
+        },
+        datasetVersionId: 'ds-xor-noisy-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-xor',
+      }),
+    ).toThrowError(/between 1 and 32/i);
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'mlp',
+        config: {
+          ...baseConfig,
+          epochs: 1001,
+        },
+        datasetVersionId: 'ds-xor-noisy-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-xor',
+      }),
+    ).toThrowError(/epochs must be between 10 and 1000/i);
+  });
+
   it('normalizes the release-one pg-xor Perceptron default config deterministically', () => {
     const config = normalizePerceptronPlaygroundConfig(
       {
@@ -45,9 +146,19 @@ describe('playground manifest validation', () => {
     expect(() =>
       assertSupportedPlaygroundPair({
         scenarioId: 'pg-xor',
-        algorithmId: 'mlp',
+        algorithmId: 'logistic-regression',
         datasetVersionId: 'ds-xor-noisy-v1',
       }),
     ).toThrowError(/not supported/i);
+  });
+
+  it('fails closed for a matrix Should pair while additionalScenarioPairs is disabled', () => {
+    expect(() =>
+      assertSupportedPlaygroundPair({
+        scenarioId: 'pg-house-price',
+        algorithmId: 'polynomial-regression',
+        datasetVersionId: 'ds-house-price-v1',
+      }),
+    ).toThrowError(/disabled/i);
   });
 });
