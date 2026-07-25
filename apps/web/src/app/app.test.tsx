@@ -2131,7 +2131,7 @@ describe('public learning journey', () => {
         algorithmUnlocks: [
           {
             algorithmId: 'pca',
-            moduleId: 'ml-m06-dimensionality-reduction',
+            moduleId: 'cml-m09-pca',
           },
         ],
       }),
@@ -2182,6 +2182,129 @@ describe('public learning journey', () => {
     expect(await screen.findByText('run-country-pca-01')).toBeVisible();
     vi.unstubAllGlobals();
   });
+
+  it.each([
+    {
+      scenarioId: 'pg-house-price',
+      algorithmId: 'linear-regression',
+      datasetVersionId: 'ds-house-price-v1',
+      moduleId: 'cml-m02-linear-polynomial',
+      expectedConfig: {
+        fitIntercept: true,
+        trainRatio: 0.8,
+        seed: 42,
+      },
+    },
+    {
+      scenarioId: 'pg-spam-detection',
+      algorithmId: 'logistic-regression',
+      datasetVersionId: 'ds-sms-spam-v1',
+      moduleId: 'cml-m04-logistic-classification',
+      expectedConfig: {
+        learningRate: 0.05,
+        epochs: 300,
+        threshold: 0.5,
+        trainRatio: 0.8,
+        seed: 42,
+      },
+    },
+    {
+      scenarioId: 'pg-credit-risk',
+      algorithmId: 'decision-tree',
+      datasetVersionId: 'ds-credit-risk-v1',
+      moduleId: 'cml-m06-trees-forest',
+      expectedConfig: {
+        maxDepth: 5,
+        minSamplesLeaf: 5,
+        trainRatio: 0.8,
+        seed: 42,
+      },
+    },
+    {
+      scenarioId: 'pg-retail-segments',
+      algorithmId: 'kmeans',
+      datasetVersionId: 'ds-retail-segments-v1',
+      moduleId: 'cml-m08-clustering',
+      expectedConfig: {
+        k: 4,
+        maxIterations: 100,
+        seed: 42,
+      },
+    },
+  ])(
+    'runs $scenarioId/$algorithmId through the registry default config',
+    async ({ algorithmId, datasetVersionId, expectedConfig, moduleId, scenarioId }) => {
+      window.history.pushState({}, '', `/playground/${scenarioId}`);
+      installImmediatePlaygroundWorker();
+      const user = userEvent.setup();
+      const createPlaygroundRunSession = vi.fn(
+        async (input: Parameters<LearningApiClient['createPlaygroundRunSession']>[0]) => ({
+          sessionId: `session-${scenarioId}-${algorithmId}-01`,
+          scenarioId: input.scenarioId,
+          algorithmId: input.algorithmId,
+          datasetVersionId: input.datasetVersionId,
+          config: input.config,
+          configHash: '6'.repeat(64),
+          expiresAt: '2026-07-19T14:00:00.000Z',
+          status: 'issued' as const,
+          verificationLevel: 'client-computed' as const,
+          workerProtocolVersion: 'ml-worker-v1' as const,
+        }),
+      );
+      const learningApiClient = createLearningApiClient({
+        createPlaygroundRunSession,
+        getProgress: vi.fn().mockResolvedValue({
+          ...createUnlockedProgressSnapshot(),
+          algorithmUnlocks: [
+            {
+              algorithmId,
+              moduleId,
+            },
+          ],
+        }),
+      });
+
+      render(
+        <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+      );
+
+      expect(await screen.findByText(`${scenarioId} / ${algorithmId}`)).toBeVisible();
+      expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        scenarioId,
+      });
+      expect(learningApiClient.listPlaygroundConfigs).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        scenarioId,
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+      expect(await screen.findByText('Đã chạy xong')).toBeVisible();
+      expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        scenarioId,
+        algorithmId,
+        datasetVersionId,
+        deviceProfile: 'desktop',
+        config: expectedConfig,
+      });
+      await waitFor(() =>
+        expect(learningApiClient.savePlaygroundRun).toHaveBeenCalledWith({
+          idToken: 'local-id-token',
+          idempotencyKey: expect.any(String),
+          sessionId: `session-${scenarioId}-${algorithmId}-01`,
+          result: expect.objectContaining({
+            scenarioId,
+            algorithmId,
+            datasetVersionId,
+            configHash: '6'.repeat(64),
+          }),
+        }),
+      );
+      vi.unstubAllGlobals();
+    },
+  );
 
   it('loads saved pg-xor runs and configs, then restores a config without starting a run', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
