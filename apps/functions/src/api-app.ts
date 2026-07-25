@@ -35,6 +35,7 @@ import {
   type UpdatePlaygroundConfigInput,
 } from './playground-repository.js';
 import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
+import { getRuntimeFeatureManifest } from './runtime-config.js';
 
 export interface VerifiedAuthUser {
   authTime?: number | undefined;
@@ -704,6 +705,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       },
       requestId: getRequestId(response),
     });
+  });
+
+  /** Returns Release 1 runtime feature flags without touching learner data. */
+  app.get('/api/v1/system/features', (_request, response) => {
+    sendSuccess(response, 200, getRuntimeFeatureManifest());
   });
 
   app.post('/api/v1/users/me/bootstrap', requireAuth, async (request, response, next) => {

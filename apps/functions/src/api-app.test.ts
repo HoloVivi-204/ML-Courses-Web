@@ -144,6 +144,26 @@ describe('API foundation', () => {
     });
   });
 
+  it('returns the public runtime feature manifest without authentication', async () => {
+    const response = await request(createApiApp()).get('/api/v1/system/features').expect(200);
+
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        releaseId: 'release-1',
+        checksum: expect.stringMatching(/^[a-f0-9]{64}$/),
+        featureFlags: {
+          capstones: false,
+          csvReports: false,
+          pinRuns: false,
+          studentDetailReports: false,
+          targetScores: false,
+        },
+      },
+      requestId: response.headers['x-request-id'],
+    });
+  });
+
   it('fails closed with the canonical error envelope for unknown routes', async () => {
     const response = await request(createApiApp()).get('/api/v1/unknown').expect(404);
 
