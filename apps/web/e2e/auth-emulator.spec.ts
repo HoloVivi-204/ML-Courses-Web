@@ -5,22 +5,31 @@ import { expect, test } from '@playwright/test';
 const runAuthEmulatorE2e = process.env.RUN_AUTH_EMULATOR_E2E === 'true';
 const AUTH_EMULATOR_READY_URL =
   'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects?key=local-emulator-api-key';
+const API_EMULATOR_HEALTH_URL =
+  'http://127.0.0.1:5001/demo-ml-learning-local/asia-southeast1/api/api/v1/health';
 
-async function isAuthEmulatorReady(): Promise<boolean> {
+async function areLocalAuthDependenciesReady(): Promise<boolean> {
   try {
-    await fetch(AUTH_EMULATOR_READY_URL);
-    return true;
+    const [authResponse, apiResponse] = await Promise.all([
+      fetch(AUTH_EMULATOR_READY_URL),
+      fetch(API_EMULATOR_HEALTH_URL),
+    ]);
+
+    return authResponse.ok && apiResponse.ok;
   } catch {
     return false;
   }
 }
 
 test.describe('Firebase Authentication Emulator', () => {
-  test.skip(!runAuthEmulatorE2e, 'Set RUN_AUTH_EMULATOR_E2E=true with the local emulator running.');
+  test.skip(
+    !runAuthEmulatorE2e,
+    'Set RUN_AUTH_EMULATOR_E2E=true with the local Auth and Functions emulators running.',
+  );
 
   test.beforeEach(async () => {
     await expect
-      .poll(isAuthEmulatorReady, {
+      .poll(areLocalAuthDependenciesReady, {
         intervals: [250, 500, 1_000],
         timeout: 30_000,
       })
