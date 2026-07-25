@@ -1,10 +1,5 @@
 import type { MlWorkerRequest, MlWorkerResponse } from './ml-worker-protocol';
-import {
-  runXorPerceptron,
-  XorPerceptronCancelledError,
-  validateXorPerceptronConfig,
-  type XorPerceptronConfig,
-} from './xor-perceptron';
+import { resolveAlgorithmAdapter } from './playground-adapter-registry';
 
 const workerScope = self as unknown as {
   close(): void;
@@ -44,11 +39,9 @@ async function handleRun(request: Extract<MlWorkerRequest, { type: 'RUN' }>['req
   try {
     cancelledRunIds.delete(request.runId);
 
-    if (
-      request.scenarioId !== 'pg-xor' ||
-      request.algorithmId !== 'perceptron' ||
-      request.datasetVersionId !== 'ds-xor-noisy-v1'
-    ) {
+    const adapter = resolveAlgorithmAdapter(request);
+
+    if (!adapter) {
       postResponse({
         type: 'ERROR',
         runId: request.runId,
@@ -58,19 +51,16 @@ async function handleRun(request: Extract<MlWorkerRequest, { type: 'RUN' }>['req
       return;
     }
 
-    const config = request.config as unknown as XorPerceptronConfig;
-
-    validateXorPerceptronConfig(config, 'desktop');
-
-    const result = await runXorPerceptron(config, {
-      runId: request.runId,
+    const result = await adapter.run(request, {
       onProgress: (progressEvent) => postResponse({ type: 'PROGRESS', event: progressEvent }),
       shouldCancel: () => cancelledRunIds.has(request.runId),
     });
 
     postResponse({ type: 'RESULT', result });
   } catch (error) {
-    if (error instanceof XorPerceptronCancelledError) {
+    const adapter = resolveAlgorithmAdapter(request);
+
+    if (adapter?.isCancelledError(error)) {
       cancelledRunIds.delete(error.runId);
       postResponse({ type: 'CANCELLED', runId: error.runId });
       return;
