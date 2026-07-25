@@ -819,7 +819,12 @@ function installImmediatePlaygroundWorker() {
 
     postMessage(message: unknown) {
       const workerRequest = message as {
-        request?: { runId: string };
+        request?: {
+          algorithmId: string;
+          datasetVersionId: string;
+          runId: string;
+          scenarioId: string;
+        };
         type: string;
       };
 
@@ -827,42 +832,82 @@ function installImmediatePlaygroundWorker() {
         return;
       }
 
+      const request = workerRequest.request;
+
       queueMicrotask(() => {
-        const runId = workerRequest.request?.runId ?? 'run-unknown';
+        const isPcaRun =
+          request.scenarioId === 'pg-country-indicators' &&
+          request.algorithmId === 'pca' &&
+          request.datasetVersionId === 'ds-country-indicators-v1';
 
         this.onmessage?.({
           data: {
             type: 'PROGRESS',
-            event: {
-              runId,
-              epoch: 100,
-              totalEpochs: 100,
-              loss: 0.5,
-            },
+            event: isPcaRun
+              ? {
+                  runId: request.runId,
+                  iteration: 1,
+                  totalIterations: 1,
+                  metric: {
+                    id: 'explained-variance',
+                    value: 1,
+                  },
+                }
+              : {
+                  runId: request.runId,
+                  epoch: 100,
+                  totalEpochs: 100,
+                  loss: 0.5,
+                },
           },
         } as MessageEvent);
         this.onmessage?.({
           data: {
             type: 'RESULT',
-            result: {
-              runId,
-              scenarioId: 'pg-xor',
-              algorithmId: 'perceptron',
-              datasetVersionId: 'ds-xor-noisy-v1',
-              boundary: {
-                weights: [0.1, -0.1],
-                bias: 0,
-              },
-              determinism: 'exact',
-              feedback: ['linear-limit', 'non-convergence'],
-              lossCurve: [{ epoch: 100, loss: 0.5 }],
-              metrics: {
-                accuracy: 0.5,
-                testAccuracy: 0.5,
-                trainAccuracy: 0.5,
-                loss: 0.5,
-              },
-            },
+            result: isPcaRun
+              ? {
+                  runId: request.runId,
+                  scenarioId: request.scenarioId,
+                  algorithmId: request.algorithmId,
+                  datasetVersionId: request.datasetVersionId,
+                  chartSummary: {
+                    kind: 'projection-2d',
+                    components: 2,
+                  },
+                  determinism: 'exact',
+                  feedback: [],
+                  metrics: {
+                    'explained-variance': 1,
+                    'reconstruction-error': 0,
+                  },
+                  textAlternative: {
+                    en: 'Two PCA components explain 100% of variance.',
+                    vi: 'Hai thành phần PCA giải thích 100% phương sai.',
+                  },
+                }
+              : {
+                  runId: request.runId,
+                  scenarioId: request.scenarioId,
+                  algorithmId: request.algorithmId,
+                  datasetVersionId: request.datasetVersionId,
+                  boundary: {
+                    weights: [0.1, -0.1],
+                    bias: 0,
+                  },
+                  determinism: 'exact',
+                  feedback: ['linear-limit', 'non-convergence'],
+                  lossCurve: [{ epoch: 100, loss: 0.5 }],
+                  metrics: {
+                    accuracy: 0.5,
+                    testAccuracy: 0.5,
+                    trainAccuracy: 0.5,
+                    loss: 0.5,
+                  },
+                  textAlternative: {
+                    en: 'Perceptron reaches 50% accuracy.',
+                    vi: 'Perceptron đạt accuracy 50%.',
+                  },
+                },
           },
         } as MessageEvent);
       });
@@ -1917,7 +1962,7 @@ describe('public learning journey', () => {
     await user.click(screen.getByRole('button', { name: 'Chạy' }));
 
     expect(await screen.findByText('Đã chạy xong')).toBeVisible();
-    expect(screen.getByText('50%')).toBeVisible();
+    expect(screen.getAllByText('50%').length).toBeGreaterThan(0);
     expect(
       screen.getByText('Giới hạn tuyến tính: một ranh giới thẳng không tách được XOR.'),
     ).toBeVisible();
@@ -1954,6 +1999,187 @@ describe('public learning journey', () => {
     );
     expect(await screen.findByText('run-pg-xor-01')).toBeVisible();
     expect(screen.getAllByText('client-computed')).not.toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('switches pg-xor to MLP when both XOR algorithms are unlocked', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    installImmediatePlaygroundWorker();
+    const user = userEvent.setup();
+    const createPlaygroundRunSession = vi.fn(
+      async (input: Parameters<LearningApiClient['createPlaygroundRunSession']>[0]) => ({
+        sessionId: 'session-xor-mlp-01',
+        scenarioId: input.scenarioId,
+        algorithmId: input.algorithmId,
+        datasetVersionId: input.datasetVersionId,
+        config: input.config,
+        configHash: '8'.repeat(64),
+        expiresAt: '2026-07-19T14:00:00.000Z',
+        status: 'issued' as const,
+        verificationLevel: 'client-computed' as const,
+        workerProtocolVersion: 'ml-worker-v1' as const,
+      }),
+    );
+    const learningApiClient = createLearningApiClient({
+      createPlaygroundRunSession,
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        algorithmUnlocks: [
+          {
+            algorithmId: 'perceptron',
+            moduleId: 'dl-m01-neuron-perceptron',
+          },
+          {
+            algorithmId: 'mlp',
+            moduleId: 'dl-m02-mlp',
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+
+    await user.selectOptions(screen.getByRole('combobox'), 'pg-xor/mlp/ds-xor-noisy-v1');
+
+    expect(await screen.findByRole('heading', { name: 'Playground XOR: MLP' })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Hidden layers' })).toHaveValue('4');
+    expect(screen.getByRole('combobox', { name: 'Activation' })).toHaveValue('tanh');
+
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+    expect(await screen.findByText('Đã chạy xong')).toBeVisible();
+    expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-xor',
+      algorithmId: 'mlp',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      deviceProfile: 'desktop',
+      config: {
+        hiddenLayers: [4],
+        activation: 'tanh',
+        learningRate: 0.05,
+        epochs: 300,
+        trainRatio: 0.75,
+        seed: 42,
+      },
+    });
+    await waitFor(() =>
+      expect(learningApiClient.savePlaygroundRun).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        idempotencyKey: expect.any(String),
+        sessionId: 'session-xor-mlp-01',
+        result: expect.objectContaining({
+          scenarioId: 'pg-xor',
+          algorithmId: 'mlp',
+          datasetVersionId: 'ds-xor-noisy-v1',
+          configHash: '8'.repeat(64),
+        }),
+      }),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it('runs pg-country-indicators PCA through the registry-driven playground UI', async () => {
+    window.history.pushState({}, '', '/playground/pg-country-indicators');
+    installImmediatePlaygroundWorker();
+    const user = userEvent.setup();
+    const createPlaygroundRunSession = vi.fn(
+      async (input: Parameters<LearningApiClient['createPlaygroundRunSession']>[0]) => ({
+        sessionId: 'session-country-pca-01',
+        scenarioId: input.scenarioId,
+        algorithmId: input.algorithmId,
+        datasetVersionId: input.datasetVersionId,
+        config: input.config,
+        configHash: '7'.repeat(64),
+        expiresAt: '2026-07-19T14:00:00.000Z',
+        status: 'issued' as const,
+        verificationLevel: 'client-computed' as const,
+        workerProtocolVersion: 'ml-worker-v1' as const,
+      }),
+    );
+    const savePlaygroundRun = vi.fn(async () => ({
+      runId: 'run-country-pca-01',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      config: {
+        components: 2,
+        scale: true,
+      },
+      durationMs: 24,
+      feedback: [] as const,
+      isPinned: false as const,
+      metrics: {
+        'explained-variance': 1,
+        'reconstruction-error': 0,
+      },
+      createdAt: '2026-07-19T14:00:00.000Z',
+      targetReached: null,
+      targetVersionId: null,
+      verificationLevel: 'client-computed' as const,
+    }));
+    const learningApiClient = createLearningApiClient({
+      createPlaygroundRunSession,
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        algorithmUnlocks: [
+          {
+            algorithmId: 'pca',
+            moduleId: 'ml-m06-dimensionality-reduction',
+          },
+        ],
+      }),
+      savePlaygroundRun,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: /PCA/i })).toBeVisible();
+    expect(screen.getByText('pg-country-indicators / pca')).toBeVisible();
+    expect(screen.getByRole('spinbutton', { name: 'Components' })).toHaveValue(2);
+
+    await user.click(screen.getByRole('button', { name: 'Chạy' }));
+
+    expect(await screen.findByText('Đã chạy xong')).toBeVisible();
+    expect(screen.getByText('Explained variance')).toBeVisible();
+    expect(screen.getByText('100%')).toBeVisible();
+    expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-country-indicators',
+    });
+    expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      deviceProfile: 'desktop',
+      config: {
+        components: 2,
+        scale: true,
+      },
+    });
+    await waitFor(() =>
+      expect(learningApiClient.savePlaygroundRun).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        idempotencyKey: expect.any(String),
+        sessionId: 'session-country-pca-01',
+        result: expect.objectContaining({
+          scenarioId: 'pg-country-indicators',
+          algorithmId: 'pca',
+          datasetVersionId: 'ds-country-indicators-v1',
+          configHash: '7'.repeat(64),
+        }),
+      }),
+    );
+    expect(await screen.findByText('run-country-pca-01')).toBeVisible();
     vi.unstubAllGlobals();
   });
 
@@ -2266,7 +2492,7 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
     ).toBeVisible();
-    expect(screen.getByText('Giới hạn mobile: epochs ≤ 200')).toBeVisible();
+    expect(screen.getByText(/Giới hạn mobile: epochs ≤ 200/i)).toBeVisible();
     expect(screen.getByRole('spinbutton', { name: 'Epochs' })).toHaveAttribute('max', '200');
 
     await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));

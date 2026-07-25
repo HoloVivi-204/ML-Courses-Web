@@ -2400,12 +2400,16 @@ a {
   background: var(--paper);
 }
 
-.playground-number-field {
+.playground-number-field,
+.playground-select-field,
+.playground-array-field {
   display: grid;
   gap: 6px;
 }
 
 .playground-number-field span,
+.playground-select-field span,
+.playground-array-field span,
 .playground-text-field span,
 .playground-config-edit span {
   color: var(--ink-soft);
@@ -2414,12 +2418,29 @@ a {
 }
 
 .playground-number-field input,
+.playground-select-field select,
+.playground-array-field input,
 .playground-text-field input,
 .playground-config-edit input {
   padding: 11px 12px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
+}
+
+.playground-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.playground-checkbox-field input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--teal);
 }
 
 .playground-text-field {
@@ -2511,6 +2532,11 @@ a {
   gap: 8px;
 }
 
+.playground-metric {
+  display: grid;
+  gap: 4px;
+}
+
 .playground-metrics span {
   color: var(--ink-soft);
   font-size: 12px;
@@ -2521,6 +2547,38 @@ a {
 .playground-metrics strong {
   color: var(--ink);
   font-size: clamp(28px, 5vw, 48px);
+}
+
+.playground-result-text {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.playground-summary-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+}
+
+.playground-summary-list div {
+  display: grid;
+  padding: 10px 12px;
+  background: var(--paper);
+  gap: 4px;
+}
+
+.playground-summary-list dt {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.playground-summary-list dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
 }
 
 .playground-chart {

@@ -18,6 +18,23 @@ describe('Playground adapter registry', () => {
     expect(registry).toHaveLength(7);
   });
 
+  it('keeps UI defaults and parameter fields aligned with every registered adapter', () => {
+    const registry = getPlaygroundPairRegistry();
+
+    for (const entry of registry) {
+      expect(entry.title.en).toEqual(expect.any(String));
+      expect(entry.title.vi).toEqual(expect.any(String));
+      expect(entry.intro.en).toEqual(expect.any(String));
+      expect(entry.intro.vi).toEqual(expect.any(String));
+      expect(entry.defaultConfigName).toEqual(expect.any(String));
+      expect(entry.primaryMetricId).toEqual(expect.any(String));
+      expect(entry.parameterFields.map((field) => field.id)).toEqual(
+        Object.keys(entry.defaultConfig),
+      );
+      expect(() => entry.adapter?.validateConfig(entry.defaultConfig)).not.toThrow();
+    }
+  });
+
   it('runs the implemented pg-xor Perceptron adapter through the generic contract', async () => {
     const adapter = resolveAlgorithmAdapter({
       scenarioId: 'pg-xor',

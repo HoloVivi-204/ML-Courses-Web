@@ -6,7 +6,11 @@ import {
   XorPerceptronCancelledError,
   type XorPerceptronConfig,
 } from './xor-perceptron';
-import type { AlgorithmAdapter, PlaygroundPairRegistration } from './algorithm-adapter';
+import type {
+  AlgorithmAdapter,
+  PlaygroundPairRegistration,
+  PlaygroundParameterField,
+} from './algorithm-adapter';
 import {
   createDecisionTreeAdapter,
   createKMeansAdapter,
@@ -45,6 +49,49 @@ const xorPerceptronAdapter: AlgorithmAdapter = {
   },
 };
 
+const commonParameterFields = {
+  epochs(max: number, mobileMax?: number): PlaygroundParameterField {
+    return {
+      id: 'epochs',
+      kind: 'number',
+      integer: true,
+      label: { en: 'Epochs', vi: 'Epochs' },
+      min: 10,
+      max,
+      ...(mobileMax === undefined ? {} : { maxByDeviceProfile: { mobile: mobileMax } }),
+      step: 10,
+    };
+  },
+  learningRate: {
+    id: 'learningRate',
+    kind: 'number',
+    label: { en: 'Learning rate', vi: 'Tốc độ học' },
+    min: 0.0001,
+    max: 1,
+    step: 0.01,
+  },
+  seed: {
+    id: 'seed',
+    kind: 'number',
+    integer: true,
+    label: { en: 'Seed', vi: 'Seed' },
+    min: 0,
+    max: 1_000_000,
+    step: 1,
+  },
+  trainRatio: {
+    id: 'trainRatio',
+    kind: 'number',
+    label: { en: 'Train split', vi: 'Tỷ lệ train' },
+    min: 0.5,
+    max: 0.9,
+    step: 0.05,
+  },
+} satisfies Record<
+  string,
+  PlaygroundParameterField | ((max: number, mobileMax?: number) => PlaygroundParameterField)
+>;
+
 const playgroundPairRegistry = [
   {
     scenarioId: 'pg-xor',
@@ -58,6 +105,19 @@ const playgroundPairRegistry = [
       trainRatio: 0.75,
       seed: 42,
     },
+    defaultConfigName: 'XOR baseline',
+    intro: {
+      en: 'Run a one-layer Perceptron on the fixed XOR dataset and inspect why a linear boundary fails.',
+      vi: 'Chạy Perceptron một lớp trên dataset XOR cố định và quan sát vì sao ranh giới tuyến tính thất bại.',
+    },
+    parameterFields: [
+      commonParameterFields.learningRate,
+      commonParameterFields.epochs(500, 200),
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'accuracy',
+    title: { en: 'XOR Playground: Perceptron', vi: 'Playground XOR: Perceptron' },
     adapter: xorPerceptronAdapter,
   },
   {
@@ -74,6 +134,39 @@ const playgroundPairRegistry = [
       trainRatio: 0.75,
       seed: 42,
     },
+    defaultConfigName: 'XOR MLP baseline',
+    intro: {
+      en: 'Train a small MLP on the same fixed XOR split to show how a hidden layer solves the nonlinear pattern.',
+      vi: 'Huấn luyện một MLP nhỏ trên cùng split XOR cố định để thấy hidden layer xử lý quan hệ phi tuyến.',
+    },
+    parameterFields: [
+      {
+        id: 'hiddenLayers',
+        itemMax: 32,
+        itemMaxByDeviceProfile: { mobile: 16 },
+        itemMin: 1,
+        kind: 'integer-array',
+        label: { en: 'Hidden layers', vi: 'Hidden layers' },
+        maxItems: 3,
+        maxItemsByDeviceProfile: { mobile: 2 },
+      },
+      {
+        id: 'activation',
+        kind: 'enum',
+        label: { en: 'Activation', vi: 'Activation' },
+        options: [
+          { value: 'tanh', label: { en: 'tanh', vi: 'tanh' } },
+          { value: 'relu', label: { en: 'ReLU', vi: 'ReLU' } },
+          { value: 'sigmoid', label: { en: 'sigmoid', vi: 'sigmoid' } },
+        ],
+      },
+      commonParameterFields.learningRate,
+      commonParameterFields.epochs(1000, 500),
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'accuracy',
+    title: { en: 'XOR Playground: MLP', vi: 'Playground XOR: MLP' },
     adapter: createMlpAdapter(),
   },
   {
@@ -86,6 +179,25 @@ const playgroundPairRegistry = [
       fitIntercept: true,
       trainRatio: 0.8,
       seed: 42,
+    },
+    defaultConfigName: 'House linear baseline',
+    intro: {
+      en: 'Fit linear regression on the fixed house-price dataset and compare predictions with residual error.',
+      vi: 'Fit hồi quy tuyến tính trên dataset giá nhà cố định rồi so sánh dự đoán với sai số residual.',
+    },
+    parameterFields: [
+      {
+        id: 'fitIntercept',
+        kind: 'boolean',
+        label: { en: 'Fit intercept', vi: 'Fit intercept' },
+      },
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'rmse',
+    title: {
+      en: 'House price Playground: Linear regression',
+      vi: 'Playground giá nhà: Hồi quy tuyến tính',
     },
     adapter: createLinearRegressionAdapter(),
   },
@@ -102,6 +214,30 @@ const playgroundPairRegistry = [
       trainRatio: 0.8,
       seed: 42,
     },
+    defaultConfigName: 'Spam logistic baseline',
+    intro: {
+      en: 'Run logistic regression on the fixed SMS-spam feature table and inspect F1, precision, and recall.',
+      vi: 'Chạy hồi quy logistic trên bảng feature SMS spam cố định và xem F1, precision, recall.',
+    },
+    parameterFields: [
+      commonParameterFields.learningRate,
+      commonParameterFields.epochs(2000),
+      {
+        id: 'threshold',
+        kind: 'number',
+        label: { en: 'Threshold', vi: 'Ngưỡng' },
+        min: 0,
+        max: 1,
+        step: 0.05,
+      },
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'f1',
+    title: {
+      en: 'Spam detection Playground: Logistic regression',
+      vi: 'Playground phát hiện spam: Hồi quy logistic',
+    },
     adapter: createLogisticRegressionAdapter(),
   },
   {
@@ -116,6 +252,39 @@ const playgroundPairRegistry = [
       trainRatio: 0.8,
       seed: 42,
     },
+    defaultConfigName: 'Credit tree baseline',
+    intro: {
+      en: 'Train a deterministic decision tree on fixed credit-risk rows and focus on recall.',
+      vi: 'Huấn luyện decision tree tái lập trên dữ liệu rủi ro tín dụng cố định và tập trung vào recall.',
+    },
+    parameterFields: [
+      {
+        id: 'maxDepth',
+        integer: true,
+        kind: 'number',
+        label: { en: 'Max depth', vi: 'Độ sâu tối đa' },
+        min: 1,
+        max: 15,
+        maxByDeviceProfile: { mobile: 8 },
+        step: 1,
+      },
+      {
+        id: 'minSamplesLeaf',
+        integer: true,
+        kind: 'number',
+        label: { en: 'Min samples per leaf', vi: 'Mẫu tối thiểu mỗi lá' },
+        min: 1,
+        max: 50,
+        step: 1,
+      },
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'recall',
+    title: {
+      en: 'Credit risk Playground: Decision tree',
+      vi: 'Playground rủi ro tín dụng: Decision tree',
+    },
     adapter: createDecisionTreeAdapter(),
   },
   {
@@ -129,6 +298,38 @@ const playgroundPairRegistry = [
       maxIterations: 100,
       seed: 42,
     },
+    defaultConfigName: 'Retail K-Means baseline',
+    intro: {
+      en: 'Cluster fixed retail-customer rows with K-Means and inspect silhouette and inertia.',
+      vi: 'Phân cụm dữ liệu khách hàng bán lẻ cố định bằng K-Means và xem silhouette, inertia.',
+    },
+    parameterFields: [
+      {
+        id: 'k',
+        integer: true,
+        kind: 'number',
+        label: { en: 'Clusters (k)', vi: 'Số cụm (k)' },
+        min: 2,
+        max: 10,
+        maxByDeviceProfile: { mobile: 8 },
+        step: 1,
+      },
+      {
+        id: 'maxIterations',
+        integer: true,
+        kind: 'number',
+        label: { en: 'Max iterations', vi: 'Vòng lặp tối đa' },
+        min: 10,
+        max: 300,
+        step: 10,
+      },
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'silhouette',
+    title: {
+      en: 'Retail segments Playground: K-Means',
+      vi: 'Playground phân nhóm bán lẻ: K-Means',
+    },
     adapter: createKMeansAdapter(),
   },
   {
@@ -140,6 +341,32 @@ const playgroundPairRegistry = [
     defaultConfig: {
       components: 2,
       scale: true,
+    },
+    defaultConfigName: 'Country PCA baseline',
+    intro: {
+      en: 'Project fixed synthetic country indicators into two PCA components and inspect explained variance.',
+      vi: 'Chiếu dữ liệu chỉ báo quốc gia tổng hợp cố định vào hai thành phần PCA và xem phương sai giải thích.',
+    },
+    parameterFields: [
+      {
+        id: 'components',
+        integer: true,
+        kind: 'number',
+        label: { en: 'Components', vi: 'Components' },
+        min: 2,
+        max: 2,
+        step: 1,
+      },
+      {
+        id: 'scale',
+        kind: 'boolean',
+        label: { en: 'Scale features', vi: 'Scale features' },
+      },
+    ],
+    primaryMetricId: 'explained-variance',
+    title: {
+      en: 'Country indicators Playground: PCA',
+      vi: 'Playground chỉ số quốc gia: PCA',
     },
     adapter: createPcaAdapter(),
   },
