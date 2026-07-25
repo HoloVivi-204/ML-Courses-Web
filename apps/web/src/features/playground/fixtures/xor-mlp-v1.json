@@ -1,0 +1,31 @@
+{
+  "config": {
+    "hiddenLayers": [4],
+    "activation": "tanh",
+    "learningRate": 0.05,
+    "epochs": 300,
+    "trainRatio": 0.75,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-xor",
+    "algorithmId": "mlp",
+    "datasetVersionId": "ds-xor-noisy-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "accuracy": 1,
+      "loss": 0.0002
+    },
+    "chartSummary": {
+      "kind": "decision-boundary",
+      "hiddenLayers": [4],
+      "activation": "tanh"
+    },
+    "textAlternative": {
+      "en": "The MLP solves the nonlinear XOR split with accuracy 100% and loss 0.0002.",
+      "vi": "MLP giải được tập XOR phi tuyến với accuracy 100% và loss 0.0002."
+    }
+  }
+}

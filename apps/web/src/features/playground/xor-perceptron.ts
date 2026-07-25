@@ -1,4 +1,11 @@
 import type { MlMetrics, MlProgressEvent, MlRunResult } from './ml-engine-contract';
+import {
+  getPlaygroundDataset,
+  roundMetric,
+  shuffleItems,
+  splitDatasetRows,
+  type PlaygroundDatasetRow,
+} from './playground-datasets';
 
 export interface XorPerceptronConfig {
   epochs: number;
@@ -35,6 +42,10 @@ export interface XorPerceptronResult extends MlRunResult {
   };
   runId: string;
   scenarioId: 'pg-xor';
+  textAlternative: {
+    en: string;
+    vi: string;
+  };
 }
 
 interface XorSample {
@@ -56,13 +67,17 @@ export class XorPerceptronCancelledError extends Error {
   }
 }
 
-const DATASET_SEED = 42;
-const SAMPLE_COUNT = 400;
-
 export function validateXorPerceptronConfig(
   config: XorPerceptronConfig,
   deviceProfile: 'desktop' | 'mobile',
 ) {
+  assertAllowedConfigFields(config as unknown as Record<string, unknown>, [
+    'epochs',
+    'learningRate',
+    'seed',
+    'trainRatio',
+  ]);
+
   const maxEpochs = deviceProfile === 'mobile' ? 200 : 500;
 
   if (config.learningRate < 0.0001 || config.learningRate > 1) {
@@ -86,10 +101,10 @@ export async function runXorPerceptron(
   config: XorPerceptronConfig,
   options: RunOptions,
 ): Promise<XorPerceptronResult> {
-  const dataset = shuffleSamples(createXorDataset(), config.seed);
-  const trainCount = Math.floor(dataset.length * config.trainRatio);
-  const trainSamples = dataset.slice(0, trainCount);
-  const testSamples = dataset.slice(trainCount);
+  const dataset = getPlaygroundDataset('ds-xor-noisy-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainSamples = toXorSamples(split.trainRows);
+  const testSamples = toXorSamples(split.testRows);
   const weights: [number, number] = [0, 0];
   let bias = 0;
   const lossCurve: { epoch: number; loss: number }[] = [];
@@ -99,7 +114,7 @@ export async function runXorPerceptron(
       throw new XorPerceptronCancelledError(options.runId);
     }
 
-    const epochSamples = shuffleSamples(trainSamples, config.seed + epoch);
+    const epochSamples = shuffleItems(trainSamples, config.seed + epoch);
 
     for (const sample of epochSamples) {
       const prediction = predict(sample, weights, bias);
@@ -148,50 +163,43 @@ export async function runXorPerceptron(
       trainAccuracy: roundMetric(trainAccuracy),
       loss: roundMetric(testLoss),
     },
+    textAlternative: {
+      en: `Perceptron reaches ${Math.round(
+        roundedTestAccuracy * 100,
+      )}% accuracy, showing one linear boundary cannot solve XOR.`,
+      vi: `Perceptron đạt accuracy ${Math.round(
+        roundedTestAccuracy * 100,
+      )}%, cho thấy một ranh giới tuyến tính không giải được XOR.`,
+    },
   };
 }
 
-function createXorDataset(): XorSample[] {
-  const random = createSeededRandom(DATASET_SEED);
-  const centers: readonly (readonly [number, number, 0 | 1])[] = [
-    [-1, -1, 0],
-    [-1, 1, 1],
-    [1, -1, 1],
-    [1, 1, 0],
-  ];
-  const samples: XorSample[] = [];
+function toXorSamples(rows: readonly PlaygroundDatasetRow[]): XorSample[] {
+  return rows.map((row) => {
+    const x1 = row.features[0];
+    const x2 = row.features[1];
 
-  for (const [centerX1, centerX2, label] of centers) {
-    for (let index = 0; index < SAMPLE_COUNT / centers.length; index += 1) {
-      samples.push({
-        x1: centerX1 + gaussian(random) * 0.15,
-        x2: centerX2 + gaussian(random) * 0.15,
-        label,
-      });
+    if (typeof x1 !== 'number' || typeof x2 !== 'number' || (row.label !== 0 && row.label !== 1)) {
+      throw new Error('XOR dataset row is invalid.');
     }
-  }
 
-  return samples;
+    return { x1, x2, label: row.label };
+  });
 }
 
-function shuffleSamples(samples: readonly XorSample[], seed: number): XorSample[] {
-  const random = createSeededRandom(seed);
-  const shuffledSamples = [...samples];
-
-  for (let index = shuffledSamples.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    const current = shuffledSamples[index];
-    const next = shuffledSamples[swapIndex];
-
-    if (!current || !next) {
-      continue;
-    }
-
-    shuffledSamples[index] = next;
-    shuffledSamples[swapIndex] = current;
+function assertAllowedConfigFields(
+  value: Record<string, unknown>,
+  allowedFields: readonly string[],
+): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('config must be an object.');
   }
 
-  return shuffledSamples;
+  const unsupportedFields = Object.keys(value).filter((field) => !allowedFields.includes(field));
+
+  if (unsupportedFields.length > 0) {
+    throw new Error(`Unsupported config fields: ${unsupportedFields.join(', ')}.`);
+  }
 }
 
 function predict(sample: XorSample, weights: readonly [number, number], bias: number): 0 | 1 {
@@ -212,33 +220,6 @@ function classificationLoss(
   bias: number,
 ) {
   return 1 - accuracy(samples, weights, bias);
-}
-
-function createSeededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
-
-function gaussian(random: () => number): number {
-  const left = Math.max(random(), Number.EPSILON);
-  const right = random();
-
-  return Math.sqrt(-2 * Math.log(left)) * Math.cos(2 * Math.PI * right);
-}
-
-function roundMetric(value: number): number {
-  const rounded = Number(value.toFixed(4));
-
-  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 async function yieldToWorkerQueue(): Promise<void> {

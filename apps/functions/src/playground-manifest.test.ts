@@ -108,6 +108,37 @@ describe('playground manifest validation', () => {
     ).toThrowError(/epochs must be between 10 and 1000/i);
   });
 
+  it('enforces the TDD desktop K-Means k limit over the looser matrix planning limit', () => {
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'kmeans',
+        config: {
+          k: 11,
+          maxIterations: 100,
+          seed: 42,
+        },
+        datasetVersionId: 'ds-retail-segments-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-retail-segments',
+      }),
+    ).toThrowError(/k must be between 2 and 10/i);
+  });
+
+  it('rejects PCA components above the static country-indicator feature count', () => {
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'pca',
+        config: {
+          components: 3,
+          scale: true,
+        },
+        datasetVersionId: 'ds-country-indicators-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-country-indicators',
+      }),
+    ).toThrowError(/components must be between 2 and 2/i);
+  });
+
   it('normalizes the release-one pg-xor Perceptron default config deterministically', () => {
     const config = normalizePerceptronPlaygroundConfig(
       {

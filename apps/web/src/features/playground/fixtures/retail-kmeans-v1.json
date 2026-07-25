@@ -1,0 +1,27 @@
+{
+  "config": {
+    "k": 4,
+    "maxIterations": 100,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-retail-segments",
+    "algorithmId": "kmeans",
+    "datasetVersionId": "ds-retail-segments-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "silhouette": 0.9602,
+      "inertia": 0.0438
+    },
+    "chartSummary": {
+      "kind": "cluster-plot",
+      "clusterSizes": [4, 4, 4, 4]
+    },
+    "textAlternative": {
+      "en": "K-Means finds four synthetic retail segments with silhouette 0.9602.",
+      "vi": "K-Means tìm bốn nhóm khách hàng bán lẻ tổng hợp với silhouette 0.9602."
+    }
+  }
+}

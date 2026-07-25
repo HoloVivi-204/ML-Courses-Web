@@ -66,6 +66,10 @@
       "testAccuracy": 0.5,
       "trainAccuracy": 0.5,
       "loss": 0.5
+    },
+    "textAlternative": {
+      "en": "Perceptron reaches 50% accuracy, showing one linear boundary cannot solve XOR.",
+      "vi": "Perceptron đạt accuracy 50%, cho thấy một ranh giới tuyến tính không giải được XOR."
     }
   }
 }

@@ -70,12 +70,12 @@ describe('Playground adapter registry', () => {
     expect(progressEpochs.at(-1)).toBe(100);
   });
 
-  it('fails closed for registered pairs without a worker adapter and for Should pairs', () => {
+  it('fails closed for disabled Should pairs and unsupported dataset combinations', () => {
     expect(
       resolveAlgorithmAdapter({
         scenarioId: 'pg-country-indicators',
         algorithmId: 'pca',
-        datasetVersionId: 'ds-country-indicators-v1',
+        datasetVersionId: 'ds-xor-noisy-v1',
       }),
     ).toBeNull();
     expect(

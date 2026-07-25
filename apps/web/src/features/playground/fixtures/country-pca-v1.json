@@ -1,0 +1,26 @@
+{
+  "config": {
+    "components": 2,
+    "scale": true
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-country-indicators",
+    "algorithmId": "pca",
+    "datasetVersionId": "ds-country-indicators-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "explained-variance": 1,
+      "reconstruction-error": 0
+    },
+    "chartSummary": {
+      "kind": "projection-2d",
+      "components": 2
+    },
+    "textAlternative": {
+      "en": "Two PCA components explain 100% of variance in the synthetic country indicators.",
+      "vi": "Hai thành phần PCA giải thích 100% phương sai của dữ liệu chỉ báo quốc gia tổng hợp."
+    }
+  }
+}

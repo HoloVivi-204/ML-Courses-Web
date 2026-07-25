@@ -1,0 +1,33 @@
+{
+  "config": {
+    "learningRate": 0.05,
+    "epochs": 300,
+    "threshold": 0.5,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-spam-detection",
+    "algorithmId": "logistic-regression",
+    "datasetVersionId": "ds-sms-spam-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "f1": 1,
+      "precision": 1,
+      "recall": 1
+    },
+    "chartSummary": {
+      "kind": "confusion-matrix",
+      "truePositive": 2,
+      "falsePositive": 0,
+      "trueNegative": 2,
+      "falseNegative": 0
+    },
+    "textAlternative": {
+      "en": "Logistic regression reaches F1 1 on the synthetic SMS test split.",
+      "vi": "Hồi quy logistic đạt F1 1 trên tập kiểm tra SMS tổng hợp."
+    }
+  }
+}

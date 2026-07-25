@@ -7,6 +7,14 @@ import {
   type XorPerceptronConfig,
 } from './xor-perceptron';
 import type { AlgorithmAdapter, PlaygroundPairRegistration } from './algorithm-adapter';
+import {
+  createDecisionTreeAdapter,
+  createKMeansAdapter,
+  createLinearRegressionAdapter,
+  createLogisticRegressionAdapter,
+  createMlpAdapter,
+  createPcaAdapter,
+} from './reference-adapters';
 
 const xorPerceptronAdapter: AlgorithmAdapter = {
   adapterVersion: 'perceptron-js-v1',
@@ -66,7 +74,7 @@ const playgroundPairRegistry = [
       trainRatio: 0.75,
       seed: 42,
     },
-    adapter: null,
+    adapter: createMlpAdapter(),
   },
   {
     scenarioId: 'pg-house-price',
@@ -79,7 +87,7 @@ const playgroundPairRegistry = [
       trainRatio: 0.8,
       seed: 42,
     },
-    adapter: null,
+    adapter: createLinearRegressionAdapter(),
   },
   {
     scenarioId: 'pg-spam-detection',
@@ -94,7 +102,7 @@ const playgroundPairRegistry = [
       trainRatio: 0.8,
       seed: 42,
     },
-    adapter: null,
+    adapter: createLogisticRegressionAdapter(),
   },
   {
     scenarioId: 'pg-credit-risk',
@@ -108,7 +116,7 @@ const playgroundPairRegistry = [
       trainRatio: 0.8,
       seed: 42,
     },
-    adapter: null,
+    adapter: createDecisionTreeAdapter(),
   },
   {
     scenarioId: 'pg-retail-segments',
@@ -121,7 +129,7 @@ const playgroundPairRegistry = [
       maxIterations: 100,
       seed: 42,
     },
-    adapter: null,
+    adapter: createKMeansAdapter(),
   },
   {
     scenarioId: 'pg-country-indicators',
@@ -133,7 +141,7 @@ const playgroundPairRegistry = [
       components: 2,
       scale: true,
     },
-    adapter: null,
+    adapter: createPcaAdapter(),
   },
 ] satisfies readonly PlaygroundPairRegistration[];
 

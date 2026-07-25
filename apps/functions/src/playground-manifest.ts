@@ -174,7 +174,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
       maxIterations: 100,
       seed: 42,
     },
-    desktopLimits: { k: 12 },
+    desktopLimits: { k: 10 },
     feedbackRules: ['too-few-clusters', 'too-many-clusters'],
     goldenFixture: 'fixtures/retail-kmeans-v1.json',
     mobileLimits: { k: 8 },
@@ -194,10 +194,10 @@ const SUBMISSION_PAIR_MANIFESTS = [
       components: 2,
       scale: true,
     },
-    desktopLimits: { features: 100 },
+    desktopLimits: { components: 2, features: 100 },
     feedbackRules: ['low-variance', 'scale-warning'],
     goldenFixture: 'fixtures/country-pca-v1.json',
-    mobileLimits: { features: 50 },
+    mobileLimits: { components: 2, features: 50 },
     preprocessing: ['median-impute', 'standard-scale'],
     primaryMetric: 'explained-variance',
     scenarioId: 'pg-country-indicators',
@@ -293,7 +293,7 @@ export function normalizePlaygroundConfig(input: NormalizePlaygroundConfigInput)
   }
 
   if (manifest.algorithmId === 'pca') {
-    return normalizePcaConfig(input.config, input.deviceProfile);
+    return normalizePcaConfig(input.config, manifest, input.deviceProfile);
   }
 
   throw new ApiError(
@@ -451,15 +451,16 @@ function normalizeKMeansConfig(
 
 function normalizePcaConfig(
   value: unknown,
+  manifest: PlaygroundPairManifest,
   deviceProfile: PlaygroundDeviceProfile,
 ): PlaygroundConfig {
   assertAllowedConfigFields(value, ['components', 'scale']);
 
   const config = value as Record<string, unknown>;
-  const featureLimit = deviceProfile === 'mobile' ? 50 : 100;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
 
   return {
-    components: getIntegerInRange(config, 'components', 2, Math.min(10, featureLimit)),
+    components: getIntegerInRange(config, 'components', 2, getManifestLimit(limits, 'components')),
     scale: getBoolean(config, 'scale'),
   };
 }

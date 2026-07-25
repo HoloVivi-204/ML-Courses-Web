@@ -1,0 +1,34 @@
+{
+  "config": {
+    "maxDepth": 5,
+    "minSamplesLeaf": 5,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-credit-risk",
+    "algorithmId": "decision-tree",
+    "datasetVersionId": "ds-credit-risk-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "recall": 1,
+      "f1": 1,
+      "precision": 1
+    },
+    "chartSummary": {
+      "kind": "tree",
+      "rootFeature": "debtRatio",
+      "rootThreshold": 0.56,
+      "truePositive": 2,
+      "falsePositive": 0,
+      "trueNegative": 2,
+      "falseNegative": 0
+    },
+    "textAlternative": {
+      "en": "Decision tree identifies the synthetic credit-risk test rows with recall 1.",
+      "vi": "Cây quyết định nhận diện tập kiểm tra rủi ro tín dụng tổng hợp với recall 1."
+    }
+  }
+}
