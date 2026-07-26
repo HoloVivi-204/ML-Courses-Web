@@ -1,0 +1,30 @@
+{
+  "config": {
+    "alpha": 1,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-house-price",
+    "algorithmId": "ridge-regression",
+    "datasetVersionId": "ds-house-price-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "rmse": 4.3453,
+      "r2": 0.9966,
+      "mae": 3.101
+    },
+    "chartSummary": {
+      "kind": "residual-coefficient",
+      "residualMean": -2.0659,
+      "residualMaxAbs": 8.3179,
+      "coefficientMagnitudes": [75.0445, 61.6865, 22.0751, 8.7211]
+    },
+    "textAlternative": {
+      "en": "Ridge regression predicts the synthetic house-price test rows with RMSE 4.3453.",
+      "vi": "Hồi quy Ridge dự đoán tập kiểm tra giá nhà tổng hợp với RMSE 4.3453."
+    }
+  }
+}

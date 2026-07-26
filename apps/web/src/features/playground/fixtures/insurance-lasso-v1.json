@@ -1,0 +1,31 @@
+{
+  "config": {
+    "alpha": 0.1,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-insurance-cost",
+    "algorithmId": "lasso-regression",
+    "datasetVersionId": "ds-insurance-cost-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "mae": 302.0517,
+      "rmse": 397.6565,
+      "r2": 0.9949
+    },
+    "chartSummary": {
+      "kind": "residual-coefficient",
+      "residualMean": 109.7572,
+      "residualMaxAbs": 815.9758,
+      "coefficientMagnitudes": [1198.9337, 2407.2957, 3551.8803, 362.7026],
+      "zeroCoefficientCount": 0
+    },
+    "textAlternative": {
+      "en": "Lasso regression reaches MAE 302.0517 on the synthetic insurance test split.",
+      "vi": "Hồi quy Lasso đạt MAE 302.0517 trên tập kiểm tra bảo hiểm tổng hợp."
+    }
+  }
+}

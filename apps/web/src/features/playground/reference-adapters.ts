@@ -17,8 +17,28 @@ export class PlaygroundReferenceAdapterCancelledError extends Error {
   }
 }
 
+const LASSO_MAX_ITERATIONS = 250;
+
 interface LinearRegressionConfig {
   fitIntercept: boolean;
+  seed: number;
+  trainRatio: number;
+}
+
+interface RidgeRegressionConfig {
+  alpha: number;
+  seed: number;
+  trainRatio: number;
+}
+
+interface PolynomialRegressionConfig {
+  degree: number;
+  seed: number;
+  trainRatio: number;
+}
+
+interface LassoRegressionConfig {
+  alpha: number;
   seed: number;
   trainRatio: number;
 }
@@ -104,6 +124,69 @@ export function createLinearRegressionAdapter(): AlgorithmAdapter {
       const config = validateLinearRegressionConfig(request.config);
 
       return runLinearRegression(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createRidgeRegressionAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'ridge-regression-js-v1',
+    algorithmId: 'ridge-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-house-price-v1',
+    scenarioId: 'pg-house-price',
+    validateConfig(config) {
+      return validateRidgeRegressionConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateRidgeRegressionConfig(request.config);
+
+      return runRidgeRegression(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createPolynomialRegressionAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'polynomial-regression-js-v1',
+    algorithmId: 'polynomial-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-insurance-cost-v1',
+    scenarioId: 'pg-insurance-cost',
+    validateConfig(config) {
+      return validatePolynomialRegressionConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validatePolynomialRegressionConfig(request.config);
+
+      return runPolynomialRegression(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createLassoRegressionAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'lasso-regression-js-v1',
+    algorithmId: 'lasso-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-insurance-cost-v1',
+    scenarioId: 'pg-insurance-cost',
+    validateConfig(config) {
+      return validateLassoRegressionConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateLassoRegressionConfig(request.config);
+
+      return runLassoRegression(request, config, options);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -286,6 +369,288 @@ function validateLinearRegressionConfig(config: MlConfig): LinearRegressionConfi
 
   return {
     fitIntercept: readBoolean(config, 'fitIntercept'),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+async function runRidgeRegression(
+  request: MlRunRequest,
+  config: RidgeRegressionConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-house-price-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const scaler = fitStandardScaler(trainRows);
+  const trainFeatures = trainRows.map((row) => createModelFeatures(row, scaler, true));
+  const coefficients = solveRidgeRegression(
+    trainFeatures,
+    trainRows.map((row) => row.label),
+    config.alpha,
+  );
+  const predictions = testRows.map((row) =>
+    predictLinear(createModelFeatures(row, scaler, true), coefficients),
+  );
+  const metrics = calculateRegressionMetrics(
+    testRows.map((row) => row.label),
+    predictions,
+  );
+  const residuals = predictions.map((prediction, index) => {
+    const actual = testRows[index]?.label;
+
+    if (actual === undefined) {
+      throw new Error('Regression test row is missing a label.');
+    }
+
+    return actual - prediction;
+  });
+
+  options.onProgress({
+    runId: request.runId,
+    iteration: 1,
+    totalIterations: 1,
+    metric: { id: 'rmse', value: metrics.rmse },
+  });
+  await yieldToWorkerQueue();
+  throwIfCancelled(request.runId, options);
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-house-price',
+    algorithmId: 'ridge-regression',
+    datasetVersionId: 'ds-house-price-v1',
+    determinism: 'exact',
+    feedback: metrics.rmse > 10 ? ['underfit'] : [],
+    metrics,
+    chartSummary: {
+      kind: 'residual-coefficient',
+      coefficientMagnitudes: coefficients
+        .slice(1)
+        .map((coefficient) => roundMetric(Math.abs(coefficient))),
+      residualMean: roundMetric(mean(residuals)),
+      residualMaxAbs: roundMetric(Math.max(...residuals.map((value) => Math.abs(value)))),
+    },
+    textAlternative: {
+      en: `Ridge regression predicts the synthetic house-price test rows with RMSE ${metrics.rmse}.`,
+      vi: `Hồi quy Ridge dự đoán tập kiểm tra giá nhà tổng hợp với RMSE ${metrics.rmse}.`,
+    },
+  };
+}
+
+function validateRidgeRegressionConfig(config: MlConfig): RidgeRegressionConfig {
+  assertAllowedFields(config, ['alpha', 'seed', 'trainRatio']);
+
+  return {
+    alpha: readNumberInRange(config, 'alpha', 0.0001, 100),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+async function runPolynomialRegression(
+  request: MlRunRequest,
+  config: PolynomialRegressionConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-insurance-cost-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const scaler = fitStandardScaler(trainRows);
+  const trainFeatures = trainRows.map((row) =>
+    createPolynomialFeatures(createScaledFeatures(row, scaler), config.degree),
+  );
+  const coefficients = solveRidgeRegression(
+    trainFeatures,
+    trainRows.map((row) => row.label),
+    0.000001,
+  );
+  const predictions = testRows.map((row) =>
+    predictLinear(
+      createPolynomialFeatures(createScaledFeatures(row, scaler), config.degree),
+      coefficients,
+    ),
+  );
+  const metrics = calculateRegressionMetrics(
+    testRows.map((row) => row.label),
+    predictions,
+  );
+  const residuals = predictions.map((prediction, index) => {
+    const actual = testRows[index]?.label;
+
+    if (actual === undefined) {
+      throw new Error('Regression test row is missing a label.');
+    }
+
+    return actual - prediction;
+  });
+
+  options.onProgress({
+    runId: request.runId,
+    iteration: 1,
+    totalIterations: 1,
+    metric: { id: 'mae', value: metrics.mae },
+  });
+  await yieldToWorkerQueue();
+  throwIfCancelled(request.runId, options);
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-insurance-cost',
+    algorithmId: 'polynomial-regression',
+    datasetVersionId: 'ds-insurance-cost-v1',
+    determinism: 'exact',
+    feedback: config.degree === 1 ? ['underfit'] : [],
+    metrics: {
+      mae: metrics.mae,
+      rmse: metrics.rmse,
+      r2: metrics.r2,
+    },
+    chartSummary: {
+      kind: 'polynomial-residual',
+      degree: config.degree,
+      residualMean: roundMetric(mean(residuals)),
+      residualMaxAbs: roundMetric(Math.max(...residuals.map((value) => Math.abs(value)))),
+    },
+    textAlternative: {
+      en: `Polynomial regression reaches MAE ${metrics.mae} on the synthetic insurance test split.`,
+      vi: `Hồi quy đa thức đạt MAE ${metrics.mae} trên tập kiểm tra bảo hiểm tổng hợp.`,
+    },
+  };
+}
+
+function validatePolynomialRegressionConfig(config: MlConfig): PolynomialRegressionConfig {
+  assertAllowedFields(config, ['degree', 'seed', 'trainRatio']);
+
+  return {
+    degree: readIntegerInRange(config, 'degree', 1, 5),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+async function runLassoRegression(
+  request: MlRunRequest,
+  config: LassoRegressionConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-insurance-cost-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const scaler = fitStandardScaler(trainRows);
+  const trainFeatures = trainRows.map((row) => createScaledFeatures(row, scaler));
+  const labelMean = mean(trainRows.map((row) => row.label));
+  const centeredLabels = trainRows.map((row) => row.label - labelMean);
+  const coefficients = Array(dataset.featureColumns.length).fill(0) as number[];
+  const trainPredictions = Array(trainRows.length).fill(0) as number[];
+
+  for (let iteration = 1; iteration <= LASSO_MAX_ITERATIONS; iteration += 1) {
+    throwIfCancelled(request.runId, options);
+
+    for (let featureIndex = 0; featureIndex < coefficients.length; featureIndex += 1) {
+      const previousCoefficient = coefficients[featureIndex] ?? 0;
+      let numerator = 0;
+      let denominator = 0;
+
+      for (let rowIndex = 0; rowIndex < trainFeatures.length; rowIndex += 1) {
+        const feature = trainFeatures[rowIndex]?.[featureIndex] ?? 0;
+        const label = centeredLabels[rowIndex] ?? 0;
+        const prediction = trainPredictions[rowIndex] ?? 0;
+
+        numerator += feature * (label - prediction + feature * previousCoefficient);
+        denominator += feature * feature;
+      }
+
+      const nextCoefficient =
+        denominator === 0
+          ? 0
+          : softThreshold(numerator, config.alpha * trainRows.length) / denominator;
+      const coefficientDelta = nextCoefficient - previousCoefficient;
+      coefficients[featureIndex] = nextCoefficient;
+
+      for (let rowIndex = 0; rowIndex < trainFeatures.length; rowIndex += 1) {
+        const feature = trainFeatures[rowIndex]?.[featureIndex] ?? 0;
+        trainPredictions[rowIndex] = (trainPredictions[rowIndex] ?? 0) + feature * coefficientDelta;
+      }
+    }
+
+    if (iteration === 1 || iteration === LASSO_MAX_ITERATIONS || iteration % 25 === 0) {
+      const trainMae = mean(
+        trainRows.map((row, rowIndex) =>
+          Math.abs(row.label - (labelMean + (trainPredictions[rowIndex] ?? 0))),
+        ),
+      );
+
+      options.onProgress({
+        runId: request.runId,
+        iteration,
+        totalIterations: LASSO_MAX_ITERATIONS,
+        metric: { id: 'mae', value: roundMetric(trainMae) },
+      });
+      await yieldToWorkerQueue();
+    }
+  }
+
+  const predictions = testRows.map(
+    (row) => labelMean + dotProduct(createScaledFeatures(row, scaler), coefficients),
+  );
+  const metrics = calculateRegressionMetrics(
+    testRows.map((row) => row.label),
+    predictions,
+  );
+  const residuals = predictions.map((prediction, index) => {
+    const actual = testRows[index]?.label;
+
+    if (actual === undefined) {
+      throw new Error('Regression test row is missing a label.');
+    }
+
+    return actual - prediction;
+  });
+  const zeroCoefficientCount = coefficients.filter(
+    (coefficient) => Math.abs(coefficient) < 0.000001,
+  ).length;
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-insurance-cost',
+    algorithmId: 'lasso-regression',
+    datasetVersionId: 'ds-insurance-cost-v1',
+    determinism: 'exact',
+    feedback: zeroCoefficientCount > 0 ? ['sparsity'] : [],
+    metrics: {
+      mae: metrics.mae,
+      rmse: metrics.rmse,
+      r2: metrics.r2,
+    },
+    chartSummary: {
+      kind: 'residual-coefficient',
+      coefficientMagnitudes: coefficients.map((coefficient) => roundMetric(Math.abs(coefficient))),
+      residualMean: roundMetric(mean(residuals)),
+      residualMaxAbs: roundMetric(Math.max(...residuals.map((value) => Math.abs(value)))),
+      zeroCoefficientCount,
+    },
+    textAlternative: {
+      en: `Lasso regression reaches MAE ${metrics.mae} on the synthetic insurance test split.`,
+      vi: `Hồi quy Lasso đạt MAE ${metrics.mae} trên tập kiểm tra bảo hiểm tổng hợp.`,
+    },
+  };
+}
+
+function validateLassoRegressionConfig(config: MlConfig): LassoRegressionConfig {
+  assertAllowedFields(config, ['alpha', 'seed', 'trainRatio']);
+
+  return {
+    alpha: readNumberInRange(config, 'alpha', 0.0001, 100),
     trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
   };
@@ -890,6 +1255,91 @@ function solveLeastSquares(features: readonly number[][], labels: readonly numbe
   return solveLinearSystem(normalMatrix, normalVector);
 }
 
+function solveRidgeRegression(
+  features: readonly number[][],
+  labels: readonly number[],
+  alpha: number,
+): number[] {
+  const columnCount = features[0]?.length ?? 0;
+  const normalMatrix = Array.from({ length: columnCount }, () => Array(columnCount).fill(0));
+  const normalVector = Array(columnCount).fill(0);
+
+  features.forEach((row, rowIndex) => {
+    const label = labels[rowIndex];
+
+    if (label === undefined) {
+      throw new Error('Regression label is missing.');
+    }
+
+    for (let leftIndex = 0; leftIndex < columnCount; leftIndex += 1) {
+      const leftFeature = row[leftIndex] ?? 0;
+      const normalMatrixRow = normalMatrix[leftIndex];
+
+      if (!normalMatrixRow) {
+        throw new Error('Normal matrix row is missing.');
+      }
+
+      normalVector[leftIndex] = (normalVector[leftIndex] ?? 0) + leftFeature * label;
+
+      for (let rightIndex = 0; rightIndex < columnCount; rightIndex += 1) {
+        normalMatrixRow[rightIndex] =
+          (normalMatrixRow[rightIndex] ?? 0) + leftFeature * (row[rightIndex] ?? 0);
+      }
+    }
+  });
+
+  for (let featureIndex = 1; featureIndex < columnCount; featureIndex += 1) {
+    const matrixRow = normalMatrix[featureIndex];
+
+    if (!matrixRow) {
+      throw new Error('Ridge normal matrix row is missing.');
+    }
+
+    matrixRow[featureIndex] = (matrixRow[featureIndex] ?? 0) + alpha;
+  }
+
+  return solveLinearSystem(normalMatrix, normalVector);
+}
+
+function createPolynomialFeatures(features: readonly number[], degree: number): number[] {
+  const polynomialFeatures = [1];
+
+  for (let currentDegree = 1; currentDegree <= degree; currentDegree += 1) {
+    appendPolynomialTerms(polynomialFeatures, features, currentDegree, 0, 1);
+  }
+
+  return polynomialFeatures;
+}
+
+function appendPolynomialTerms(
+  target: number[],
+  features: readonly number[],
+  remainingDegree: number,
+  startIndex: number,
+  product: number,
+): void {
+  if (remainingDegree === 0) {
+    target.push(product);
+    return;
+  }
+
+  for (let featureIndex = startIndex; featureIndex < features.length; featureIndex += 1) {
+    const featureValue = features[featureIndex];
+
+    if (featureValue === undefined) {
+      throw new Error('Polynomial feature is missing.');
+    }
+
+    appendPolynomialTerms(
+      target,
+      features,
+      remainingDegree - 1,
+      featureIndex,
+      product * featureValue,
+    );
+  }
+}
+
 function solveLinearSystem(matrix: number[][], vector: number[]): number[] {
   const size = vector.length;
   const augmentedMatrix = matrix.map((row, index) => [...row, vector[index] ?? 0]);
@@ -1472,6 +1922,18 @@ function calculateLogLoss(
 
 function clampProbability(probability: number): number {
   return Math.min(1 - 1e-12, Math.max(1e-12, probability));
+}
+
+function softThreshold(value: number, threshold: number): number {
+  if (value > threshold) {
+    return value - threshold;
+  }
+
+  if (value < -threshold) {
+    return value + threshold;
+  }
+
+  return 0;
 }
 
 function sigmoid(value: number): number {

@@ -4,6 +4,9 @@ import { resolveAlgorithmAdapter } from './playground-adapter-registry';
 import creditTreeFixture from './fixtures/credit-tree-v1.json';
 import countryPcaFixture from './fixtures/country-pca-v1.json';
 import houseLinearFixture from './fixtures/house-linear-v1.json';
+import houseRidgeFixture from './fixtures/house-ridge-v1.json';
+import insurancePolynomialFixture from './fixtures/insurance-polynomial-v1.json';
+import insuranceLassoFixture from './fixtures/insurance-lasso-v1.json';
 import retailKMeansFixture from './fixtures/retail-kmeans-v1.json';
 import spamLogisticFixture from './fixtures/spam-logistic-v1.json';
 import xorPerceptronFixture from './fixtures/xor-perceptron-v1.json';
@@ -27,6 +30,24 @@ const fixtureCases = [
     algorithmId: 'linear-regression',
     datasetVersionId: 'ds-house-price-v1',
     fixture: houseLinearFixture,
+  },
+  {
+    scenarioId: 'pg-house-price',
+    algorithmId: 'ridge-regression',
+    datasetVersionId: 'ds-house-price-v1',
+    fixture: houseRidgeFixture,
+  },
+  {
+    scenarioId: 'pg-insurance-cost',
+    algorithmId: 'polynomial-regression',
+    datasetVersionId: 'ds-insurance-cost-v1',
+    fixture: insurancePolynomialFixture,
+  },
+  {
+    scenarioId: 'pg-insurance-cost',
+    algorithmId: 'lasso-regression',
+    datasetVersionId: 'ds-insurance-cost-v1',
+    fixture: insuranceLassoFixture,
   },
   {
     scenarioId: 'pg-spam-detection',
@@ -55,7 +76,7 @@ const fixtureCases = [
 ] as const;
 
 describe('Playground reference adapters', () => {
-  it('registers runnable adapters for all seven locked submission fixture pairs', () => {
+  it('registers runnable adapters for every implemented Must fixture pair', () => {
     for (const fixtureCase of fixtureCases) {
       expect(resolveAlgorithmAdapter(fixtureCase)).not.toBeNull();
     }
@@ -78,7 +99,7 @@ describe('Playground reference adapters', () => {
     }
   });
 
-  it('returns deterministic results for all seven golden fixture pairs', async () => {
+  it('returns deterministic results for every implemented Must golden fixture pair', async () => {
     for (const fixtureCase of fixtureCases) {
       const adapter = resolveAlgorithmAdapter(fixtureCase);
 
@@ -176,6 +197,108 @@ describe('Playground reference adapters', () => {
       ...houseLinearFixture.result,
     });
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('RMSE'));
+  });
+
+  it('runs pg-house-price ridge regression through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-house-price',
+      algorithmId: 'ridge-regression',
+      datasetVersionId: 'ds-house-price-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-house-price/ridge-regression adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-house-ridge',
+        sessionId: 'session-house-ridge',
+        scenarioId: 'pg-house-price',
+        algorithmId: 'ridge-regression',
+        datasetVersionId: 'ds-house-price-v1',
+        configHash: '8'.repeat(64),
+        config: houseRidgeFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-house-ridge',
+      ...houseRidgeFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('RMSE'));
+  });
+
+  it('runs pg-insurance-cost polynomial regression through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-insurance-cost',
+      algorithmId: 'polynomial-regression',
+      datasetVersionId: 'ds-insurance-cost-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-insurance-cost/polynomial-regression adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-insurance-polynomial',
+        sessionId: 'session-insurance-polynomial',
+        scenarioId: 'pg-insurance-cost',
+        algorithmId: 'polynomial-regression',
+        datasetVersionId: 'ds-insurance-cost-v1',
+        configHash: '8'.repeat(64),
+        config: insurancePolynomialFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-insurance-polynomial',
+      ...insurancePolynomialFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('MAE'));
+  });
+
+  it('runs pg-insurance-cost Lasso regression through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-insurance-cost',
+      algorithmId: 'lasso-regression',
+      datasetVersionId: 'ds-insurance-cost-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-insurance-cost/lasso-regression adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-insurance-lasso',
+        sessionId: 'session-insurance-lasso',
+        scenarioId: 'pg-insurance-cost',
+        algorithmId: 'lasso-regression',
+        datasetVersionId: 'ds-insurance-cost-v1',
+        configHash: '8'.repeat(64),
+        config: insuranceLassoFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-insurance-lasso',
+      ...insuranceLassoFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('MAE'));
   });
 
   it('runs pg-spam-detection logistic regression through the registry and matches the golden fixture', async () => {

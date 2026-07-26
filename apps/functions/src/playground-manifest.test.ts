@@ -10,19 +10,22 @@ import {
 } from './playground-manifest.js';
 
 describe('playground manifest validation', () => {
-  it('exposes exactly the seven submission Playground pairs as the baseline runtime manifest', () => {
+  it('exposes every implemented Must pair in the baseline runtime manifest', () => {
     const manifests = getSubmissionPlaygroundPairManifests();
 
     expect(manifests.map((manifest) => `${manifest.scenarioId}/${manifest.algorithmId}`)).toEqual([
       'pg-xor/perceptron',
       'pg-xor/mlp',
       'pg-house-price/linear-regression',
+      'pg-house-price/ridge-regression',
+      'pg-insurance-cost/polynomial-regression',
+      'pg-insurance-cost/lasso-regression',
       'pg-spam-detection/logistic-regression',
       'pg-credit-risk/decision-tree',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(manifests).toHaveLength(7);
+    expect(manifests).toHaveLength(10);
     expect(
       manifests.every(
         (manifest) =>
@@ -122,6 +125,36 @@ describe('playground manifest validation', () => {
         scenarioId: 'pg-retail-segments',
       }),
     ).toThrowError(/k must be between 2 and 10/i);
+  });
+
+  it('enforces the regression-family alpha and polynomial degree limits before worker execution', () => {
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'ridge-regression',
+        config: { alpha: 100.1, trainRatio: 0.8, seed: 42 },
+        datasetVersionId: 'ds-house-price-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-house-price',
+      }),
+    ).toThrowError(/alpha must be between 0.0001 and 100/i);
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'lasso-regression',
+        config: { alpha: 0, trainRatio: 0.8, seed: 42 },
+        datasetVersionId: 'ds-insurance-cost-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-insurance-cost',
+      }),
+    ).toThrowError(/alpha must be between 0.0001 and 100/i);
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'polynomial-regression',
+        config: { degree: 4, trainRatio: 0.8, seed: 42 },
+        datasetVersionId: 'ds-insurance-cost-v1',
+        deviceProfile: 'mobile',
+        scenarioId: 'pg-insurance-cost',
+      }),
+    ).toThrowError(/degree must be between 1 and 3/i);
   });
 
   it('rejects PCA components above the static country-indicator feature count', () => {

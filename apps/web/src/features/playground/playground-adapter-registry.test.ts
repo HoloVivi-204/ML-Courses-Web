@@ -3,19 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { getPlaygroundPairRegistry, resolveAlgorithmAdapter } from './playground-adapter-registry';
 
 describe('Playground adapter registry', () => {
-  it('exposes exactly the seven locked submission pairs to the worker registry', () => {
+  it('exposes every implemented Must pair to the worker registry', () => {
     const registry = getPlaygroundPairRegistry();
 
     expect(registry.map((entry) => `${entry.scenarioId}/${entry.algorithmId}`)).toEqual([
       'pg-xor/perceptron',
       'pg-xor/mlp',
       'pg-house-price/linear-regression',
+      'pg-house-price/ridge-regression',
+      'pg-insurance-cost/polynomial-regression',
+      'pg-insurance-cost/lasso-regression',
       'pg-spam-detection/logistic-regression',
       'pg-credit-risk/decision-tree',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(registry).toHaveLength(7);
+    expect(registry).toHaveLength(10);
   });
 
   it('keeps UI defaults and parameter fields aligned with every registered adapter', () => {

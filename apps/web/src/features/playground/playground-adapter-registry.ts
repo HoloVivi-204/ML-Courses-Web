@@ -14,10 +14,13 @@ import type {
 import {
   createDecisionTreeAdapter,
   createKMeansAdapter,
+  createLassoRegressionAdapter,
   createLinearRegressionAdapter,
   createLogisticRegressionAdapter,
   createMlpAdapter,
   createPcaAdapter,
+  createPolynomialRegressionAdapter,
+  createRidgeRegressionAdapter,
 } from './reference-adapters';
 
 const xorPerceptronAdapter: AlgorithmAdapter = {
@@ -200,6 +203,113 @@ const playgroundPairRegistry = [
       vi: 'Playground giá nhà: Hồi quy tuyến tính',
     },
     adapter: createLinearRegressionAdapter(),
+  },
+  {
+    scenarioId: 'pg-house-price',
+    algorithmId: 'ridge-regression',
+    datasetVersionId: 'ds-house-price-v1',
+    adapterVersion: 'ridge-regression-js-v1',
+    configSchemaVersion: 1,
+    defaultConfig: {
+      alpha: 1,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    defaultConfigName: 'House ridge baseline',
+    intro: {
+      en: 'Fit ridge regression on the fixed house-price dataset and inspect the residual error and coefficient shrinkage.',
+      vi: 'Fit hồi quy Ridge trên dataset giá nhà cố định và xem sai số residual cùng độ co hệ số.',
+    },
+    parameterFields: [
+      {
+        id: 'alpha',
+        kind: 'number',
+        label: { en: 'Regularization alpha', vi: 'Hệ số regularization' },
+        min: 0.0001,
+        max: 100,
+        step: 0.1,
+      },
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'rmse',
+    title: {
+      en: 'House price Playground: Ridge regression',
+      vi: 'Playground giá nhà: Hồi quy Ridge',
+    },
+    adapter: createRidgeRegressionAdapter(),
+  },
+  {
+    scenarioId: 'pg-insurance-cost',
+    algorithmId: 'polynomial-regression',
+    datasetVersionId: 'ds-insurance-cost-v1',
+    adapterVersion: 'polynomial-regression-js-v1',
+    configSchemaVersion: 1,
+    defaultConfig: {
+      degree: 2,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    defaultConfigName: 'Insurance polynomial baseline',
+    intro: {
+      en: 'Fit a degree-two polynomial model to the fixed insurance-cost data and inspect residual error.',
+      vi: 'Fit mô hình đa thức bậc hai trên dữ liệu chi phí bảo hiểm cố định và xem sai số residual.',
+    },
+    parameterFields: [
+      {
+        id: 'degree',
+        integer: true,
+        kind: 'number',
+        label: { en: 'Polynomial degree', vi: 'Bậc đa thức' },
+        min: 1,
+        max: 5,
+        maxByDeviceProfile: { mobile: 3 },
+        step: 1,
+      },
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'mae',
+    title: {
+      en: 'Insurance cost Playground: Polynomial regression',
+      vi: 'Playground chi phí bảo hiểm: Hồi quy đa thức',
+    },
+    adapter: createPolynomialRegressionAdapter(),
+  },
+  {
+    scenarioId: 'pg-insurance-cost',
+    algorithmId: 'lasso-regression',
+    datasetVersionId: 'ds-insurance-cost-v1',
+    adapterVersion: 'lasso-regression-js-v1',
+    configSchemaVersion: 1,
+    defaultConfig: {
+      alpha: 0.1,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    defaultConfigName: 'Insurance lasso baseline',
+    intro: {
+      en: 'Fit Lasso regression on the fixed insurance-cost data and inspect coefficient sparsity and residual error.',
+      vi: 'Fit hồi quy Lasso trên dữ liệu chi phí bảo hiểm cố định và xem độ thưa hệ số cùng sai số residual.',
+    },
+    parameterFields: [
+      {
+        id: 'alpha',
+        kind: 'number',
+        label: { en: 'Regularization alpha', vi: 'Hệ số regularization' },
+        min: 0.0001,
+        max: 100,
+        step: 0.1,
+      },
+      commonParameterFields.trainRatio,
+      commonParameterFields.seed,
+    ],
+    primaryMetricId: 'mae',
+    title: {
+      en: 'Insurance cost Playground: Lasso regression',
+      vi: 'Playground chi phí bảo hiểm: Hồi quy Lasso',
+    },
+    adapter: createLassoRegressionAdapter(),
   },
   {
     scenarioId: 'pg-spam-detection',

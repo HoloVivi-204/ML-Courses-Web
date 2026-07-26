@@ -1,0 +1,30 @@
+{
+  "config": {
+    "degree": 2,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-insurance-cost",
+    "algorithmId": "polynomial-regression",
+    "datasetVersionId": "ds-insurance-cost-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "mae": 0.0002,
+      "rmse": 0.0002,
+      "r2": 1
+    },
+    "chartSummary": {
+      "kind": "polynomial-residual",
+      "degree": 2,
+      "residualMean": -0.0001,
+      "residualMaxAbs": 0.0005
+    },
+    "textAlternative": {
+      "en": "Polynomial regression reaches MAE 0.0002 on the synthetic insurance test split.",
+      "vi": "Hồi quy đa thức đạt MAE 0.0002 trên tập kiểm tra bảo hiểm tổng hợp."
+    }
+  }
+}

@@ -120,6 +120,69 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['actual-vs-predicted', 'residual'],
   },
   {
+    adapterVersion: 'ridge-regression-js-v1',
+    algorithmId: 'ridge-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-house-price-v1',
+    defaultConfig: {
+      alpha: 1,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { rows: 10_000, alpha: 100 },
+    feedbackRules: ['underfit', 'regularization'],
+    goldenFixture: 'fixtures/house-ridge-v1.json',
+    mobileLimits: { rows: 3000, alpha: 100 },
+    preprocessing: ['median-impute', 'standard-scale'],
+    primaryMetric: 'rmse',
+    scenarioId: 'pg-house-price',
+    scopePriority: 'must',
+    secondaryMetrics: ['r2', 'mae'],
+    visualizations: ['residual', 'coefficient'],
+  },
+  {
+    adapterVersion: 'polynomial-regression-js-v1',
+    algorithmId: 'polynomial-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-insurance-cost-v1',
+    defaultConfig: {
+      degree: 2,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { rows: 10_000, degree: 5 },
+    feedbackRules: ['underfit', 'overfit'],
+    goldenFixture: 'fixtures/insurance-polynomial-v1.json',
+    mobileLimits: { rows: 3000, degree: 3 },
+    preprocessing: ['one-hot', 'standard-scale'],
+    primaryMetric: 'mae',
+    scenarioId: 'pg-insurance-cost',
+    scopePriority: 'must',
+    secondaryMetrics: ['rmse', 'r2'],
+    visualizations: ['feature-slice', 'actual-vs-predicted', 'residual'],
+  },
+  {
+    adapterVersion: 'lasso-regression-js-v1',
+    algorithmId: 'lasso-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-insurance-cost-v1',
+    defaultConfig: {
+      alpha: 0.1,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { rows: 10_000, alpha: 100 },
+    feedbackRules: ['underfit', 'sparsity'],
+    goldenFixture: 'fixtures/insurance-lasso-v1.json',
+    mobileLimits: { rows: 3000, alpha: 100 },
+    preprocessing: ['one-hot', 'standard-scale'],
+    primaryMetric: 'mae',
+    scenarioId: 'pg-insurance-cost',
+    scopePriority: 'must',
+    secondaryMetrics: ['rmse', 'r2'],
+    visualizations: ['residual', 'coefficient'],
+  },
+  {
     adapterVersion: 'logistic-regression-js-v1',
     algorithmId: 'logistic-regression',
     configSchemaVersion: 1,
@@ -280,6 +343,18 @@ export function normalizePlaygroundConfig(input: NormalizePlaygroundConfigInput)
     return normalizeLinearRegressionConfig(input.config);
   }
 
+  if (manifest.algorithmId === 'ridge-regression') {
+    return normalizeRidgeRegressionConfig(input.config, manifest, input.deviceProfile);
+  }
+
+  if (manifest.algorithmId === 'polynomial-regression') {
+    return normalizePolynomialRegressionConfig(input.config, manifest, input.deviceProfile);
+  }
+
+  if (manifest.algorithmId === 'lasso-regression') {
+    return normalizeLassoRegressionConfig(input.config, manifest, input.deviceProfile);
+  }
+
   if (manifest.algorithmId === 'logistic-regression') {
     return normalizeLogisticRegressionConfig(input.config);
   }
@@ -395,6 +470,57 @@ function normalizeLinearRegressionConfig(value: unknown): PlaygroundConfig {
 
   return {
     fitIntercept: getBoolean(config, 'fitIntercept'),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeRidgeRegressionConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    alpha: getNumberInRange(config, 'alpha', 0.0001, getManifestLimit(limits, 'alpha')),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizePolynomialRegressionConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['degree', 'seed', 'trainRatio']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    degree: getIntegerInRange(config, 'degree', 1, getManifestLimit(limits, 'degree')),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeLassoRegressionConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    alpha: getNumberInRange(config, 'alpha', 0.0001, getManifestLimit(limits, 'alpha')),
     trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
   };

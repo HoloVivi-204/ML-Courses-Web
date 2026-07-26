@@ -35,6 +35,8 @@ export interface PlaygroundDataSplit {
 const XOR_DATASET_SEED = 42;
 const XOR_SAMPLE_COUNT = 400;
 const XOR_NOISE_STD = 0.15;
+const INSURANCE_DATASET_SEED = 314;
+const INSURANCE_SAMPLE_COUNT = 64;
 
 const playgroundDatasets = [
   createDataset({
@@ -57,6 +59,17 @@ const playgroundDatasets = [
     textAlternative: {
       en: 'Synthetic house-price rows generated from area, rooms, distance, and age.',
       vi: 'Dữ liệu giá nhà tổng hợp từ diện tích, số phòng, khoảng cách và tuổi nhà.',
+    },
+  }),
+  createDataset({
+    datasetVersionId: 'ds-insurance-cost-v1',
+    featureColumns: ['ageYears', 'bodyMassIndex', 'smokerRiskIndex', 'childrenCount'],
+    labelColumn: 'annualCostIndex',
+    rows: createInsuranceRows(),
+    task: 'regression',
+    textAlternative: {
+      en: 'Synthetic insurance-cost rows with numeric values already encoded for age, body mass, smoker risk, and children.',
+      vi: 'Dữ liệu chi phí bảo hiểm tổng hợp với đặc trưng số đã mã hóa cho tuổi, BMI, rủi ro hút thuốc và số con.',
     },
   }),
   createDataset({
@@ -272,6 +285,31 @@ function createHouseRows(): PlaygroundDatasetRow[] {
       80 + features[0] * 2.4 + features[1] * 25 - features[2] * 5 - features[3] * 1.2,
     ),
   }));
+}
+
+function createInsuranceRows(): PlaygroundDatasetRow[] {
+  const random = createSeededRandom(INSURANCE_DATASET_SEED);
+
+  return Array.from({ length: INSURANCE_SAMPLE_COUNT }, (_, index) => {
+    const ageYears = 18 + random() * 47;
+    const bodyMassIndex = 18 + random() * 17;
+    const smokerRiskIndex = 0.05 + random() * 0.9;
+    const childrenCount = Math.floor(random() * 5);
+    const label =
+      600 +
+      ageYears * 27 +
+      bodyMassIndex * 82 +
+      smokerRiskIndex * 8_700 +
+      childrenCount * 210 +
+      bodyMassIndex ** 2 * 7.5 +
+      ageYears * smokerRiskIndex * 105;
+
+    return {
+      rowId: `insurance-${String(index + 1).padStart(2, '0')}`,
+      features: [ageYears, bodyMassIndex, smokerRiskIndex, childrenCount],
+      label: roundMetric(label),
+    };
+  });
 }
 
 function createSpamRows(): PlaygroundDatasetRow[] {
