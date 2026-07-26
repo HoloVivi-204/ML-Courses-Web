@@ -124,6 +124,53 @@ describe('fetch learning API client', () => {
     });
   });
 
+  it('records required lesson block views and the current reading position', async () => {
+    const postView = {
+      contentViewed: false,
+      postId: 'dl-p01-neuron-perceptron',
+      readingPosition: 'weighted-sum',
+      started: true,
+      viewedItemIds: ['what-is-a-neuron', 'neuron-explanation', 'weighted-sum'],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { postView },
+        }),
+        {
+          headers: {
+            'content-type': 'application/json',
+          },
+          status: 200,
+        },
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    const result = await client.recordPostView({
+      idToken: 'local-id-token',
+      postId: 'dl-p01-neuron-perceptron',
+      readingPosition: 'weighted-sum',
+      viewedItemIds: ['what-is-a-neuron', 'neuron-explanation', 'weighted-sum'],
+    });
+
+    expect(result).toEqual({ postView });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/posts/dl-p01-neuron-perceptron/views', {
+      body: JSON.stringify({
+        readingPosition: 'weighted-sum',
+        viewedItemIds: ['what-is-a-neuron', 'neuron-explanation', 'weighted-sum'],
+      }),
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+  });
+
   it('fetches the admin report summary with the admin bearer token', async () => {
     const reportSummary = {
       generatedAt: '2026-07-23T01:00:00.000Z',

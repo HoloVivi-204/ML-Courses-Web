@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Clock3, MoveRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
@@ -26,21 +26,81 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const accessKey =
     status === 'authenticated' && courseId && postId && uid ? `${uid}:${courseId}:${postId}` : null;
   const [verifiedAccessKey, setVerifiedAccessKey] = useState<string | null>(null);
+  const [savedReadingPosition, setSavedReadingPosition] = useState<string | null>(null);
+  const articleRef = useRef<HTMLElement>(null);
+  const postViewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const observedItemIdsRef = useRef(new Set<string>());
+  const readingPositionRef = useRef<string | null>(null);
+  const restoredReadingPositionRef = useRef<string | null>(null);
   const hasStoredFullAccess =
     status === 'authenticated' && hasLearningPostAccess(courseId, postId, uid);
   const hasBackendFullAccess = accessKey !== null && verifiedAccessKey === accessKey;
   const hasFullAccess = hasStoredFullAccess || hasBackendFullAccess;
   const post = getReadablePost(courseId, postId, hasFullAccess);
 
-  useEffect(() => {
+  const syncPostView = useCallback(async () => {
     if (
       status !== 'authenticated' ||
-      !accessKey ||
       !courseId ||
       !postId ||
       !uid ||
-      hasStoredFullAccess
+      !hasFullAccess ||
+      !readingPositionRef.current ||
+      observedItemIdsRef.current.size === 0
     ) {
+      return;
+    }
+
+    try {
+      const idToken = await getIdToken();
+
+      if (!idToken) {
+        throw new Error('Authenticated user is missing an ID token.');
+      }
+
+      const postViewResult = await learningApiClient.recordPostView({
+        idToken,
+        postId,
+        readingPosition: readingPositionRef.current,
+        viewedItemIds: [...observedItemIdsRef.current],
+      });
+
+      observedItemIdsRef.current = new Set(postViewResult.postView.viewedItemIds);
+    } catch {
+      // Progress sync is retried as the learner continues through required blocks.
+    }
+  }, [courseId, getIdToken, hasFullAccess, learningApiClient, postId, status, uid]);
+
+  const queuePostView = useCallback(
+    (blockId: string) => {
+      observedItemIdsRef.current.add(blockId);
+      readingPositionRef.current = blockId;
+
+      if (postViewTimerRef.current !== null) {
+        clearTimeout(postViewTimerRef.current);
+      }
+
+      postViewTimerRef.current = setTimeout(() => {
+        postViewTimerRef.current = null;
+        void syncPostView();
+      }, 250);
+    },
+    [syncPostView],
+  );
+
+  useEffect(() => {
+    observedItemIdsRef.current = new Set();
+    readingPositionRef.current = null;
+    restoredReadingPositionRef.current = null;
+
+    if (postViewTimerRef.current !== null) {
+      clearTimeout(postViewTimerRef.current);
+      postViewTimerRef.current = null;
+    }
+  }, [accessKey]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !accessKey || !courseId || !postId || !uid) {
       return undefined;
     }
 
@@ -69,9 +129,17 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         const hasProgressPostAccess = progressSnapshot.contentAccess.some(
           (item) => item.contentType === 'post' && item.entityId === activePostId,
         );
+        const savedPostProgress = progressSnapshot.posts.find(
+          (item) => item.postId === activePostId,
+        );
 
         if (isActive) {
           setVerifiedAccessKey(hasProgressPostAccess ? activeAccessKey : null);
+          setSavedReadingPosition(savedPostProgress?.readingPosition ?? null);
+          observedItemIdsRef.current = new Set([
+            ...observedItemIdsRef.current,
+            ...(savedPostProgress?.viewedItemIds ?? []),
+          ]);
         }
       } catch {
         if (isActive) {
@@ -85,16 +153,73 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
     return () => {
       isActive = false;
     };
-  }, [
-    accessKey,
-    courseId,
-    getIdToken,
-    hasStoredFullAccess,
-    learningApiClient,
-    postId,
-    status,
-    uid,
-  ]);
+  }, [accessKey, courseId, getIdToken, learningApiClient, postId, status, uid]);
+
+  useEffect(() => {
+    if (
+      !post ||
+      !hasFullAccess ||
+      status !== 'authenticated' ||
+      !articleRef.current ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return undefined;
+    }
+
+    const requiredBlockIds = new Set(
+      post.blocks.filter((block) => block.required).map((block) => block.id),
+    );
+    const targets = [
+      ...articleRef.current.querySelectorAll<HTMLElement>('[data-content-block-id]'),
+    ].filter((element) => {
+      const blockId = element.dataset.contentBlockId;
+
+      return blockId !== undefined && requiredBlockIds.has(blockId);
+    });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const blockId = (entry.target as HTMLElement).dataset.contentBlockId;
+
+          if (entry.isIntersecting && blockId) {
+            queuePostView(blockId);
+          }
+        }
+      },
+      { threshold: 0.6 },
+    );
+
+    for (const target of targets) {
+      observer.observe(target);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasFullAccess, post, queuePostView, status]);
+
+  useEffect(() => {
+    if (
+      !savedReadingPosition ||
+      restoredReadingPositionRef.current === savedReadingPosition ||
+      !articleRef.current
+    ) {
+      return;
+    }
+
+    const target = document.getElementById(savedReadingPosition);
+
+    if (
+      !target ||
+      !articleRef.current.contains(target) ||
+      typeof target.scrollIntoView !== 'function'
+    ) {
+      return;
+    }
+
+    restoredReadingPositionRef.current = savedReadingPosition;
+    target.scrollIntoView({ block: 'start' });
+  }, [savedReadingPosition]);
 
   if (!post) {
     return <TrialPostNotFoundPage />;
@@ -137,7 +262,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
           <ContentBlockNavigation blocks={post.blocks} locale={locale} postId={post.id} />
         </aside>
 
-        <article className="trial-article">
+        <article className="trial-article" ref={articleRef}>
           <ContentBlockRenderer blocks={post.blocks} locale={locale} postId={post.id} />
 
           <footer className="trial-lesson-summary">

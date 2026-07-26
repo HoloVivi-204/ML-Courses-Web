@@ -41,6 +41,17 @@ function createLearningApiClient() {
         viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
       },
     }),
+    recordPostView: vi.fn().mockImplementation(({ postId, readingPosition, viewedItemIds }) =>
+      Promise.resolve({
+        postView: {
+          contentViewed: false,
+          postId,
+          readingPosition,
+          started: true,
+          viewedItemIds,
+        },
+      }),
+    ),
     createAdminContentDraft: vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',

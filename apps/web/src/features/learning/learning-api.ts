@@ -37,6 +37,16 @@ export interface DemoCompletionResult {
   };
 }
 
+export interface PostViewResult {
+  postView: {
+    contentViewed: boolean;
+    postId: string;
+    readingPosition: string;
+    started: boolean;
+    viewedItemIds: readonly string[];
+  };
+}
+
 export type QuizQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
 
 export type QuizAnswerValue = readonly string[] | string;
@@ -130,9 +140,13 @@ export interface LearningProgressSnapshot {
   posts: ReadonlyArray<{
     bestScore: number;
     completed: boolean;
+    contentViewed?: boolean | undefined;
     postId: string;
     quizId: string;
     quizPassed: boolean;
+    readingPosition?: string | null | undefined;
+    started?: boolean | undefined;
+    viewedItemIds?: readonly string[] | undefined;
   }>;
   quizzes: ReadonlyArray<{
     attemptCount: number;
@@ -379,6 +393,12 @@ export interface LearningApiClient {
     idempotencyKey: string;
     viewedStepIds: readonly string[];
   }): Promise<DemoCompletionResult>;
+  recordPostView(input: {
+    idToken: string;
+    postId: string;
+    readingPosition: string;
+    viewedItemIds: readonly string[];
+  }): Promise<PostViewResult>;
   createAdminContentDraft(input: {
     entityId: string;
     entityType: AdminContentEntityType;
@@ -526,6 +546,18 @@ export function createFetchLearningApiClient(): LearningApiClient {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
             'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
+        }),
+      );
+    },
+    async recordPostView({ idToken, postId, readingPosition, viewedItemIds }) {
+      return readSuccessEnvelope<PostViewResult>(
+        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/views`, {
+          body: JSON.stringify({ readingPosition, viewedItemIds }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
           },
           method: 'POST',
         }),

@@ -84,6 +84,7 @@ test.describe('Firebase local Emulator journey', () => {
       page.getByRole('heading', { name: 'Vì sao XOR làm Perceptron một lớp thất bại?' }),
     ).toBeVisible();
 
+    await viewAllRequiredPostBlocks(page);
     await page.getByRole('link', { name: /Mở quiz bài học/i }).click();
     await expect(page.getByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
@@ -147,6 +148,20 @@ test.describe('Firebase local Emulator journey', () => {
     await expect(page.getByText('client-computed', { exact: true })).toBeVisible();
   });
 });
+
+async function viewAllRequiredPostBlocks(page: Page) {
+  const blocks = page.locator('[data-content-block-id]');
+  const blockCount = await blocks.count();
+
+  expect(blockCount).toBeGreaterThan(0);
+
+  for (let index = 0; index < blockCount; index += 1) {
+    await blocks.nth(index).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(80);
+  }
+
+  await page.waitForTimeout(400);
+}
 
 async function answerPostQuiz(page: Page) {
   await page

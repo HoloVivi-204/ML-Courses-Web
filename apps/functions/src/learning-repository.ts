@@ -4,6 +4,7 @@ import { FieldValue, getFirestore, Timestamp, type Firestore } from 'firebase-ad
 
 import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { getPostViewManifest } from './post-view-manifest.js';
 import {
   createQuizAttemptPayload,
   getQuizManifest,
@@ -44,6 +45,13 @@ export interface CompleteDemoInput {
   requiredStepIds: readonly string[];
   uid: string;
   viewedStepIds: readonly string[];
+}
+
+export interface RecordPostViewInput {
+  postId: string;
+  readingPosition: string;
+  uid: string;
+  viewedItemIds: readonly string[];
 }
 
 export interface CreateQuizAttemptInput {
@@ -101,9 +109,13 @@ export interface LearningProgressSnapshot {
   posts: ReadonlyArray<{
     bestScore: number;
     completed: boolean;
+    contentViewed: boolean;
     postId: string;
     quizId: string;
     quizPassed: boolean;
+    readingPosition: string | null;
+    started: boolean;
+    viewedItemIds: readonly string[];
   }>;
   quizzes: ReadonlyArray<{
     attemptCount: number;
@@ -121,6 +133,10 @@ export interface LearningRepository {
   }>;
   completeDemo(input: CompleteDemoInput): Promise<{
     data: unknown;
+    statusCode: 200;
+  }>;
+  recordPostView(input: RecordPostViewInput): Promise<{
+    data: PostViewResponseData;
     statusCode: 200;
   }>;
   createQuizAttempt(input: CreateQuizAttemptInput): Promise<{
@@ -211,6 +227,16 @@ interface DemoCompletionResponseData {
   };
 }
 
+interface PostViewResponseData {
+  postView: {
+    contentViewed: boolean;
+    postId: string;
+    readingPosition: string;
+    started: true;
+    viewedItemIds: readonly string[];
+  };
+}
+
 interface QuizSubmissionResponseData {
   bestScore: number;
   feedback: readonly unknown[];
@@ -253,6 +279,7 @@ const LEARNER_ACCOUNT_SUBCOLLECTIONS = [
   'moduleCompletions',
   'moduleProgress',
   'postCompletions',
+  'postViews',
   'quizAttempts',
   'quizProgress',
 ] as const;
@@ -444,6 +471,23 @@ function createDemoCompletionResponseData(input: CompleteDemoInput): DemoComplet
   };
 }
 
+function createPostViewResponseData(input: {
+  contentViewed: boolean;
+  postId: string;
+  readingPosition: string;
+  viewedItemIds: readonly string[];
+}): PostViewResponseData {
+  return {
+    postView: {
+      contentViewed: input.contentViewed,
+      postId: input.postId,
+      readingPosition: input.readingPosition,
+      started: true,
+      viewedItemIds: input.viewedItemIds,
+    },
+  };
+}
+
 function createDemoCompletionRequestHash(input: CompleteDemoInput): string {
   return JSON.stringify({
     operation: 'demo-completion',
@@ -571,6 +615,22 @@ function getStatusField(data: FirebaseFirestore.DocumentData | undefined) {
   const status = data?.status;
 
   return status === 'completed' || status === 'in-progress' ? status : null;
+}
+
+function getStringArrayField(data: FirebaseFirestore.DocumentData | undefined, fieldName: string) {
+  const value = data?.[fieldName];
+
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    return [];
+  }
+
+  return [...new Set(value)].sort((leftItem, rightItem) => leftItem.localeCompare(rightItem));
+}
+
+function getStringField(data: FirebaseFirestore.DocumentData | undefined, fieldName: string) {
+  const value = data?.[fieldName];
+
+  return typeof value === 'string' && value.trim() ? value : null;
 }
 
 type StableContentAccessItem = LearningProgressSnapshot['contentAccess'][number];
@@ -710,6 +770,7 @@ function createLearningProgressSnapshot(input: {
   enrollments: readonly UserSubcollectionDocumentData[];
   moduleCompletions: readonly UserSubcollectionDocumentData[];
   postCompletions: readonly UserSubcollectionDocumentData[];
+  postViews: readonly UserSubcollectionDocumentData[];
   quizProgress: readonly UserSubcollectionDocumentData[];
 }): LearningProgressSnapshot {
   const catalog = getReleaseLearningCatalog();
@@ -739,6 +800,7 @@ function createLearningProgressSnapshot(input: {
   );
   const moduleCompletionIds = new Set(input.moduleCompletions.map((item) => item.id));
   const postCompletionIds = new Set(input.postCompletions.map((item) => item.id));
+  const postViewsById = new Map(input.postViews.map((item) => [item.id, item.data]));
   const demoCompletionIds = new Set(input.demoCompletions.map((item) => item.id));
   const quizProgressById = new Map(input.quizProgress.map((item) => [item.id, item.data]));
   const visibleModules =
@@ -751,6 +813,7 @@ function createLearningProgressSnapshot(input: {
         (post) =>
           contentAccessKeys.has(`post:${post.postId}`) ||
           postCompletionIds.has(post.postId) ||
+          postViewsById.has(post.postId) ||
           quizProgressById.has(post.postQuizId),
       );
       const hasDemoProgress =
@@ -837,13 +900,18 @@ function createLearningProgressSnapshot(input: {
         .map((post) => {
           const quizProgress = quizProgressById.get(post.postQuizId);
           const quizPassed = getBooleanField(quizProgress, 'passed');
+          const postView = postViewsById.get(post.postId);
 
           return {
             bestScore: getNumberField(quizProgress, 'bestScore'),
             completed: postCompletionIds.has(post.postId) || quizPassed,
+            contentViewed: getBooleanField(postView, 'contentViewed'),
             postId: post.postId,
             quizId: post.postQuizId,
             quizPassed,
+            readingPosition: getStringField(postView, 'readingPosition'),
+            started: getBooleanField(postView, 'started'),
+            viewedItemIds: getStringArrayField(postView, 'viewedItemIds'),
           };
         }),
     ),
@@ -1002,6 +1070,81 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         return { statusCode: 200 as const, data: responseData };
       });
     },
+    async recordPostView(input) {
+      const manifest = getPostViewManifest(input.postId);
+
+      if (!manifest) {
+        throw new ApiError(404, 'POST_NOT_FOUND', 'The requested post was not found.');
+      }
+
+      const requestedViewedItemIds = [...new Set(input.viewedItemIds)].sort((leftItem, rightItem) =>
+        leftItem.localeCompare(rightItem),
+      );
+      const allowedBlockIds = new Set(manifest.requiredBlockIds);
+
+      if (
+        !allowedBlockIds.has(input.readingPosition) ||
+        requestedViewedItemIds.some((itemId) => !allowedBlockIds.has(itemId))
+      ) {
+        throw new ApiError(
+          422,
+          'POST_VIEW_BLOCK_INVALID',
+          'Post view data must reference required blocks in the current post.',
+        );
+      }
+
+      return firestore.runTransaction(async (transaction) => {
+        const accessRef = firestore.doc(`users/${input.uid}/contentAccess/post_${input.postId}`);
+        const postViewRef = firestore.doc(`users/${input.uid}/postViews/${input.postId}`);
+        const [accessSnapshot, postViewSnapshot] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(postViewRef),
+        ]);
+
+        if (!accessSnapshot.exists) {
+          throw new ApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.');
+        }
+
+        const viewedItemIds = [
+          ...new Set([
+            ...getStringArrayField(postViewSnapshot.data(), 'viewedItemIds'),
+            ...requestedViewedItemIds,
+          ]),
+        ].sort((leftItem, rightItem) => leftItem.localeCompare(rightItem));
+        const contentViewed = manifest.requiredBlockIds.every((blockId) =>
+          viewedItemIds.includes(blockId),
+        );
+        const previousContentViewed = getBooleanField(postViewSnapshot.data(), 'contentViewed');
+        const responseData = createPostViewResponseData({
+          contentViewed,
+          postId: input.postId,
+          readingPosition: input.readingPosition,
+          viewedItemIds,
+        });
+
+        transaction.set(
+          postViewRef,
+          {
+            schemaVersion: 1,
+            postId: input.postId,
+            requiredBlockIds: manifest.requiredBlockIds,
+            readingPosition: input.readingPosition,
+            started: true,
+            contentViewed,
+            status: contentViewed ? 'content-viewed' : 'in-progress',
+            viewedItemIds,
+            ...(postViewSnapshot.exists ? {} : { startedAt: FieldValue.serverTimestamp() }),
+            ...(contentViewed && !previousContentViewed
+              ? { contentViewedAt: FieldValue.serverTimestamp() }
+              : {}),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        return { statusCode: 200 as const, data: responseData };
+      });
+    },
     async createQuizAttempt(input) {
       const manifest = getQuizManifest(input.quizId);
       const attemptId = `attempt_${randomUUID()}`;
@@ -1013,6 +1156,10 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           manifest.quizKind === 'post' && manifest.postId
             ? firestore.doc(`users/${input.uid}/contentAccess/post_${manifest.postId}`)
             : firestore.doc(`users/${input.uid}/contentAccess/module_${manifest.moduleId}`);
+        const postViewRef =
+          manifest.quizKind === 'post' && manifest.postId
+            ? firestore.doc(`users/${input.uid}/postViews/${manifest.postId}`)
+            : null;
         const progressRef = firestore.doc(`users/${input.uid}/quizProgress/${input.quizId}`);
         const attemptRef = firestore.doc(`users/${input.uid}/quizAttempts/${attemptId}`);
         const demoCompletionRef = manifest.demoId
@@ -1027,17 +1174,27 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         const [
           accessSnapshot,
           progressSnapshot,
+          postViewSnapshot,
           demoCompletionSnapshot,
           ...requiredPostCompletionSnapshots
         ] = await Promise.all([
           transaction.get(accessRef),
           transaction.get(progressRef),
+          postViewRef ? transaction.get(postViewRef) : Promise.resolve(null),
           demoCompletionRef ? transaction.get(demoCompletionRef) : Promise.resolve(null),
           ...requiredPostCompletionRefs.map((reference) => transaction.get(reference)),
         ]);
 
         if (!accessSnapshot.exists) {
           throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Quiz access is required.');
+        }
+
+        if (postViewRef && !getBooleanField(postViewSnapshot?.data(), 'contentViewed')) {
+          throw new ApiError(
+            403,
+            'POST_CONTENT_VIEW_REQUIRED',
+            'All required post blocks must be viewed before starting this quiz.',
+          );
         }
 
         if (requiredPostCompletionSnapshots.some((snapshot) => !snapshot.exists)) {
@@ -1230,6 +1387,7 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         enrollments,
         moduleCompletions,
         postCompletions,
+        postViews,
         quizProgress,
       ] = await Promise.all([
         listUserSubcollectionData(firestore, input.uid, 'algorithmUnlocks'),
@@ -1238,6 +1396,7 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         listUserSubcollectionData(firestore, input.uid, 'enrollments'),
         listUserSubcollectionData(firestore, input.uid, 'moduleCompletions'),
         listUserSubcollectionData(firestore, input.uid, 'postCompletions'),
+        listUserSubcollectionData(firestore, input.uid, 'postViews'),
         listUserSubcollectionData(firestore, input.uid, 'quizProgress'),
       ]);
 
@@ -1250,6 +1409,7 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           enrollments,
           moduleCompletions,
           postCompletions,
+          postViews,
           quizProgress,
         }),
       };

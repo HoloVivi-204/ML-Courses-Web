@@ -17,6 +17,9 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     completeDemo: async () => {
       throw new Error('Demo completion is not part of this test.');
     },
+    recordPostView: async () => {
+      throw new Error('Post view recording is not part of this test.');
+    },
     createQuizAttempt: async () => {
       throw new Error('Quiz attempt creation is not part of this test.');
     },
@@ -766,6 +769,56 @@ describe('API foundation', () => {
     expect(submissions).toEqual(
       new Set(['learner-01:attempt-quiz-post-dl-p01-01:38fd203c-e09f-40e4-a26c-50127c6b24ee']),
     );
+  });
+
+  it('records authenticated post block views with an allowlisted body contract', async () => {
+    const recordedViews: unknown[] = [];
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        recordPostView: async (input) => {
+          recordedViews.push(input);
+
+          return {
+            statusCode: 200,
+            data: {
+              postView: {
+                contentViewed: false,
+                postId: input.postId,
+                readingPosition: input.readingPosition,
+                started: true,
+                viewedItemIds: input.viewedItemIds,
+              },
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/posts/dl-p01-neuron-perceptron/views')
+      .set('authorization', 'Bearer local-id-token')
+      .send({
+        readingPosition: 'weighted-sum',
+        viewedItemIds: ['what-is-a-neuron', 'neuron-explanation'],
+      })
+      .expect(200);
+
+    expect(response.body.data.postView).toMatchObject({
+      postId: 'dl-p01-neuron-perceptron',
+      readingPosition: 'weighted-sum',
+    });
+    expect(recordedViews).toEqual([
+      {
+        postId: 'dl-p01-neuron-perceptron',
+        readingPosition: 'weighted-sum',
+        uid: 'learner-01',
+        viewedItemIds: ['what-is-a-neuron', 'neuron-explanation'],
+      },
+    ]);
   });
 
   it('returns the authenticated learner progress snapshot through the owner boundary', async () => {

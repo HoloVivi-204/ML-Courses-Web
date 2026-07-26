@@ -521,6 +521,78 @@ describe('Firestore learning repository', () => {
     });
   });
 
+  it('merges required post block views, retains the reading position, and opens the post quiz only after content is viewed', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.createQuizAttempt({
+        quizId: 'quiz-post-dl-p01',
+        uid: 'learner-01',
+      }),
+    ).rejects.toMatchObject({
+      code: 'POST_CONTENT_VIEW_REQUIRED',
+      statusCode: 403,
+    });
+
+    const firstView = await repository.recordPostView({
+      postId: 'dl-p01-neuron-perceptron',
+      readingPosition: 'weighted-sum',
+      uid: 'learner-01',
+      viewedItemIds: ['what-is-a-neuron', 'neuron-explanation', 'neuron-insight'],
+    });
+
+    expect(firstView.data.postView).toMatchObject({
+      contentViewed: false,
+      readingPosition: 'weighted-sum',
+      postId: 'dl-p01-neuron-perceptron',
+      started: true,
+    });
+
+    const secondView = await repository.recordPostView({
+      postId: 'dl-p01-neuron-perceptron',
+      readingPosition: 'from-perceptron-to-next-step',
+      uid: 'learner-01',
+      viewedItemIds: [
+        'weighted-sum',
+        'weight-explanation',
+        'weighted-sum-formula',
+        'try-it',
+        'read-result',
+        'xor-linear-limit',
+        'xor-truth-table',
+        'stable-content-access',
+        'from-perceptron-to-next-step',
+      ],
+    });
+
+    expect(secondView.data.postView).toMatchObject({
+      contentViewed: true,
+      readingPosition: 'from-perceptron-to-next-step',
+      postId: 'dl-p01-neuron-perceptron',
+      started: true,
+    });
+    expect(documents.get('users/learner-01/postViews/dl-p01-neuron-perceptron')).toMatchObject({
+      contentViewed: true,
+      readingPosition: 'from-perceptron-to-next-step',
+      status: 'content-viewed',
+      viewedItemIds: expect.arrayContaining(['what-is-a-neuron', 'from-perceptron-to-next-step']),
+    });
+
+    await expect(
+      repository.createQuizAttempt({
+        quizId: 'quiz-post-dl-p01',
+        uid: 'learner-01',
+      }),
+    ).resolves.toMatchObject({ statusCode: 201 });
+  });
+
   it('completes the module, updates enrollment progress, and opens the next module after passing the module quiz', async () => {
     const { documents, firestore } = createFakeFirestore({
       'users/learner-01/enrollments/course-deep-learning-basic': {

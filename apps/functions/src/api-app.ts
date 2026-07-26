@@ -508,6 +508,28 @@ function getQuizAnswersBodyField(request: Request): QuizAnswer[] {
   });
 }
 
+function getPostViewBody(request: Request): {
+  readingPosition: string;
+  viewedItemIds: string[];
+} {
+  const body = getObjectBody(request);
+  assertBodyFieldsAllowlisted(body, ['readingPosition', 'viewedItemIds']);
+  const viewedItemIds = getStringArrayBodyField(request, 'viewedItemIds');
+
+  if (viewedItemIds.length > 80 || viewedItemIds.some((item) => item.length > 160)) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'viewedItemIds must contain at most 80 identifiers of 160 characters or fewer.',
+    );
+  }
+
+  return {
+    readingPosition: getTrimmedStringValue(body.readingPosition, 'readingPosition', 160),
+    viewedItemIds,
+  };
+}
+
 function isQuizAnswerBodyItem(
   value: unknown,
 ): value is { questionId: string; value: QuizAnswerValue } {
@@ -795,6 +817,23 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         requiredStepIds: seed.requiredStepIds,
         uid: authUser.uid,
         viewedStepIds,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/v1/posts/:postId/views', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const postView = getPostViewBody(request);
+      const result = await getLearningRepository().recordPostView({
+        postId: getRouteParam(request, 'postId'),
+        readingPosition: postView.readingPosition,
+        uid: authUser.uid,
+        viewedItemIds: postView.viewedItemIds,
       });
 
       sendSuccess(response, result.statusCode, result.data);

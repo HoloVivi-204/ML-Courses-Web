@@ -63,12 +63,13 @@ export function ContentBlockRenderer({ blocks, locale, postId }: ContentBlockRen
   const displayIndexes = getDisplayIndexes(validBlocks, locale);
 
   return validBlocks.map((block) => (
-    <ContentBlockView
-      block={block}
-      displayIndex={displayIndexes.get(block.id) ?? null}
-      key={block.id}
-      locale={locale}
-    />
+    <div className="content-block" data-content-block-id={block.id} id={block.id} key={block.id}>
+      <ContentBlockView
+        block={block}
+        displayIndex={displayIndexes.get(block.id) ?? null}
+        locale={locale}
+      />
+    </div>
   ));
 }
 
@@ -88,7 +89,7 @@ function ContentBlockView({ block, displayIndex, locale }: ContentBlockViewProps
       return <FormulaBlockView block={block} locale={locale} />;
     case 'example':
       return (
-        <div className="lesson-section lesson-lab-section" id={block.id}>
+        <div className="lesson-section lesson-lab-section">
           <span className="lesson-section-index">{displayIndex}</span>
           <NeuronDecisionLab activityId={block.activityId} />
         </div>
@@ -112,7 +113,7 @@ function HeadingBlockView({
   const content = block.locales[locale];
 
   return (
-    <div className="lesson-section content-heading-block" id={block.id}>
+    <div className="lesson-section content-heading-block">
       <span className="lesson-section-index">{displayIndex}</span>
       <h2>{content.title}</h2>
       <p className="lesson-lede">{content.lede}</p>
