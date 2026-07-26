@@ -26,6 +26,20 @@ test('public learning journey is responsive and passes automated WCAG checks', a
   await expect(page.locator('.katex').first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectNoWcagViolations(page);
+
+  await page.locator('.utility-button').press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(
+    page.getByRole('heading', { name: 'How does a neuron make a decision?' }),
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expectNoWcagViolations(page);
+
+  await page.getByRole('button', { name: 'Enable light theme' }).press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
 test('registration entry remains responsive and accessible before authentication starts', async ({
@@ -87,7 +101,7 @@ async function expectNoHorizontalOverflow(page: import('@playwright/test').Page)
 
 async function expectNoWcagViolations(page: import('@playwright/test').Page) {
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
 
   const fingerprints = results.violations.map((violation) => ({
