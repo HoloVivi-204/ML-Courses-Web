@@ -1,6 +1,6 @@
 import { ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
@@ -264,6 +264,14 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
 
       if (result.passed && user) {
         try {
+          if (activeQuizRoute.postId) {
+            await learningApiClient.completePost({
+              idToken,
+              idempotencyKey: createIdempotencyKey(),
+              postId: activeQuizRoute.postId,
+            });
+          }
+
           const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
 
           rememberLearningContentAccessGrants({

@@ -104,7 +104,8 @@ const resources = {
       'learning.intro':
         'Your enrollment keeps the first module open and preserves the next safe lesson path.',
       'learning.firstModuleState': 'First module open',
-      'learning.openFirstPost': 'Open the first lesson',
+      'learning.openModuleOverview': 'Open module overview',
+      'learning.overview.failed': 'We could not open this module overview. Please try again.',
       'learning.enrollment.syncing': 'Preparing your enrollment…',
       'learning.enrollment.ready': 'Enrollment ready. Your first module is open.',
       'learning.enrollment.failed':
@@ -342,6 +343,7 @@ const resources = {
         'and the limits of linear decisions.',
       'trial.summary.openDemo': 'Open the AND gate demo',
       'trial.summary.openQuiz': 'Open the lesson quiz',
+      'trial.postViewRequired': 'View every required lesson block before opening the quiz.',
       'trial.summary.back': 'Return to course roadmap',
     },
   },
@@ -446,7 +448,8 @@ const resources = {
       'learning.intro':
         'Enrollment giữ module đầu tiên ở trạng thái đã mở và bảo toàn đường dẫn bài học kế tiếp an toàn.',
       'learning.firstModuleState': 'Module đầu đã mở',
-      'learning.openFirstPost': 'Mở bài học đầu tiên',
+      'learning.openModuleOverview': 'Mở tổng quan module',
+      'learning.overview.failed': 'Chưa thể mở tổng quan module. Hãy thử lại.',
       'learning.enrollment.syncing': 'Đang chuẩn bị enrollment của bạn…',
       'learning.enrollment.ready': 'Enrollment đã sẵn sàng. Module đầu tiên đã mở.',
       'learning.enrollment.failed':
@@ -685,6 +688,7 @@ const resources = {
         'luyện và giới hạn của quyết định tuyến tính.',
       'trial.summary.openDemo': 'Mở demo AND gate',
       'trial.summary.openQuiz': 'Mở quiz bài học',
+      'trial.postViewRequired': 'Hãy xem đầy đủ các khối bắt buộc trước khi mở quiz.',
       'trial.summary.back': 'Trở về lộ trình khóa học',
     },
   },

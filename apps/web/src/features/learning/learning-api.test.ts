@@ -171,6 +171,103 @@ describe('fetch learning API client', () => {
     });
   });
 
+  it('records a module overview before opening its first lesson', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            moduleOverview: {
+              moduleId: 'dl-m01-neuron-perceptron',
+              nextPostId: 'dl-p01-neuron-perceptron',
+              status: 'completed',
+            },
+          },
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    await client.recordModuleOverview({
+      idToken: 'local-id-token',
+      moduleId: 'dl-m01-neuron-perceptron',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/module-overviews/dl-m01-neuron-perceptron/views',
+      {
+        headers: { authorization: 'Bearer local-id-token' },
+        method: 'POST',
+      },
+    );
+  });
+
+  it('records demo views and confirms post completion with the authenticated API contract', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              demoView: {
+                demoId: 'demo-perceptron-and-gate',
+                started: true,
+                viewedStepIds: ['and-problem'],
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              completion: { postId: 'dl-p01-neuron-perceptron', status: 'completed' },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    await client.recordDemoView({
+      demoId: 'demo-perceptron-and-gate',
+      idToken: 'local-id-token',
+      viewedStepIds: ['and-problem'],
+    });
+    await client.completePost({
+      idToken: 'local-id-token',
+      idempotencyKey: '52c0b84a-6f5e-4d93-a69b-6129f8ea5f20',
+      postId: 'dl-p01-neuron-perceptron',
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/demos/demo-perceptron-and-gate/views', {
+      body: JSON.stringify({ viewedStepIds: ['and-problem'] }),
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/posts/dl-p01-neuron-perceptron/completions',
+      {
+        headers: {
+          authorization: 'Bearer local-id-token',
+          'idempotency-key': '52c0b84a-6f5e-4d93-a69b-6129f8ea5f20',
+        },
+        method: 'POST',
+      },
+    );
+  });
+
   it('fetches the admin report summary with the admin bearer token', async () => {
     const reportSummary = {
       generatedAt: '2026-07-23T01:00:00.000Z',

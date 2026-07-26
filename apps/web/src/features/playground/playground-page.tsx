@@ -1,7 +1,7 @@
 import { ArrowLeft, RotateCcw, Square, Zap } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 
 import { localize, type Locale } from '../catalog/course-data';
 import { useAuth } from '../auth/auth-context';

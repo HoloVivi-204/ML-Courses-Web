@@ -2,7 +2,7 @@ import { ConfigProvider, theme as antTheme } from 'antd';
 import type { i18n as I18nInstance } from 'i18next';
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from 'react';
 import { I18nextProvider, useTranslation } from 'react-i18next';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 
 import { CourseCatalogPage, CoursePage, RouteNotFoundPage } from '../features/catalog/catalog-page';
 import type { Locale } from '../features/catalog/course-data';

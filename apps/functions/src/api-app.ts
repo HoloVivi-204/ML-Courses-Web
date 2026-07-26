@@ -530,6 +530,22 @@ function getPostViewBody(request: Request): {
   };
 }
 
+function getDemoViewBody(request: Request): string[] {
+  const body = getObjectBody(request);
+  assertBodyFieldsAllowlisted(body, ['viewedStepIds']);
+  const viewedStepIds = getStringArrayBodyField(request, 'viewedStepIds');
+
+  if (viewedStepIds.length > 20 || viewedStepIds.some((item) => item.length > 160)) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'viewedStepIds must contain at most 20 identifiers of 160 characters or fewer.',
+    );
+  }
+
+  return viewedStepIds;
+}
+
 function isQuizAnswerBodyItem(
   value: unknown,
 ): value is { questionId: string; value: QuizAnswerValue } {
@@ -825,6 +841,39 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
+  app.post('/api/v1/demos/:demoId/views', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getLearningRepository().recordDemoView({
+        demoId: getRouteParam(request, 'demoId'),
+        uid: authUser.uid,
+        viewedStepIds: getDemoViewBody(request),
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post(
+    '/api/v1/module-overviews/:moduleId/views',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getLearningRepository().recordModuleOverview({
+          moduleId: getRouteParam(request, 'moduleId'),
+          uid: authUser.uid,
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   app.post('/api/v1/posts/:postId/views', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);
@@ -834,6 +883,21 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         readingPosition: postView.readingPosition,
         uid: authUser.uid,
         viewedItemIds: postView.viewedItemIds,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/v1/posts/:postId/completions', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const result = await getLearningRepository().completePost({
+        idempotencyKey: getIdempotencyKey(request),
+        postId: getRouteParam(request, 'postId'),
+        uid: authUser.uid,
       });
 
       sendSuccess(response, result.statusCode, result.data);

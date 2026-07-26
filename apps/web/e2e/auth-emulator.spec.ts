@@ -79,13 +79,15 @@ test.describe('Firebase local Emulator journey', () => {
     await expect(page.getByText(/Enrollment đã sẵn sàng/i)).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
-    await page.getByRole('link', { name: /Mở bài học đầu tiên/i }).click();
+    await page.getByRole('button', { name: /Mở tổng quan module/i }).click();
     await expect(
       page.getByRole('heading', { name: 'Vì sao XOR làm Perceptron một lớp thất bại?' }),
     ).toBeVisible();
 
     await viewAllRequiredPostBlocks(page);
+    const postContentViewed = waitForPostContentViewed(page, 'dl-p01-neuron-perceptron');
     await page.getByRole('link', { name: /Mở quiz bài học/i }).click();
+    await postContentViewed;
     await expect(page.getByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
@@ -161,6 +163,23 @@ async function viewAllRequiredPostBlocks(page: Page) {
   }
 
   await page.waitForTimeout(400);
+}
+
+async function waitForPostContentViewed(page: Page, postId: string) {
+  const response = await page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'POST' &&
+      candidate.url().includes(`/api/v1/posts/${postId}/views`),
+    { timeout: 15_000 },
+  );
+  const payload = (await response.json()) as {
+    data?: { postView?: { contentViewed?: boolean } };
+    success?: boolean;
+  };
+
+  expect(response.status()).toBe(200);
+  expect(payload.success).toBe(true);
+  expect(payload.data?.postView?.contentViewed).toBe(true);
 }
 
 async function answerPostQuiz(page: Page) {

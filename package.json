@@ -10,7 +10,9 @@
     "dev": "pnpm --filter @ml-path/web dev",
     "build": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present build",
     "test": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present test",
+    "test:coverage": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present test:coverage",
     "test:e2e": "pnpm --filter @ml-path/web test:e2e",
+    "test:performance": "pnpm --filter @ml-path/web test:performance",
     "typecheck": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present typecheck",
     "lint": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present lint",
     "format:check": "prettier --check package.json pnpm-workspace.yaml firebase.json && prettier --check .firebaserc --parser json && pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present format:check",
@@ -25,6 +27,7 @@
     "firebase:emulators:verify": "node firebase/emulator-seed/dist/run-emulators.js verify"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.10",
     "firebase-tools": "^15.24.0",
     "prettier": "^3.9.5"
   }

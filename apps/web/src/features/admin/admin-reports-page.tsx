@@ -1,7 +1,7 @@
 import { Activity, ArrowLeft, BarChart3, FileText, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import type { AdminReportSummary, LearningApiClient } from '../learning/learning-api';

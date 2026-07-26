@@ -1,6 +1,6 @@
 import { ArrowRight, LockKeyhole, MailCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import type { Locale } from '../catalog/course-data';
 import type {

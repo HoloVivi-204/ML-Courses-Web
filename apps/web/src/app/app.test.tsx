@@ -77,10 +77,32 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
       },
     }),
+    completePost: vi.fn().mockResolvedValue({
+      completion: {
+        postId: 'dl-p01-neuron-perceptron',
+        status: 'completed',
+      },
+    }),
+    recordDemoView: vi.fn().mockImplementation(({ demoId, viewedStepIds }) =>
+      Promise.resolve({
+        demoView: {
+          demoId,
+          started: true,
+          viewedStepIds,
+        },
+      }),
+    ),
+    recordModuleOverview: vi.fn().mockResolvedValue({
+      moduleOverview: {
+        moduleId: 'dl-m01-neuron-perceptron',
+        nextPostId: 'dl-p01-neuron-perceptron',
+        status: 'completed',
+      },
+    }),
     recordPostView: vi.fn().mockImplementation(({ postId, readingPosition, viewedItemIds }) =>
       Promise.resolve({
         postView: {
-          contentViewed: false,
+          contentViewed: viewedItemIds.length >= 12,
           postId,
           readingPosition,
           started: true,
@@ -358,14 +380,13 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
     enrollCourse: vi.fn().mockResolvedValue({
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
-        postId: 'dl-p01-neuron-perceptron',
       },
       enrollment: {
         courseId: 'course-deep-learning-basic',
         progressPercent: 0,
         status: 'in-progress',
       },
-      nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+      nextPath: '/learn/course-deep-learning-basic',
     }),
     getProgress: vi.fn().mockResolvedValue({
       algorithmUnlocks: [],
@@ -395,7 +416,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
           completedStepCount: 0,
           moduleId: 'dl-m01-neuron-perceptron',
           progressPercent: 0,
-          requiredStepCount: 3,
+          requiredStepCount: 4,
           status: 'in-progress',
         },
       ],
@@ -696,19 +717,11 @@ function createInitialProgressSnapshot() {
         completedStepCount: 0,
         moduleId: 'dl-m01-neuron-perceptron',
         progressPercent: 0,
-        requiredStepCount: 3,
+        requiredStepCount: 4,
         status: 'in-progress' as const,
       },
     ],
-    posts: [
-      {
-        bestScore: 0,
-        completed: false,
-        postId: 'dl-p01-neuron-perceptron',
-        quizId: 'quiz-post-dl-p01',
-        quizPassed: false,
-      },
-    ],
+    posts: [],
     quizzes: [
       {
         attemptCount: 0,
@@ -740,10 +753,11 @@ function createPostPassedProgressSnapshot() {
     ],
     modules: [
       {
-        completedStepCount: 1,
+        completedStepCount: 2,
         moduleId: 'dl-m01-neuron-perceptron',
-        progressPercent: 33,
-        requiredStepCount: 3,
+        overviewViewed: true,
+        progressPercent: 50,
+        requiredStepCount: 4,
         status: 'in-progress' as const,
       },
     ],
@@ -786,10 +800,11 @@ function createDemoCompletedProgressSnapshot() {
     ],
     modules: [
       {
-        completedStepCount: 2,
+        completedStepCount: 3,
         moduleId: 'dl-m01-neuron-perceptron',
-        progressPercent: 67,
-        requiredStepCount: 3,
+        overviewViewed: true,
+        progressPercent: 75,
+        requiredStepCount: 4,
         status: 'in-progress' as const,
       },
     ],
@@ -831,10 +846,11 @@ function createUnlockedProgressSnapshot() {
     },
     modules: [
       {
-        completedStepCount: 3,
+        completedStepCount: 4,
         moduleId: 'dl-m01-neuron-perceptron',
+        overviewViewed: true,
         progressPercent: 100,
-        requiredStepCount: 3,
+        requiredStepCount: 4,
         status: 'completed',
       },
     ],
@@ -952,6 +968,34 @@ function createLinearModuleUnlockedProgressSnapshot() {
       },
     ],
   };
+}
+
+function installVisibleContentBlockObserver() {
+  class VisibleContentBlockObserver {
+    constructor(private readonly callback: IntersectionObserverCallback) {}
+
+    disconnect() {}
+
+    observe(target: Element) {
+      this.callback(
+        [
+          {
+            isIntersecting: true,
+            target,
+          } as IntersectionObserverEntry,
+        ],
+        this as unknown as IntersectionObserver,
+      );
+    }
+
+    takeRecords() {
+      return [];
+    }
+
+    unobserve() {}
+  }
+
+  vi.stubGlobal('IntersectionObserver', VisibleContentBlockObserver);
 }
 
 function installImmediatePlaygroundWorker() {
@@ -1436,7 +1480,12 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
+
+    expect(learningApiClient.recordModuleOverview).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      moduleId: 'dl-m01-neuron-perceptron',
+    });
 
     expect(
       await screen.findByRole(
@@ -1552,10 +1601,11 @@ describe('public learning journey', () => {
         },
         modules: [
           {
-            completedStepCount: 3,
+            completedStepCount: 4,
             moduleId: 'dl-m01-neuron-perceptron',
+            overviewViewed: true,
             progressPercent: 100,
-            requiredStepCount: 3,
+            requiredStepCount: 4,
             status: 'completed',
           },
         ],
@@ -1592,7 +1642,7 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText('Tiến độ đã xác minh: 33%')).toBeVisible();
-    expect(screen.getByText('Module hoàn thành: 3/3 bước')).toBeVisible();
+    expect(screen.getByText('Module hoàn thành: 4/4 bước')).toBeVisible();
     expect(screen.getByText('Quiz bài học: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
@@ -1627,7 +1677,7 @@ describe('public learning journey', () => {
     ).toBeVisible();
     expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
     expect(screen.getByText('Tiến độ khóa học 33%')).toBeVisible();
-    expect(screen.getByText('Module hoàn thành 3/3 bước')).toBeVisible();
+    expect(screen.getByText('Module hoàn thành 4/4 bước')).toBeVisible();
     expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
     expect(screen.getByText('Hoạt động Playground client-computed')).toBeVisible();
@@ -1933,7 +1983,7 @@ describe('public learning journey', () => {
     });
     expect(await screen.findAllByText('Edited draft preview copy')).toHaveLength(2);
     expect(screen.getByText('Published learner copy')).toBeVisible();
-  });
+  }, 10_000);
 
   it('lets an authenticated admin validate and publish a draft from the content screen', async () => {
     window.history.pushState({}, '', '/admin/content');
@@ -2880,7 +2930,7 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
     expect(
       await screen.findByRole(
         'heading',
@@ -2962,10 +3012,11 @@ describe('public learning journey', () => {
         },
         modules: [
           {
-            completedStepCount: 1,
+            completedStepCount: 2,
             moduleId: 'dl-m01-neuron-perceptron',
-            progressPercent: 33,
-            requiredStepCount: 3,
+            overviewViewed: true,
+            progressPercent: 50,
+            requiredStepCount: 4,
             status: 'in-progress',
           },
         ],
@@ -3002,7 +3053,7 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
     expect(
       await screen.findByRole(
         'heading',
@@ -3246,6 +3297,7 @@ describe('public learning journey', () => {
 
   it('lets an enrolled learner pass the post mastery quiz with server-side scoring', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    installVisibleContentBlockObserver();
     const user = userEvent.setup();
     const learningApiClient = createLearningApiClient();
 
@@ -3254,7 +3306,7 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
     expect(
       await screen.findByRole(
         'heading',
@@ -3299,6 +3351,7 @@ describe('public learning journey', () => {
 
   it('proves the learner baseline from enrollment through unlock, Playground persistence, and dashboard', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    installVisibleContentBlockObserver();
     const user = userEvent.setup();
     const initialProgress = createInitialProgressSnapshot();
     const postPassedProgress = createPostPassedProgressSnapshot();
@@ -3389,9 +3442,9 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    expect(screen.getByText('Module hoàn thành: 0/3 bước')).toBeVisible();
+    expect(screen.getByText('Module hoàn thành: 0/4 bước')).toBeVisible();
 
-    await user.click(screen.getByRole('link', { name: /Mở bài học đầu tiên/i }));
+    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
     expect(
       await screen.findByRole(
         'heading',

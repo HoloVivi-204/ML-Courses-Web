@@ -18,5 +18,11 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     css: true,
     fileParallelism: false,
+    coverage: {
+      include: ['src/**/*.{ts,tsx}'],
+      thresholds: {
+        lines: 80,
+      },
+    },
   },
 });

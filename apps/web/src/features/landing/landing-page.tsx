@@ -7,7 +7,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { CourseCard } from '../catalog/course-card';
 import { courses, type Locale } from '../catalog/course-data';

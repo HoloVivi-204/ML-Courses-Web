@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { ArrowLeft, Clock3, MoveRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
@@ -10,7 +10,7 @@ import {
   hasLearningPostAccess,
   rememberLearningContentAccessGrants,
 } from './learning-access-store';
-import type { LearningApiClient } from './learning-api';
+import type { LearningApiClient, PostViewResult } from './learning-api';
 import { getReadablePost } from './trial-post-data';
 
 interface TrialPostPageProps {
@@ -21,12 +21,14 @@ interface TrialPostPageProps {
 export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps) {
   const { t } = useTranslation();
   const { getIdToken, status, user } = useAuth();
+  const navigate = useNavigate();
   const { courseId, postId } = useParams();
   const uid = user?.uid;
   const accessKey =
     status === 'authenticated' && courseId && postId && uid ? `${uid}:${courseId}:${postId}` : null;
   const [verifiedAccessKey, setVerifiedAccessKey] = useState<string | null>(null);
   const [savedReadingPosition, setSavedReadingPosition] = useState<string | null>(null);
+  const [postViewSyncError, setPostViewSyncError] = useState(false);
   const articleRef = useRef<HTMLElement>(null);
   const postViewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const observedItemIdsRef = useRef(new Set<string>());
@@ -38,7 +40,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const hasFullAccess = hasStoredFullAccess || hasBackendFullAccess;
   const post = getReadablePost(courseId, postId, hasFullAccess);
 
-  const syncPostView = useCallback(async () => {
+  const syncPostView = useCallback(async (): Promise<PostViewResult | null> => {
     if (
       status !== 'authenticated' ||
       !courseId ||
@@ -48,7 +50,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       !readingPositionRef.current ||
       observedItemIdsRef.current.size === 0
     ) {
-      return;
+      return null;
     }
 
     try {
@@ -65,9 +67,14 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         viewedItemIds: [...observedItemIdsRef.current],
       });
 
-      observedItemIdsRef.current = new Set(postViewResult.postView.viewedItemIds);
+      observedItemIdsRef.current = new Set([
+        ...observedItemIdsRef.current,
+        ...postViewResult.postView.viewedItemIds,
+      ]);
+      return postViewResult;
     } catch {
       // Progress sync is retried as the learner continues through required blocks.
+      return null;
     }
   }, [courseId, getIdToken, hasFullAccess, learningApiClient, postId, status, uid]);
 
@@ -140,6 +147,8 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
             ...observedItemIdsRef.current,
             ...(savedPostProgress?.viewedItemIds ?? []),
           ]);
+          readingPositionRef.current =
+            savedPostProgress?.readingPosition ?? readingPositionRef.current;
         }
       } catch {
         if (isActive) {
@@ -186,7 +195,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
           }
         }
       },
-      { threshold: 0.6 },
+      { threshold: 0.1 },
     );
 
     for (const target of targets) {
@@ -234,6 +243,29 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const quizPath =
     post.accessLevel === 'full' ? `/learn/${post.courseId}/quizzes/${post.postQuizId}` : null;
 
+  async function openQuiz(event: MouseEvent<HTMLAnchorElement>) {
+    if (!quizPath) {
+      return;
+    }
+
+    event.preventDefault();
+    setPostViewSyncError(false);
+
+    if (postViewTimerRef.current !== null) {
+      clearTimeout(postViewTimerRef.current);
+      postViewTimerRef.current = null;
+    }
+
+    const postViewResult = await syncPostView();
+
+    if (postViewResult?.postView.contentViewed) {
+      navigate(quizPath);
+      return;
+    }
+
+    setPostViewSyncError(true);
+  }
+
   return (
     <main className="trial-post-page page-shell">
       <Link className="breadcrumb-link" to={`/courses/${post.courseId}`}>
@@ -276,11 +308,12 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
               </Link>
             ) : null}
             {quizPath ? (
-              <Link className="secondary-link" to={quizPath}>
+              <Link className="secondary-link" to={quizPath} onClick={openQuiz}>
                 {t('trial.summary.openQuiz')}
                 <MoveRight aria-hidden="true" size={17} />
               </Link>
             ) : null}
+            {postViewSyncError ? <p role="alert">{t('trial.postViewRequired')}</p> : null}
             <Link className="secondary-link" to={`/courses/${post.courseId}`}>
               {t('trial.summary.back')}
               <MoveRight aria-hidden="true" size={17} />

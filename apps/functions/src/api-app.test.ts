@@ -17,6 +17,15 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     completeDemo: async () => {
       throw new Error('Demo completion is not part of this test.');
     },
+    completePost: async () => {
+      throw new Error('Post completion is not part of this test.');
+    },
+    recordDemoView: async () => {
+      throw new Error('Demo view recording is not part of this test.');
+    },
+    recordModuleOverview: async () => {
+      throw new Error('Module overview recording is not part of this test.');
+    },
     recordPostView: async () => {
       throw new Error('Post view recording is not part of this test.');
     },
@@ -494,7 +503,7 @@ describe('API foundation', () => {
     expect(response.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
   });
 
-  it('enrolls an authenticated learner idempotently and opens the first module path', async () => {
+  it('enrolls an authenticated learner idempotently and opens the first module overview', async () => {
     const idempotencyRecords = new Map<string, unknown>();
     const enrollmentKeys = new Set<string>();
     const app = createApiApp({
@@ -522,9 +531,8 @@ describe('API foundation', () => {
               },
               access: {
                 moduleId: 'dl-m01-neuron-perceptron',
-                postId: 'dl-p01-neuron-perceptron',
               },
-              nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+              nextPath: '/learn/course-deep-learning-basic',
             },
           };
 
@@ -558,9 +566,8 @@ describe('API foundation', () => {
       },
       access: {
         moduleId: 'dl-m01-neuron-perceptron',
-        postId: 'dl-p01-neuron-perceptron',
       },
-      nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+      nextPath: '/learn/course-deep-learning-basic',
     });
     expect(retryResponse.body.data).toEqual(firstResponse.body.data);
     expect(enrollmentKeys).toEqual(new Set(['learner-01:course-deep-learning-basic']));
@@ -817,6 +824,86 @@ describe('API foundation', () => {
         readingPosition: 'weighted-sum',
         uid: 'learner-01',
         viewedItemIds: ['what-is-a-neuron', 'neuron-explanation'],
+      },
+    ]);
+  });
+
+  it('records an authenticated module overview through the owner boundary', async () => {
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        recordModuleOverview: async (input) => ({
+          statusCode: 200,
+          data: {
+            moduleOverview: {
+              moduleId: input.moduleId,
+              nextPostId: 'dl-p01-neuron-perceptron',
+              status: 'completed',
+            },
+          },
+        }),
+      }),
+      verifyAuthToken: async () => ({ uid: 'learner-01', displayName: 'Local Student' }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/module-overviews/dl-m01-neuron-perceptron/views')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+
+    expect(response.body.data.moduleOverview).toMatchObject({
+      moduleId: 'dl-m01-neuron-perceptron',
+      nextPostId: 'dl-p01-neuron-perceptron',
+    });
+  });
+
+  it('records authenticated demo views and confirms post completion through allowlisted routes', async () => {
+    const demoViewCalls: unknown[] = [];
+    const completionCalls: unknown[] = [];
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        completePost: async (input) => {
+          completionCalls.push(input);
+          return {
+            statusCode: 200,
+            data: { completion: { postId: input.postId, status: 'completed' } },
+          };
+        },
+        recordDemoView: async (input) => {
+          demoViewCalls.push(input);
+          return {
+            statusCode: 200,
+            data: {
+              demoView: { demoId: input.demoId, started: true, viewedStepIds: input.viewedStepIds },
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({ uid: 'learner-01', displayName: 'Local Student' }),
+    });
+
+    await request(app)
+      .post('/api/v1/demos/demo-perceptron-and-gate/views')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ viewedStepIds: ['and-problem'] })
+      .expect(200);
+    await request(app)
+      .post('/api/v1/posts/dl-p01-neuron-perceptron/completions')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', '39f43d7f-ee38-4e4e-92b6-7a1b2bfb6f7e')
+      .expect(200);
+
+    expect(demoViewCalls).toEqual([
+      {
+        demoId: 'demo-perceptron-and-gate',
+        uid: 'learner-01',
+        viewedStepIds: ['and-problem'],
+      },
+    ]);
+    expect(completionCalls).toEqual([
+      {
+        idempotencyKey: '39f43d7f-ee38-4e4e-92b6-7a1b2bfb6f7e',
+        postId: 'dl-p01-neuron-perceptron',
+        uid: 'learner-01',
       },
     ]);
   });

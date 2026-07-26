@@ -365,7 +365,7 @@ describe('Firestore learning repository', () => {
     });
   });
 
-  it('enrolls a learner idempotently and grants stable first module access', async () => {
+  it('enrolls a learner idempotently and grants only the first module until its overview is viewed', async () => {
     const { documents, firestore } = createFakeFirestore();
     const repository = createFirestoreLearningRepository(firestore);
     const enrollmentInput = {
@@ -388,9 +388,8 @@ describe('Firestore learning repository', () => {
         },
         access: {
           moduleId: 'dl-m01-neuron-perceptron',
-          postId: 'dl-p01-neuron-perceptron',
         },
-        nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+        nextPath: '/learn/course-deep-learning-basic',
       },
     });
     expect(retryResult).toEqual(firstResult);
@@ -423,19 +422,10 @@ describe('Firestore learning repository', () => {
     );
     expect(
       documents.get('users/learner-01/contentAccess/post_dl-p01-neuron-perceptron'),
-    ).toMatchObject({
-      schemaVersion: 1,
-      contentType: 'post',
-      entityId: 'dl-p01-neuron-perceptron',
-      reason: 'course-enrollment',
-      sourceProgressId: 'enrollments/course-deep-learning-basic',
-    });
-    expectStableContentAccessGrant(
-      documents.get('users/learner-01/contentAccess/post_dl-p01-neuron-perceptron'),
-    );
+    ).toBeUndefined();
   });
 
-  it('enrolls a Classical ML learner into the locked first module and post', async () => {
+  it('enrolls a Classical ML learner into the locked first module only', async () => {
     const { documents, firestore } = createFakeFirestore();
     const repository = createFirestoreLearningRepository(firestore);
 
@@ -451,9 +441,8 @@ describe('Firestore learning repository', () => {
       data: {
         access: {
           moduleId: 'cml-m01-foundations',
-          postId: 'cml-p01-problem-data-types',
         },
-        nextPath: '/learn/course-classical-ml/posts/cml-p01-problem-data-types',
+        nextPath: '/learn/course-classical-ml',
       },
     });
     expect(
@@ -464,9 +453,58 @@ describe('Firestore learning repository', () => {
     });
     expect(
       documents.get('users/learner-classical/contentAccess/post_cml-p01-problem-data-types'),
+    ).toBeUndefined();
+  });
+
+  it('records an accessible module overview before granting its first post', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/contentAccess/module_dl-m01-neuron-perceptron': {
+        contentType: 'module',
+        entityId: 'dl-m01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.createQuizAttempt({
+        quizId: 'quiz-post-dl-p01',
+        uid: 'learner-01',
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONTENT_ACCESS_REQUIRED',
+      statusCode: 403,
+    });
+
+    await expect(
+      repository.recordModuleOverview({
+        moduleId: 'dl-m01-neuron-perceptron',
+        uid: 'learner-01',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        moduleOverview: {
+          moduleId: 'dl-m01-neuron-perceptron',
+          nextPostId: 'dl-p01-neuron-perceptron',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(documents.get('users/learner-01/moduleProgress/dl-m01-neuron-perceptron')).toMatchObject(
+      {
+        completedStepCount: 1,
+        overviewViewed: true,
+        requiredStepCount: 4,
+        status: 'in-progress',
+      },
+    );
+    expect(
+      documents.get('users/learner-01/contentAccess/post_dl-p01-neuron-perceptron'),
     ).toMatchObject({
       contentType: 'post',
-      entityId: 'cml-p01-problem-data-types',
+      entityId: 'dl-p01-neuron-perceptron',
+      reason: 'module-overview',
     });
   });
 
@@ -593,6 +631,87 @@ describe('Firestore learning repository', () => {
     ).resolves.toMatchObject({ statusCode: 201 });
   });
 
+  it('records a started demo only after the backend grants demo access', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/contentAccess/demo_demo-perceptron-and-gate': {
+        contentType: 'demo',
+        entityId: 'demo-perceptron-and-gate',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.recordDemoView({
+        demoId: 'demo-perceptron-and-gate',
+        uid: 'learner-01',
+        viewedStepIds: ['and-problem', 'and-data'],
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        demoView: {
+          demoId: 'demo-perceptron-and-gate',
+          started: true,
+          viewedStepIds: ['and-data', 'and-problem'],
+        },
+      },
+    });
+
+    expect(documents.get('users/learner-01/demoViews/demo-perceptron-and-gate')).toMatchObject({
+      started: true,
+      status: 'in-progress',
+      viewedStepIds: ['and-data', 'and-problem'],
+    });
+  });
+
+  it('confirms a passed and fully viewed post before persisting its completion', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+      'users/learner-01/postViews/dl-p01-neuron-perceptron': {
+        contentViewed: true,
+        schemaVersion: 1,
+      },
+      'users/learner-01/quizProgress/quiz-post-dl-p01': {
+        passed: true,
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.completePost({
+        idempotencyKey: 'post-completion-key-01',
+        postId: 'dl-p01-neuron-perceptron',
+        uid: 'learner-01',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        completion: {
+          postId: 'dl-p01-neuron-perceptron',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(
+      documents.get('users/learner-01/postCompletions/dl-p01-neuron-perceptron'),
+    ).toMatchObject({
+      postId: 'dl-p01-neuron-perceptron',
+      quizId: 'quiz-post-dl-p01',
+      status: 'completed',
+    });
+    expect(
+      documents.get('users/learner-01/contentAccess/demo_demo-perceptron-and-gate'),
+    ).toMatchObject({
+      contentType: 'demo',
+      entityId: 'demo-perceptron-and-gate',
+    });
+  });
+
   it('completes the module, updates enrollment progress, and opens the next module after passing the module quiz', async () => {
     const { documents, firestore } = createFakeFirestore({
       'users/learner-01/enrollments/course-deep-learning-basic': {
@@ -688,14 +807,7 @@ describe('Firestore learning repository', () => {
     );
     expect(
       documents.get('users/learner-01/contentAccess/post_dl-p02-mlp-forward-activation'),
-    ).toMatchObject({
-      contentType: 'post',
-      entityId: 'dl-p02-mlp-forward-activation',
-      reason: 'module-completed',
-    });
-    expectStableContentAccessGrant(
-      documents.get('users/learner-01/contentAccess/post_dl-p02-mlp-forward-activation'),
-    );
+    ).toBeUndefined();
   });
 
   it('unlocks all seven submission algorithms through trusted module quiz completion', async () => {
@@ -1032,10 +1144,11 @@ describe('Firestore learning repository', () => {
     });
     expect(result.data.modules).toEqual([
       {
-        completedStepCount: 3,
+        completedStepCount: 4,
         moduleId: 'dl-m01-neuron-perceptron',
+        overviewViewed: false,
         progressPercent: 100,
-        requiredStepCount: 3,
+        requiredStepCount: 4,
         status: 'completed',
       },
     ]);

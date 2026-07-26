@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
@@ -26,11 +26,13 @@ function createIdempotencyKey(): string {
 export function LearningCoursePage({ learningApiClient, locale }: LearningCoursePageProps) {
   const { t } = useTranslation();
   const { getIdToken, user } = useAuth();
+  const navigate = useNavigate();
   const { courseId } = useParams();
   const course = getCourse(courseId);
   const firstModule = course?.modules?.[0];
   const idempotencyKey = useRef(createIdempotencyKey());
   const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus>('syncing');
+  const [overviewStatus, setOverviewStatus] = useState<EnrollmentStatus>('ready');
   const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
 
   useEffect(() => {
@@ -60,7 +62,6 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
         rememberLearningAccessGrant({
           courseId: selectedCourse.id,
           moduleId: enrollmentResult.access.moduleId,
-          postId: enrollmentResult.access.postId,
           uid: user.uid,
         });
 
@@ -104,6 +105,38 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
     );
   }
 
+  async function openFirstModuleOverview() {
+    if (!course || !firstModule) {
+      return;
+    }
+
+    setOverviewStatus('syncing');
+
+    try {
+      const idToken = await getIdToken();
+
+      if (!idToken || !user) {
+        throw new Error('Authenticated user is missing an ID token or user identity.');
+      }
+
+      const result = await learningApiClient.recordModuleOverview({
+        idToken,
+        moduleId: firstModule.id,
+      });
+
+      rememberLearningAccessGrant({
+        courseId: course.id,
+        moduleId: result.moduleOverview.moduleId,
+        postId: result.moduleOverview.nextPostId,
+        uid: user.uid,
+      });
+      setOverviewStatus('ready');
+      navigate(`/learn/${course.id}/posts/${result.moduleOverview.nextPostId}`);
+    } catch {
+      setOverviewStatus('failed');
+    }
+  }
+
   return (
     <main className="learning-course-page page-shell">
       <Link className="breadcrumb-link" to={`/courses/${course.id}`}>
@@ -129,10 +162,20 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
           </span>
           <h2>{localize(firstModule.title, locale)}</h2>
           <p>{localize(firstModule.description, locale)}</p>
-          <Link className="primary-link" to={`/learn/${course.id}/posts/${firstModule.postId}`}>
-            {t('learning.openFirstPost')}
+          <button
+            className="primary-link"
+            disabled={enrollmentStatus !== 'ready' || overviewStatus === 'syncing'}
+            onClick={() => void openFirstModuleOverview()}
+            type="button"
+          >
+            {t('learning.openModuleOverview')}
             <ArrowRight aria-hidden="true" size={18} />
-          </Link>
+          </button>
+          {overviewStatus === 'failed' ? (
+            <p className="learning-sync-state" role="status">
+              {t('learning.overview.failed')}
+            </p>
+          ) : null}
         </div>
       </section>
     </main>

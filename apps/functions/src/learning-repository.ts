@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore, Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 import { ApiError } from './api-error.js';
+import { getDemoCompletionSeed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { getPostViewManifest } from './post-view-manifest.js';
 import {
@@ -18,6 +19,7 @@ import {
   getReleaseLearningCatalog,
   getReleaseModule,
   getReleaseModuleByQuizId,
+  getReleasePost,
   type ReleaseLearningModule,
 } from './release-learning-catalog.js';
 
@@ -45,6 +47,23 @@ export interface CompleteDemoInput {
   requiredStepIds: readonly string[];
   uid: string;
   viewedStepIds: readonly string[];
+}
+
+export interface CompletePostInput {
+  idempotencyKey: string;
+  postId: string;
+  uid: string;
+}
+
+export interface RecordDemoViewInput {
+  demoId: string;
+  uid: string;
+  viewedStepIds: readonly string[];
+}
+
+export interface RecordModuleOverviewInput {
+  moduleId: string;
+  uid: string;
 }
 
 export interface RecordPostViewInput {
@@ -93,6 +112,7 @@ export interface LearningProgressSnapshot {
   demos: ReadonlyArray<{
     completed: boolean;
     demoId: string;
+    started: boolean;
   }>;
   enrollment: {
     courseId: string;
@@ -102,6 +122,7 @@ export interface LearningProgressSnapshot {
   modules: ReadonlyArray<{
     completedStepCount: number;
     moduleId: string;
+    overviewViewed: boolean;
     progressPercent: number;
     requiredStepCount: number;
     status: 'completed' | 'in-progress' | 'locked';
@@ -133,6 +154,18 @@ export interface LearningRepository {
   }>;
   completeDemo(input: CompleteDemoInput): Promise<{
     data: unknown;
+    statusCode: 200;
+  }>;
+  completePost(input: CompletePostInput): Promise<{
+    data: PostCompletionResponseData;
+    statusCode: 200;
+  }>;
+  recordDemoView(input: RecordDemoViewInput): Promise<{
+    data: DemoViewResponseData;
+    statusCode: 200;
+  }>;
+  recordModuleOverview(input: RecordModuleOverviewInput): Promise<{
+    data: ModuleOverviewResponseData;
     statusCode: 200;
   }>;
   recordPostView(input: RecordPostViewInput): Promise<{
@@ -169,18 +202,17 @@ interface EnrollmentSeed {
   courseId: string;
   courseRevisionId: string;
   firstModuleId: string;
-  firstPostId: string;
-  nextPath: string;
 }
 
 interface ModuleCompletionSeed {
+  completedModuleCount: number;
   courseId: string;
   moduleId: string;
   moduleRevisionId: string;
   moduleQuizId: string;
   nextModuleId: string | null;
-  nextPostId: string | null;
   requiredModuleCount: number;
+  requiredStepCount: number;
   requiredPostIds: readonly string[];
   unlockAlgorithmIds: readonly string[];
 }
@@ -204,7 +236,6 @@ interface LearnerProfilePayload {
 interface EnrollmentResponseData {
   access: {
     moduleId: string;
-    postId: string;
   };
   enrollment: {
     courseId: string;
@@ -212,6 +243,29 @@ interface EnrollmentResponseData {
     status: 'in-progress';
   };
   nextPath: string;
+}
+
+interface ModuleOverviewResponseData {
+  moduleOverview: {
+    moduleId: string;
+    nextPostId: string;
+    status: 'completed';
+  };
+}
+
+interface DemoViewResponseData {
+  demoView: {
+    demoId: string;
+    started: true;
+    viewedStepIds: readonly string[];
+  };
+}
+
+interface PostCompletionResponseData {
+  completion: {
+    postId: string;
+    status: 'completed';
+  };
 }
 
 interface DemoCompletionResponseData {
@@ -274,6 +328,7 @@ const LEARNER_ACCOUNT_SUBCOLLECTIONS = [
   'algorithmUnlocks',
   'contentAccess',
   'demoCompletions',
+  'demoViews',
   'enrollments',
   'idempotencyKeys',
   'moduleCompletions',
@@ -296,8 +351,6 @@ function getEnrollmentSeed(courseId: string): EnrollmentSeed {
     courseId: course.courseId,
     courseRevisionId: course.courseRevisionId,
     firstModuleId: firstModule.moduleId,
-    firstPostId: firstPost.postId,
-    nextPath: `/learn/${course.courseId}/posts/${firstPost.postId}`,
   };
 }
 
@@ -306,13 +359,14 @@ function createModuleCompletionSeed(module: ReleaseLearningModule): ModuleComple
   const nextModule = getNextReleaseModule(module.moduleId);
 
   return {
+    completedModuleCount: module.order,
     courseId: module.courseId,
     moduleId: module.moduleId,
     moduleRevisionId: `${module.moduleId}-rev-r1`,
     moduleQuizId: module.moduleQuizId,
     nextModuleId: nextModule?.moduleId ?? null,
-    nextPostId: nextModule?.posts[0]?.postId ?? null,
     requiredModuleCount: course?.modules.length ?? 1,
+    requiredStepCount: module.posts.length + (module.demoId ? 1 : 0) + 2,
     requiredPostIds: module.posts.map((post) => post.postId),
     unlockAlgorithmIds: module.unlockAlgorithmIds,
   };
@@ -442,9 +496,45 @@ function createEnrollmentResponseData(seed: EnrollmentSeed): EnrollmentResponseD
     },
     access: {
       moduleId: seed.firstModuleId,
-      postId: seed.firstPostId,
     },
-    nextPath: seed.nextPath,
+    nextPath: `/learn/${seed.courseId}`,
+  };
+}
+
+function createModuleOverviewResponseData(
+  module: ReleaseLearningModule,
+): ModuleOverviewResponseData {
+  const nextPostId = module.posts[0]?.postId;
+
+  if (!nextPostId) {
+    throw new ApiError(409, 'MODULE_POST_REQUIRED', 'A module overview requires a first post.');
+  }
+
+  return {
+    moduleOverview: {
+      moduleId: module.moduleId,
+      nextPostId,
+      status: 'completed',
+    },
+  };
+}
+
+function createDemoViewResponseData(input: RecordDemoViewInput): DemoViewResponseData {
+  return {
+    demoView: {
+      demoId: input.demoId,
+      started: true,
+      viewedStepIds: input.viewedStepIds,
+    },
+  };
+}
+
+function createPostCompletionResponseData(postId: string): PostCompletionResponseData {
+  return {
+    completion: {
+      postId,
+      status: 'completed',
+    },
   };
 }
 
@@ -494,6 +584,14 @@ function createDemoCompletionRequestHash(input: CompleteDemoInput): string {
     uid: input.uid,
     demoId: input.demoId,
     viewedStepIds: [...input.viewedStepIds].sort(),
+  });
+}
+
+function createPostCompletionRequestHash(input: CompletePostInput): string {
+  return JSON.stringify({
+    operation: 'post-completion',
+    postId: input.postId,
+    uid: input.uid,
   });
 }
 
@@ -677,6 +775,16 @@ function getNextPostIdInModule(moduleId: string, postId: string): string | null 
   return module.posts[currentPostIndex + 1]?.postId ?? null;
 }
 
+function getModuleIdForPost(postId: string): string | null {
+  for (const module of getReleaseLearningCatalog().courses.flatMap((course) => course.modules)) {
+    if (module.posts.some((post) => post.postId === postId)) {
+      return module.moduleId;
+    }
+  }
+
+  return null;
+}
+
 function areAllOtherRequiredPostsComplete(input: {
   completedPostId: string;
   requiredPostIds: readonly string[];
@@ -767,8 +875,10 @@ function createLearningProgressSnapshot(input: {
   algorithmUnlocks: readonly UserSubcollectionDocumentData[];
   contentAccess: readonly UserSubcollectionDocumentData[];
   demoCompletions: readonly UserSubcollectionDocumentData[];
+  demoViews: readonly UserSubcollectionDocumentData[];
   enrollments: readonly UserSubcollectionDocumentData[];
   moduleCompletions: readonly UserSubcollectionDocumentData[];
+  moduleProgress: readonly UserSubcollectionDocumentData[];
   postCompletions: readonly UserSubcollectionDocumentData[];
   postViews: readonly UserSubcollectionDocumentData[];
   quizProgress: readonly UserSubcollectionDocumentData[];
@@ -802,6 +912,8 @@ function createLearningProgressSnapshot(input: {
   const postCompletionIds = new Set(input.postCompletions.map((item) => item.id));
   const postViewsById = new Map(input.postViews.map((item) => [item.id, item.data]));
   const demoCompletionIds = new Set(input.demoCompletions.map((item) => item.id));
+  const demoViewsById = new Map(input.demoViews.map((item) => [item.id, item.data]));
+  const moduleProgressById = new Map(input.moduleProgress.map((item) => [item.id, item.data]));
   const quizProgressById = new Map(input.quizProgress.map((item) => [item.id, item.data]));
   const visibleModules =
     selectedCourse?.modules.filter((module) => {
@@ -818,9 +930,12 @@ function createLearningProgressSnapshot(input: {
       );
       const hasDemoProgress =
         module.demoId !== null &&
-        (contentAccessKeys.has(`demo:${module.demoId}`) || demoCompletionIds.has(module.demoId));
+        (contentAccessKeys.has(`demo:${module.demoId}`) ||
+          demoCompletionIds.has(module.demoId) ||
+          demoViewsById.has(module.demoId));
+      const hasOverviewProgress = moduleProgressById.has(module.moduleId);
 
-      return hasModuleProgress || hasPostProgress || hasDemoProgress;
+      return hasModuleProgress || hasPostProgress || hasDemoProgress || hasOverviewProgress;
     }) ?? [];
   const completedModuleCount = selectedCourse
     ? selectedCourse.modules.filter((module) => moduleCompletionIds.has(module.moduleId)).length
@@ -849,6 +964,9 @@ function createLearningProgressSnapshot(input: {
       .map((module) => ({
         completed: module.demoId ? demoCompletionIds.has(module.demoId) : false,
         demoId: module.demoId!,
+        started: module.demoId
+          ? getBooleanField(demoViewsById.get(module.demoId), 'started')
+          : false,
       })),
     enrollment: {
       courseId: selectedCourseId,
@@ -868,15 +986,22 @@ function createLearningProgressSnapshot(input: {
       const demoCompleted = module.demoId ? demoCompletionIds.has(module.demoId) : false;
       const moduleQuizProgress = quizProgressById.get(module.moduleQuizId);
       const moduleQuizPassed = getBooleanField(moduleQuizProgress, 'passed');
-      const requiredStepCount = module.posts.length + (module.demoId ? 1 : 0) + 1;
-      const completedStepCount =
-        completedPostCount + (demoCompleted ? 1 : 0) + (moduleQuizPassed ? 1 : 0);
+      const moduleProgress = moduleProgressById.get(module.moduleId);
+      const overviewViewed = getBooleanField(moduleProgress, 'overviewViewed');
+      const requiredStepCount = module.posts.length + (module.demoId ? 1 : 0) + 2;
+      const derivedCompletedStepCount =
+        (overviewViewed ? 1 : 0) +
+        completedPostCount +
+        (demoCompleted ? 1 : 0) +
+        (moduleQuizPassed ? 1 : 0);
       const moduleCompleted =
-        moduleCompletionIds.has(module.moduleId) || completedStepCount >= requiredStepCount;
+        moduleCompletionIds.has(module.moduleId) || derivedCompletedStepCount >= requiredStepCount;
+      const completedStepCount = moduleCompleted ? requiredStepCount : derivedCompletedStepCount;
 
       return {
         completedStepCount,
         moduleId: module.moduleId,
+        overviewViewed,
         progressPercent: moduleCompleted
           ? 100
           : Math.round((completedStepCount / requiredStepCount) * 100),
@@ -1070,6 +1195,140 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         return { statusCode: 200 as const, data: responseData };
       });
     },
+    async recordDemoView(input) {
+      const demoSeed = getDemoCompletionSeed(input.demoId);
+      const requestedViewedStepIds = [...new Set(input.viewedStepIds)].sort((leftItem, rightItem) =>
+        leftItem.localeCompare(rightItem),
+      );
+      const allowedStepIds = new Set(demoSeed.requiredStepIds);
+
+      if (
+        requestedViewedStepIds.length === 0 ||
+        requestedViewedStepIds.some((stepId) => !allowedStepIds.has(stepId))
+      ) {
+        throw new ApiError(
+          422,
+          'DEMO_VIEW_STEP_INVALID',
+          'Demo view data must reference required steps in the current demo.',
+        );
+      }
+
+      return firestore.runTransaction(async (transaction) => {
+        const accessRef = firestore.doc(`users/${input.uid}/contentAccess/demo_${input.demoId}`);
+        const demoViewRef = firestore.doc(`users/${input.uid}/demoViews/${input.demoId}`);
+        const [accessSnapshot, demoViewSnapshot] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(demoViewRef),
+        ]);
+
+        if (!accessSnapshot.exists) {
+          throw new ApiError(403, 'DEMO_ACCESS_REQUIRED', 'Demo access is required.');
+        }
+
+        const viewedStepIds = [
+          ...new Set([
+            ...getStringArrayField(demoViewSnapshot.data(), 'viewedStepIds'),
+            ...requestedViewedStepIds,
+          ]),
+        ].sort((leftItem, rightItem) => leftItem.localeCompare(rightItem));
+        const responseData = createDemoViewResponseData({
+          ...input,
+          viewedStepIds,
+        });
+
+        transaction.set(
+          demoViewRef,
+          {
+            schemaVersion: 1,
+            demoId: input.demoId,
+            requiredStepIds: demoSeed.requiredStepIds,
+            started: true,
+            status: 'in-progress',
+            viewedStepIds,
+            ...(demoViewSnapshot.exists ? {} : { startedAt: FieldValue.serverTimestamp() }),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        return { statusCode: 200 as const, data: responseData };
+      });
+    },
+    async recordModuleOverview(input) {
+      const module = getReleaseModule(input.moduleId);
+
+      if (!module) {
+        throw new ApiError(404, 'MODULE_NOT_FOUND', 'The requested module was not found.');
+      }
+
+      const responseData = createModuleOverviewResponseData(module);
+
+      return firestore.runTransaction(async (transaction) => {
+        const accessRef = firestore.doc(
+          `users/${input.uid}/contentAccess/module_${input.moduleId}`,
+        );
+        const moduleProgressRef = firestore.doc(
+          `users/${input.uid}/moduleProgress/${input.moduleId}`,
+        );
+        const postAccessRef = firestore.doc(
+          `users/${input.uid}/contentAccess/post_${responseData.moduleOverview.nextPostId}`,
+        );
+        const [accessSnapshot, moduleProgressSnapshot] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(moduleProgressRef),
+        ]);
+
+        if (!accessSnapshot.exists) {
+          throw new ApiError(403, 'MODULE_ACCESS_REQUIRED', 'Module access is required.');
+        }
+
+        const moduleSeed = createModuleCompletionSeed(module);
+        const existingCompletedStepCount = getNumberField(
+          moduleProgressSnapshot.data(),
+          'completedStepCount',
+        );
+        const isCompleted = getStatusField(moduleProgressSnapshot.data()) === 'completed';
+        const completedStepCount = isCompleted
+          ? moduleSeed.requiredStepCount
+          : Math.max(1, existingCompletedStepCount);
+
+        transaction.set(
+          moduleProgressRef,
+          {
+            schemaVersion: 1,
+            courseId: module.courseId,
+            moduleId: module.moduleId,
+            overviewViewed: true,
+            ...(getBooleanField(moduleProgressSnapshot.data(), 'overviewViewed')
+              ? {}
+              : { overviewViewedAt: FieldValue.serverTimestamp() }),
+            ...(moduleProgressSnapshot.exists ? {} : { startedAt: FieldValue.serverTimestamp() }),
+            completedStepCount,
+            progressPercent: isCompleted
+              ? 100
+              : Math.round((completedStepCount / moduleSeed.requiredStepCount) * 100),
+            requiredStepCount: moduleSeed.requiredStepCount,
+            status: isCompleted ? 'completed' : 'in-progress',
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.set(
+          postAccessRef,
+          {
+            schemaVersion: 1,
+            contentType: 'post',
+            entityId: responseData.moduleOverview.nextPostId,
+            grantedAt: FieldValue.serverTimestamp(),
+            reason: 'module-overview',
+            sourceProgressId: `moduleProgress/${module.moduleId}`,
+          },
+          { merge: true },
+        );
+
+        return { statusCode: 200 as const, data: responseData };
+      });
+    },
     async recordPostView(input) {
       const manifest = getPostViewManifest(input.postId);
 
@@ -1141,6 +1400,153 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           },
           { merge: true },
         );
+
+        return { statusCode: 200 as const, data: responseData };
+      });
+    },
+    async completePost(input) {
+      const post = getReleasePost(input.postId);
+
+      if (!post) {
+        throw new ApiError(404, 'POST_NOT_FOUND', 'The requested post was not found.');
+      }
+
+      const moduleId = getModuleIdForPost(post.postId);
+
+      if (!moduleId) {
+        throw new ApiError(409, 'POST_MODULE_REQUIRED', 'The requested post is missing a module.');
+      }
+
+      const requestHash = createPostCompletionRequestHash(input);
+      const nextPostId = getNextPostIdInModule(moduleId, post.postId);
+      const demoAccessSeed = getDemoAccessSeedByPostId(post.postId);
+      const siblingCompletionRefs =
+        demoAccessSeed?.requiredPostIds
+          .filter((postId) => postId !== post.postId)
+          .map((postId) => firestore.doc(`users/${input.uid}/postCompletions/${postId}`)) ?? [];
+
+      return firestore.runTransaction(async (transaction) => {
+        const accessRef = firestore.doc(`users/${input.uid}/contentAccess/post_${input.postId}`);
+        const postViewRef = firestore.doc(`users/${input.uid}/postViews/${input.postId}`);
+        const quizProgressRef = firestore.doc(`users/${input.uid}/quizProgress/${post.postQuizId}`);
+        const completionRef = firestore.doc(`users/${input.uid}/postCompletions/${input.postId}`);
+        const idempotencyRef = firestore.doc(
+          `users/${input.uid}/idempotencyKeys/${input.idempotencyKey}`,
+        );
+        const [
+          accessSnapshot,
+          postViewSnapshot,
+          quizProgressSnapshot,
+          idempotencySnapshot,
+          ...siblingCompletionSnapshots
+        ] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(postViewRef),
+          transaction.get(quizProgressRef),
+          transaction.get(idempotencyRef),
+          ...siblingCompletionRefs.map((reference) => transaction.get(reference)),
+        ]);
+
+        if (!accessSnapshot.exists) {
+          throw new ApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.');
+        }
+
+        if (!getBooleanField(postViewSnapshot.data(), 'contentViewed')) {
+          throw new ApiError(
+            403,
+            'POST_CONTENT_VIEW_REQUIRED',
+            'All required post blocks must be viewed before completion.',
+          );
+        }
+
+        if (!getBooleanField(quizProgressSnapshot.data(), 'passed')) {
+          throw new ApiError(
+            403,
+            'POST_QUIZ_PASS_REQUIRED',
+            'A passed post quiz is required before completion.',
+          );
+        }
+
+        if (idempotencySnapshot.exists) {
+          const record = idempotencySnapshot.data();
+
+          if (!isStoredIdempotencyRecord(record) || record.requestHash !== requestHash) {
+            throw new ApiError(
+              409,
+              'IDEMPOTENCY_CONFLICT',
+              'This Idempotency-Key was used for a different request.',
+            );
+          }
+
+          return {
+            statusCode: 200 as const,
+            data:
+              (record.responseData as PostCompletionResponseData | undefined) ??
+              createPostCompletionResponseData(input.postId),
+          };
+        }
+
+        const responseData = createPostCompletionResponseData(input.postId);
+
+        transaction.set(
+          completionRef,
+          {
+            schemaVersion: 1,
+            completedAt: FieldValue.serverTimestamp(),
+            postId: input.postId,
+            quizId: post.postQuizId,
+            status: 'completed',
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (nextPostId) {
+          transaction.set(
+            firestore.doc(`users/${input.uid}/contentAccess/post_${nextPostId}`),
+            {
+              schemaVersion: 1,
+              contentType: 'post',
+              entityId: nextPostId,
+              grantedAt: FieldValue.serverTimestamp(),
+              reason: 'post-completed',
+              sourceProgressId: `postCompletions/${input.postId}`,
+            },
+            { merge: true },
+          );
+        }
+
+        if (
+          demoAccessSeed &&
+          areAllOtherRequiredPostsComplete({
+            completedPostId: input.postId,
+            requiredPostIds: demoAccessSeed.requiredPostIds,
+            snapshots: siblingCompletionSnapshots,
+          })
+        ) {
+          transaction.set(
+            firestore.doc(`users/${input.uid}/contentAccess/demo_${demoAccessSeed.demoId}`),
+            {
+              schemaVersion: 1,
+              contentType: 'demo',
+              entityId: demoAccessSeed.demoId,
+              grantedAt: FieldValue.serverTimestamp(),
+              reason: 'post-completed',
+              sourceProgressId: `postCompletions/${input.postId}`,
+            },
+            { merge: true },
+          );
+        }
+
+        transaction.set(idempotencyRef, {
+          schemaVersion: 1,
+          operation: 'post-completion',
+          requestHash,
+          responseData,
+          statusCode: 200,
+          createdAt: FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + IDEMPOTENCY_TTL_MS),
+        });
 
         return { statusCode: 200 as const, data: responseData };
       });
@@ -1353,17 +1759,6 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
               sourceProgressId: `enrollments/${input.courseId}`,
             },
           );
-          transaction.set(
-            firestore.doc(`users/${input.uid}/contentAccess/post_${seed.firstPostId}`),
-            {
-              schemaVersion: 1,
-              contentType: 'post',
-              entityId: seed.firstPostId,
-              grantedAt: FieldValue.serverTimestamp(),
-              reason: 'course-enrollment',
-              sourceProgressId: `enrollments/${input.courseId}`,
-            },
-          );
         }
 
         transaction.set(idempotencyRef, {
@@ -1384,8 +1779,10 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         algorithmUnlocks,
         contentAccess,
         demoCompletions,
+        demoViews,
         enrollments,
         moduleCompletions,
+        moduleProgress,
         postCompletions,
         postViews,
         quizProgress,
@@ -1393,8 +1790,10 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         listUserSubcollectionData(firestore, input.uid, 'algorithmUnlocks'),
         listUserSubcollectionData(firestore, input.uid, 'contentAccess'),
         listUserSubcollectionData(firestore, input.uid, 'demoCompletions'),
+        listUserSubcollectionData(firestore, input.uid, 'demoViews'),
         listUserSubcollectionData(firestore, input.uid, 'enrollments'),
         listUserSubcollectionData(firestore, input.uid, 'moduleCompletions'),
+        listUserSubcollectionData(firestore, input.uid, 'moduleProgress'),
         listUserSubcollectionData(firestore, input.uid, 'postCompletions'),
         listUserSubcollectionData(firestore, input.uid, 'postViews'),
         listUserSubcollectionData(firestore, input.uid, 'quizProgress'),
@@ -1406,8 +1805,10 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           algorithmUnlocks,
           contentAccess,
           demoCompletions,
+          demoViews,
           enrollments,
           moduleCompletions,
+          moduleProgress,
           postCompletions,
           postViews,
           quizProgress,
@@ -1585,9 +1986,8 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
 
         if (grade.passed) {
           if (moduleSeed && moduleCompletionRef && enrollmentRef) {
-            const completedModuleCount = 1;
             const enrollmentProgressPercent = Math.round(
-              (completedModuleCount / moduleSeed.requiredModuleCount) * 100,
+              (moduleSeed.completedModuleCount / moduleSeed.requiredModuleCount) * 100,
             );
 
             transaction.set(
@@ -1610,9 +2010,9 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
                 schemaVersion: 1,
                 courseId: moduleSeed.courseId,
                 moduleId: moduleSeed.moduleId,
-                completedStepCount: 3,
+                completedStepCount: moduleSeed.requiredStepCount,
                 progressPercent: 100,
-                requiredStepCount: 3,
+                requiredStepCount: moduleSeed.requiredStepCount,
                 status: 'completed',
                 updatedAt: FieldValue.serverTimestamp(),
               },
@@ -1640,21 +2040,6 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
                   schemaVersion: 1,
                   contentType: 'module',
                   entityId: moduleSeed.nextModuleId,
-                  grantedAt: FieldValue.serverTimestamp(),
-                  reason: 'module-completed',
-                  sourceProgressId: `moduleCompletions/${moduleSeed.moduleId}`,
-                },
-                { merge: true },
-              );
-            }
-
-            if (moduleSeed.nextPostId) {
-              transaction.set(
-                firestore.doc(`users/${input.uid}/contentAccess/post_${moduleSeed.nextPostId}`),
-                {
-                  schemaVersion: 1,
-                  contentType: 'post',
-                  entityId: moduleSeed.nextPostId,
                   grantedAt: FieldValue.serverTimestamp(),
                   reason: 'module-completed',
                   sourceProgressId: `moduleCompletions/${moduleSeed.moduleId}`,

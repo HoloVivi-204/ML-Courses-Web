@@ -41,6 +41,28 @@ function createLearningApiClient() {
         viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
       },
     }),
+    completePost: vi.fn().mockResolvedValue({
+      completion: {
+        postId: 'dl-p01-neuron-perceptron',
+        status: 'completed',
+      },
+    }),
+    recordDemoView: vi.fn().mockImplementation(({ demoId, viewedStepIds }) =>
+      Promise.resolve({
+        demoView: {
+          demoId,
+          started: true,
+          viewedStepIds,
+        },
+      }),
+    ),
+    recordModuleOverview: vi.fn().mockResolvedValue({
+      moduleOverview: {
+        moduleId: 'dl-m01-neuron-perceptron',
+        nextPostId: 'dl-p01-neuron-perceptron',
+        status: 'completed',
+      },
+    }),
     recordPostView: vi.fn().mockImplementation(({ postId, readingPosition, viewedItemIds }) =>
       Promise.resolve({
         postView: {

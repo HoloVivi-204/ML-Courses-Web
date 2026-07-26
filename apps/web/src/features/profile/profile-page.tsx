@@ -1,7 +1,7 @@
 import { AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import type { LearningApiClient } from '../learning/learning-api';

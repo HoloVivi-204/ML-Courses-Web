@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
@@ -191,6 +191,41 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
       isActive = false;
     };
   }, [accessKey, courseId, demo, getIdToken, hasStoredAccess, learningApiClient, status, uid]);
+
+  useEffect(() => {
+    if (!demo || !hasAccess || viewedStepIds.length === 0) {
+      return;
+    }
+
+    const activeDemo = demo;
+    let isActive = true;
+
+    async function recordDemoView() {
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Authenticated user is missing an ID token.');
+        }
+
+        await learningApiClient.recordDemoView({
+          demoId: activeDemo.demoId,
+          idToken,
+          viewedStepIds,
+        });
+      } catch {
+        if (!isActive) {
+          return;
+        }
+      }
+    }
+
+    void recordDemoView();
+
+    return () => {
+      isActive = false;
+    };
+  }, [demo, getIdToken, hasAccess, learningApiClient, viewedStepIds]);
 
   useEffect(() => {
     if (!demo || !hasAccess || !isComplete || completionStarted.current) {

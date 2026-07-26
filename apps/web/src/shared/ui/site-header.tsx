@@ -1,7 +1,7 @@
 import { Button } from 'antd';
 import { Languages, LogOut, Moon, Sun, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router';
 
 import type { Locale } from '../../features/catalog/course-data';
 import type { Theme } from '../theme/use-theme';

@@ -14,7 +14,6 @@ export interface LearnerProfile {
 export interface EnrollmentResult {
   access: {
     moduleId: string;
-    postId: string;
   };
   enrollment: {
     courseId: string;
@@ -22,6 +21,29 @@ export interface EnrollmentResult {
     status: 'in-progress';
   };
   nextPath: string;
+}
+
+export interface ModuleOverviewResult {
+  moduleOverview: {
+    moduleId: string;
+    nextPostId: string;
+    status: 'completed';
+  };
+}
+
+export interface DemoViewResult {
+  demoView: {
+    demoId: string;
+    started: boolean;
+    viewedStepIds: readonly string[];
+  };
+}
+
+export interface PostCompletionResult {
+  completion: {
+    postId: string;
+    status: 'completed';
+  };
 }
 
 export interface DemoCompletionResult {
@@ -124,6 +146,7 @@ export interface LearningProgressSnapshot {
   demos: ReadonlyArray<{
     completed: boolean;
     demoId: string;
+    started?: boolean | undefined;
   }>;
   enrollment: {
     courseId: string;
@@ -133,6 +156,7 @@ export interface LearningProgressSnapshot {
   modules: ReadonlyArray<{
     completedStepCount: number;
     moduleId: string;
+    overviewViewed?: boolean | undefined;
     progressPercent: number;
     requiredStepCount: number;
     status: 'completed' | 'in-progress' | 'locked';
@@ -393,6 +417,17 @@ export interface LearningApiClient {
     idempotencyKey: string;
     viewedStepIds: readonly string[];
   }): Promise<DemoCompletionResult>;
+  completePost(input: {
+    idToken: string;
+    idempotencyKey: string;
+    postId: string;
+  }): Promise<PostCompletionResult>;
+  recordDemoView(input: {
+    demoId: string;
+    idToken: string;
+    viewedStepIds: readonly string[];
+  }): Promise<DemoViewResult>;
+  recordModuleOverview(input: { idToken: string; moduleId: string }): Promise<ModuleOverviewResult>;
   recordPostView(input: {
     idToken: string;
     postId: string;
@@ -546,6 +581,39 @@ export function createFetchLearningApiClient(): LearningApiClient {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
             'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
+        }),
+      );
+    },
+    async completePost({ idToken, idempotencyKey, postId }) {
+      return readSuccessEnvelope<PostCompletionResult>(
+        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/completions`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
+        }),
+      );
+    },
+    async recordDemoView({ demoId, idToken, viewedStepIds }) {
+      return readSuccessEnvelope<DemoViewResult>(
+        await fetch(`/api/v1/demos/${encodeURIComponent(demoId)}/views`, {
+          body: JSON.stringify({ viewedStepIds }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
+        }),
+      );
+    },
+    async recordModuleOverview({ idToken, moduleId }) {
+      return readSuccessEnvelope<ModuleOverviewResult>(
+        await fetch(`/api/v1/module-overviews/${encodeURIComponent(moduleId)}/views`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
           },
           method: 'POST',
         }),

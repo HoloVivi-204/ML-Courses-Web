@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, Clock3, LockKeyhole, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 
 import { CourseCard } from './course-card';
 import { courses, getCourse, localize, type Locale } from './course-data';
