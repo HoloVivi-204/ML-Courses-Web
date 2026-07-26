@@ -1,0 +1,34 @@
+{
+  "config": {
+    "k": 7,
+    "distance": "euclidean",
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-customer-churn",
+    "algorithmId": "knn",
+    "datasetVersionId": "ds-customer-churn-v1",
+    "determinism": "exact",
+    "feedback": ["imbalance"],
+    "metrics": {
+      "f1": 1,
+      "auc": 1,
+      "precision": 1,
+      "recall": 1
+    },
+    "chartSummary": {
+      "kind": "confusion-matrix",
+      "k": 7,
+      "truePositive": 5,
+      "falsePositive": 0,
+      "trueNegative": 7,
+      "falseNegative": 0
+    },
+    "textAlternative": {
+      "en": "KNN reaches F1 1 and AUC 1 on the synthetic customer-churn test split.",
+      "vi": "KNN dat F1 1 va AUC 1 tren tap kiem tra customer churn tong hop."
+    }
+  }
+}

@@ -26,6 +26,7 @@ type RunStatus = 'idle' | 'running' | 'stopping' | 'cancelled' | 'completed' | '
 
 const PERCENT_METRIC_IDS = new Set([
   'accuracy',
+  'auc',
   'explained-variance',
   'f1',
   'precision',

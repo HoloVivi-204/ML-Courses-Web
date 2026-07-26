@@ -64,6 +64,20 @@ interface DecisionTreeConfig {
   trainRatio: number;
 }
 
+interface KnnConfig {
+  distance: 'euclidean';
+  k: number;
+  seed: number;
+  trainRatio: number;
+}
+
+interface RandomForestConfig {
+  maxDepth: number;
+  seed: number;
+  trainRatio: number;
+  trees: number;
+}
+
 interface KMeansConfig {
   k: number;
   maxIterations: number;
@@ -263,6 +277,48 @@ export function createDecisionTreeAdapter(): AlgorithmAdapter {
       const config = validateDecisionTreeConfig(request.config);
 
       return runDecisionTree(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createKnnAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'knn-js-v1',
+    algorithmId: 'knn',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-customer-churn-v1',
+    scenarioId: 'pg-customer-churn',
+    validateConfig(config) {
+      return validateKnnConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateKnnConfig(request.config);
+
+      return runKnn(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createRandomForestAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'random-forest-js-v1',
+    algorithmId: 'random-forest',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-customer-churn-v1',
+    scenarioId: 'pg-customer-churn',
+    validateConfig(config) {
+      return validateRandomForestConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateRandomForestConfig(request.config);
+
+      return runRandomForest(request, config, options);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -892,6 +948,197 @@ function validateDecisionTreeConfig(config: MlConfig): DecisionTreeConfig {
   return {
     maxDepth: readIntegerInRange(config, 'maxDepth', 1, 20),
     minSamplesLeaf: readIntegerInRange(config, 'minSamplesLeaf', 1, 50),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+async function runKnn(
+  request: MlRunRequest,
+  config: KnnConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-customer-churn-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+
+  if (config.k > trainRows.length) {
+    throw new Error('k must not exceed the training row count.');
+  }
+
+  const scaler = fitStandardScaler(trainRows);
+  const trainingPoints = trainRows.map((row) => ({
+    features: createScaledFeatures(row, scaler),
+    label: row.label,
+    rowId: row.rowId,
+  }));
+  const scores: number[] = [];
+  const predictedLabels: number[] = [];
+
+  for (const row of testRows) {
+    throwIfCancelled(request.runId, options);
+
+    const scaledFeatures = createScaledFeatures(row, scaler);
+    const nearestPoints = trainingPoints
+      .map((point) => ({
+        ...point,
+        distance: euclideanDistance(scaledFeatures, point.features),
+      }))
+      .sort(
+        (left, right) => left.distance - right.distance || left.rowId.localeCompare(right.rowId),
+      )
+      .slice(0, config.k);
+    const score = nearestPoints.reduce((total, point) => total + point.label, 0) / config.k;
+
+    scores.push(score);
+    predictedLabels.push(score >= 0.5 ? 1 : 0);
+  }
+
+  const actualLabels = testRows.map((row) => row.label);
+  const binaryMetrics = calculateBinaryClassificationMetrics(actualLabels, predictedLabels);
+  const auc = calculateBinaryAuc(actualLabels, scores);
+  const confusionMatrix = calculateConfusionMatrix(actualLabels, predictedLabels);
+
+  options.onProgress({
+    runId: request.runId,
+    iteration: 1,
+    totalIterations: 1,
+    metric: { id: 'f1', value: binaryMetrics.f1 },
+  });
+  await yieldToWorkerQueue();
+  throwIfCancelled(request.runId, options);
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-customer-churn',
+    algorithmId: 'knn',
+    datasetVersionId: 'ds-customer-churn-v1',
+    determinism: 'exact',
+    feedback: hasClassImbalance(trainRows)
+      ? ['imbalance']
+      : binaryMetrics.f1 < 0.6
+        ? ['underfit']
+        : [],
+    metrics: {
+      f1: binaryMetrics.f1,
+      auc,
+      precision: binaryMetrics.precision,
+      recall: binaryMetrics.recall,
+    },
+    chartSummary: {
+      kind: 'confusion-matrix',
+      k: config.k,
+      ...confusionMatrix,
+    },
+    textAlternative: {
+      en: `KNN reaches F1 ${binaryMetrics.f1} and AUC ${auc} on the synthetic customer-churn test split.`,
+      vi: `KNN dat F1 ${binaryMetrics.f1} va AUC ${auc} tren tap kiem tra customer churn tong hop.`,
+    },
+  };
+}
+
+function validateKnnConfig(config: MlConfig): KnnConfig {
+  assertAllowedFields(config, ['distance', 'k', 'seed', 'trainRatio']);
+
+  return {
+    k: readIntegerInRange(config, 'k', 1, 50),
+    distance: readEnum(config, 'distance', ['euclidean']),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+async function runRandomForest(
+  request: MlRunRequest,
+  config: RandomForestConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-customer-churn-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const treeConfig: DecisionTreeConfig = {
+    maxDepth: config.maxDepth,
+    minSamplesLeaf: 1,
+    trainRatio: config.trainRatio,
+    seed: config.seed,
+  };
+  const featureCount = dataset.featureColumns.length;
+  const selectedFeatureCount = Math.max(1, Math.floor(Math.sqrt(featureCount)));
+  const forest: DecisionTreeNode[] = [];
+
+  for (let treeIndex = 0; treeIndex < config.trees; treeIndex += 1) {
+    throwIfCancelled(request.runId, options);
+
+    const bootstrapRows = createBootstrapSample(trainRows, config.seed + treeIndex * 7_919);
+    const candidateFeatureIndexes = shuffleItems(
+      Array.from({ length: featureCount }, (_, featureIndex) => featureIndex),
+      config.seed + treeIndex * 10_007,
+    ).slice(0, selectedFeatureCount);
+
+    forest.push(buildDecisionTree(bootstrapRows, treeConfig, 0, candidateFeatureIndexes));
+
+    if ((treeIndex + 1) % 5 === 0 || treeIndex + 1 === config.trees) {
+      options.onProgress({
+        runId: request.runId,
+        iteration: treeIndex + 1,
+        totalIterations: config.trees,
+      });
+      await yieldToWorkerQueue();
+    }
+  }
+
+  const scores = testRows.map(
+    (row) => forest.reduce((total, tree) => total + predictTree(tree, row), 0) / forest.length,
+  );
+  const predictedLabels = scores.map((score) => (score >= 0.5 ? 1 : 0));
+  const actualLabels = testRows.map((row) => row.label);
+  const binaryMetrics = calculateBinaryClassificationMetrics(actualLabels, predictedLabels);
+  const auc = calculateBinaryAuc(actualLabels, scores);
+  const confusionMatrix = calculateConfusionMatrix(actualLabels, predictedLabels);
+  const featureUsage = countForestFeatureUsage(forest, dataset.featureColumns);
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-customer-churn',
+    algorithmId: 'random-forest',
+    datasetVersionId: 'ds-customer-churn-v1',
+    determinism: 'exact',
+    feedback: hasClassImbalance(trainRows)
+      ? ['imbalance']
+      : binaryMetrics.f1 < 0.6
+        ? ['underfit']
+        : [],
+    metrics: {
+      f1: binaryMetrics.f1,
+      auc,
+      precision: binaryMetrics.precision,
+      recall: binaryMetrics.recall,
+    },
+    chartSummary: {
+      kind: 'importance',
+      trees: config.trees,
+      featureUsage,
+      ...confusionMatrix,
+    },
+    textAlternative: {
+      en: `Random Forest reaches F1 ${binaryMetrics.f1} and AUC ${auc} on the synthetic customer-churn test split.`,
+      vi: `Random Forest dat F1 ${binaryMetrics.f1} va AUC ${auc} tren tap kiem tra customer churn tong hop.`,
+    },
+  };
+}
+
+function validateRandomForestConfig(config: MlConfig): RandomForestConfig {
+  assertAllowedFields(config, ['maxDepth', 'seed', 'trainRatio', 'trees']);
+
+  return {
+    trees: readIntegerInRange(config, 'trees', 1, 200),
+    maxDepth: readIntegerInRange(config, 'maxDepth', 1, 15),
     trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
   };
@@ -1536,6 +1783,41 @@ function calculateBinaryClassificationMetrics(
   };
 }
 
+function calculateBinaryAuc(actualLabels: readonly number[], scores: readonly number[]): number {
+  const rankedRows = actualLabels
+    .map((label, index) => ({ index, label, score: scores[index] ?? 0 }))
+    .sort((left, right) => left.score - right.score || left.index - right.index);
+  const positiveCount = actualLabels.filter((label) => label === 1).length;
+  const negativeCount = actualLabels.length - positiveCount;
+
+  if (positiveCount === 0 || negativeCount === 0) {
+    return 0.5;
+  }
+
+  let accumulatedNegativeCount = 0;
+  let area = 0;
+
+  for (let index = 0; index < rankedRows.length;) {
+    const score = rankedRows[index]?.score;
+    let groupPositiveCount = 0;
+    let groupNegativeCount = 0;
+
+    while (index < rankedRows.length && rankedRows[index]?.score === score) {
+      if (rankedRows[index]?.label === 1) {
+        groupPositiveCount += 1;
+      } else {
+        groupNegativeCount += 1;
+      }
+      index += 1;
+    }
+
+    area += groupPositiveCount * (accumulatedNegativeCount + groupNegativeCount / 2);
+    accumulatedNegativeCount += groupNegativeCount;
+  }
+
+  return roundMetric(area / (positiveCount * negativeCount));
+}
+
 function calculateNaiveBayesStatistics(
   rows: readonly (PlaygroundDatasetRow & { label: number })[],
   alpha: number,
@@ -1604,6 +1886,7 @@ function buildDecisionTree(
   rows: Array<PlaygroundDatasetRow & { label: number }>,
   config: DecisionTreeConfig,
   depth: number,
+  candidateFeatureIndexes?: readonly number[],
 ): DecisionTreeNode {
   const prediction = majorityLabel(rows);
 
@@ -1615,7 +1898,7 @@ function buildDecisionTree(
     return { prediction };
   }
 
-  const split = findBestDecisionTreeSplit(rows, config.minSamplesLeaf);
+  const split = findBestDecisionTreeSplit(rows, config.minSamplesLeaf, candidateFeatureIndexes);
 
   if (!split) {
     return { prediction };
@@ -1625,19 +1908,22 @@ function buildDecisionTree(
     prediction,
     featureIndex: split.featureIndex,
     threshold: split.threshold,
-    left: buildDecisionTree(split.leftRows, config, depth + 1),
-    right: buildDecisionTree(split.rightRows, config, depth + 1),
+    left: buildDecisionTree(split.leftRows, config, depth + 1, candidateFeatureIndexes),
+    right: buildDecisionTree(split.rightRows, config, depth + 1, candidateFeatureIndexes),
   };
 }
 
 function findBestDecisionTreeSplit(
   rows: Array<PlaygroundDatasetRow & { label: number }>,
   minSamplesLeaf: number,
+  candidateFeatureIndexes?: readonly number[],
 ): DecisionTreeSplit | null {
   const featureCount = rows[0]?.features.length ?? 0;
+  const featureIndexes =
+    candidateFeatureIndexes ?? Array.from({ length: featureCount }, (_, index) => index);
   let bestSplit: DecisionTreeSplit | null = null;
 
-  for (let featureIndex = 0; featureIndex < featureCount; featureIndex += 1) {
+  for (const featureIndex of featureIndexes) {
     for (const threshold of getCandidateThresholds(rows, featureIndex)) {
       const leftRows = rows.filter((row) => readFeature(row, featureIndex) <= threshold);
       const rightRows = rows.filter((row) => readFeature(row, featureIndex) > threshold);
@@ -1712,6 +1998,60 @@ function predictTree(tree: DecisionTreeNode, row: PlaygroundDatasetRow): 0 | 1 {
   return readFeature(row, tree.featureIndex) <= tree.threshold
     ? predictTree(tree.left, row)
     : predictTree(tree.right, row);
+}
+
+function createBootstrapSample<TItem>(items: readonly TItem[], seed: number): TItem[] {
+  const random = createSeededRandom(seed);
+
+  return Array.from({ length: items.length }, () => {
+    const item = items[Math.floor(random() * items.length)];
+
+    if (item === undefined) {
+      throw new Error('Cannot bootstrap an empty sample.');
+    }
+
+    return item;
+  });
+}
+
+function countForestFeatureUsage(
+  forest: readonly DecisionTreeNode[],
+  featureColumns: readonly string[],
+): Record<string, number> {
+  const usage = Object.fromEntries(featureColumns.map((feature) => [feature, 0])) as Record<
+    string,
+    number
+  >;
+
+  for (const tree of forest) {
+    countTreeFeatureUsage(tree, featureColumns, usage);
+  }
+
+  return usage;
+}
+
+function countTreeFeatureUsage(
+  tree: DecisionTreeNode,
+  featureColumns: readonly string[],
+  usage: Record<string, number>,
+): void {
+  if (tree.featureIndex === undefined) {
+    return;
+  }
+
+  const featureColumn = featureColumns[tree.featureIndex];
+
+  if (featureColumn) {
+    usage[featureColumn] = (usage[featureColumn] ?? 0) + 1;
+  }
+
+  if (tree.left) {
+    countTreeFeatureUsage(tree.left, featureColumns, usage);
+  }
+
+  if (tree.right) {
+    countTreeFeatureUsage(tree.right, featureColumns, usage);
+  }
 }
 
 function initializeKMeansCentroids(

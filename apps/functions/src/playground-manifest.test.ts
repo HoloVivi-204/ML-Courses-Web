@@ -23,10 +23,12 @@ describe('playground manifest validation', () => {
       'pg-spam-detection/logistic-regression',
       'pg-spam-detection/naive-bayes',
       'pg-credit-risk/decision-tree',
+      'pg-customer-churn/knn',
+      'pg-customer-churn/random-forest',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(manifests).toHaveLength(11);
+    expect(manifests).toHaveLength(13);
     expect(
       manifests.every(
         (manifest) =>
@@ -126,6 +128,62 @@ describe('playground manifest validation', () => {
         scenarioId: 'pg-retail-segments',
       }),
     ).toThrowError(/k must be between 2 and 10/i);
+  });
+
+  it('enforces the customer churn KNN limits before worker execution', () => {
+    const baseConfig = {
+      k: 7,
+      distance: 'euclidean',
+      trainRatio: 0.8,
+      seed: 42,
+    };
+
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'knn',
+        config: { ...baseConfig, k: 51 },
+        datasetVersionId: 'ds-customer-churn-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-customer-churn',
+      }),
+    ).toThrowError(/k must be between 1 and 50/i);
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'knn',
+        config: { ...baseConfig, k: 26 },
+        datasetVersionId: 'ds-customer-churn-v1',
+        deviceProfile: 'mobile',
+        scenarioId: 'pg-customer-churn',
+      }),
+    ).toThrowError(/k must be between 1 and 25/i);
+  });
+
+  it('enforces the customer churn Random Forest tree limits before worker execution', () => {
+    const baseConfig = {
+      trees: 50,
+      maxDepth: 6,
+      trainRatio: 0.8,
+      seed: 42,
+    };
+
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'random-forest',
+        config: { ...baseConfig, trees: 201 },
+        datasetVersionId: 'ds-customer-churn-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-customer-churn',
+      }),
+    ).toThrowError(/trees must be between 1 and 200/i);
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'random-forest',
+        config: { ...baseConfig, trees: 51 },
+        datasetVersionId: 'ds-customer-churn-v1',
+        deviceProfile: 'mobile',
+        scenarioId: 'pg-customer-churn',
+      }),
+    ).toThrowError(/trees must be between 1 and 50/i);
   });
 
   it('enforces the regression-family alpha and polynomial degree limits before worker execution', () => {

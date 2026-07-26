@@ -15,11 +15,13 @@ describe('Playground adapter registry', () => {
       'pg-insurance-cost/lasso-regression',
       'pg-spam-detection/logistic-regression',
       'pg-spam-detection/naive-bayes',
+      'pg-customer-churn/knn',
+      'pg-customer-churn/random-forest',
       'pg-credit-risk/decision-tree',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(registry).toHaveLength(11);
+    expect(registry).toHaveLength(13);
   });
 
   it('keeps UI defaults and parameter fields aligned with every registered adapter', () => {

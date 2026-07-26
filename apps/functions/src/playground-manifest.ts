@@ -249,6 +249,50 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'tree'],
   },
   {
+    adapterVersion: 'knn-js-v1',
+    algorithmId: 'knn',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-customer-churn-v1',
+    defaultConfig: {
+      k: 7,
+      distance: 'euclidean',
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { k: 50 },
+    feedbackRules: ['underfit', 'overfit', 'imbalance'],
+    goldenFixture: 'fixtures/churn-knn-v1.json',
+    mobileLimits: { k: 25 },
+    preprocessing: ['impute', 'one-hot', 'standard-scale'],
+    primaryMetric: 'f1',
+    scenarioId: 'pg-customer-churn',
+    scopePriority: 'must',
+    secondaryMetrics: ['auc', 'precision', 'recall'],
+    visualizations: ['confusion-matrix', 'k-curve'],
+  },
+  {
+    adapterVersion: 'random-forest-js-v1',
+    algorithmId: 'random-forest',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-customer-churn-v1',
+    defaultConfig: {
+      trees: 50,
+      maxDepth: 6,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { trees: 200, depth: 15 },
+    feedbackRules: ['underfit', 'overfit', 'imbalance'],
+    goldenFixture: 'fixtures/churn-forest-v1.json',
+    mobileLimits: { trees: 50, depth: 8 },
+    preprocessing: ['impute', 'ordinal-encode'],
+    primaryMetric: 'f1',
+    scenarioId: 'pg-customer-churn',
+    scopePriority: 'must',
+    secondaryMetrics: ['auc', 'precision', 'recall'],
+    visualizations: ['confusion-matrix', 'importance'],
+  },
+  {
     adapterVersion: 'kmeans-js-v1',
     algorithmId: 'kmeans',
     configSchemaVersion: 1,
@@ -386,6 +430,14 @@ export function normalizePlaygroundConfig(input: NormalizePlaygroundConfigInput)
 
   if (manifest.algorithmId === 'decision-tree') {
     return normalizeDecisionTreeConfig(input.config, manifest, input.deviceProfile);
+  }
+
+  if (manifest.algorithmId === 'knn') {
+    return normalizeKnnConfig(input.config, manifest, input.deviceProfile);
+  }
+
+  if (manifest.algorithmId === 'random-forest') {
+    return normalizeRandomForestConfig(input.config, manifest, input.deviceProfile);
   }
 
   if (manifest.algorithmId === 'kmeans') {
@@ -595,6 +647,42 @@ function normalizeDecisionTreeConfig(
   return {
     maxDepth: getIntegerInRange(config, 'maxDepth', 1, getManifestLimit(limits, 'depth')),
     minSamplesLeaf: getIntegerInRange(config, 'minSamplesLeaf', 1, 50),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeKnnConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['distance', 'k', 'seed', 'trainRatio']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    k: getIntegerInRange(config, 'k', 1, getManifestLimit(limits, 'k')),
+    distance: getEnumValue(config.distance, 'distance', ['euclidean']),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeRandomForestConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['maxDepth', 'seed', 'trainRatio', 'trees']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    trees: getIntegerInRange(config, 'trees', 1, getManifestLimit(limits, 'trees')),
+    maxDepth: getIntegerInRange(config, 'maxDepth', 1, getManifestLimit(limits, 'depth')),
     trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
   };

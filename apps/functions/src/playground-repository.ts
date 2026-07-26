@@ -363,6 +363,7 @@ function normalizeMetricValue(value: unknown, metricId: string): PlaygroundMetri
   if (
     [
       'accuracy',
+      'auc',
       'explained-variance',
       'f1',
       'precision',

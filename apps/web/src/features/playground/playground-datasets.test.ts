@@ -14,6 +14,7 @@ describe('Playground dataset registry', () => {
       'ds-house-price-v1',
       'ds-insurance-cost-v1',
       'ds-sms-spam-v1',
+      'ds-customer-churn-v1',
       'ds-credit-risk-v1',
       'ds-retail-segments-v1',
       'ds-country-indicators-v1',

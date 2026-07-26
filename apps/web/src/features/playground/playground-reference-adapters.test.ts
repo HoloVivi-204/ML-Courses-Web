@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveAlgorithmAdapter } from './playground-adapter-registry';
 import creditTreeFixture from './fixtures/credit-tree-v1.json';
+import churnKnnFixture from './fixtures/churn-knn-v1.json';
+import churnForestFixture from './fixtures/churn-forest-v1.json';
 import countryPcaFixture from './fixtures/country-pca-v1.json';
 import houseLinearFixture from './fixtures/house-linear-v1.json';
 import houseRidgeFixture from './fixtures/house-ridge-v1.json';
@@ -61,6 +63,18 @@ const fixtureCases = [
     algorithmId: 'naive-bayes',
     datasetVersionId: 'ds-sms-spam-v1',
     fixture: spamNaiveBayesFixture,
+  },
+  {
+    scenarioId: 'pg-customer-churn',
+    algorithmId: 'knn',
+    datasetVersionId: 'ds-customer-churn-v1',
+    fixture: churnKnnFixture,
+  },
+  {
+    scenarioId: 'pg-customer-churn',
+    algorithmId: 'random-forest',
+    datasetVersionId: 'ds-customer-churn-v1',
+    fixture: churnForestFixture,
   },
   {
     scenarioId: 'pg-credit-risk',
@@ -372,6 +386,74 @@ describe('Playground reference adapters', () => {
     expect(result).toMatchObject({
       runId: 'run-spam-naive-bayes',
       ...spamNaiveBayesFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
+  });
+
+  it('runs pg-customer-churn KNN through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-customer-churn',
+      algorithmId: 'knn',
+      datasetVersionId: 'ds-customer-churn-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-customer-churn/knn adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-churn-knn',
+        sessionId: 'session-churn-knn',
+        scenarioId: 'pg-customer-churn',
+        algorithmId: 'knn',
+        datasetVersionId: 'ds-customer-churn-v1',
+        configHash: '8'.repeat(64),
+        config: churnKnnFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-churn-knn',
+      ...churnKnnFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
+  });
+
+  it('runs pg-customer-churn Random Forest through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-customer-churn',
+      algorithmId: 'random-forest',
+      datasetVersionId: 'ds-customer-churn-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-customer-churn/random-forest adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-churn-forest',
+        sessionId: 'session-churn-forest',
+        scenarioId: 'pg-customer-churn',
+        algorithmId: 'random-forest',
+        datasetVersionId: 'ds-customer-churn-v1',
+        configHash: '8'.repeat(64),
+        config: churnForestFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-churn-forest',
+      ...churnForestFixture.result,
     });
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
   });

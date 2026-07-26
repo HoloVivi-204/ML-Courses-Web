@@ -84,6 +84,17 @@ const playgroundDatasets = [
     },
   }),
   createDataset({
+    datasetVersionId: 'ds-customer-churn-v1',
+    featureColumns: ['tenureMonths', 'monthlyChargeIndex', 'supportContactIndex', 'contractIndex'],
+    labelColumn: 'isChurned',
+    rows: createChurnRows(),
+    task: 'binary-classification',
+    textAlternative: {
+      en: 'Synthetic customer-churn rows with pre-encoded tenure, charge, support, and contract signals.',
+      vi: 'Du lieu customer churn tong hop voi tenure, chi phi, lien he ho tro va loai hop dong da ma hoa so.',
+    },
+  }),
+  createDataset({
     datasetVersionId: 'ds-credit-risk-v1',
     featureColumns: ['incomeScore', 'debtRatio', 'missedPayments', 'collateralScore'],
     labelColumn: 'isHighRisk',
@@ -343,6 +354,33 @@ function createSpamRows(): PlaygroundDatasetRow[] {
       label,
     }),
   );
+}
+
+function createChurnRows(): PlaygroundDatasetRow[] {
+  const random = createSeededRandom(731);
+
+  return Array.from({ length: 60 }, (_, index) => {
+    const label = index % 4 === 0 || index % 11 === 0;
+    const variance = gaussian(random);
+
+    return {
+      rowId: `churn-${String(index + 1).padStart(2, '0')}`,
+      features: label
+        ? [
+            roundMetric(2 + random() * 16 + variance),
+            roundMetric(72 + random() * 26 + variance * 2),
+            roundMetric(4 + random() * 5 + Math.abs(variance)),
+            roundMetric(random() * 0.35),
+          ]
+        : [
+            roundMetric(28 + random() * 44 + variance),
+            roundMetric(28 + random() * 38 + variance * 2),
+            roundMetric(random() * 2.8 + Math.max(variance, -0.5)),
+            roundMetric(1 + random() * 1.8),
+          ],
+      label: label ? 1 : 0,
+    };
+  });
 }
 
 function createCreditRows(): PlaygroundDatasetRow[] {
