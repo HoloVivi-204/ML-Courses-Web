@@ -33,6 +33,8 @@ export interface ReleaseLearningCourse {
   courseId: string;
   courseRevisionId: string;
   modules: readonly ReleaseLearningModule[];
+  sourceCandidateIds: readonly string[];
+  sourceReviewStatus: 'pending-operator-review';
   title: LocalizedText;
   trialPostId: string;
 }
@@ -81,6 +83,13 @@ const releaseLearningCatalog: ReleaseLearningCatalog = {
     {
       courseId: 'course-classical-ml',
       courseRevisionId: 'course-classical-ml-rev-r1',
+      sourceCandidateIds: [
+        'microsoft-ml-for-beginners',
+        'google-ml-crash-course',
+        'mit-ocw',
+        'sklearn-docs',
+      ],
+      sourceReviewStatus: 'pending-operator-review',
       title: {
         en: 'Classical Machine Learning',
         vi: 'Học máy cổ điển',
@@ -389,6 +398,13 @@ const releaseLearningCatalog: ReleaseLearningCatalog = {
     {
       courseId: 'course-deep-learning-basic',
       courseRevisionId: 'course-deep-learning-basic-rev-r1',
+      sourceCandidateIds: [
+        'd2l-vi',
+        'microsoft-ai-for-beginners',
+        'google-ml-crash-course',
+        'tensorflow-tutorials',
+      ],
+      sourceReviewStatus: 'pending-operator-review',
       title: {
         en: 'Deep Learning Basics',
         vi: 'Học sâu cơ bản',

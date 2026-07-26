@@ -42,6 +42,12 @@ export interface QuizQuestion {
 export interface QuizManifest {
   courseId: string;
   demoId: string | null;
+  draftProvenance?: {
+    candidateSourceIds: readonly string[];
+    contentReviewStatus: 'pending-operator-review';
+    externalEvidenceStatus: 'not-collected';
+    importStatus: 'draft-only';
+  };
   mastery: LocalizedText;
   moduleId: string;
   passingScorePercent: number;
@@ -579,6 +585,263 @@ function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearn
   } as const satisfies QuizManifest;
 }
 
+interface PostQuizDraftDefinition {
+  coreMove: LocalizedText;
+  trueAssertion: LocalizedText;
+}
+
+const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {
+  'cml-p01-problem-data-types': {
+    coreMove: {
+      en: 'Define the prediction target before listing the features.',
+      vi: 'Xác định mục tiêu dự đoán trước khi liệt kê feature.',
+    },
+    trueAssertion: {
+      en: 'A label is an outcome known in supervised examples, while a feature is evidence used to estimate it.',
+      vi: 'Nhãn là kết quả đã biết trong ví dụ có giám sát, còn feature là bằng chứng dùng để ước lượng kết quả đó.',
+    },
+  },
+  'cml-p02-train-test-metrics': {
+    coreMove: {
+      en: 'Judge a model on held-out examples with a metric that reflects the costly error.',
+      vi: 'Đánh giá mô hình trên ví dụ giữ lại bằng metric phản ánh lỗi tốn kém.',
+    },
+    trueAssertion: {
+      en: 'A high training score alone cannot show how a model will behave on unseen examples.',
+      vi: 'Điểm train cao một mình không thể cho biết mô hình sẽ hoạt động thế nào trên ví dụ chưa thấy.',
+    },
+  },
+  'cml-p03-linear-regression': {
+    coreMove: {
+      en: 'Start with an interpretable line and inspect residual patterns before adding complexity.',
+      vi: 'Bắt đầu bằng đường thẳng dễ giải thích và xem mẫu phần dư trước khi tăng độ phức tạp.',
+    },
+    trueAssertion: {
+      en: 'A repeated residual pattern can show that a straight baseline misses structure in the data.',
+      vi: 'Mẫu phần dư lặp lại có thể cho thấy baseline đường thẳng bỏ sót cấu trúc trong dữ liệu.',
+    },
+  },
+  'cml-p04-polynomial-regression': {
+    coreMove: {
+      en: 'Compare added curvature against held-out error instead of assuming a higher degree is better.',
+      vi: 'So sánh độ cong tăng thêm với lỗi trên dữ liệu giữ lại thay vì cho rằng bậc cao luôn tốt hơn.',
+    },
+    trueAssertion: {
+      en: 'A high-degree curve can fit accidental noise even when it looks better on the training examples.',
+      vi: 'Đường cong bậc cao có thể khớp nhiễu ngẫu nhiên dù trông tốt hơn trên ví dụ train.',
+    },
+  },
+  'cml-p05-regularization-ridge-lasso': {
+    coreMove: {
+      en: 'Use regularisation to favour stable coefficients when signals overlap or contain noise.',
+      vi: 'Dùng regularization để ưu tiên hệ số ổn định khi tín hiệu chồng chéo hoặc có nhiễu.',
+    },
+    trueAssertion: {
+      en: 'Ridge shrinks related coefficients, while Lasso can set a weak redundant coefficient to zero.',
+      vi: 'Ridge thu nhỏ hệ số liên quan, còn Lasso có thể đưa hệ số dư yếu về không.',
+    },
+  },
+  'cml-p06-logistic-regression': {
+    coreMove: {
+      en: 'Read a probability estimate before deciding which threshold should trigger an action.',
+      vi: 'Đọc ước lượng xác suất trước khi quyết định ngưỡng nào kích hoạt hành động.',
+    },
+    trueAssertion: {
+      en: 'The same probability can lead to different actions when the cost of a false negative changes.',
+      vi: 'Cùng một xác suất có thể dẫn đến hành động khác khi chi phí âm tính giả thay đổi.',
+    },
+  },
+  'cml-p07-classification-metrics': {
+    coreMove: {
+      en: 'Choose a classification metric from the false-positive and false-negative trade-off.',
+      vi: 'Chọn metric phân loại từ đánh đổi giữa dương tính giả và âm tính giả.',
+    },
+    trueAssertion: {
+      en: 'Accuracy can hide an important error type when classes or error costs are uneven.',
+      vi: 'Accuracy có thể che giấu loại lỗi quan trọng khi lớp hoặc chi phí lỗi không cân bằng.',
+    },
+  },
+  'cml-p08-knn': {
+    coreMove: {
+      en: 'Make distance meaningful by scaling features before trusting nearby examples.',
+      vi: 'Làm khoảng cách có ý nghĩa bằng cách chuẩn hóa feature trước khi tin ví dụ lân cận.',
+    },
+    trueAssertion: {
+      en: 'A feature with a much larger numeric range can dominate a KNN distance unless the representation is scaled.',
+      vi: 'Feature có thang số lớn hơn nhiều có thể chi phối khoảng cách KNN nếu biểu diễn chưa được chuẩn hóa.',
+    },
+  },
+  'cml-p09-naive-bayes': {
+    coreMove: {
+      en: 'Combine prior belief with observed feature evidence while keeping the independence assumption visible.',
+      vi: 'Kết hợp niềm tin ban đầu với bằng chứng feature quan sát được và giữ rõ giả định độc lập.',
+    },
+    trueAssertion: {
+      en: 'Naive Bayes can update a class belief from several features without claiming that the features are truly independent.',
+      vi: 'Naive Bayes có thể cập nhật niềm tin về lớp từ nhiều feature mà không khẳng định các feature thực sự độc lập.',
+    },
+  },
+  'cml-p10-decision-tree': {
+    coreMove: {
+      en: 'Read each tree split as an explicit rule that reduces label mixing.',
+      vi: 'Đọc mỗi split của cây như quy tắc rõ ràng làm giảm sự lẫn lộn của nhãn.',
+    },
+    trueAssertion: {
+      en: 'A useful split makes the labels in its child groups more consistent than before the split.',
+      vi: 'Split hữu ích làm nhãn trong các nhóm con nhất quán hơn so với trước khi chia.',
+    },
+  },
+  'cml-p11-random-forest': {
+    coreMove: {
+      en: 'Combine diverse trees so one brittle split has less influence on the final vote.',
+      vi: 'Kết hợp các cây đa dạng để một split mong manh có ít ảnh hưởng hơn lên phiếu cuối.',
+    },
+    trueAssertion: {
+      en: 'Bootstrap samples and feature subsets help forest trees avoid making the same error for the same reason.',
+      vi: 'Mẫu bootstrap và tập con feature giúp các cây trong forest tránh cùng mắc một lỗi vì cùng lý do.',
+    },
+  },
+  'cml-p12-svm': {
+    coreMove: {
+      en: 'Prefer a separating boundary with margin and identify the nearest support points.',
+      vi: 'Ưu tiên ranh giới phân tách có margin và xác định các support point gần nhất.',
+    },
+    trueAssertion: {
+      en: 'Support vectors matter because moving them changes the margin-constrained boundary.',
+      vi: 'Support vector quan trọng vì di chuyển chúng làm thay đổi ranh giới bị ràng buộc bởi margin.',
+    },
+  },
+  'cml-p13-kmeans': {
+    coreMove: {
+      en: 'Explain the K-Means loop as assignment to centres followed by centre updates.',
+      vi: 'Giải thích vòng lặp K-Means là gán vào tâm rồi cập nhật tâm.',
+    },
+    trueAssertion: {
+      en: 'Changing k changes the grouping question being asked, not just the label names shown at the end.',
+      vi: 'Thay đổi k làm thay đổi câu hỏi gom nhóm, không chỉ đổi tên nhãn hiển thị ở cuối.',
+    },
+  },
+  'cml-p14-hierarchical-clustering': {
+    coreMove: {
+      en: 'Read merge heights before choosing the dendrogram cut that defines groups.',
+      vi: 'Đọc độ cao gộp trước khi chọn mức cắt dendrogram xác định các nhóm.',
+    },
+    trueAssertion: {
+      en: 'A large late merge can be evidence that two groups stayed distinct until a high cut level.',
+      vi: 'Lần gộp muộn lớn có thể là bằng chứng hai nhóm vẫn khác biệt cho tới mức cắt cao.',
+    },
+  },
+  'cml-p15-pca': {
+    coreMove: {
+      en: 'Track retained variation and reconstruction loss when reducing correlated features.',
+      vi: 'Theo dõi phương sai giữ lại và lỗi tái dựng khi giảm các feature tương quan.',
+    },
+    trueAssertion: {
+      en: 'Keeping fewer principal components can simplify a representation while discarding some reconstructable information.',
+      vi: 'Giữ ít component chính hơn có thể đơn giản hóa biểu diễn nhưng loại bỏ một phần thông tin có thể tái dựng.',
+    },
+  },
+  'dl-p02-mlp-forward-activation': {
+    coreMove: {
+      en: 'Use hidden layers and activation functions to reshape evidence before the output decision.',
+      vi: 'Dùng hidden layer và hàm kích hoạt để định hình lại bằng chứng trước quyết định đầu ra.',
+    },
+    trueAssertion: {
+      en: 'Without an activation between layers, stacking linear transformations still behaves like one linear transformation.',
+      vi: 'Không có hàm kích hoạt giữa các layer, xếp chồng biến đổi tuyến tính vẫn hoạt động như một biến đổi tuyến tính.',
+    },
+  },
+  'dl-p03-backprop-overfitting': {
+    coreMove: {
+      en: 'Use validation curves to stop treating lower training loss as automatic improvement.',
+      vi: 'Dùng đường validation để không coi training loss thấp hơn là cải thiện tự động.',
+    },
+    trueAssertion: {
+      en: 'Rising validation loss while training loss falls is a warning that the model may be overfitting.',
+      vi: 'Validation loss tăng trong khi training loss giảm là cảnh báo mô hình có thể đang overfitting.',
+    },
+  },
+};
+
+function getPostQuizDraftDefinition(postId: string): PostQuizDraftDefinition {
+  const definition = postQuizDraftDefinitions[postId];
+
+  if (!definition) {
+    throw new Error(`Missing post quiz draft definition for ${postId}.`);
+  }
+
+  return definition;
+}
+
+function createExpandedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
+  const genericQuiz = createGeneratedPostQuiz(post, module);
+  const definition = getPostQuizDraftDefinition(post.postId);
+  const [coreQuestion, evidenceQuestion, boundaryQuestion] = genericQuiz.questions;
+
+  if (!coreQuestion || !evidenceQuestion || !boundaryQuestion) {
+    throw new Error(`Post quiz ${post.postQuizId} must contain three generated questions.`);
+  }
+
+  return {
+    ...genericQuiz,
+    questions: [
+      {
+        ...coreQuestion,
+        explanation: {
+          en: `The key learning move is: ${definition.coreMove.en}`,
+          vi: `Động tác học chính là: ${definition.coreMove.vi}`,
+        },
+        hints: [
+          {
+            en: `Focus on the decision described by ${post.title.en}.`,
+            vi: `Tập trung vào quyết định được mô tả trong ${post.title.vi}.`,
+          },
+          {
+            en: definition.coreMove.en,
+            vi: definition.coreMove.vi,
+          },
+        ],
+        options: [
+          { optionId: 'opt-core-idea', text: definition.coreMove },
+          ...coreQuestion.options.filter((option) => option.optionId !== 'opt-core-idea'),
+        ],
+        prompt: {
+          en: `Which learning move best supports "${post.title.en}"?`,
+          vi: `Động tác học nào phù hợp nhất với "${post.title.vi}"?`,
+        },
+      },
+      {
+        ...evidenceQuestion,
+        prompt: {
+          en: `Which two checks make a decision in "${post.title.en}" defensible?`,
+          vi: `Hai kiểm tra nào giúp quyết định trong "${post.title.vi}" có cơ sở?`,
+        },
+      },
+      {
+        ...boundaryQuestion,
+        explanation: {
+          en: definition.trueAssertion.en,
+          vi: definition.trueAssertion.vi,
+        },
+        hints: [
+          {
+            en: `Recall the cause-and-effect claim in ${post.title.en}.`,
+            vi: `Nhớ lại khẳng định nhân quả trong ${post.title.vi}.`,
+          },
+          {
+            en: definition.trueAssertion.en,
+            vi: definition.trueAssertion.vi,
+          },
+        ],
+        prompt: {
+          en: `True or false: ${definition.trueAssertion.en}`,
+          vi: `Đúng hay sai: ${definition.trueAssertion.vi}`,
+        },
+      },
+    ],
+  } as const satisfies QuizManifest;
+}
+
 function createGeneratedModuleQuiz(module: ReleaseLearningModule) {
   const unlockLabel = module.unlockAlgorithmIds.length
     ? module.unlockAlgorithmIds.join(', ')
@@ -855,19 +1118,46 @@ function createReleaseQuizManifests() {
 
       for (const post of module.posts) {
         if (!handAuthoredQuizManifests[post.postQuizId]) {
-          generatedManifests[post.postQuizId] = createGeneratedPostQuiz(post, module);
+          generatedManifests[post.postQuizId] = createExpandedPostQuiz(post, module);
         }
       }
     }
   }
 
-  return {
+  const manifests = {
     ...generatedManifests,
     ...handAuthoredQuizManifests,
   };
+
+  return Object.fromEntries(
+    Object.entries(manifests).map(([quizId, manifest]) => [
+      quizId,
+      {
+        ...manifest,
+        draftProvenance: {
+          candidateSourceIds:
+            manifest.courseId === 'course-classical-ml'
+              ? ['microsoft-ml-for-beginners', 'google-ml-crash-course', 'mit-ocw', 'sklearn-docs']
+              : [
+                  'd2l-vi',
+                  'microsoft-ai-for-beginners',
+                  'google-ml-crash-course',
+                  'tensorflow-tutorials',
+                ],
+          contentReviewStatus: 'pending-operator-review' as const,
+          externalEvidenceStatus: 'not-collected' as const,
+          importStatus: 'draft-only' as const,
+        },
+      },
+    ]),
+  ) as Readonly<Record<string, QuizManifest>>;
 }
 
 const quizManifests: Readonly<Record<string, QuizManifest>> = createReleaseQuizManifests();
+
+export function getReleaseQuizManifests(): readonly QuizManifest[] {
+  return Object.values(quizManifests);
+}
 
 export function getQuizManifest(quizId: string): QuizManifest {
   const manifest = quizManifests[quizId];

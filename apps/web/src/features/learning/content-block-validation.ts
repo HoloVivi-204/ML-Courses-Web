@@ -243,7 +243,7 @@ function isLocalizedString(value: unknown) {
   return isRecord(value) && isNonEmptyString(value.en) && isNonEmptyString(value.vi);
 }
 
-function isLicense(value: unknown) {
+function isLicense(value: unknown): value is { name: string; url: string } {
   return isRecord(value) && isNonEmptyString(value.name) && isNonEmptyString(value.url);
 }
 

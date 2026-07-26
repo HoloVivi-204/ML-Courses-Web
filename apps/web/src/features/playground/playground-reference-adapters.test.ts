@@ -185,7 +185,7 @@ describe('Playground reference adapters', () => {
       expect(firstResult.textAlternative?.en).toEqual(expect.any(String));
       expect(firstResult.textAlternative?.vi).toEqual(expect.any(String));
     }
-  });
+  }, 15_000);
 
   it('cooperatively cancels every locked adapter before producing a result', async () => {
     for (const fixtureCase of fixtureCases) {

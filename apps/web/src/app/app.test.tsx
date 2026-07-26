@@ -1495,11 +1495,11 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole(
         'heading',
-        { level: 1, name: 'Hồi quy tuyến tính và đa thức: linear regression' },
+        { level: 1, name: 'Dùng baseline tuyến tính' },
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
-    expect(screen.getByText('Trạng thái draft')).toBeVisible();
+    expect(screen.getByText('Trạng thái provenance của draft')).toBeVisible();
     expect(screen.getByText('cml-p03-linear-regression')).toBeVisible();
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
   });
@@ -3060,7 +3060,7 @@ describe('public learning journey', () => {
     ).toBeVisible();
     expect(
       screen.getByRole('img', {
-        name: /Một thẻ bài toán cố định cho problem-demo-linear-calibration/i,
+        name: /Một thẻ bài toán cố định giới thiệu hiệu chuẩn tuyến tính/i,
       }),
     ).toBeVisible();
     expect(screen.getByRole('status', { name: 'Tiến độ demo' })).toHaveTextContent(

@@ -12,23 +12,47 @@ export interface FixedDemoManifest {
   algorithmId: string;
   courseId: string;
   demoId: string;
+  draftProvenance?: {
+    candidateSourceIds: readonly string[];
+    contentReviewStatus: 'pending-operator-review';
+    externalEvidenceStatus: 'not-collected';
+    importStatus: 'draft-only';
+  };
+  learningObjective?: LocalizedText;
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
   revisionId: string;
   seed: number;
   steps: readonly DemoStep[];
+  taskFingerprint?: string;
 }
 
 export const andGateDemo: FixedDemoManifest = {
   algorithmId: 'perceptron',
   courseId: 'course-deep-learning-basic',
   demoId: 'demo-perceptron-and-gate',
+  draftProvenance: {
+    candidateSourceIds: [
+      'd2l-vi',
+      'microsoft-ai-for-beginners',
+      'google-ml-crash-course',
+      'tensorflow-tutorials',
+    ],
+    contentReviewStatus: 'pending-operator-review',
+    externalEvidenceStatus: 'not-collected',
+    importStatus: 'draft-only',
+  },
+  learningObjective: {
+    en: 'Explain one fixed linearly separable decision without changing the dataset or model.',
+    vi: 'Giải thích một quyết định tách tuyến tính cố định mà không thay đổi dataset hoặc mô hình.',
+  },
   moduleId: 'dl-m01-neuron-perceptron',
   problemId: 'problem-demo-perceptron-and-gate',
   requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
   revisionId: 'demo-perceptron-and-gate-rev-r1',
   seed: 42,
+  taskFingerprint: 'demo-perceptron-and-fixed-and-rule',
   steps: [
     {
       id: 'and-problem',
@@ -108,6 +132,222 @@ const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
   'demo-pca-sensor-compression': 'problem-demo-pca-sensor-compression',
   'demo-mlp-checkerboard': 'problem-demo-mlp-checkerboard',
 };
+
+interface DemoDraftDefinition {
+  decision: LocalizedText;
+  evidence: LocalizedText;
+  learningObjective: LocalizedText;
+  result: LocalizedText;
+  taskFingerprint: string;
+  topic: LocalizedText;
+}
+
+const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {
+  'demo-linear-calibration': {
+    decision: {
+      en: 'A straight calibration line turns the observed input into an estimate; the residual shows the remaining gap.',
+      vi: 'Một đường hiệu chuẩn thẳng biến đầu vào quan sát thành ước lượng; phần dư cho thấy khoảng cách còn lại.',
+    },
+    evidence: {
+      en: 'The fixed readings are ordered from a reference instrument and a simple sensor; no learner parameter is editable.',
+      vi: 'Các số đo cố định đến từ dụng cụ tham chiếu và cảm biến đơn giản; người học không thể sửa tham số.',
+    },
+    learningObjective: {
+      en: 'Read a fixed linear calibration and use residuals to judge its limitation.',
+      vi: 'Đọc một hiệu chuẩn tuyến tính cố định và dùng phần dư để đánh giá giới hạn của nó.',
+    },
+    result: {
+      en: 'The result is a fixed baseline, not a replacement for checking new measurements.',
+      vi: 'Kết quả là baseline cố định, không thay thế việc kiểm tra số đo mới.',
+    },
+    taskFingerprint: 'demo-linear-calibration-residual-reading',
+    topic: { en: 'linear calibration', vi: 'hiệu chuẩn tuyến tính' },
+  },
+  'demo-regularization-noisy-signal': {
+    decision: {
+      en: 'Ridge keeps related signal weights smaller, while Lasso can suppress a weak redundant signal in the fixed comparison.',
+      vi: 'Ridge giữ trọng số tín hiệu liên quan nhỏ hơn, còn Lasso có thể triệt một tín hiệu dư yếu trong so sánh cố định.',
+    },
+    evidence: {
+      en: 'The fixed signal table contains overlapping measurements and one noisy measurement so coefficient instability is visible.',
+      vi: 'Bảng tín hiệu cố định có các số đo chồng chéo và một số đo nhiễu để thấy hệ số không ổn định.',
+    },
+    learningObjective: {
+      en: 'Compare a noisy regression fit with a regularised fixed alternative.',
+      vi: 'So sánh khớp hồi quy nhiễu với một phương án regularization cố định.',
+    },
+    result: {
+      en: 'The stable result trades a little fit for coefficients that are easier to trust on new observations.',
+      vi: 'Kết quả ổn định đánh đổi một phần độ khớp để hệ số đáng tin hơn trên quan sát mới.',
+    },
+    taskFingerprint: 'demo-regularisation-noisy-coefficients',
+    topic: { en: 'regularisation under noisy signals', vi: 'regularization với tín hiệu nhiễu' },
+  },
+  'demo-logistic-admission': {
+    decision: {
+      en: 'The fixed logistic score becomes a probability, then a policy threshold turns it into a review decision.',
+      vi: 'Điểm logistic cố định trở thành xác suất, rồi ngưỡng chính sách biến nó thành quyết định xem xét.',
+    },
+    evidence: {
+      en: 'The fixed records show preparation signals and a binary outcome without asking the learner to alter a threshold.',
+      vi: 'Các hồ sơ cố định cho thấy tín hiệu chuẩn bị và kết quả nhị phân mà không yêu cầu người học đổi ngưỡng.',
+    },
+    learningObjective: {
+      en: 'Separate a probability estimate from the policy decision made with it.',
+      vi: 'Tách ước lượng xác suất khỏi quyết định chính sách dùng xác suất đó.',
+    },
+    result: {
+      en: 'The fixed outcome illustrates a threshold choice; it does not claim that one threshold fits every context.',
+      vi: 'Kết quả cố định minh họa việc chọn ngưỡng; nó không khẳng định một ngưỡng phù hợp mọi bối cảnh.',
+    },
+    taskFingerprint: 'demo-logistic-probability-policy-threshold',
+    topic: { en: 'probability and threshold', vi: 'xác suất và ngưỡng' },
+  },
+  'demo-neighbor-flower': {
+    decision: {
+      en: 'The fixed KNN view assigns the new sample from its nearest labelled neighbours after all displayed features share a scale.',
+      vi: 'Góc nhìn KNN cố định gán mẫu mới từ láng giềng đã gán nhãn gần nhất sau khi các feature hiển thị cùng thang đo.',
+    },
+    evidence: {
+      en: 'The fixed flower measurements are small enough to inspect neighbour distances without changing k or the dataset.',
+      vi: 'Các số đo hoa cố định đủ nhỏ để quan sát khoảng cách láng giềng mà không đổi k hoặc dataset.',
+    },
+    learningObjective: {
+      en: 'Explain a nearest-neighbour classification from fixed, scaled evidence.',
+      vi: 'Giải thích phân loại láng giềng gần nhất từ bằng chứng cố định đã chuẩn hóa.',
+    },
+    result: {
+      en: 'The final class follows the displayed neighbours and highlights that distance depends on representation.',
+      vi: 'Lớp cuối theo các láng giềng hiển thị và nhấn mạnh khoảng cách phụ thuộc vào cách biểu diễn.',
+    },
+    taskFingerprint: 'demo-knn-flower-neighbour-representation',
+    topic: { en: 'nearest-neighbour classification', vi: 'phân loại láng giềng gần nhất' },
+  },
+  'demo-tree-forest-habitat': {
+    decision: {
+      en: 'A fixed tree follows transparent split rules, while the forest combines several fixed tree votes before reporting a class.',
+      vi: 'Cây cố định đi theo quy tắc chia minh bạch, còn forest tổng hợp phiếu từ nhiều cây cố định trước khi báo lớp.',
+    },
+    evidence: {
+      en: 'The habitat cards expose the few feature checks used by each tree and keep the voting set fixed.',
+      vi: 'Các thẻ môi trường cho thấy vài kiểm tra feature của từng cây và giữ tập bỏ phiếu cố định.',
+    },
+    learningObjective: {
+      en: 'Contrast one interpretable split path with a fixed ensemble vote.',
+      vi: 'Đối chiếu một đường chia dễ giải thích với một phiếu ensemble cố định.',
+    },
+    result: {
+      en: 'The result makes the vote visible and leaves the learner to consider when diversity reduces brittleness.',
+      vi: 'Kết quả làm rõ phiếu bầu và để người học cân nhắc khi nào đa dạng giảm tính mong manh.',
+    },
+    taskFingerprint: 'demo-tree-forest-habitat-voting',
+    topic: { en: 'tree rules and forest voting', vi: 'quy tắc cây và phiếu forest' },
+  },
+  'demo-svm-margin': {
+    decision: {
+      en: 'The fixed separator is chosen for margin, so the closest support points constrain the boundary more than distant points.',
+      vi: 'Ranh giới cố định được chọn theo margin, nên các support point gần nhất ràng buộc đường biên mạnh hơn điểm ở xa.',
+    },
+    evidence: {
+      en: 'The fixed sketch shows two labelled clouds and the few points nearest the separating line.',
+      vi: 'Phác thảo cố định cho thấy hai đám mây có nhãn và vài điểm gần đường phân tách nhất.',
+    },
+    learningObjective: {
+      en: 'Read a fixed margin and identify why support vectors matter.',
+      vi: 'Đọc một margin cố định và xác định vì sao support vector quan trọng.',
+    },
+    result: {
+      en: 'The final frame preserves room around the line instead of fitting every distant point tightly.',
+      vi: 'Frame cuối giữ khoảng trống quanh đường biên thay vì khớp chặt mọi điểm ở xa.',
+    },
+    taskFingerprint: 'demo-svm-margin-support-points',
+    topic: { en: 'support-vector margin', vi: 'margin của support vector' },
+  },
+  'demo-stellar-clusters': {
+    decision: {
+      en: 'The fixed clustering view groups nearby observations and then checks whether the selected centres describe compact groups.',
+      vi: 'Góc nhìn phân cụm cố định gom các quan sát gần nhau rồi kiểm tra tâm đã chọn có mô tả nhóm gọn không.',
+    },
+    evidence: {
+      en: 'The fixed points are unlabeled and remain unchanged while the learner reads the centre assignments.',
+      vi: 'Các điểm cố định không có nhãn và giữ nguyên khi người học đọc gán tâm.',
+    },
+    learningObjective: {
+      en: 'Interpret a fixed clustering result without treating cluster labels as ground truth classes.',
+      vi: 'Diễn giải kết quả phân cụm cố định mà không coi nhãn cụm là lớp sự thật.',
+    },
+    result: {
+      en: 'The result reports compactness as a clue, not a proof that the chosen number of groups is uniquely correct.',
+      vi: 'Kết quả báo độ gọn như một gợi ý, không phải bằng chứng số nhóm đã chọn là duy nhất đúng.',
+    },
+    taskFingerprint: 'demo-clustering-stellar-centres-compactness',
+    topic: { en: 'fixed cluster centres', vi: 'tâm cụm cố định' },
+  },
+  'demo-pca-sensor-compression': {
+    decision: {
+      en: 'The fixed PCA projection keeps the directions with most shared variation and reconstructs the original signal approximately.',
+      vi: 'Phép chiếu PCA cố định giữ các hướng có biến thiên chung lớn nhất và tái dựng tín hiệu gốc gần đúng.',
+    },
+    evidence: {
+      en: 'The fixed sensor table contains related measurements so shared variation can be compared with the reconstruction.',
+      vi: 'Bảng cảm biến cố định có các số đo liên quan để so sánh biến thiên chung với tái dựng.',
+    },
+    learningObjective: {
+      en: 'Relate a fixed PCA projection to retained variation and reconstruction loss.',
+      vi: 'Liên hệ phép chiếu PCA cố định với biến thiên giữ lại và lỗi tái dựng.',
+    },
+    result: {
+      en: 'The final summary states what was kept and what approximation cost remains.',
+      vi: 'Tóm tắt cuối nêu điều được giữ và chi phí xấp xỉ còn lại.',
+    },
+    taskFingerprint: 'demo-pca-sensor-reconstruction',
+    topic: { en: 'PCA compression', vi: 'nén PCA' },
+  },
+  'demo-mlp-checkerboard': {
+    decision: {
+      en: 'The fixed MLP uses a hidden transformation and activation so a nonlinear pattern can be separated before the output decision.',
+      vi: 'MLP cố định dùng biến đổi hidden và hàm kích hoạt để tách mẫu phi tuyến trước quyết định đầu ra.',
+    },
+    evidence: {
+      en: 'The fixed checkerboard points remain unchanged while the demo shows the representation change across layers.',
+      vi: 'Các điểm bàn cờ cố định giữ nguyên khi demo cho thấy biểu diễn đổi qua các layer.',
+    },
+    learningObjective: {
+      en: 'Explain why a fixed hidden layer and activation can separate a nonlinear pattern.',
+      vi: 'Giải thích vì sao hidden layer và hàm kích hoạt cố định có thể tách một mẫu phi tuyến.',
+    },
+    result: {
+      en: 'The final output is fixed and highlights the representational step rather than exposing training controls.',
+      vi: 'Đầu ra cuối cố định và nhấn mạnh bước biểu diễn thay vì mở điều khiển huấn luyện.',
+    },
+    taskFingerprint: 'demo-mlp-checkerboard-hidden-representation',
+    topic: { en: 'hidden-layer representation', vi: 'biểu diễn hidden layer' },
+  },
+};
+
+function getDemoDraftDefinition(demoId: string): DemoDraftDefinition {
+  const definition = demoDraftDefinitions[demoId];
+
+  if (!definition) {
+    throw new Error(`Missing draft demo definition for ${demoId}.`);
+  }
+
+  return definition;
+}
+
+function createDemoDraftProvenance(courseId: string) {
+  const candidateSourceIds =
+    courseId === 'course-classical-ml'
+      ? ['microsoft-ml-for-beginners', 'google-ml-crash-course', 'mit-ocw', 'sklearn-docs']
+      : ['d2l-vi', 'microsoft-ai-for-beginners', 'google-ml-crash-course', 'tensorflow-tutorials'];
+
+  return {
+    candidateSourceIds,
+    contentReviewStatus: 'pending-operator-review' as const,
+    externalEvidenceStatus: 'not-collected' as const,
+    importStatus: 'draft-only' as const,
+  };
+}
 
 function createGenericDemo(input: {
   courseId: string;
@@ -196,11 +436,73 @@ function createGenericDemo(input: {
   };
 }
 
+function createExpandedDemo(input: {
+  courseId: string;
+  demoId: string;
+  module: CourseModule;
+}): FixedDemoManifest {
+  const genericDemo = createGenericDemo(input);
+  const definition = getDemoDraftDefinition(input.demoId);
+  const stepDrafts = [
+    {
+      narration: {
+        en: `This fixed demo frames ${definition.topic.en} as one inspectable learning decision.`,
+        vi: `Demo cố định này đặt ${definition.topic.vi} thành một quyết định học tập có thể quan sát.`,
+      },
+      textAlternative: {
+        en: `A fixed problem card introduces ${definition.topic.en}.`,
+        vi: `Một thẻ bài toán cố định giới thiệu ${definition.topic.vi}.`,
+      },
+      title: { en: `Frame ${definition.topic.en}`, vi: `Đặt khung ${definition.topic.vi}` },
+    },
+    {
+      narration: definition.evidence,
+      textAlternative: {
+        en: 'A static evidence summary is shown without parameter or dataset controls.',
+        vi: 'Một tóm tắt bằng chứng tĩnh được hiển thị, không có điều khiển tham số hoặc dataset.',
+      },
+      title: { en: 'Inspect fixed evidence', vi: 'Quan sát bằng chứng cố định' },
+    },
+    {
+      narration: definition.decision,
+      textAlternative: {
+        en: 'The fixed model decision is shown with its relevant metric or rule.',
+        vi: 'Quyết định mô hình cố định được hiển thị cùng metric hoặc quy tắc liên quan.',
+      },
+      title: { en: 'Read the fixed decision', vi: 'Đọc quyết định cố định' },
+    },
+    {
+      narration: definition.result,
+      textAlternative: {
+        en: 'The final frame reports the fixed result and one limitation to remember.',
+        vi: 'Frame cuối báo kết quả cố định và một giới hạn cần ghi nhớ.',
+      },
+      title: { en: 'Interpret the result', vi: 'Diễn giải kết quả' },
+    },
+  ] as const;
+
+  return {
+    ...genericDemo,
+    draftProvenance: createDemoDraftProvenance(input.courseId),
+    learningObjective: definition.learningObjective,
+    steps: genericDemo.steps.map((step, index) => {
+      const draftStep = stepDrafts[index];
+
+      if (!draftStep) {
+        throw new Error(`Missing fixed demo step ${index + 1} for ${input.demoId}.`);
+      }
+
+      return { ...step, ...draftStep };
+    }),
+    taskFingerprint: definition.taskFingerprint,
+  };
+}
+
 const generatedDemos = courses.flatMap((course) =>
   (course.modules ?? [])
     .filter((module) => module.demoId !== null && module.demoId !== andGateDemo.demoId)
     .map((module) =>
-      createGenericDemo({
+      createExpandedDemo({
         courseId: course.id,
         demoId: module.demoId!,
         module,

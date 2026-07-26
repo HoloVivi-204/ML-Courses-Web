@@ -4,6 +4,10 @@ import { randomUUID } from 'node:crypto';
 import { deleteApp } from 'firebase-admin/app';
 
 import { LOCAL_STORAGE_BUCKET, createLocalAdminServices } from './admin-services.js';
+import {
+  createReleaseContentDraftManifest,
+  importReleaseContentDrafts,
+} from './content-draft-import.js';
 import { LOCAL_FIREBASE_PROJECT_ID } from './environment.js';
 import { resetAndSeedLocalEmulators } from './reset-and-seed.js';
 import { createLocalSeedManifest } from './seed-manifest.js';
@@ -243,6 +247,57 @@ async function verifyResetAndSeed(): Promise<void> {
   }
 }
 
+async function assertDraftContentImport(): Promise<void> {
+  const services = createLocalAdminServices();
+  const manifest = createReleaseContentDraftManifest();
+  const firstDraft = manifest.documents[0];
+
+  if (!firstDraft) {
+    assert.fail('The content draft manifest must contain at least one document.');
+  }
+
+  const store = {
+    async get(path: string): Promise<Readonly<Record<string, unknown>> | null> {
+      const snapshot = await services.firestore.doc(path).get();
+
+      return snapshot.exists ? (snapshot.data() ?? null) : null;
+    },
+    async set(path: string, value: Readonly<Record<string, unknown>>): Promise<void> {
+      await services.firestore.doc(path).set(value);
+    },
+  };
+
+  try {
+    const publishedPointer = services.firestore.doc('publishedContent/current-pointer');
+    await publishedPointer.set({ publishedRevisionId: 'published-sentinel-rev-r1' });
+
+    const dryRun = await importReleaseContentDrafts({ dryRun: true, store });
+    assert.equal(dryRun.created, 72);
+    assert.equal(dryRun.updated, 0);
+    assert.equal((await services.firestore.doc(firstDraft.storagePath).get()).exists, false);
+
+    const firstImport = await importReleaseContentDrafts({ dryRun: false, store });
+    assert.equal(firstImport.created, 72);
+    assert.equal(firstImport.updated, 0);
+    assert.equal(firstImport.unchanged, 0);
+
+    const secondImport = await importReleaseContentDrafts({ dryRun: false, store });
+    assert.equal(secondImport.created, 0);
+    assert.equal(secondImport.updated, 0);
+    assert.equal(secondImport.unchanged, 72);
+
+    const importedDraft = await services.firestore.doc(firstDraft.storagePath).get();
+    assert.equal(importedDraft.get('contentHash'), firstDraft.contentHash);
+    assert.equal(importedDraft.get('publishedRevisionId'), undefined);
+    assert.equal(
+      (await publishedPointer.get()).get('publishedRevisionId'),
+      'published-sentinel-rev-r1',
+    );
+  } finally {
+    await deleteApp(services.app);
+  }
+}
+
 async function assertAdminContentLifecycleApi(): Promise<void> {
   const services = createLocalAdminServices();
   const adminUid = `admin-${randomUUID()}`;
@@ -388,6 +443,7 @@ await assertEmailPasswordAuthentication();
 await assertAdminContentLifecycleApi();
 await assertClientAccessDenied();
 await assertDirectProgressMutationDenied();
+await assertDraftContentImport();
 
 console.log(
   JSON.stringify({
@@ -395,6 +451,7 @@ console.log(
     projectId: LOCAL_FIREBASE_PROJECT_ID,
     emulators: ['auth', 'firestore', 'functions', 'storage'],
     deterministicSeed: true,
+    draftContentImport: 'idempotent-draft-only',
     clientAccess: 'deny-by-default',
     directProgressWrites: 'denied',
     adminContentLifecycle: 'verified',
