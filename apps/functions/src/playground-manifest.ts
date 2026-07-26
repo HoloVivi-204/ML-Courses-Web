@@ -99,6 +99,30 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['decision-boundary', 'loss'],
   },
   {
+    adapterVersion: 'mlp-js-v1',
+    algorithmId: 'mlp',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-moons-2d-v1',
+    defaultConfig: {
+      hiddenLayers: [8, 8],
+      activation: 'tanh',
+      learningRate: 0.03,
+      epochs: 500,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { layers: 3, neurons: 32, epochs: 1000 },
+    feedbackRules: ['underfit', 'overfit', 'non-convergence'],
+    goldenFixture: 'fixtures/moons-mlp-v1.json',
+    mobileLimits: { layers: 2, neurons: 16, epochs: 500 },
+    preprocessing: ['standard-scale'],
+    primaryMetric: 'accuracy',
+    scenarioId: 'pg-nonlinear-2d',
+    scopePriority: 'must',
+    secondaryMetrics: ['loss'],
+    visualizations: ['decision-boundary', 'loss'],
+  },
+  {
     adapterVersion: 'linear-regression-js-v1',
     algorithmId: 'linear-regression',
     configSchemaVersion: 1,
@@ -381,6 +405,27 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['cluster-plot', 'elbow'],
   },
   {
+    adapterVersion: 'hierarchical-clustering-js-v1',
+    algorithmId: 'hierarchical-clustering',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-retail-segments-v1',
+    defaultConfig: {
+      linkage: 'ward',
+      distance: 'euclidean',
+      clusters: 4,
+    },
+    desktopLimits: { rows: 3000, clusters: 12 },
+    feedbackRules: ['cut-level', 'cluster-imbalance'],
+    goldenFixture: 'fixtures/retail-hierarchical-v1.json',
+    mobileLimits: { rows: 800, clusters: 8 },
+    preprocessing: ['median-impute', 'standard-scale'],
+    primaryMetric: 'silhouette',
+    scenarioId: 'pg-retail-segments',
+    scopePriority: 'must',
+    secondaryMetrics: ['cluster-count'],
+    visualizations: ['dendrogram', 'cluster-plot'],
+  },
+  {
     adapterVersion: 'pca-js-v1',
     algorithmId: 'pca',
     configSchemaVersion: 1,
@@ -513,6 +558,10 @@ export function normalizePlaygroundConfig(input: NormalizePlaygroundConfigInput)
 
   if (manifest.algorithmId === 'kmeans') {
     return normalizeKMeansConfig(input.config, manifest, input.deviceProfile);
+  }
+
+  if (manifest.algorithmId === 'hierarchical-clustering') {
+    return normalizeHierarchicalClusteringConfig(input.config, manifest, input.deviceProfile);
   }
 
   if (manifest.algorithmId === 'pca') {
@@ -807,6 +856,23 @@ function normalizeKMeansConfig(
     k: getIntegerInRange(config, 'k', 2, getManifestLimit(limits, 'k')),
     maxIterations: getIntegerInRange(config, 'maxIterations', 10, 300),
     seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeHierarchicalClusteringConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['clusters', 'distance', 'linkage']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    linkage: getEnumValue(config.linkage, 'linkage', ['ward']),
+    distance: getEnumValue(config.distance, 'distance', ['euclidean']),
+    clusters: getIntegerInRange(config, 'clusters', 2, getManifestLimit(limits, 'clusters')),
   };
 }
 

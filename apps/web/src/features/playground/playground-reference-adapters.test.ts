@@ -10,8 +10,10 @@ import countryPcaFixture from './fixtures/country-pca-v1.json';
 import houseLinearFixture from './fixtures/house-linear-v1.json';
 import houseRidgeFixture from './fixtures/house-ridge-v1.json';
 import insurancePolynomialFixture from './fixtures/insurance-polynomial-v1.json';
+import moonsMlpFixture from './fixtures/moons-mlp-v1.json';
 import insuranceLassoFixture from './fixtures/insurance-lasso-v1.json';
 import retailKMeansFixture from './fixtures/retail-kmeans-v1.json';
+import retailHierarchicalFixture from './fixtures/retail-hierarchical-v1.json';
 import spamNaiveBayesFixture from './fixtures/spam-naive-bayes-v1.json';
 import wineNaiveBayesFixture from './fixtures/wine-naive-bayes-v1.json';
 import spamLogisticFixture from './fixtures/spam-logistic-v1.json';
@@ -30,6 +32,12 @@ const fixtureCases = [
     algorithmId: 'mlp',
     datasetVersionId: 'ds-xor-noisy-v1',
     fixture: xorMlpFixture,
+  },
+  {
+    scenarioId: 'pg-nonlinear-2d',
+    algorithmId: 'mlp',
+    datasetVersionId: 'ds-moons-2d-v1',
+    fixture: moonsMlpFixture,
   },
   {
     scenarioId: 'pg-house-price',
@@ -102,6 +110,12 @@ const fixtureCases = [
     algorithmId: 'decision-tree',
     datasetVersionId: 'ds-credit-risk-v1',
     fixture: creditTreeFixture,
+  },
+  {
+    scenarioId: 'pg-retail-segments',
+    algorithmId: 'hierarchical-clustering',
+    datasetVersionId: 'ds-retail-segments-v1',
+    fixture: retailHierarchicalFixture,
   },
   {
     scenarioId: 'pg-retail-segments',
@@ -205,6 +219,40 @@ describe('Playground reference adapters', () => {
 
       expect(adapter.isCancelledError(caughtError)).toBe(true);
     }
+  });
+
+  it('runs pg-nonlinear-2d MLP through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-nonlinear-2d',
+      algorithmId: 'mlp',
+      datasetVersionId: 'ds-moons-2d-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-nonlinear-2d/mlp adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-moons-mlp',
+        sessionId: 'session-moons-mlp',
+        scenarioId: 'pg-nonlinear-2d',
+        algorithmId: 'mlp',
+        datasetVersionId: 'ds-moons-2d-v1',
+        configHash: '8'.repeat(64),
+        config: moonsMlpFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-moons-mlp',
+      ...moonsMlpFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('accuracy'));
   });
 
   it('runs pg-house-price linear regression through the registry and matches the golden fixture', async () => {
@@ -645,6 +693,42 @@ describe('Playground reference adapters', () => {
     expect(result).toMatchObject({
       runId: 'run-retail-kmeans',
       ...retailKMeansFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('silhouette'));
+  });
+
+  it('runs pg-retail-segments hierarchical clustering through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-retail-segments',
+      algorithmId: 'hierarchical-clustering',
+      datasetVersionId: 'ds-retail-segments-v1',
+    });
+
+    if (!adapter) {
+      throw new Error(
+        'Expected pg-retail-segments/hierarchical-clustering adapter to be registered.',
+      );
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-retail-hierarchical',
+        sessionId: 'session-retail-hierarchical',
+        scenarioId: 'pg-retail-segments',
+        algorithmId: 'hierarchical-clustering',
+        datasetVersionId: 'ds-retail-segments-v1',
+        configHash: '8'.repeat(64),
+        config: retailHierarchicalFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-retail-hierarchical',
+      ...retailHierarchicalFixture.result,
     });
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('silhouette'));
   });

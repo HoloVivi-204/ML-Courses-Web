@@ -7,8 +7,11 @@ import {
 
 const expectedSubmissionPairs = [
   ['pg-house-price', 'linear-regression'],
+  ['pg-house-price', 'ridge-regression'],
   ['pg-spam-detection', 'logistic-regression'],
+  ['pg-customer-churn', 'knn'],
   ['pg-credit-risk', 'decision-tree'],
+  ['pg-credit-risk', 'svm'],
   ['pg-retail-segments', 'kmeans'],
   ['pg-country-indicators', 'pca'],
   ['pg-xor', 'perceptron'],
@@ -68,7 +71,7 @@ describe('Release 1 learning catalog manifest', () => {
     expect(posts.every((post) => post.sourceReviewStatus === 'pending-operator-review')).toBe(true);
   });
 
-  it('maps the seven submission Playground pairs to trusted module unlock units', () => {
+  it('maps submission Playground algorithms to trusted module unlock units', () => {
     const units = getSubmissionLearningUnits();
 
     expect(units.map((unit) => [unit.scenarioId, unit.algorithmId])).toEqual(
@@ -82,5 +85,29 @@ describe('Release 1 learning catalog manifest', () => {
       expect(unit.requiredPostIds.length).toBeGreaterThanOrEqual(1);
       expect(unit.unlockAlgorithmIds).toContain(unit.algorithmId);
     }
+  });
+
+  it('unlocks every distinct Must Playground algorithm through a trusted module unit', () => {
+    const unlockedAlgorithmIds = [
+      ...new Set(getSubmissionLearningUnits().flatMap((unit) => unit.unlockAlgorithmIds)),
+    ].sort();
+
+    expect(unlockedAlgorithmIds).toEqual([
+      'decision-tree',
+      'hierarchical-clustering',
+      'kmeans',
+      'knn',
+      'lasso-regression',
+      'linear-regression',
+      'logistic-regression',
+      'mlp',
+      'naive-bayes',
+      'pca',
+      'perceptron',
+      'polynomial-regression',
+      'random-forest',
+      'ridge-regression',
+      'svm',
+    ]);
   });
 });

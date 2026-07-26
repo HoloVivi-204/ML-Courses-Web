@@ -55,6 +55,17 @@ const playgroundDatasets = [
     },
   }),
   createDataset({
+    datasetVersionId: 'ds-moons-2d-v1',
+    featureColumns: ['x1', 'x2'],
+    labelColumn: 'moonClass',
+    rows: createMoonsRows(),
+    task: 'binary-classification',
+    textAlternative: {
+      en: 'Two deterministic noisy moon shapes with two numeric features and a binary label.',
+      vi: 'Hai cung trang khuyet co nhieu xac dinh voi hai dac trung so va nhan nhi phan.',
+    },
+  }),
+  createDataset({
     datasetVersionId: 'ds-house-price-v1',
     featureColumns: ['areaSqm', 'rooms', 'distanceKm', 'ageYears'],
     labelColumn: 'priceIndex',
@@ -276,6 +287,35 @@ function createXorRows(): PlaygroundDatasetRow[] {
       });
     }
   });
+
+  return rows;
+}
+
+function createMoonsRows(): PlaygroundDatasetRow[] {
+  const random = createSeededRandom(2_024);
+  const samplesPerClass = 80;
+  const rows: PlaygroundDatasetRow[] = [];
+
+  for (let index = 0; index < samplesPerClass; index += 1) {
+    const angle = (Math.PI * index) / (samplesPerClass - 1);
+
+    rows.push({
+      rowId: `moon-0-${String(index + 1).padStart(3, '0')}`,
+      features: [
+        roundMetric(Math.cos(angle) + gaussian(random) * 0.09),
+        roundMetric(Math.sin(angle) + gaussian(random) * 0.09),
+      ],
+      label: 0,
+    });
+    rows.push({
+      rowId: `moon-1-${String(index + 1).padStart(3, '0')}`,
+      features: [
+        roundMetric(1 - Math.cos(angle) + gaussian(random) * 0.09),
+        roundMetric(0.48 - Math.sin(angle) + gaussian(random) * 0.09),
+      ],
+      label: 1,
+    });
+  }
 
   return rows;
 }

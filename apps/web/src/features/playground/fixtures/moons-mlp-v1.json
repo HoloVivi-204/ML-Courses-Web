@@ -1,0 +1,32 @@
+{
+  "config": {
+    "hiddenLayers": [8, 8],
+    "activation": "tanh",
+    "learningRate": 0.03,
+    "epochs": 500,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-nonlinear-2d",
+    "algorithmId": "mlp",
+    "datasetVersionId": "ds-moons-2d-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "accuracy": 1,
+      "loss": 0.0097
+    },
+    "chartSummary": {
+      "kind": "decision-boundary",
+      "hiddenLayers": [8, 8],
+      "activation": "tanh",
+      "trainAccuracy": 1
+    },
+    "textAlternative": {
+      "en": "The MLP solves the nonlinear moons split with accuracy 100% and loss 0.0097.",
+      "vi": "MLP giai duoc tap moons phi tuyen voi accuracy 100% va loss 0.0097."
+    }
+  }
+}

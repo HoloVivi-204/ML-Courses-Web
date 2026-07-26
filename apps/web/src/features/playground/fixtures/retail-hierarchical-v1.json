@@ -1,0 +1,31 @@
+{
+  "config": {
+    "linkage": "ward",
+    "distance": "euclidean",
+    "clusters": 4
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-retail-segments",
+    "algorithmId": "hierarchical-clustering",
+    "datasetVersionId": "ds-retail-segments-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "silhouette": 0.9602,
+      "cluster-count": 4
+    },
+    "chartSummary": {
+      "kind": "dendrogram",
+      "clusterSizes": [4, 4, 4, 4],
+      "mergeHeights": [
+        0.0006, 0.0006, 0.0006, 0.0006, 0.0019, 0.0035, 0.0035, 0.0035, 0.0068, 0.0068, 0.0068,
+        0.0085
+      ]
+    },
+    "textAlternative": {
+      "en": "Ward hierarchical clustering finds 4 retail segments with silhouette 0.9602.",
+      "vi": "Ward hierarchical clustering tim 4 nhom retail voi silhouette 0.9602."
+    }
+  }
+}

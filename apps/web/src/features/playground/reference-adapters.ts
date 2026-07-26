@@ -106,6 +106,12 @@ interface KMeansConfig {
   seed: number;
 }
 
+interface HierarchicalClusteringConfig {
+  clusters: number;
+  distance: 'euclidean';
+  linkage: 'ward';
+}
+
 interface PcaConfig {
   components: number;
   scale: boolean;
@@ -118,6 +124,12 @@ interface MlpConfig {
   learningRate: number;
   seed: number;
   trainRatio: number;
+}
+
+interface MlpAdapterDefinition {
+  datasetVersionId: 'ds-moons-2d-v1' | 'ds-xor-noisy-v1';
+  scaleFeatures: boolean;
+  scenarioId: 'pg-nonlinear-2d' | 'pg-xor';
 }
 
 interface DecisionTreeNode {
@@ -139,6 +151,14 @@ interface DecisionTreeSplit {
 interface KMeansPoint {
   features: readonly number[];
   rowId: string;
+}
+
+interface WardMerge {
+  distance: number;
+  leftIndex: number;
+  leftMembers: readonly number[];
+  rightIndex: number;
+  rightMembers: readonly number[];
 }
 
 interface NeuralLayer {
@@ -383,6 +403,27 @@ export function createSvmAdapter(): AlgorithmAdapter {
   };
 }
 
+export function createHierarchicalClusteringAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'hierarchical-clustering-js-v1',
+    algorithmId: 'hierarchical-clustering',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-retail-segments-v1',
+    scenarioId: 'pg-retail-segments',
+    validateConfig(config) {
+      return validateHierarchicalClusteringConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateHierarchicalClusteringConfig(request.config);
+
+      return runHierarchicalClustering(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
 export function createKMeansAdapter(): AlgorithmAdapter {
   return {
     adapterVersion: 'kmeans-js-v1',
@@ -425,20 +466,26 @@ export function createPcaAdapter(): AlgorithmAdapter {
   };
 }
 
-export function createMlpAdapter(): AlgorithmAdapter {
+export function createMlpAdapter(
+  definition: MlpAdapterDefinition = {
+    datasetVersionId: 'ds-xor-noisy-v1',
+    scaleFeatures: false,
+    scenarioId: 'pg-xor',
+  },
+): AlgorithmAdapter {
   return {
     adapterVersion: 'mlp-js-v1',
     algorithmId: 'mlp',
     configSchemaVersion: 1,
-    datasetVersionId: 'ds-xor-noisy-v1',
-    scenarioId: 'pg-xor',
+    datasetVersionId: definition.datasetVersionId,
+    scenarioId: definition.scenarioId,
     validateConfig(config) {
       return validateMlpConfig(config) as unknown as MlConfig;
     },
     async run(request, options) {
       const config = validateMlpConfig(request.config);
 
-      return runMlp(request, config, options);
+      return runMlp(request, config, options, definition);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -1445,6 +1492,102 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+async function runHierarchicalClustering(
+  request: MlRunRequest,
+  config: HierarchicalClusteringConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-retail-segments-v1');
+
+  if (config.clusters > dataset.rows.length) {
+    throw new Error('clusters must not exceed the dataset row count.');
+  }
+
+  const scaler = fitStandardScaler(dataset.rows);
+  const points = dataset.rows.map((row) => ({
+    rowId: row.rowId,
+    features: createScaledFeatures(row, scaler),
+  }));
+  let clusters = points.map((_, pointIndex) => [pointIndex]);
+  const mergeHeights: number[] = [];
+  const totalMerges = points.length - config.clusters;
+
+  while (clusters.length > config.clusters) {
+    throwIfCancelled(request.runId, options);
+
+    const merge = findNearestWardMerge(clusters, points);
+    const mergedMembers = [...merge.leftMembers, ...merge.rightMembers].sort(
+      (left, right) => left - right,
+    );
+
+    clusters = clusters
+      .filter(
+        (_, clusterIndex) => clusterIndex !== merge.leftIndex && clusterIndex !== merge.rightIndex,
+      )
+      .concat([mergedMembers]);
+    mergeHeights.push(roundMetric(merge.distance));
+
+    options.onProgress({
+      runId: request.runId,
+      iteration: mergeHeights.length,
+      totalIterations: totalMerges,
+    });
+    await yieldToWorkerQueue();
+  }
+
+  const orderedClusters = [...clusters].sort((left, right) => (left[0] ?? 0) - (right[0] ?? 0));
+  const assignments = Array(points.length).fill(0) as number[];
+
+  orderedClusters.forEach((members, clusterIndex) => {
+    members.forEach((pointIndex) => {
+      assignments[pointIndex] = clusterIndex;
+    });
+  });
+
+  const clusterSizes = orderedClusters.map((members) => members.length);
+  const silhouette = roundMetric(calculateSilhouette(points, assignments, config.clusters));
+  const largestCluster = Math.max(...clusterSizes);
+  const smallestCluster = Math.min(...clusterSizes);
+  const feedback = [
+    ...(config.clusters === 4 ? [] : ['cut-level']),
+    ...(smallestCluster * 3 < largestCluster ? ['cluster-imbalance'] : []),
+  ];
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-retail-segments',
+    algorithmId: 'hierarchical-clustering',
+    datasetVersionId: 'ds-retail-segments-v1',
+    determinism: 'exact',
+    feedback,
+    metrics: {
+      silhouette,
+      'cluster-count': config.clusters,
+    },
+    chartSummary: {
+      kind: 'dendrogram',
+      clusterSizes,
+      mergeHeights,
+    },
+    textAlternative: {
+      en: `Ward hierarchical clustering finds ${config.clusters} retail segments with silhouette ${silhouette}.`,
+      vi: `Ward hierarchical clustering tim ${config.clusters} nhom retail voi silhouette ${silhouette}.`,
+    },
+  };
+}
+
+function validateHierarchicalClusteringConfig(config: MlConfig): HierarchicalClusteringConfig {
+  assertAllowedFields(config, ['clusters', 'distance', 'linkage']);
+
+  return {
+    linkage: readEnum(config, 'linkage', ['ward']),
+    distance: readEnum(config, 'distance', ['euclidean']),
+    clusters: readIntegerInRange(config, 'clusters', 2, 12),
+  };
+}
+
 async function runKMeans(
   request: MlRunRequest,
   config: KMeansConfig,
@@ -1623,13 +1766,15 @@ async function runMlp(
   request: MlRunRequest,
   config: MlpConfig,
   options: AlgorithmAdapterRunOptions,
+  definition: MlpAdapterDefinition,
 ): Promise<MlRunResult> {
   throwIfCancelled(request.runId, options);
 
-  const dataset = getPlaygroundDataset('ds-xor-noisy-v1');
+  const dataset = getPlaygroundDataset(definition.datasetVersionId);
   const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
   const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
   const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const scaler = definition.scaleFeatures ? fitStandardScaler(trainRows) : null;
   const network = initializeNeuralNetwork(
     [dataset.featureColumns.length, ...config.hiddenLayers, 1],
     config.seed,
@@ -1640,11 +1785,13 @@ async function runMlp(
     throwIfCancelled(request.runId, options);
 
     for (const row of shuffleItems(trainRows, config.seed + epoch)) {
-      trainNeuralNetworkSample(network, row.features, row.label, config);
+      trainNeuralNetworkSample(network, createMlpFeatures(row, scaler), row.label, config);
     }
 
     if (epoch === 1 || epoch === config.epochs || epoch % 25 === 0) {
-      const loss = roundMetric(calculateNeuralLogLoss(trainRows, network, config.activation));
+      const loss = roundMetric(
+        calculateNeuralLogLoss(trainRows, network, config.activation, scaler),
+      );
 
       lossCurve.push({ epoch, loss });
       options.onProgress({
@@ -1660,23 +1807,29 @@ async function runMlp(
   const trainAccuracy = calculateAccuracy(
     trainRows.map((row) => row.label),
     trainRows.map((row) =>
-      forwardNeuralNetwork(network, row.features, config.activation).output >= 0.5 ? 1 : 0,
+      forwardNeuralNetwork(network, createMlpFeatures(row, scaler), config.activation).output >= 0.5
+        ? 1
+        : 0,
     ),
   );
   const testAccuracy = calculateAccuracy(
     testRows.map((row) => row.label),
     testRows.map((row) =>
-      forwardNeuralNetwork(network, row.features, config.activation).output >= 0.5 ? 1 : 0,
+      forwardNeuralNetwork(network, createMlpFeatures(row, scaler), config.activation).output >= 0.5
+        ? 1
+        : 0,
     ),
   );
   const roundedAccuracy = roundMetric(testAccuracy);
-  const roundedLoss = roundMetric(calculateNeuralLogLoss(testRows, network, config.activation));
+  const roundedLoss = roundMetric(
+    calculateNeuralLogLoss(testRows, network, config.activation, scaler),
+  );
 
   return {
     runId: request.runId,
-    scenarioId: 'pg-xor',
+    scenarioId: definition.scenarioId,
     algorithmId: 'mlp',
-    datasetVersionId: 'ds-xor-noisy-v1',
+    datasetVersionId: definition.datasetVersionId,
     determinism: 'exact',
     feedback: roundedAccuracy < 0.9 ? ['underfit', 'non-convergence'] : [],
     metrics: {
@@ -1691,12 +1844,22 @@ async function runMlp(
       trainAccuracy: roundMetric(trainAccuracy),
     },
     textAlternative: {
-      en: `The MLP solves the nonlinear XOR split with accuracy ${Math.round(
-        roundedAccuracy * 100,
-      )}% and loss ${roundedLoss}.`,
-      vi: `MLP giải được tập XOR phi tuyến với accuracy ${Math.round(
-        roundedAccuracy * 100,
-      )}% và loss ${roundedLoss}.`,
+      en:
+        definition.scenarioId === 'pg-xor'
+          ? `The MLP solves the nonlinear XOR split with accuracy ${Math.round(
+              roundedAccuracy * 100,
+            )}% and loss ${roundedLoss}.`
+          : `The MLP solves the nonlinear moons split with accuracy ${Math.round(
+              roundedAccuracy * 100,
+            )}% and loss ${roundedLoss}.`,
+      vi:
+        definition.scenarioId === 'pg-xor'
+          ? `MLP giải được tập XOR phi tuyến với accuracy ${Math.round(
+              roundedAccuracy * 100,
+            )}% và loss ${roundedLoss}.`
+          : `MLP giai duoc tap moons phi tuyen voi accuracy ${Math.round(
+              roundedAccuracy * 100,
+            )}% va loss ${roundedLoss}.`,
     },
   };
 }
@@ -1858,6 +2021,13 @@ function createScaledFeatures(row: PlaygroundDatasetRow, scaler: FeatureScaler):
 
     return (feature - meanValue) / standardDeviation;
   });
+}
+
+function createMlpFeatures(
+  row: PlaygroundDatasetRow,
+  scaler: FeatureScaler | null,
+): readonly number[] {
+  return scaler ? createScaledFeatures(row, scaler) : row.features;
 }
 
 function solveLeastSquares(features: readonly number[][], labels: readonly number[]): number[] {
@@ -2407,6 +2577,92 @@ function countTreeFeatureUsage(
   }
 }
 
+function findNearestWardMerge(
+  clusters: readonly (readonly number[])[],
+  points: readonly KMeansPoint[],
+): WardMerge {
+  let nearestMerge: WardMerge | null = null;
+
+  for (let leftIndex = 0; leftIndex < clusters.length; leftIndex += 1) {
+    const leftMembers = clusters[leftIndex];
+
+    if (!leftMembers) {
+      continue;
+    }
+
+    for (let rightIndex = leftIndex + 1; rightIndex < clusters.length; rightIndex += 1) {
+      const rightMembers = clusters[rightIndex];
+
+      if (!rightMembers) {
+        continue;
+      }
+
+      const distance = calculateWardDistance(leftMembers, rightMembers, points);
+      const candidate: WardMerge = {
+        distance,
+        leftIndex,
+        leftMembers,
+        rightIndex,
+        rightMembers,
+      };
+
+      if (
+        nearestMerge === null ||
+        candidate.distance < nearestMerge.distance ||
+        (candidate.distance === nearestMerge.distance &&
+          (candidate.leftMembers[0] ?? 0) < (nearestMerge.leftMembers[0] ?? 0))
+      ) {
+        nearestMerge = candidate;
+      }
+    }
+  }
+
+  if (!nearestMerge) {
+    throw new Error('Hierarchical clustering requires at least two clusters to merge.');
+  }
+
+  return nearestMerge;
+}
+
+function calculateWardDistance(
+  leftMembers: readonly number[],
+  rightMembers: readonly number[],
+  points: readonly KMeansPoint[],
+): number {
+  const leftCentroid = calculateClusterCentroid(leftMembers, points);
+  const rightCentroid = calculateClusterCentroid(rightMembers, points);
+
+  return (
+    (leftMembers.length * rightMembers.length * distanceSquared(leftCentroid, rightCentroid)) /
+    (leftMembers.length + rightMembers.length)
+  );
+}
+
+function calculateClusterCentroid(
+  members: readonly number[],
+  points: readonly KMeansPoint[],
+): number[] {
+  const firstPoint = points[members[0] ?? -1];
+
+  if (!firstPoint) {
+    throw new Error('Hierarchical cluster has no points.');
+  }
+
+  return firstPoint.features.map((_, featureIndex) =>
+    mean(
+      members.map((memberIndex) => {
+        const point = points[memberIndex];
+
+        if (!point) {
+          throw new Error('Hierarchical cluster references a missing point.');
+        }
+
+        return point.features[featureIndex] ?? 0;
+      }),
+    ),
+  );
+}
+
 function initializeKMeansCentroids(
   points: readonly KMeansPoint[],
   k: number,
@@ -2926,11 +3182,12 @@ function calculateNeuralLogLoss(
   rows: readonly (PlaygroundDatasetRow & { label: number })[],
   network: readonly NeuralLayer[],
   activation: MlpConfig['activation'],
+  scaler: FeatureScaler | null = null,
 ): number {
   return mean(
     rows.map((row) => {
       const probability = clampProbability(
-        forwardNeuralNetwork(network, row.features, activation).output,
+        forwardNeuralNetwork(network, createMlpFeatures(row, scaler), activation).output,
       );
 
       return -(row.label * Math.log(probability) + (1 - row.label) * Math.log(1 - probability));

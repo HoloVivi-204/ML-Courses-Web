@@ -492,6 +492,15 @@ const submissionLearningUnits: readonly SubmissionLearningUnit[] = [
     unlockAlgorithmIds: ['linear-regression', 'polynomial-regression'],
   },
   {
+    algorithmId: 'ridge-regression',
+    courseId: 'course-classical-ml',
+    moduleId: 'cml-m03-ridge-lasso',
+    moduleQuizId: 'quiz-module-cml-m03',
+    requiredPostIds: ['cml-p05-regularization-ridge-lasso'],
+    scenarioId: 'pg-house-price',
+    unlockAlgorithmIds: ['ridge-regression', 'lasso-regression'],
+  },
+  {
     algorithmId: 'logistic-regression',
     courseId: 'course-classical-ml',
     moduleId: 'cml-m04-logistic-classification',
@@ -501,6 +510,15 @@ const submissionLearningUnits: readonly SubmissionLearningUnit[] = [
     unlockAlgorithmIds: ['logistic-regression'],
   },
   {
+    algorithmId: 'knn',
+    courseId: 'course-classical-ml',
+    moduleId: 'cml-m05-knn-naive-bayes',
+    moduleQuizId: 'quiz-module-cml-m05',
+    requiredPostIds: ['cml-p08-knn', 'cml-p09-naive-bayes'],
+    scenarioId: 'pg-customer-churn',
+    unlockAlgorithmIds: ['knn', 'naive-bayes'],
+  },
+  {
     algorithmId: 'decision-tree',
     courseId: 'course-classical-ml',
     moduleId: 'cml-m06-trees-forest',
@@ -508,6 +526,15 @@ const submissionLearningUnits: readonly SubmissionLearningUnit[] = [
     requiredPostIds: ['cml-p10-decision-tree', 'cml-p11-random-forest'],
     scenarioId: 'pg-credit-risk',
     unlockAlgorithmIds: ['decision-tree', 'random-forest'],
+  },
+  {
+    algorithmId: 'svm',
+    courseId: 'course-classical-ml',
+    moduleId: 'cml-m07-svm',
+    moduleQuizId: 'quiz-module-cml-m07',
+    requiredPostIds: ['cml-p12-svm'],
+    scenarioId: 'pg-credit-risk',
+    unlockAlgorithmIds: ['svm'],
   },
   {
     algorithmId: 'kmeans',

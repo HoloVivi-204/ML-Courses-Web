@@ -16,6 +16,7 @@ describe('playground manifest validation', () => {
     expect(manifests.map((manifest) => `${manifest.scenarioId}/${manifest.algorithmId}`)).toEqual([
       'pg-xor/perceptron',
       'pg-xor/mlp',
+      'pg-nonlinear-2d/mlp',
       'pg-house-price/linear-regression',
       'pg-house-price/ridge-regression',
       'pg-insurance-cost/polynomial-regression',
@@ -29,9 +30,10 @@ describe('playground manifest validation', () => {
       'pg-customer-churn/knn',
       'pg-customer-churn/random-forest',
       'pg-retail-segments/kmeans',
+      'pg-retail-segments/hierarchical-clustering',
       'pg-country-indicators/pca',
     ]);
-    expect(manifests).toHaveLength(16);
+    expect(manifests).toHaveLength(18);
     expect(
       manifests.every(
         (manifest) =>
@@ -221,6 +223,37 @@ describe('playground manifest validation', () => {
     ).toThrowError(/smoothing must be between 1e-12 and 1/i);
   });
 
+  it('enforces the retail hierarchical clustering mobile cluster limit before worker execution', () => {
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'hierarchical-clustering',
+        config: { linkage: 'ward', distance: 'euclidean', clusters: 9 },
+        datasetVersionId: 'ds-retail-segments-v1',
+        deviceProfile: 'mobile',
+        scenarioId: 'pg-retail-segments',
+      }),
+    ).toThrowError(/clusters must be between 2 and 8/i);
+  });
+
+  it('enforces the nonlinear MLP mobile epoch limit before worker execution', () => {
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'mlp',
+        config: {
+          hiddenLayers: [8, 8],
+          activation: 'tanh',
+          learningRate: 0.03,
+          epochs: 501,
+          trainRatio: 0.8,
+          seed: 42,
+        },
+        datasetVersionId: 'ds-moons-2d-v1',
+        deviceProfile: 'mobile',
+        scenarioId: 'pg-nonlinear-2d',
+      }),
+    ).toThrowError(/epochs must be between 10 and 500/i);
+  });
+
   it('enforces the regression-family alpha and polynomial degree limits before worker execution', () => {
     expect(() =>
       normalizePlaygroundConfig({
@@ -318,5 +351,29 @@ describe('playground manifest validation', () => {
         datasetVersionId: 'ds-house-price-v1',
       }),
     ).toThrowError(/disabled/i);
+  });
+
+  it('fails closed for every matrix Should pair', () => {
+    const disabledPairs = [
+      ['pg-house-price', 'polynomial-regression', 'ds-house-price-v1'],
+      ['pg-house-price', 'lasso-regression', 'ds-house-price-v1'],
+      ['pg-insurance-cost', 'linear-regression', 'ds-insurance-cost-v1'],
+      ['pg-insurance-cost', 'ridge-regression', 'ds-insurance-cost-v1'],
+      ['pg-customer-churn', 'logistic-regression', 'ds-customer-churn-v1'],
+      ['pg-customer-churn', 'decision-tree', 'ds-customer-churn-v1'],
+      ['pg-customer-churn', 'svm', 'ds-customer-churn-v1'],
+      ['pg-credit-risk', 'knn', 'ds-credit-risk-v1'],
+      ['pg-credit-risk', 'random-forest', 'ds-credit-risk-v1'],
+      ['pg-wine-cultivar', 'knn', 'ds-wine-cultivar-v1'],
+      ['pg-wine-cultivar', 'decision-tree', 'ds-wine-cultivar-v1'],
+      ['pg-wine-cultivar', 'random-forest', 'ds-wine-cultivar-v1'],
+      ['pg-wine-cultivar', 'svm', 'ds-wine-cultivar-v1'],
+    ] as const;
+
+    for (const [scenarioId, algorithmId, datasetVersionId] of disabledPairs) {
+      expect(() =>
+        assertSupportedPlaygroundPair({ scenarioId, algorithmId, datasetVersionId }),
+      ).toThrowError(/disabled/i);
+    }
   });
 });

@@ -11,6 +11,7 @@ describe('Playground dataset registry', () => {
 
     expect([...datasetIds]).toEqual([
       'ds-xor-noisy-v1',
+      'ds-moons-2d-v1',
       'ds-house-price-v1',
       'ds-insurance-cost-v1',
       'ds-sms-spam-v1',

@@ -389,7 +389,12 @@ function normalizeMetricValue(value: unknown, metricId: string): PlaygroundMetri
     );
   }
 
-  if (['inertia', 'loss', 'mae', 'reconstruction-error', 'rmse'].includes(metricId) && metric < 0) {
+  if (
+    ['cluster-count', 'inertia', 'loss', 'mae', 'reconstruction-error', 'rmse'].includes(
+      metricId,
+    ) &&
+    metric < 0
+  ) {
     throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', `${metricId} must be non-negative.`);
   }
 

@@ -10,6 +10,7 @@ import {
   rememberLearningContentAccessGrants,
 } from './learning-access-store';
 import type { LearningApiClient, LearningProgressSnapshot } from './learning-api';
+import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
 
 interface LearningCoursePageProps {
   learningApiClient: LearningApiClient;
@@ -208,35 +209,6 @@ function VerifiedProgressPanel({
       ) : null}
     </section>
   );
-}
-
-function getPlaygroundPathForAlgorithm(algorithmId: string): string | null {
-  const scenarioIdByAlgorithmId: Readonly<Record<string, string>> = {
-    'decision-tree': 'pg-credit-risk',
-    kmeans: 'pg-retail-segments',
-    'linear-regression': 'pg-house-price',
-    'logistic-regression': 'pg-spam-detection',
-    mlp: 'pg-xor',
-    pca: 'pg-country-indicators',
-    perceptron: 'pg-xor',
-  };
-  const scenarioId = scenarioIdByAlgorithmId[algorithmId];
-
-  return scenarioId ? `/playground/${scenarioId}` : null;
-}
-
-function formatAlgorithmName(algorithmId: string): string {
-  const displayNames: Readonly<Record<string, string>> = {
-    'decision-tree': 'Decision Tree',
-    kmeans: 'K-Means',
-    'linear-regression': 'Linear Regression',
-    'logistic-regression': 'Logistic Regression',
-    mlp: 'MLP',
-    pca: 'PCA',
-    perceptron: 'Perceptron',
-  };
-
-  return displayNames[algorithmId] ?? algorithmId;
 }
 
 function formatQuizAttemptCount(attemptCount: number, resolvedLanguage: string | undefined) {

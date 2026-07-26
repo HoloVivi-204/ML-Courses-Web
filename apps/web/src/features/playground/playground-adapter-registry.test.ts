@@ -9,6 +9,7 @@ describe('Playground adapter registry', () => {
     expect(registry.map((entry) => `${entry.scenarioId}/${entry.algorithmId}`)).toEqual([
       'pg-xor/perceptron',
       'pg-xor/mlp',
+      'pg-nonlinear-2d/mlp',
       'pg-house-price/linear-regression',
       'pg-house-price/ridge-regression',
       'pg-insurance-cost/polynomial-regression',
@@ -22,9 +23,10 @@ describe('Playground adapter registry', () => {
       'pg-credit-risk/svm',
       'pg-wine-cultivar/naive-bayes',
       'pg-retail-segments/kmeans',
+      'pg-retail-segments/hierarchical-clustering',
       'pg-country-indicators/pca',
     ]);
-    expect(registry).toHaveLength(16);
+    expect(registry).toHaveLength(18);
   });
 
   it('keeps UI defaults and parameter fields aligned with every registered adapter', () => {
