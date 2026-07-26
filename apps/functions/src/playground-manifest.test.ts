@@ -21,11 +21,12 @@ describe('playground manifest validation', () => {
       'pg-insurance-cost/polynomial-regression',
       'pg-insurance-cost/lasso-regression',
       'pg-spam-detection/logistic-regression',
+      'pg-spam-detection/naive-bayes',
       'pg-credit-risk/decision-tree',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(manifests).toHaveLength(10);
+    expect(manifests).toHaveLength(11);
     expect(
       manifests.every(
         (manifest) =>

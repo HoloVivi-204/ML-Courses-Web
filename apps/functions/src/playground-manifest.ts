@@ -206,6 +206,27 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'loss'],
   },
   {
+    adapterVersion: 'naive-bayes-js-v1',
+    algorithmId: 'naive-bayes',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-sms-spam-v1',
+    defaultConfig: {
+      alpha: 1,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { features: 10_000, alpha: 100 },
+    feedbackRules: ['imbalance', 'smoothing'],
+    goldenFixture: 'fixtures/spam-naive-bayes-v1.json',
+    mobileLimits: { features: 3000, alpha: 100 },
+    preprocessing: ['tokenize', 'count-vector'],
+    primaryMetric: 'f1',
+    scenarioId: 'pg-spam-detection',
+    scopePriority: 'must',
+    secondaryMetrics: ['precision', 'recall'],
+    visualizations: ['confusion-matrix', 'class-error'],
+  },
+  {
     adapterVersion: 'decision-tree-js-v1',
     algorithmId: 'decision-tree',
     configSchemaVersion: 1,
@@ -357,6 +378,10 @@ export function normalizePlaygroundConfig(input: NormalizePlaygroundConfigInput)
 
   if (manifest.algorithmId === 'logistic-regression') {
     return normalizeLogisticRegressionConfig(input.config);
+  }
+
+  if (manifest.algorithmId === 'naive-bayes') {
+    return normalizeNaiveBayesConfig(input.config, manifest, input.deviceProfile);
   }
 
   if (manifest.algorithmId === 'decision-tree') {
@@ -535,6 +560,23 @@ function normalizeLogisticRegressionConfig(value: unknown): PlaygroundConfig {
     learningRate: getNumberInRange(config, 'learningRate', 0.0001, 1),
     epochs: getIntegerInRange(config, 'epochs', 10, 2000),
     threshold: getNumberInRange(config, 'threshold', 0, 1),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeNaiveBayesConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    alpha: getNumberInRange(config, 'alpha', 0.0001, getManifestLimit(limits, 'alpha')),
     trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
   };

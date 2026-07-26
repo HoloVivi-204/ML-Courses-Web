@@ -8,6 +8,7 @@ import houseRidgeFixture from './fixtures/house-ridge-v1.json';
 import insurancePolynomialFixture from './fixtures/insurance-polynomial-v1.json';
 import insuranceLassoFixture from './fixtures/insurance-lasso-v1.json';
 import retailKMeansFixture from './fixtures/retail-kmeans-v1.json';
+import spamNaiveBayesFixture from './fixtures/spam-naive-bayes-v1.json';
 import spamLogisticFixture from './fixtures/spam-logistic-v1.json';
 import xorPerceptronFixture from './fixtures/xor-perceptron-v1.json';
 import xorMlpFixture from './fixtures/xor-mlp-v1.json';
@@ -54,6 +55,12 @@ const fixtureCases = [
     algorithmId: 'logistic-regression',
     datasetVersionId: 'ds-sms-spam-v1',
     fixture: spamLogisticFixture,
+  },
+  {
+    scenarioId: 'pg-spam-detection',
+    algorithmId: 'naive-bayes',
+    datasetVersionId: 'ds-sms-spam-v1',
+    fixture: spamNaiveBayesFixture,
   },
   {
     scenarioId: 'pg-credit-risk',
@@ -331,6 +338,40 @@ describe('Playground reference adapters', () => {
     expect(result).toMatchObject({
       runId: 'run-spam-logistic',
       ...spamLogisticFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
+  });
+
+  it('runs pg-spam-detection Naive Bayes through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-spam-detection',
+      algorithmId: 'naive-bayes',
+      datasetVersionId: 'ds-sms-spam-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-spam-detection/naive-bayes adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-spam-naive-bayes',
+        sessionId: 'session-spam-naive-bayes',
+        scenarioId: 'pg-spam-detection',
+        algorithmId: 'naive-bayes',
+        datasetVersionId: 'ds-sms-spam-v1',
+        configHash: '8'.repeat(64),
+        config: spamNaiveBayesFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-spam-naive-bayes',
+      ...spamNaiveBayesFixture.result,
     });
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
   });

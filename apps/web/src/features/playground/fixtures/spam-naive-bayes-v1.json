@@ -1,0 +1,31 @@
+{
+  "config": {
+    "alpha": 1,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-spam-detection",
+    "algorithmId": "naive-bayes",
+    "datasetVersionId": "ds-sms-spam-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "f1": 1,
+      "precision": 1,
+      "recall": 1
+    },
+    "chartSummary": {
+      "kind": "confusion-matrix",
+      "truePositive": 2,
+      "falsePositive": 0,
+      "trueNegative": 2,
+      "falseNegative": 0
+    },
+    "textAlternative": {
+      "en": "Naive Bayes reaches F1 1 on the synthetic SMS test split.",
+      "vi": "Naive Bayes đạt F1 1 trên tập kiểm tra SMS tổng hợp."
+    }
+  }
+}

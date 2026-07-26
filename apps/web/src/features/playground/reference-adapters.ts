@@ -43,6 +43,12 @@ interface LassoRegressionConfig {
   trainRatio: number;
 }
 
+interface NaiveBayesConfig {
+  alpha: number;
+  seed: number;
+  trainRatio: number;
+}
+
 interface LogisticRegressionConfig {
   epochs: number;
   learningRate: number;
@@ -108,6 +114,13 @@ interface NeuralForwardPass {
   activations: number[][];
   output: number;
   weightedInputs: number[][];
+}
+
+interface NaiveBayesClassStatistics {
+  label: number;
+  logPrior: number;
+  means: readonly number[];
+  variances: readonly number[];
 }
 
 export function createLinearRegressionAdapter(): AlgorithmAdapter {
@@ -187,6 +200,27 @@ export function createLassoRegressionAdapter(): AlgorithmAdapter {
       const config = validateLassoRegressionConfig(request.config);
 
       return runLassoRegression(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createNaiveBayesAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'naive-bayes-js-v1',
+    algorithmId: 'naive-bayes',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-sms-spam-v1',
+    scenarioId: 'pg-spam-detection',
+    validateConfig(config) {
+      return validateNaiveBayesConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateNaiveBayesConfig(request.config);
+
+      return runSpamNaiveBayes(request, config, options);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -647,6 +681,61 @@ async function runLassoRegression(
 }
 
 function validateLassoRegressionConfig(config: MlConfig): LassoRegressionConfig {
+  assertAllowedFields(config, ['alpha', 'seed', 'trainRatio']);
+
+  return {
+    alpha: readNumberInRange(config, 'alpha', 0.0001, 100),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+async function runSpamNaiveBayes(
+  request: MlRunRequest,
+  config: NaiveBayesConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-sms-spam-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const statistics = calculateNaiveBayesStatistics(trainRows, config.alpha);
+  const actualLabels = testRows.map((row) => row.label);
+  const predictedLabels = testRows.map((row) => predictNaiveBayesLabel(row.features, statistics));
+  const metrics = calculateBinaryClassificationMetrics(actualLabels, predictedLabels);
+  const confusionMatrix = calculateConfusionMatrix(actualLabels, predictedLabels);
+
+  options.onProgress({
+    runId: request.runId,
+    iteration: 1,
+    totalIterations: 1,
+    metric: { id: 'f1', value: metrics.f1 },
+  });
+  await yieldToWorkerQueue();
+  throwIfCancelled(request.runId, options);
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-spam-detection',
+    algorithmId: 'naive-bayes',
+    datasetVersionId: 'ds-sms-spam-v1',
+    determinism: 'exact',
+    feedback: hasClassImbalance(trainRows) ? ['imbalance'] : [],
+    metrics,
+    chartSummary: {
+      kind: 'confusion-matrix',
+      ...confusionMatrix,
+    },
+    textAlternative: {
+      en: `Naive Bayes reaches F1 ${metrics.f1} on the synthetic SMS test split.`,
+      vi: `Naive Bayes đạt F1 ${metrics.f1} trên tập kiểm tra SMS tổng hợp.`,
+    },
+  };
+}
+
+function validateNaiveBayesConfig(config: MlConfig): NaiveBayesConfig {
   assertAllowedFields(config, ['alpha', 'seed', 'trainRatio']);
 
   return {
@@ -1445,6 +1534,70 @@ function calculateBinaryClassificationMetrics(
     precision: roundMetric(precision),
     recall: roundMetric(recall),
   };
+}
+
+function calculateNaiveBayesStatistics(
+  rows: readonly (PlaygroundDatasetRow & { label: number })[],
+  alpha: number,
+): readonly NaiveBayesClassStatistics[] {
+  const labels = [...new Set(rows.map((row) => row.label))].sort((left, right) => left - right);
+
+  return labels.map((label) => {
+    const classRows = rows.filter((row) => row.label === label);
+    const means = Array.from({ length: rows[0]?.features.length ?? 0 }, (_, featureIndex) =>
+      mean(classRows.map((row) => readFeature(row, featureIndex))),
+    );
+    const variances = means.map(
+      (featureMean, featureIndex) =>
+        mean(classRows.map((row) => (readFeature(row, featureIndex) - featureMean) ** 2)) +
+        alpha * 0.000001,
+    );
+
+    return {
+      label,
+      logPrior: Math.log(classRows.length / rows.length),
+      means,
+      variances,
+    };
+  });
+}
+
+function predictNaiveBayesLabel(
+  features: readonly number[],
+  statistics: readonly NaiveBayesClassStatistics[],
+): number {
+  const bestMatch = statistics.reduce<{ label: number; score: number } | undefined>(
+    (currentBest, classStatistics) => {
+      const score = classStatistics.means.reduce((totalScore, meanValue, featureIndex) => {
+        const variance = classStatistics.variances[featureIndex] ?? 0;
+        const feature = features[featureIndex] ?? 0;
+        const safeVariance = Math.max(variance, 0.000000001);
+
+        return (
+          totalScore -
+          0.5 * Math.log(2 * Math.PI * safeVariance) -
+          (feature - meanValue) ** 2 / (2 * safeVariance)
+        );
+      }, classStatistics.logPrior);
+
+      if (
+        !currentBest ||
+        score > currentBest.score ||
+        (score === currentBest.score && classStatistics.label < currentBest.label)
+      ) {
+        return { label: classStatistics.label, score };
+      }
+
+      return currentBest;
+    },
+    undefined,
+  );
+
+  if (!bestMatch) {
+    throw new Error('Naive Bayes requires at least one observed class.');
+  }
+
+  return bestMatch.label;
 }
 
 function buildDecisionTree(
