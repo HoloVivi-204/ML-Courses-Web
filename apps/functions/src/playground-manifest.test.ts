@@ -23,12 +23,15 @@ describe('playground manifest validation', () => {
       'pg-spam-detection/logistic-regression',
       'pg-spam-detection/naive-bayes',
       'pg-credit-risk/decision-tree',
+      'pg-credit-risk/logistic-regression',
+      'pg-credit-risk/svm',
+      'pg-wine-cultivar/naive-bayes',
       'pg-customer-churn/knn',
       'pg-customer-churn/random-forest',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(manifests).toHaveLength(13);
+    expect(manifests).toHaveLength(16);
     expect(
       manifests.every(
         (manifest) =>
@@ -184,6 +187,38 @@ describe('playground manifest validation', () => {
         scenarioId: 'pg-customer-churn',
       }),
     ).toThrowError(/trees must be between 1 and 50/i);
+  });
+
+  it('enforces the credit SVM C limit before worker execution', () => {
+    const baseConfig = {
+      kernel: 'rbf',
+      c: 1,
+      gamma: 'scale',
+      trainRatio: 0.8,
+      seed: 42,
+    };
+
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'svm',
+        config: { ...baseConfig, c: 100.1 },
+        datasetVersionId: 'ds-credit-risk-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-credit-risk',
+      }),
+    ).toThrowError(/c must be between 0.001 and 100/i);
+  });
+
+  it('enforces the wine Naive Bayes smoothing limit before worker execution', () => {
+    expect(() =>
+      normalizePlaygroundConfig({
+        algorithmId: 'naive-bayes',
+        config: { smoothing: 1.1, trainRatio: 0.8, seed: 42 },
+        datasetVersionId: 'ds-wine-cultivar-v1',
+        deviceProfile: 'desktop',
+        scenarioId: 'pg-wine-cultivar',
+      }),
+    ).toThrowError(/smoothing must be between 1e-12 and 1/i);
   });
 
   it('enforces the regression-family alpha and polynomial degree limits before worker execution', () => {

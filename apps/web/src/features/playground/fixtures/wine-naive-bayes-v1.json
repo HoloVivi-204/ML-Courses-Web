@@ -1,0 +1,32 @@
+{
+  "config": {
+    "smoothing": 0.000000001,
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-wine-cultivar",
+    "algorithmId": "naive-bayes",
+    "datasetVersionId": "ds-wine-cultivar-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "macro-f1": 1,
+      "accuracy": 1
+    },
+    "chartSummary": {
+      "kind": "confusion-matrix",
+      "labels": [0, 1, 2],
+      "matrix": [
+        [3, 0, 0],
+        [0, 6, 0],
+        [0, 0, 3]
+      ]
+    },
+    "textAlternative": {
+      "en": "Naive Bayes reaches macro-F1 1 on the synthetic wine test split.",
+      "vi": "Naive Bayes dat macro-F1 1 tren tap kiem tra wine tong hop."
+    }
+  }
+}

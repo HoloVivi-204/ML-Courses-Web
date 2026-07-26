@@ -16,6 +16,7 @@ describe('Playground dataset registry', () => {
       'ds-sms-spam-v1',
       'ds-customer-churn-v1',
       'ds-credit-risk-v1',
+      'ds-wine-cultivar-v1',
       'ds-retail-segments-v1',
       'ds-country-indicators-v1',
     ]);

@@ -249,6 +249,73 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'tree'],
   },
   {
+    adapterVersion: 'logistic-regression-js-v1',
+    algorithmId: 'logistic-regression',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-credit-risk-v1',
+    defaultConfig: {
+      learningRate: 0.05,
+      epochs: 300,
+      threshold: 0.4,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { rows: 10_000 },
+    feedbackRules: ['threshold', 'imbalance'],
+    goldenFixture: 'fixtures/credit-logistic-v1.json',
+    mobileLimits: { rows: 3000 },
+    preprocessing: ['impute', 'one-hot', 'standard-scale'],
+    primaryMetric: 'recall',
+    scenarioId: 'pg-credit-risk',
+    scopePriority: 'must',
+    secondaryMetrics: ['f1', 'precision', 'auc'],
+    visualizations: ['confusion-matrix', 'roc'],
+  },
+  {
+    adapterVersion: 'svm-js-v1',
+    algorithmId: 'svm',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-credit-risk-v1',
+    defaultConfig: {
+      kernel: 'rbf',
+      c: 1,
+      gamma: 'scale',
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { rows: 5000, c: 100 },
+    feedbackRules: ['margin', 'imbalance'],
+    goldenFixture: 'fixtures/credit-svm-v1.json',
+    mobileLimits: { rows: 1500, c: 100 },
+    preprocessing: ['impute', 'one-hot', 'standard-scale'],
+    primaryMetric: 'recall',
+    scenarioId: 'pg-credit-risk',
+    scopePriority: 'must',
+    secondaryMetrics: ['f1', 'precision'],
+    visualizations: ['confusion-matrix'],
+  },
+  {
+    adapterVersion: 'naive-bayes-js-v1',
+    algorithmId: 'naive-bayes',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-wine-cultivar-v1',
+    defaultConfig: {
+      smoothing: 0.000000001,
+      trainRatio: 0.8,
+      seed: 42,
+    },
+    desktopLimits: { features: 100, smoothing: 1 },
+    feedbackRules: ['class-overlap'],
+    goldenFixture: 'fixtures/wine-naive-bayes-v1.json',
+    mobileLimits: { features: 100, smoothing: 1 },
+    preprocessing: ['standard-scale'],
+    primaryMetric: 'macro-f1',
+    scenarioId: 'pg-wine-cultivar',
+    scopePriority: 'must',
+    secondaryMetrics: ['accuracy'],
+    visualizations: ['confusion-matrix', 'class-error'],
+  },
+  {
     adapterVersion: 'knn-js-v1',
     algorithmId: 'knn',
     configSchemaVersion: 1,
@@ -440,6 +507,10 @@ export function normalizePlaygroundConfig(input: NormalizePlaygroundConfigInput)
     return normalizeRandomForestConfig(input.config, manifest, input.deviceProfile);
   }
 
+  if (manifest.algorithmId === 'svm') {
+    return normalizeSvmConfig(input.config, manifest, input.deviceProfile);
+  }
+
   if (manifest.algorithmId === 'kmeans') {
     return normalizeKMeansConfig(input.config, manifest, input.deviceProfile);
   }
@@ -557,10 +628,10 @@ function normalizeRidgeRegressionConfig(
   manifest: PlaygroundPairManifest,
   deviceProfile: PlaygroundDeviceProfile,
 ): PlaygroundConfig {
-  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
-
   const config = value as Record<string, unknown>;
   const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
 
   return {
     alpha: getNumberInRange(config, 'alpha', 0.0001, getManifestLimit(limits, 'alpha')),
@@ -622,10 +693,25 @@ function normalizeNaiveBayesConfig(
   manifest: PlaygroundPairManifest,
   deviceProfile: PlaygroundDeviceProfile,
 ): PlaygroundConfig {
-  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
-
   const config = value as Record<string, unknown>;
   const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  if (manifest.scenarioId === 'pg-wine-cultivar') {
+    assertAllowedConfigFields(value, ['seed', 'smoothing', 'trainRatio']);
+
+    return {
+      smoothing: getNumberInRange(
+        config,
+        'smoothing',
+        0.000000000001,
+        getManifestLimit(limits, 'smoothing'),
+      ),
+      trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+      seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+    };
+  }
+
+  assertAllowedConfigFields(value, ['alpha', 'seed', 'trainRatio']);
 
   return {
     alpha: getNumberInRange(config, 'alpha', 0.0001, getManifestLimit(limits, 'alpha')),
@@ -683,6 +769,25 @@ function normalizeRandomForestConfig(
   return {
     trees: getIntegerInRange(config, 'trees', 1, getManifestLimit(limits, 'trees')),
     maxDepth: getIntegerInRange(config, 'maxDepth', 1, getManifestLimit(limits, 'depth')),
+    trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function normalizeSvmConfig(
+  value: unknown,
+  manifest: PlaygroundPairManifest,
+  deviceProfile: PlaygroundDeviceProfile,
+): PlaygroundConfig {
+  assertAllowedConfigFields(value, ['c', 'gamma', 'kernel', 'seed', 'trainRatio']);
+
+  const config = value as Record<string, unknown>;
+  const limits = deviceProfile === 'mobile' ? manifest.mobileLimits : manifest.desktopLimits;
+
+  return {
+    kernel: getEnumValue(config.kernel, 'kernel', ['rbf']),
+    c: getNumberInRange(config, 'c', 0.001, getManifestLimit(limits, 'c')),
+    gamma: getEnumValue(config.gamma, 'gamma', ['scale']),
     trainRatio: getNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: getIntegerInRange(config, 'seed', 0, 1_000_000),
   };

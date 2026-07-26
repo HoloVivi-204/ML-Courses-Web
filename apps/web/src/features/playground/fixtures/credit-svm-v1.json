@@ -1,0 +1,35 @@
+{
+  "config": {
+    "kernel": "rbf",
+    "c": 1,
+    "gamma": "scale",
+    "trainRatio": 0.8,
+    "seed": 42
+  },
+  "tolerance": 0.0001,
+  "result": {
+    "scenarioId": "pg-credit-risk",
+    "algorithmId": "svm",
+    "datasetVersionId": "ds-credit-risk-v1",
+    "determinism": "exact",
+    "feedback": [],
+    "metrics": {
+      "recall": 1,
+      "f1": 1,
+      "precision": 1
+    },
+    "chartSummary": {
+      "kind": "confusion-matrix",
+      "gamma": 0.25,
+      "supportVectorCount": 6,
+      "truePositive": 2,
+      "falsePositive": 0,
+      "trueNegative": 2,
+      "falseNegative": 0
+    },
+    "textAlternative": {
+      "en": "RBF SVM reaches recall 1 on the synthetic credit-risk test split.",
+      "vi": "RBF SVM dat recall 1 tren tap kiem tra rui ro tin dung tong hop."
+    }
+  }
+}

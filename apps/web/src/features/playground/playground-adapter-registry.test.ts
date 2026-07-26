@@ -18,10 +18,13 @@ describe('Playground adapter registry', () => {
       'pg-customer-churn/knn',
       'pg-customer-churn/random-forest',
       'pg-credit-risk/decision-tree',
+      'pg-credit-risk/logistic-regression',
+      'pg-credit-risk/svm',
+      'pg-wine-cultivar/naive-bayes',
       'pg-retail-segments/kmeans',
       'pg-country-indicators/pca',
     ]);
-    expect(registry).toHaveLength(13);
+    expect(registry).toHaveLength(16);
   });
 
   it('keeps UI defaults and parameter fields aligned with every registered adapter', () => {

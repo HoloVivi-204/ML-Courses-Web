@@ -1,5 +1,9 @@
 export type PlaygroundDatasetTask =
-  'binary-classification' | 'clustering' | 'dimensionality-reduction' | 'regression';
+  | 'binary-classification'
+  | 'clustering'
+  | 'dimensionality-reduction'
+  | 'multiclass-classification'
+  | 'regression';
 
 export interface PlaygroundDatasetRow {
   features: readonly number[];
@@ -103,6 +107,17 @@ const playgroundDatasets = [
     textAlternative: {
       en: 'Synthetic credit rows with income, debt ratio, missed payments, and collateral score.',
       vi: 'Dữ liệu tín dụng tổng hợp với thu nhập, tỷ lệ nợ, lần trễ hạn và điểm tài sản đảm bảo.',
+    },
+  }),
+  createDataset({
+    datasetVersionId: 'ds-wine-cultivar-v1',
+    featureColumns: ['flavonoidIndex', 'hueIndex', 'colorIntensityIndex', 'prolineIndex'],
+    labelColumn: 'cultivarClass',
+    rows: createWineRows(),
+    task: 'multiclass-classification',
+    textAlternative: {
+      en: 'Synthetic wine cultivar rows with four standardized numeric chemistry indicators and three classes.',
+      vi: 'Du lieu cultivar ruou vang tong hop voi bon chi bao hoa hoc dang so va ba lop.',
     },
   }),
   createDataset({
@@ -412,6 +427,23 @@ function createCreditRows(): PlaygroundDatasetRow[] {
     features: [incomeScore, debtRatio, missedPayments, collateralScore],
     label,
   }));
+}
+
+function createWineRows(): PlaygroundDatasetRow[] {
+  const random = createSeededRandom(1_779);
+  const centers: readonly (readonly [number, number, number, number])[] = [
+    [1.2, 0.7, 2.1, 1.1],
+    [3.7, 2.9, 4.8, 4.2],
+    [6.4, 5.8, 7.1, 7.3],
+  ];
+
+  return centers.flatMap((center, label) =>
+    Array.from({ length: 20 }, (_, index) => ({
+      rowId: `wine-${label}-${String(index + 1).padStart(2, '0')}`,
+      features: center.map((value) => roundMetric(value + gaussian(random) * 0.28)),
+      label,
+    })),
+  );
 }
 
 function createRetailRows(): PlaygroundDatasetRow[] {

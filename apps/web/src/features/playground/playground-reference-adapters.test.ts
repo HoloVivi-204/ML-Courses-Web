@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveAlgorithmAdapter } from './playground-adapter-registry';
 import creditTreeFixture from './fixtures/credit-tree-v1.json';
+import creditLogisticFixture from './fixtures/credit-logistic-v1.json';
+import creditSvmFixture from './fixtures/credit-svm-v1.json';
 import churnKnnFixture from './fixtures/churn-knn-v1.json';
 import churnForestFixture from './fixtures/churn-forest-v1.json';
 import countryPcaFixture from './fixtures/country-pca-v1.json';
@@ -11,6 +13,7 @@ import insurancePolynomialFixture from './fixtures/insurance-polynomial-v1.json'
 import insuranceLassoFixture from './fixtures/insurance-lasso-v1.json';
 import retailKMeansFixture from './fixtures/retail-kmeans-v1.json';
 import spamNaiveBayesFixture from './fixtures/spam-naive-bayes-v1.json';
+import wineNaiveBayesFixture from './fixtures/wine-naive-bayes-v1.json';
 import spamLogisticFixture from './fixtures/spam-logistic-v1.json';
 import xorPerceptronFixture from './fixtures/xor-perceptron-v1.json';
 import xorMlpFixture from './fixtures/xor-mlp-v1.json';
@@ -53,6 +56,12 @@ const fixtureCases = [
     fixture: insuranceLassoFixture,
   },
   {
+    scenarioId: 'pg-wine-cultivar',
+    algorithmId: 'naive-bayes',
+    datasetVersionId: 'ds-wine-cultivar-v1',
+    fixture: wineNaiveBayesFixture,
+  },
+  {
     scenarioId: 'pg-spam-detection',
     algorithmId: 'logistic-regression',
     datasetVersionId: 'ds-sms-spam-v1',
@@ -75,6 +84,18 @@ const fixtureCases = [
     algorithmId: 'random-forest',
     datasetVersionId: 'ds-customer-churn-v1',
     fixture: churnForestFixture,
+  },
+  {
+    scenarioId: 'pg-credit-risk',
+    algorithmId: 'svm',
+    datasetVersionId: 'ds-credit-risk-v1',
+    fixture: creditSvmFixture,
+  },
+  {
+    scenarioId: 'pg-credit-risk',
+    algorithmId: 'logistic-regression',
+    datasetVersionId: 'ds-credit-risk-v1',
+    fixture: creditLogisticFixture,
   },
   {
     scenarioId: 'pg-credit-risk',
@@ -456,6 +477,108 @@ describe('Playground reference adapters', () => {
       ...churnForestFixture.result,
     });
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
+  });
+
+  it('runs pg-credit-risk logistic regression through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-credit-risk',
+      algorithmId: 'logistic-regression',
+      datasetVersionId: 'ds-credit-risk-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-credit-risk/logistic-regression adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-credit-logistic',
+        sessionId: 'session-credit-logistic',
+        scenarioId: 'pg-credit-risk',
+        algorithmId: 'logistic-regression',
+        datasetVersionId: 'ds-credit-risk-v1',
+        configHash: '8'.repeat(64),
+        config: creditLogisticFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-credit-logistic',
+      ...creditLogisticFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('recall'));
+  });
+
+  it('runs pg-wine-cultivar Naive Bayes through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-wine-cultivar',
+      algorithmId: 'naive-bayes',
+      datasetVersionId: 'ds-wine-cultivar-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-wine-cultivar/naive-bayes adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-wine-naive-bayes',
+        sessionId: 'session-wine-naive-bayes',
+        scenarioId: 'pg-wine-cultivar',
+        algorithmId: 'naive-bayes',
+        datasetVersionId: 'ds-wine-cultivar-v1',
+        configHash: '8'.repeat(64),
+        config: wineNaiveBayesFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-wine-naive-bayes',
+      ...wineNaiveBayesFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('macro-F1'));
+  });
+
+  it('runs pg-credit-risk SVM through the registry and matches the golden fixture', async () => {
+    const adapter = resolveAlgorithmAdapter({
+      scenarioId: 'pg-credit-risk',
+      algorithmId: 'svm',
+      datasetVersionId: 'ds-credit-risk-v1',
+    });
+
+    if (!adapter) {
+      throw new Error('Expected pg-credit-risk/svm adapter to be registered.');
+    }
+
+    const result = await adapter.run(
+      {
+        runId: 'run-credit-svm',
+        sessionId: 'session-credit-svm',
+        scenarioId: 'pg-credit-risk',
+        algorithmId: 'svm',
+        datasetVersionId: 'ds-credit-risk-v1',
+        configHash: '8'.repeat(64),
+        config: creditSvmFixture.config,
+      },
+      {
+        onProgress: () => undefined,
+        shouldCancel: () => false,
+      },
+    );
+
+    expect(result).toMatchObject({
+      runId: 'run-credit-svm',
+      ...creditSvmFixture.result,
+    });
+    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('recall'));
   });
 
   it('runs pg-credit-risk decision tree through the registry and matches the golden fixture', async () => {

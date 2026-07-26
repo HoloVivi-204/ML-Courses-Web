@@ -29,6 +29,7 @@ const PERCENT_METRIC_IDS = new Set([
   'auc',
   'explained-variance',
   'f1',
+  'macro-f1',
   'precision',
   'r2',
   'recall',

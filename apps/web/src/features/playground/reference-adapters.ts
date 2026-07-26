@@ -44,9 +44,16 @@ interface LassoRegressionConfig {
 }
 
 interface NaiveBayesConfig {
-  alpha: number;
   seed: number;
+  smoothing: number;
   trainRatio: number;
+}
+
+interface NaiveBayesAdapterDefinition {
+  configField: 'alpha' | 'smoothing';
+  datasetVersionId: 'ds-sms-spam-v1' | 'ds-wine-cultivar-v1';
+  primaryMetric: 'f1' | 'macro-f1';
+  scenarioId: 'pg-spam-detection' | 'pg-wine-cultivar';
 }
 
 interface LogisticRegressionConfig {
@@ -55,6 +62,13 @@ interface LogisticRegressionConfig {
   seed: number;
   threshold: number;
   trainRatio: number;
+}
+
+interface LogisticRegressionAdapterDefinition {
+  datasetVersionId: 'ds-credit-risk-v1' | 'ds-sms-spam-v1';
+  includeAuc: boolean;
+  primaryMetric: 'f1' | 'recall';
+  scenarioId: 'pg-credit-risk' | 'pg-spam-detection';
 }
 
 interface DecisionTreeConfig {
@@ -76,6 +90,14 @@ interface RandomForestConfig {
   seed: number;
   trainRatio: number;
   trees: number;
+}
+
+interface SvmConfig {
+  c: number;
+  gamma: 'scale';
+  kernel: 'rbf';
+  seed: number;
+  trainRatio: number;
 }
 
 interface KMeansConfig {
@@ -221,20 +243,27 @@ export function createLassoRegressionAdapter(): AlgorithmAdapter {
   };
 }
 
-export function createNaiveBayesAdapter(): AlgorithmAdapter {
+export function createNaiveBayesAdapter(
+  definition: NaiveBayesAdapterDefinition = {
+    configField: 'alpha',
+    datasetVersionId: 'ds-sms-spam-v1',
+    primaryMetric: 'f1',
+    scenarioId: 'pg-spam-detection',
+  },
+): AlgorithmAdapter {
   return {
     adapterVersion: 'naive-bayes-js-v1',
     algorithmId: 'naive-bayes',
     configSchemaVersion: 1,
-    datasetVersionId: 'ds-sms-spam-v1',
-    scenarioId: 'pg-spam-detection',
+    datasetVersionId: definition.datasetVersionId,
+    scenarioId: definition.scenarioId,
     validateConfig(config) {
-      return validateNaiveBayesConfig(config) as unknown as MlConfig;
+      return validateNaiveBayesConfig(config, definition) as unknown as MlConfig;
     },
     async run(request, options) {
-      const config = validateNaiveBayesConfig(request.config);
+      const config = validateNaiveBayesConfig(request.config, definition);
 
-      return runSpamNaiveBayes(request, config, options);
+      return runNaiveBayes(request, config, options, definition);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -242,20 +271,27 @@ export function createNaiveBayesAdapter(): AlgorithmAdapter {
   };
 }
 
-export function createLogisticRegressionAdapter(): AlgorithmAdapter {
+export function createLogisticRegressionAdapter(
+  definition: LogisticRegressionAdapterDefinition = {
+    datasetVersionId: 'ds-sms-spam-v1',
+    includeAuc: false,
+    primaryMetric: 'f1',
+    scenarioId: 'pg-spam-detection',
+  },
+): AlgorithmAdapter {
   return {
     adapterVersion: 'logistic-regression-js-v1',
     algorithmId: 'logistic-regression',
     configSchemaVersion: 1,
-    datasetVersionId: 'ds-sms-spam-v1',
-    scenarioId: 'pg-spam-detection',
+    datasetVersionId: definition.datasetVersionId,
+    scenarioId: definition.scenarioId,
     validateConfig(config) {
       return validateLogisticRegressionConfig(config) as unknown as MlConfig;
     },
     async run(request, options) {
       const config = validateLogisticRegressionConfig(request.config);
 
-      return runLogisticRegression(request, config, options);
+      return runLogisticRegression(request, config, options, definition);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -319,6 +355,27 @@ export function createRandomForestAdapter(): AlgorithmAdapter {
       const config = validateRandomForestConfig(request.config);
 
       return runRandomForest(request, config, options);
+    },
+    isCancelledError(error): error is { runId: string } {
+      return error instanceof PlaygroundReferenceAdapterCancelledError;
+    },
+  };
+}
+
+export function createSvmAdapter(): AlgorithmAdapter {
+  return {
+    adapterVersion: 'svm-js-v1',
+    algorithmId: 'svm',
+    configSchemaVersion: 1,
+    datasetVersionId: 'ds-credit-risk-v1',
+    scenarioId: 'pg-credit-risk',
+    validateConfig(config) {
+      return validateSvmConfig(config) as unknown as MlConfig;
+    },
+    async run(request, options) {
+      const config = validateSvmConfig(request.config);
+
+      return runSvm(request, config, options);
     },
     isCancelledError(error): error is { runId: string } {
       return error instanceof PlaygroundReferenceAdapterCancelledError;
@@ -746,56 +803,88 @@ function validateLassoRegressionConfig(config: MlConfig): LassoRegressionConfig 
   };
 }
 
-async function runSpamNaiveBayes(
+async function runNaiveBayes(
   request: MlRunRequest,
   config: NaiveBayesConfig,
   options: AlgorithmAdapterRunOptions,
+  definition: NaiveBayesAdapterDefinition,
 ): Promise<MlRunResult> {
   throwIfCancelled(request.runId, options);
 
-  const dataset = getPlaygroundDataset('ds-sms-spam-v1');
+  const dataset = getPlaygroundDataset(definition.datasetVersionId);
   const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
   const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
   const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
-  const statistics = calculateNaiveBayesStatistics(trainRows, config.alpha);
+  const statistics = calculateNaiveBayesStatistics(trainRows, config.smoothing);
   const actualLabels = testRows.map((row) => row.label);
   const predictedLabels = testRows.map((row) => predictNaiveBayesLabel(row.features, statistics));
-  const metrics = calculateBinaryClassificationMetrics(actualLabels, predictedLabels);
-  const confusionMatrix = calculateConfusionMatrix(actualLabels, predictedLabels);
+  const binaryMetrics =
+    definition.primaryMetric === 'f1'
+      ? calculateBinaryClassificationMetrics(actualLabels, predictedLabels)
+      : null;
+  const multiclassMetrics = calculateMulticlassClassificationMetrics(actualLabels, predictedLabels);
+  const metricValue =
+    definition.primaryMetric === 'macro-f1' ? multiclassMetrics.macroF1 : (binaryMetrics?.f1 ?? 0);
 
   options.onProgress({
     runId: request.runId,
     iteration: 1,
     totalIterations: 1,
-    metric: { id: 'f1', value: metrics.f1 },
+    metric: { id: definition.primaryMetric, value: metricValue },
   });
   await yieldToWorkerQueue();
   throwIfCancelled(request.runId, options);
 
   return {
     runId: request.runId,
-    scenarioId: 'pg-spam-detection',
+    scenarioId: definition.scenarioId,
     algorithmId: 'naive-bayes',
-    datasetVersionId: 'ds-sms-spam-v1',
+    datasetVersionId: definition.datasetVersionId,
     determinism: 'exact',
-    feedback: hasClassImbalance(trainRows) ? ['imbalance'] : [],
-    metrics,
+    feedback:
+      definition.primaryMetric === 'macro-f1'
+        ? multiclassMetrics.macroF1 < 0.7
+          ? ['class-overlap']
+          : []
+        : hasClassImbalance(trainRows)
+          ? ['imbalance']
+          : [],
+    metrics:
+      definition.primaryMetric === 'macro-f1'
+        ? { 'macro-f1': multiclassMetrics.macroF1, accuracy: multiclassMetrics.accuracy }
+        : (binaryMetrics ?? { f1: 0, precision: 0, recall: 0 }),
     chartSummary: {
       kind: 'confusion-matrix',
-      ...confusionMatrix,
+      ...(definition.primaryMetric === 'macro-f1'
+        ? calculateMulticlassConfusionMatrix(actualLabels, predictedLabels)
+        : calculateConfusionMatrix(actualLabels, predictedLabels)),
     },
     textAlternative: {
-      en: `Naive Bayes reaches F1 ${metrics.f1} on the synthetic SMS test split.`,
-      vi: `Naive Bayes đạt F1 ${metrics.f1} trên tập kiểm tra SMS tổng hợp.`,
+      en:
+        definition.primaryMetric === 'macro-f1'
+          ? `Naive Bayes reaches macro-F1 ${multiclassMetrics.macroF1} on the synthetic wine test split.`
+          : `Naive Bayes reaches F1 ${binaryMetrics?.f1 ?? 0} on the synthetic SMS test split.`,
+      vi:
+        definition.primaryMetric === 'macro-f1'
+          ? `Naive Bayes dat macro-F1 ${multiclassMetrics.macroF1} tren tap kiem tra wine tong hop.`
+          : `Naive Bayes đạt F1 ${binaryMetrics?.f1 ?? 0} trên tập kiểm tra SMS tổng hợp.`,
     },
   };
 }
 
-function validateNaiveBayesConfig(config: MlConfig): NaiveBayesConfig {
-  assertAllowedFields(config, ['alpha', 'seed', 'trainRatio']);
+function validateNaiveBayesConfig(
+  config: MlConfig,
+  definition: NaiveBayesAdapterDefinition,
+): NaiveBayesConfig {
+  assertAllowedFields(config, [definition.configField, 'seed', 'trainRatio']);
 
   return {
-    alpha: readNumberInRange(config, 'alpha', 0.0001, 100),
+    smoothing: readNumberInRange(
+      config,
+      definition.configField,
+      definition.configField === 'alpha' ? 0.0001 : 0.000000000001,
+      definition.configField === 'alpha' ? 100 : 1,
+    ),
     trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
   };
@@ -805,10 +894,11 @@ async function runLogisticRegression(
   request: MlRunRequest,
   config: LogisticRegressionConfig,
   options: AlgorithmAdapterRunOptions,
+  definition: LogisticRegressionAdapterDefinition,
 ): Promise<MlRunResult> {
   throwIfCancelled(request.runId, options);
 
-  const dataset = getPlaygroundDataset('ds-sms-spam-v1');
+  const dataset = getPlaygroundDataset(definition.datasetVersionId);
   const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
   const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
   const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
@@ -855,24 +945,37 @@ async function runLogisticRegression(
     return sigmoid(predictLinear(features, weights) + bias) >= config.threshold ? 1 : 0;
   });
   const metrics = calculateBinaryClassificationMetrics(actualLabels, predictedLabels);
+  const scores = testRows.map((row) => {
+    const features = createScaledFeatures(row, scaler);
+
+    return sigmoid(predictLinear(features, weights) + bias);
+  });
+  const auc = calculateBinaryAuc(actualLabels, scores);
   const confusionMatrix = calculateConfusionMatrix(actualLabels, predictedLabels);
+  const primaryValue = definition.primaryMetric === 'recall' ? metrics.recall : metrics.f1;
+  const primaryMetricName = definition.primaryMetric === 'recall' ? 'recall' : 'F1';
 
   return {
     runId: request.runId,
-    scenarioId: 'pg-spam-detection',
+    scenarioId: definition.scenarioId,
     algorithmId: 'logistic-regression',
-    datasetVersionId: 'ds-sms-spam-v1',
+    datasetVersionId: definition.datasetVersionId,
     determinism: 'exact',
     feedback: hasClassImbalance(trainRows) ? ['imbalance'] : [],
-    metrics,
+    metrics: definition.includeAuc ? { ...metrics, auc } : metrics,
     lossCurve,
     chartSummary: {
       kind: 'confusion-matrix',
       ...confusionMatrix,
     },
     textAlternative: {
-      en: `Logistic regression reaches F1 ${metrics.f1} on the synthetic SMS test split.`,
-      vi: `Hồi quy logistic đạt F1 ${metrics.f1} trên tập kiểm tra SMS tổng hợp.`,
+      en: `Logistic regression reaches ${primaryMetricName} ${primaryValue} on the synthetic ${
+        definition.scenarioId === 'pg-credit-risk' ? 'credit-risk' : 'SMS'
+      } test split.`,
+      vi:
+        definition.scenarioId === 'pg-spam-detection'
+          ? `Hồi quy logistic đạt F1 ${metrics.f1} trên tập kiểm tra SMS tổng hợp.`
+          : `Logistic regression dat recall ${metrics.recall} tren tap kiem tra rui ro tin dung tong hop.`,
     },
   };
 }
@@ -1142,6 +1245,204 @@ function validateRandomForestConfig(config: MlConfig): RandomForestConfig {
     trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
     seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
   };
+}
+
+async function runSvm(
+  request: MlRunRequest,
+  config: SvmConfig,
+  options: AlgorithmAdapterRunOptions,
+): Promise<MlRunResult> {
+  throwIfCancelled(request.runId, options);
+
+  const dataset = getPlaygroundDataset('ds-credit-risk-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainRows = requireLabeledRows(split.trainRows, dataset.datasetVersionId);
+  const testRows = requireLabeledRows(split.testRows, dataset.datasetVersionId);
+  const scaler = fitStandardScaler(trainRows);
+  const trainFeatures = trainRows.map((row) => createScaledFeatures(row, scaler));
+  const trainLabels = trainRows.map((row) => (row.label === 1 ? 1 : -1));
+  const gamma = 1 / Math.max(1, dataset.featureColumns.length);
+  const alphas = Array(trainRows.length).fill(0) as number[];
+  let bias = 0;
+  let stablePasses = 0;
+  const maximumPasses = 40;
+
+  for (let pass = 0; pass < maximumPasses && stablePasses < 5; pass += 1) {
+    throwIfCancelled(request.runId, options);
+    let changes = 0;
+
+    for (let leftIndex = 0; leftIndex < trainRows.length; leftIndex += 1) {
+      const rightIndex = (leftIndex + pass + 1) % trainRows.length;
+
+      if (leftIndex === rightIndex) {
+        continue;
+      }
+
+      const leftLabel = trainLabels[leftIndex] ?? -1;
+      const rightLabel = trainLabels[rightIndex] ?? -1;
+      const leftAlpha = alphas[leftIndex] ?? 0;
+      const rightAlpha = alphas[rightIndex] ?? 0;
+      const leftFeatures = trainFeatures[leftIndex] ?? [];
+      const rightFeatures = trainFeatures[rightIndex] ?? [];
+      const leftError =
+        svmDecision(trainFeatures, trainLabels, alphas, bias, gamma, leftFeatures) - leftLabel;
+
+      if (!(
+        (leftLabel * leftError < -0.001 && leftAlpha < config.c - 0.000001) ||
+        (leftLabel * leftError > 0.001 && leftAlpha > 0.000001)
+      )) {
+        continue;
+      }
+
+      const rightError =
+        svmDecision(trainFeatures, trainLabels, alphas, bias, gamma, rightFeatures) - rightLabel;
+      const [lowerBound, upperBound] = getSvmAlphaBounds(
+        leftLabel,
+        rightLabel,
+        leftAlpha,
+        rightAlpha,
+        config.c,
+      );
+
+      if (lowerBound === upperBound) {
+        continue;
+      }
+
+      const leftKernel = rbfKernel(leftFeatures, leftFeatures, gamma);
+      const rightKernel = rbfKernel(rightFeatures, rightFeatures, gamma);
+      const crossKernel = rbfKernel(leftFeatures, rightFeatures, gamma);
+      const eta = 2 * crossKernel - leftKernel - rightKernel;
+
+      if (eta >= -0.000000000001) {
+        continue;
+      }
+
+      const nextRightAlpha = clamp(
+        rightAlpha - (rightLabel * (leftError - rightError)) / eta,
+        lowerBound,
+        upperBound,
+      );
+
+      if (Math.abs(nextRightAlpha - rightAlpha) < 0.000001) {
+        continue;
+      }
+
+      const nextLeftAlpha = leftAlpha + leftLabel * rightLabel * (rightAlpha - nextRightAlpha);
+      const firstBias =
+        bias -
+        leftError -
+        leftLabel * (nextLeftAlpha - leftAlpha) * leftKernel -
+        rightLabel * (nextRightAlpha - rightAlpha) * crossKernel;
+      const secondBias =
+        bias -
+        rightError -
+        leftLabel * (nextLeftAlpha - leftAlpha) * crossKernel -
+        rightLabel * (nextRightAlpha - rightAlpha) * rightKernel;
+
+      alphas[leftIndex] = nextLeftAlpha;
+      alphas[rightIndex] = nextRightAlpha;
+      bias =
+        nextLeftAlpha > 0.000001 && nextLeftAlpha < config.c - 0.000001
+          ? firstBias
+          : nextRightAlpha > 0.000001 && nextRightAlpha < config.c - 0.000001
+            ? secondBias
+            : (firstBias + secondBias) / 2;
+      changes += 1;
+    }
+
+    stablePasses = changes === 0 ? stablePasses + 1 : 0;
+    options.onProgress({
+      runId: request.runId,
+      iteration: pass + 1,
+      totalIterations: maximumPasses,
+    });
+    await yieldToWorkerQueue();
+  }
+
+  throwIfCancelled(request.runId, options);
+
+  const scores = testRows.map((row) =>
+    svmDecision(trainFeatures, trainLabels, alphas, bias, gamma, createScaledFeatures(row, scaler)),
+  );
+  const predictedLabels = scores.map((score) => (score >= 0 ? 1 : 0));
+  const actualLabels = testRows.map((row) => row.label);
+  const metrics = calculateBinaryClassificationMetrics(actualLabels, predictedLabels);
+  const confusionMatrix = calculateConfusionMatrix(actualLabels, predictedLabels);
+  const meanMargin = mean(scores.map((score) => Math.abs(score)));
+
+  return {
+    runId: request.runId,
+    scenarioId: 'pg-credit-risk',
+    algorithmId: 'svm',
+    datasetVersionId: 'ds-credit-risk-v1',
+    determinism: 'exact',
+    feedback: hasClassImbalance(trainRows) ? ['imbalance'] : meanMargin < 0.2 ? ['margin'] : [],
+    metrics: {
+      recall: metrics.recall,
+      f1: metrics.f1,
+      precision: metrics.precision,
+    },
+    chartSummary: {
+      kind: 'confusion-matrix',
+      gamma: roundMetric(gamma),
+      supportVectorCount: alphas.filter((alpha) => alpha > 0.000001).length,
+      ...confusionMatrix,
+    },
+    textAlternative: {
+      en: `RBF SVM reaches recall ${metrics.recall} on the synthetic credit-risk test split.`,
+      vi: `RBF SVM dat recall ${metrics.recall} tren tap kiem tra rui ro tin dung tong hop.`,
+    },
+  };
+}
+
+function validateSvmConfig(config: MlConfig): SvmConfig {
+  assertAllowedFields(config, ['c', 'gamma', 'kernel', 'seed', 'trainRatio']);
+
+  return {
+    kernel: readEnum(config, 'kernel', ['rbf']),
+    c: readNumberInRange(config, 'c', 0.001, 100),
+    gamma: readEnum(config, 'gamma', ['scale']),
+    trainRatio: readNumberInRange(config, 'trainRatio', 0.5, 0.9),
+    seed: readIntegerInRange(config, 'seed', 0, 1_000_000),
+  };
+}
+
+function svmDecision(
+  trainFeatures: readonly (readonly number[])[],
+  trainLabels: readonly number[],
+  alphas: readonly number[],
+  bias: number,
+  gamma: number,
+  features: readonly number[],
+): number {
+  return (
+    trainFeatures.reduce((total, supportFeatures, index) => {
+      const alpha = alphas[index] ?? 0;
+      const label = trainLabels[index] ?? -1;
+
+      return total + alpha * label * rbfKernel(supportFeatures, features, gamma);
+    }, 0) + bias
+  );
+}
+
+function rbfKernel(left: readonly number[], right: readonly number[], gamma: number): number {
+  return Math.exp(-gamma * distanceSquared(left, right));
+}
+
+function getSvmAlphaBounds(
+  leftLabel: number,
+  rightLabel: number,
+  leftAlpha: number,
+  rightAlpha: number,
+  c: number,
+): readonly [number, number] {
+  return leftLabel === rightLabel
+    ? [Math.max(0, leftAlpha + rightAlpha - c), Math.min(c, leftAlpha + rightAlpha)]
+    : [Math.max(0, rightAlpha - leftAlpha), Math.min(c, c + rightAlpha - leftAlpha)];
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 async function runKMeans(
@@ -1781,6 +2082,58 @@ function calculateBinaryClassificationMetrics(
     precision: roundMetric(precision),
     recall: roundMetric(recall),
   };
+}
+
+function calculateMulticlassClassificationMetrics(
+  actualLabels: readonly number[],
+  predictedLabels: readonly number[],
+): { accuracy: number; macroF1: number } {
+  const labels = [...new Set([...actualLabels, ...predictedLabels])].sort(
+    (left, right) => left - right,
+  );
+  const macroF1 = mean(
+    labels.map((label) => {
+      const truePositive = actualLabels.filter(
+        (actualLabel, index) => actualLabel === label && predictedLabels[index] === label,
+      ).length;
+      const falsePositive = actualLabels.filter(
+        (actualLabel, index) => actualLabel !== label && predictedLabels[index] === label,
+      ).length;
+      const falseNegative = actualLabels.filter(
+        (actualLabel, index) => actualLabel === label && predictedLabels[index] !== label,
+      ).length;
+      const precision =
+        truePositive + falsePositive === 0 ? 0 : truePositive / (truePositive + falsePositive);
+      const recall =
+        truePositive + falseNegative === 0 ? 0 : truePositive / (truePositive + falseNegative);
+
+      return precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+    }),
+  );
+
+  return {
+    accuracy: roundMetric(calculateAccuracy(actualLabels, predictedLabels)),
+    macroF1: roundMetric(macroF1),
+  };
+}
+
+function calculateMulticlassConfusionMatrix(
+  actualLabels: readonly number[],
+  predictedLabels: readonly number[],
+): { labels: readonly number[]; matrix: readonly (readonly number[])[] } {
+  const labels = [...new Set([...actualLabels, ...predictedLabels])].sort(
+    (left, right) => left - right,
+  );
+  const matrix = labels.map((actualLabel) =>
+    labels.map(
+      (predictedLabel) =>
+        actualLabels.filter(
+          (value, index) => value === actualLabel && predictedLabels[index] === predictedLabel,
+        ).length,
+    ),
+  );
+
+  return { labels, matrix };
 }
 
 function calculateBinaryAuc(actualLabels: readonly number[], scores: readonly number[]): number {

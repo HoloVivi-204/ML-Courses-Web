@@ -366,6 +366,7 @@ function normalizeMetricValue(value: unknown, metricId: string): PlaygroundMetri
       'auc',
       'explained-variance',
       'f1',
+      'macro-f1',
       'precision',
       'recall',
       'testAccuracy',
