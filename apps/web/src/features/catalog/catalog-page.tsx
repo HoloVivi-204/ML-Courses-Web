@@ -143,9 +143,11 @@ export function CoursePage({ locale }: LocaleProps) {
                         <Clock3 aria-hidden="true" size={15} />
                         {t('course.minuteCount', { count: module.durationMinutes })}
                       </span>
-                      <span>
-                        POST <code>{module.postId}</code>
-                      </span>
+                      {module.postIds.map((postId) => (
+                        <span key={postId}>
+                          POST <code>{postId}</code>
+                        </span>
+                      ))}
                       {module.demoId ? (
                         <span>
                           DEMO <code>{module.demoId}</code>

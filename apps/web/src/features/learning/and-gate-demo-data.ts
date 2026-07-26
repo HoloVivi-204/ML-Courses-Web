@@ -1,4 +1,4 @@
-import type { LocalizedText } from '../catalog/course-data';
+import { courses, type CourseModule, type LocalizedText } from '../catalog/course-data';
 
 export interface DemoStep {
   id: string;
@@ -97,6 +97,118 @@ export const andGateDemo: FixedDemoManifest = {
   ],
 };
 
+const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
+  'demo-linear-calibration': 'problem-demo-linear-calibration',
+  'demo-regularization-noisy-signal': 'problem-demo-regularization-noisy-signal',
+  'demo-logistic-admission': 'problem-demo-logistic-admission',
+  'demo-neighbor-flower': 'problem-demo-neighbor-flower',
+  'demo-tree-forest-habitat': 'problem-demo-tree-forest-habitat',
+  'demo-svm-margin': 'problem-demo-svm-margin',
+  'demo-stellar-clusters': 'problem-demo-stellar-clusters',
+  'demo-pca-sensor-compression': 'problem-demo-pca-sensor-compression',
+  'demo-mlp-checkerboard': 'problem-demo-mlp-checkerboard',
+};
+
+function createGenericDemo(input: {
+  courseId: string;
+  demoId: string;
+  module: CourseModule;
+}): FixedDemoManifest {
+  const algorithmId = input.module.unlockAlgorithmIds[0] ?? 'learning-review';
+  const problemId = demoProblemIdByDemoId[input.demoId] ?? `problem-${input.demoId}`;
+  const stepIds = ['problem', 'data', 'decision', 'result'] as const;
+
+  return {
+    algorithmId,
+    courseId: input.courseId,
+    demoId: input.demoId,
+    moduleId: input.module.id,
+    problemId,
+    requiredStepIds: stepIds,
+    revisionId: `${input.demoId}-rev-r1`,
+    seed: 42,
+    steps: [
+      {
+        id: 'problem',
+        narration: {
+          en: `Define the fixed task for ${input.module.title.en}.`,
+          vi: `Xác định nhiệm vụ cố định cho ${input.module.title.vi}.`,
+        },
+        required: true,
+        textAlternative: {
+          en: `A fixed problem card for ${problemId}.`,
+          vi: `Một thẻ bài toán cố định cho ${problemId}.`,
+        },
+        title: {
+          en: 'Define the task',
+          vi: 'Xác định nhiệm vụ',
+        },
+      },
+      {
+        id: 'data',
+        narration: {
+          en: 'Inspect the fixed input signal before reading the model result.',
+          vi: 'Quan sát tín hiệu đầu vào cố định trước khi đọc kết quả mô hình.',
+        },
+        required: true,
+        textAlternative: {
+          en: 'A small static data summary is shown; no live training controls are present.',
+          vi: 'Một tóm tắt dữ liệu tĩnh được hiển thị; không có điều khiển train live.',
+        },
+        title: {
+          en: 'Inspect fixed data',
+          vi: 'Quan sát dữ liệu cố định',
+        },
+      },
+      {
+        id: 'decision',
+        narration: {
+          en: `Read how ${algorithmId} turns the signal into a model decision.`,
+          vi: `Đọc cách ${algorithmId} biến tín hiệu thành quyết định mô hình.`,
+        },
+        required: true,
+        textAlternative: {
+          en: 'The decision step highlights the model output and its metric.',
+          vi: 'Bước quyết định làm nổi bật đầu ra mô hình và metric.',
+        },
+        title: {
+          en: 'Read the decision',
+          vi: 'Đọc quyết định',
+        },
+      },
+      {
+        id: 'result',
+        narration: {
+          en: 'Confirm the fixed result before the module quiz opens.',
+          vi: 'Xác nhận kết quả cố định trước khi quiz module mở.',
+        },
+        required: true,
+        textAlternative: {
+          en: 'The final frame summarises the metric and the limitation to remember.',
+          vi: 'Frame cuối tóm tắt metric và giới hạn cần nhớ.',
+        },
+        title: {
+          en: 'Confirm the result',
+          vi: 'Xác nhận kết quả',
+        },
+      },
+    ],
+  };
+}
+
+const generatedDemos = courses.flatMap((course) =>
+  (course.modules ?? [])
+    .filter((module) => module.demoId !== null && module.demoId !== andGateDemo.demoId)
+    .map((module) =>
+      createGenericDemo({
+        courseId: course.id,
+        demoId: module.demoId!,
+        module,
+      }),
+    ),
+);
+const fixedDemos = [andGateDemo, ...generatedDemos] as const;
+
 export function getFixedDemo(demoId: string | undefined) {
-  return demoId === andGateDemo.demoId ? andGateDemo : undefined;
+  return fixedDemos.find((demo) => demo.demoId === demoId);
 }

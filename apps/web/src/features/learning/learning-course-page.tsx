@@ -188,24 +188,55 @@ function VerifiedProgressPanel({
               </li>
             ))}
           </ul>
-          {unlockedAlgorithms.some((unlock) => unlock.algorithmId === 'perceptron') ? (
-            <Link className="module-trial-link" to="/playground/pg-xor">
-              {t('learning.progress.openPlayground')}
-              <ArrowRight aria-hidden="true" size={17} />
-            </Link>
-          ) : null}
+          {unlockedAlgorithms
+            .map((unlock) => ({
+              algorithmId: unlock.algorithmId,
+              playgroundPath: getPlaygroundPathForAlgorithm(unlock.algorithmId),
+            }))
+            .filter((unlock) => unlock.playgroundPath !== null)
+            .map((unlock) => (
+              <Link
+                className="module-trial-link"
+                key={unlock.algorithmId}
+                to={unlock.playgroundPath!}
+              >
+                {t('learning.progress.openPlayground')}: {formatAlgorithmName(unlock.algorithmId)}
+                <ArrowRight aria-hidden="true" size={17} />
+              </Link>
+            ))}
         </>
       ) : null}
     </section>
   );
 }
 
-function formatAlgorithmName(algorithmId: string): string {
-  if (algorithmId === 'perceptron') {
-    return 'Perceptron';
-  }
+function getPlaygroundPathForAlgorithm(algorithmId: string): string | null {
+  const scenarioIdByAlgorithmId: Readonly<Record<string, string>> = {
+    'decision-tree': 'pg-credit-risk',
+    kmeans: 'pg-retail-segments',
+    'linear-regression': 'pg-house-price',
+    'logistic-regression': 'pg-spam-detection',
+    mlp: 'pg-xor',
+    pca: 'pg-country-indicators',
+    perceptron: 'pg-xor',
+  };
+  const scenarioId = scenarioIdByAlgorithmId[algorithmId];
 
-  return algorithmId;
+  return scenarioId ? `/playground/${scenarioId}` : null;
+}
+
+function formatAlgorithmName(algorithmId: string): string {
+  const displayNames: Readonly<Record<string, string>> = {
+    'decision-tree': 'Decision Tree',
+    kmeans: 'K-Means',
+    'linear-regression': 'Linear Regression',
+    'logistic-regression': 'Logistic Regression',
+    mlp: 'MLP',
+    pca: 'PCA',
+    perceptron: 'Perceptron',
+  };
+
+  return displayNames[algorithmId] ?? algorithmId;
 }
 
 function formatQuizAttemptCount(attemptCount: number, resolvedLanguage: string | undefined) {

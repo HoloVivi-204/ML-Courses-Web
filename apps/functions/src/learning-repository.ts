@@ -11,6 +11,14 @@ import {
   type QuizAnswer,
   type StoredQuestionWrongCounts,
 } from './quiz-manifest.js';
+import {
+  getNextReleaseModule,
+  getReleaseCourse,
+  getReleaseLearningCatalog,
+  getReleaseModule,
+  getReleaseModuleByQuizId,
+  type ReleaseLearningModule,
+} from './release-learning-catalog.js';
 
 export type LearnerLocalePreference = 'en' | 'vi';
 export type LearnerThemePreference = 'dark' | 'light' | 'system';
@@ -164,7 +172,7 @@ interface ModuleCompletionSeed {
 interface DemoAccessSeed {
   demoId: string;
   moduleId: string;
-  postId: string;
+  requiredPostIds: readonly string[];
 }
 
 interface LearnerProfilePayload {
@@ -248,60 +256,81 @@ const LEARNER_ACCOUNT_SUBCOLLECTIONS = [
   'quizAttempts',
   'quizProgress',
 ] as const;
-const releaseOneEnrollmentSeeds: Readonly<Record<string, EnrollmentSeed>> = {
-  'course-deep-learning-basic': {
-    courseId: 'course-deep-learning-basic',
-    courseRevisionId: 'course-deep-learning-basic-rev-r1',
-    firstModuleId: 'dl-m01-neuron-perceptron',
-    firstPostId: 'dl-p01-neuron-perceptron',
-    nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
-  },
-};
-const releaseOneModuleCompletionSeeds: readonly ModuleCompletionSeed[] = [
-  {
-    courseId: 'course-deep-learning-basic',
-    moduleId: 'dl-m01-neuron-perceptron',
-    moduleRevisionId: 'dl-m01-neuron-perceptron-rev-r1',
-    moduleQuizId: 'quiz-module-dl-m01',
-    nextModuleId: 'dl-m02-mlp',
-    nextPostId: 'dl-p02-mlp-forward-activation',
-    requiredModuleCount: 3,
-    requiredPostIds: ['dl-p01-neuron-perceptron'],
-    unlockAlgorithmIds: ['perceptron'],
-  },
-];
-const releaseOneDemoAccessSeeds: readonly DemoAccessSeed[] = [
-  {
-    demoId: 'demo-perceptron-and-gate',
-    moduleId: 'dl-m01-neuron-perceptron',
-    postId: 'dl-p01-neuron-perceptron',
-  },
-];
-
 function getEnrollmentSeed(courseId: string): EnrollmentSeed {
-  const seed = releaseOneEnrollmentSeeds[courseId];
+  const course = getReleaseCourse(courseId);
+  const firstModule = course?.modules[0];
+  const firstPost = firstModule?.posts[0];
 
-  if (!seed) {
+  if (!course || !firstModule || !firstPost) {
     throw new ApiError(404, 'COURSE_NOT_FOUND', 'The requested course was not found.');
   }
 
-  return seed;
+  return {
+    courseId: course.courseId,
+    courseRevisionId: course.courseRevisionId,
+    firstModuleId: firstModule.moduleId,
+    firstPostId: firstPost.postId,
+    nextPath: `/learn/${course.courseId}/posts/${firstPost.postId}`,
+  };
+}
+
+function createModuleCompletionSeed(module: ReleaseLearningModule): ModuleCompletionSeed {
+  const course = getReleaseCourse(module.courseId);
+  const nextModule = getNextReleaseModule(module.moduleId);
+
+  return {
+    courseId: module.courseId,
+    moduleId: module.moduleId,
+    moduleRevisionId: `${module.moduleId}-rev-r1`,
+    moduleQuizId: module.moduleQuizId,
+    nextModuleId: nextModule?.moduleId ?? null,
+    nextPostId: nextModule?.posts[0]?.postId ?? null,
+    requiredModuleCount: course?.modules.length ?? 1,
+    requiredPostIds: module.posts.map((post) => post.postId),
+    unlockAlgorithmIds: module.unlockAlgorithmIds,
+  };
 }
 
 function getModuleCompletionSeedByModuleId(moduleId: string): ModuleCompletionSeed | null {
-  return releaseOneModuleCompletionSeeds.find((seed) => seed.moduleId === moduleId) ?? null;
+  const module = getReleaseModule(moduleId);
+
+  return module ? createModuleCompletionSeed(module) : null;
 }
 
 function getModuleCompletionSeedByQuizId(quizId: string): ModuleCompletionSeed | null {
-  return releaseOneModuleCompletionSeeds.find((seed) => seed.moduleQuizId === quizId) ?? null;
+  const module = getReleaseModuleByQuizId(quizId);
+
+  return module ? createModuleCompletionSeed(module) : null;
 }
 
 function getDemoAccessSeedByPostId(postId: string): DemoAccessSeed | null {
-  return releaseOneDemoAccessSeeds.find((seed) => seed.postId === postId) ?? null;
+  for (const module of getReleaseLearningCatalog().courses.flatMap((course) => course.modules)) {
+    const lastPostId = module.posts.at(-1)?.postId;
+
+    if (module.demoId && lastPostId === postId) {
+      return {
+        demoId: module.demoId,
+        moduleId: module.moduleId,
+        requiredPostIds: module.posts.map((post) => post.postId),
+      };
+    }
+  }
+
+  return null;
 }
 
 function getDemoAccessSeedByDemoId(demoId: string): DemoAccessSeed | null {
-  return releaseOneDemoAccessSeeds.find((seed) => seed.demoId === demoId) ?? null;
+  for (const module of getReleaseLearningCatalog().courses.flatMap((course) => course.modules)) {
+    if (module.demoId === demoId) {
+      return {
+        demoId: module.demoId,
+        moduleId: module.moduleId,
+        requiredPostIds: module.posts.map((post) => post.postId),
+      };
+    }
+  }
+
+  return null;
 }
 
 function normalizeDisplayName(displayName: string): string {
@@ -577,101 +606,250 @@ function getRequiredPostCompletionIdsForModule(moduleId: string): readonly strin
   return getModuleCompletionSeedByModuleId(moduleId)?.requiredPostIds ?? [];
 }
 
-function createDeepLearningProgressSnapshot(input: {
-  algorithmUnlock: FirebaseFirestore.DocumentData | undefined;
-  contentAccess: ReadonlyArray<FirebaseFirestore.DocumentData | undefined>;
-  demoCompletion: FirebaseFirestore.DocumentData | undefined;
-  enrollment: FirebaseFirestore.DocumentData | undefined;
-  moduleCompletion: FirebaseFirestore.DocumentData | undefined;
-  moduleQuizProgress: FirebaseFirestore.DocumentData | undefined;
-  postCompletion: FirebaseFirestore.DocumentData | undefined;
-  postQuizProgress: FirebaseFirestore.DocumentData | undefined;
+function getNextPostIdInModule(moduleId: string, postId: string): string | null {
+  const module = getReleaseModule(moduleId);
+  const currentPostIndex = module?.posts.findIndex((post) => post.postId === postId) ?? -1;
+
+  if (!module || currentPostIndex < 0) {
+    return null;
+  }
+
+  return module.posts[currentPostIndex + 1]?.postId ?? null;
+}
+
+function areAllOtherRequiredPostsComplete(input: {
+  completedPostId: string;
+  requiredPostIds: readonly string[];
+  snapshots: readonly FirebaseFirestore.DocumentSnapshot[];
+}) {
+  const otherRequiredPostIds = input.requiredPostIds.filter(
+    (postId) => postId !== input.completedPostId,
+  );
+
+  return (
+    otherRequiredPostIds.length === input.snapshots.length &&
+    input.snapshots.every((snapshot) => snapshot.exists)
+  );
+}
+
+interface UserSubcollectionDocumentData {
+  data: FirebaseFirestore.DocumentData;
+  id: string;
+}
+
+async function listUserSubcollectionData(
+  firestore: Firestore,
+  uid: string,
+  collectionName: string,
+): Promise<UserSubcollectionDocumentData[]> {
+  const documentRefs = await firestore.collection(`users/${uid}/${collectionName}`).listDocuments();
+  const snapshots = await Promise.all(
+    documentRefs.map(async (reference) => ({
+      data: (await reference.get()).data(),
+      id: reference.path.split('/').pop() ?? reference.path,
+    })),
+  );
+
+  return snapshots.filter(
+    (snapshot): snapshot is UserSubcollectionDocumentData => snapshot.data !== undefined,
+  );
+}
+
+function toAlgorithmUnlockItem(data: FirebaseFirestore.DocumentData) {
+  if (typeof data.algorithmId !== 'string' || typeof data.moduleId !== 'string') {
+    return null;
+  }
+
+  return {
+    algorithmId: data.algorithmId,
+    moduleId: data.moduleId,
+  };
+}
+
+function toQuizProgressItem(id: string, data: FirebaseFirestore.DocumentData) {
+  try {
+    const manifest = getQuizManifest(id);
+
+    return {
+      attemptCount: getNumberField(data, 'attemptCount'),
+      bestScore: getNumberField(data, 'bestScore'),
+      passed: getBooleanField(data, 'passed'),
+      quizId: id,
+      quizKind: manifest.quizKind,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sortStableContentAccessItems(
+  items: readonly StableContentAccessItem[],
+): StableContentAccessItem[] {
+  const contentTypeOrder: Record<StableContentAccessItem['contentType'], number> = {
+    module: 0,
+    post: 1,
+    demo: 2,
+  };
+
+  return [...items].sort((leftItem, rightItem) => {
+    const typeOrder =
+      contentTypeOrder[leftItem.contentType] - contentTypeOrder[rightItem.contentType];
+
+    if (typeOrder !== 0) {
+      return typeOrder;
+    }
+
+    return leftItem.entityId.localeCompare(rightItem.entityId);
+  });
+}
+
+function createLearningProgressSnapshot(input: {
+  algorithmUnlocks: readonly UserSubcollectionDocumentData[];
+  contentAccess: readonly UserSubcollectionDocumentData[];
+  demoCompletions: readonly UserSubcollectionDocumentData[];
+  enrollments: readonly UserSubcollectionDocumentData[];
+  moduleCompletions: readonly UserSubcollectionDocumentData[];
+  postCompletions: readonly UserSubcollectionDocumentData[];
+  quizProgress: readonly UserSubcollectionDocumentData[];
 }): LearningProgressSnapshot {
-  const postQuizPassed = getBooleanField(input.postQuizProgress, 'passed');
-  const moduleQuizPassed = getBooleanField(input.moduleQuizProgress, 'passed');
-  const postCompleted = input.postCompletion !== undefined || postQuizPassed;
-  const demoCompleted = input.demoCompletion !== undefined;
-  const moduleCompleted =
-    input.moduleCompletion !== undefined || (postCompleted && demoCompleted && moduleQuizPassed);
-  const completedStepCount = [postCompleted, demoCompleted, moduleQuizPassed].filter(
-    Boolean,
-  ).length;
-  const moduleProgressPercent = Math.round((completedStepCount / 3) * 100);
-  const computedEnrollmentProgressPercent = moduleCompleted ? 33 : 0;
-  const storedEnrollmentStatus = getStatusField(input.enrollment);
-  const storedEnrollmentProgressPercent = getNumberField(input.enrollment, 'progressPercent');
+  const catalog = getReleaseLearningCatalog();
+  const courseOrder = new Map(
+    catalog.courses.map((course, index) => [course.courseId, index] as const),
+  );
+  const enrollmentItems = input.enrollments
+    .map((item) => ({
+      courseId: typeof item.data.courseId === 'string' ? item.data.courseId : item.id,
+      data: item.data,
+    }))
+    .sort(
+      (leftItem, rightItem) =>
+        (courseOrder.get(leftItem.courseId) ?? Number.MAX_SAFE_INTEGER) -
+        (courseOrder.get(rightItem.courseId) ?? Number.MAX_SAFE_INTEGER),
+    );
+  const selectedEnrollment = enrollmentItems[0];
+  const selectedCourseId = selectedEnrollment?.courseId ?? 'course-deep-learning-basic';
+  const selectedCourse = getReleaseCourse(selectedCourseId);
+  const contentAccess = sortStableContentAccessItems(
+    input.contentAccess
+      .map((item) => toStableContentAccessItem(item.data))
+      .filter((item): item is StableContentAccessItem => item !== null),
+  );
+  const contentAccessKeys = new Set(
+    contentAccess.map((item) => `${item.contentType}:${item.entityId}`),
+  );
+  const moduleCompletionIds = new Set(input.moduleCompletions.map((item) => item.id));
+  const postCompletionIds = new Set(input.postCompletions.map((item) => item.id));
+  const demoCompletionIds = new Set(input.demoCompletions.map((item) => item.id));
+  const quizProgressById = new Map(input.quizProgress.map((item) => [item.id, item.data]));
+  const visibleModules =
+    selectedCourse?.modules.filter((module) => {
+      const hasModuleProgress =
+        contentAccessKeys.has(`module:${module.moduleId}`) ||
+        moduleCompletionIds.has(module.moduleId) ||
+        quizProgressById.has(module.moduleQuizId);
+      const hasPostProgress = module.posts.some(
+        (post) =>
+          contentAccessKeys.has(`post:${post.postId}`) ||
+          postCompletionIds.has(post.postId) ||
+          quizProgressById.has(post.postQuizId),
+      );
+      const hasDemoProgress =
+        module.demoId !== null &&
+        (contentAccessKeys.has(`demo:${module.demoId}`) || demoCompletionIds.has(module.demoId));
+
+      return hasModuleProgress || hasPostProgress || hasDemoProgress;
+    }) ?? [];
+  const completedModuleCount = selectedCourse
+    ? selectedCourse.modules.filter((module) => moduleCompletionIds.has(module.moduleId)).length
+    : 0;
+  const computedEnrollmentProgressPercent =
+    selectedCourse && selectedCourse.modules.length > 0
+      ? Math.round((completedModuleCount / selectedCourse.modules.length) * 100)
+      : 0;
+  const storedEnrollmentProgressPercent = getNumberField(
+    selectedEnrollment?.data,
+    'progressPercent',
+  );
   const enrollmentProgressPercent = Math.max(
     storedEnrollmentProgressPercent,
     computedEnrollmentProgressPercent,
   );
 
   return {
-    algorithmUnlocks: input.algorithmUnlock
-      ? [
-          {
-            algorithmId:
-              typeof input.algorithmUnlock.algorithmId === 'string'
-                ? input.algorithmUnlock.algorithmId
-                : 'perceptron',
-            moduleId:
-              typeof input.algorithmUnlock.moduleId === 'string'
-                ? input.algorithmUnlock.moduleId
-                : 'dl-m01-neuron-perceptron',
-          },
-        ]
-      : [],
-    contentAccess: input.contentAccess
-      .filter((data): data is FirebaseFirestore.DocumentData => data !== undefined)
-      .map(toStableContentAccessItem)
-      .filter((item): item is StableContentAccessItem => item !== null),
-    demos: [
-      {
-        demoId: 'demo-perceptron-and-gate',
-        completed: demoCompleted,
-      },
-    ],
+    algorithmUnlocks: input.algorithmUnlocks
+      .map((item) => toAlgorithmUnlockItem(item.data))
+      .filter((item): item is LearningProgressSnapshot['algorithmUnlocks'][number] => item !== null)
+      .sort((leftItem, rightItem) => leftItem.algorithmId.localeCompare(rightItem.algorithmId)),
+    contentAccess,
+    demos: visibleModules
+      .filter((module) => module.demoId !== null)
+      .map((module) => ({
+        completed: module.demoId ? demoCompletionIds.has(module.demoId) : false,
+        demoId: module.demoId!,
+      })),
     enrollment: {
-      courseId: 'course-deep-learning-basic',
+      courseId: selectedCourseId,
       progressPercent: enrollmentProgressPercent,
       status:
         enrollmentProgressPercent >= 100
           ? 'completed'
-          : (storedEnrollmentStatus ?? (input.enrollment ? 'in-progress' : 'not-enrolled')),
+          : (getStatusField(selectedEnrollment?.data) ??
+            (selectedEnrollment ? 'in-progress' : 'not-enrolled')),
     },
-    modules: [
-      {
-        moduleId: 'dl-m01-neuron-perceptron',
+    modules: visibleModules.map((module) => {
+      const completedPostCount = module.posts.filter((post) => {
+        const quizProgress = quizProgressById.get(post.postQuizId);
+
+        return postCompletionIds.has(post.postId) || getBooleanField(quizProgress, 'passed');
+      }).length;
+      const demoCompleted = module.demoId ? demoCompletionIds.has(module.demoId) : false;
+      const moduleQuizProgress = quizProgressById.get(module.moduleQuizId);
+      const moduleQuizPassed = getBooleanField(moduleQuizProgress, 'passed');
+      const requiredStepCount = module.posts.length + (module.demoId ? 1 : 0) + 1;
+      const completedStepCount =
+        completedPostCount + (demoCompleted ? 1 : 0) + (moduleQuizPassed ? 1 : 0);
+      const moduleCompleted =
+        moduleCompletionIds.has(module.moduleId) || completedStepCount >= requiredStepCount;
+
+      return {
         completedStepCount,
-        progressPercent: moduleCompleted ? 100 : moduleProgressPercent,
-        requiredStepCount: 3,
-        status: moduleCompleted ? 'completed' : input.enrollment ? 'in-progress' : 'locked',
-      },
-    ],
-    posts: [
-      {
-        postId: 'dl-p01-neuron-perceptron',
-        quizId: 'quiz-post-dl-p01',
-        completed: postCompleted,
-        quizPassed: postQuizPassed,
-        bestScore: getNumberField(input.postQuizProgress, 'bestScore'),
-      },
-    ],
-    quizzes: [
-      {
-        quizId: 'quiz-post-dl-p01',
-        quizKind: 'post',
-        attemptCount: getNumberField(input.postQuizProgress, 'attemptCount'),
-        bestScore: getNumberField(input.postQuizProgress, 'bestScore'),
-        passed: postQuizPassed,
-      },
-      {
-        quizId: 'quiz-module-dl-m01',
-        quizKind: 'module',
-        attemptCount: getNumberField(input.moduleQuizProgress, 'attemptCount'),
-        bestScore: getNumberField(input.moduleQuizProgress, 'bestScore'),
-        passed: moduleQuizPassed,
-      },
-    ],
+        moduleId: module.moduleId,
+        progressPercent: moduleCompleted
+          ? 100
+          : Math.round((completedStepCount / requiredStepCount) * 100),
+        requiredStepCount,
+        status: moduleCompleted
+          ? ('completed' as const)
+          : contentAccessKeys.has(`module:${module.moduleId}`)
+            ? ('in-progress' as const)
+            : ('locked' as const),
+      };
+    }),
+    posts: visibleModules.flatMap((module) =>
+      module.posts
+        .filter((post) => {
+          return (
+            contentAccessKeys.has(`post:${post.postId}`) ||
+            postCompletionIds.has(post.postId) ||
+            quizProgressById.has(post.postQuizId)
+          );
+        })
+        .map((post) => {
+          const quizProgress = quizProgressById.get(post.postQuizId);
+          const quizPassed = getBooleanField(quizProgress, 'passed');
+
+          return {
+            bestScore: getNumberField(quizProgress, 'bestScore'),
+            completed: postCompletionIds.has(post.postId) || quizPassed,
+            postId: post.postId,
+            quizId: post.postQuizId,
+            quizPassed,
+          };
+        }),
+    ),
+    quizzes: input.quizProgress
+      .map((item) => toQuizProgressItem(item.id, item.data))
+      .filter((item): item is LearningProgressSnapshot['quizzes'][number] => item !== null),
   };
 }
 
@@ -757,9 +935,10 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         const idempotencyRef = firestore.doc(
           `users/${input.uid}/idempotencyKeys/${input.idempotencyKey}`,
         );
-        const requiredPostCompletionRefs = demoAccessSeed
-          ? [firestore.doc(`users/${input.uid}/postCompletions/${demoAccessSeed.postId}`)]
-          : [];
+        const requiredPostCompletionRefs =
+          demoAccessSeed?.requiredPostIds.map((postId) =>
+            firestore.doc(`users/${input.uid}/postCompletions/${postId}`),
+          ) ?? [];
         const [accessSnapshot, idempotencySnapshot, ...requiredPostCompletionSnapshots] =
           await Promise.all([
             transaction.get(accessRef),
@@ -1045,50 +1224,33 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
     },
     async getProgress(input) {
       const [
-        enrollmentSnapshot,
-        moduleAccessSnapshot,
-        postAccessSnapshot,
-        demoAccessSnapshot,
-        nextModuleAccessSnapshot,
-        nextPostAccessSnapshot,
-        postCompletionSnapshot,
-        demoCompletionSnapshot,
-        moduleCompletionSnapshot,
-        postQuizProgressSnapshot,
-        moduleQuizProgressSnapshot,
-        algorithmUnlockSnapshot,
+        algorithmUnlocks,
+        contentAccess,
+        demoCompletions,
+        enrollments,
+        moduleCompletions,
+        postCompletions,
+        quizProgress,
       ] = await Promise.all([
-        firestore.doc(`users/${input.uid}/enrollments/course-deep-learning-basic`).get(),
-        firestore.doc(`users/${input.uid}/contentAccess/module_dl-m01-neuron-perceptron`).get(),
-        firestore.doc(`users/${input.uid}/contentAccess/post_dl-p01-neuron-perceptron`).get(),
-        firestore.doc(`users/${input.uid}/contentAccess/demo_demo-perceptron-and-gate`).get(),
-        firestore.doc(`users/${input.uid}/contentAccess/module_dl-m02-mlp`).get(),
-        firestore.doc(`users/${input.uid}/contentAccess/post_dl-p02-mlp-forward-activation`).get(),
-        firestore.doc(`users/${input.uid}/postCompletions/dl-p01-neuron-perceptron`).get(),
-        firestore.doc(`users/${input.uid}/demoCompletions/demo-perceptron-and-gate`).get(),
-        firestore.doc(`users/${input.uid}/moduleCompletions/dl-m01-neuron-perceptron`).get(),
-        firestore.doc(`users/${input.uid}/quizProgress/quiz-post-dl-p01`).get(),
-        firestore.doc(`users/${input.uid}/quizProgress/quiz-module-dl-m01`).get(),
-        firestore.doc(`users/${input.uid}/algorithmUnlocks/perceptron`).get(),
+        listUserSubcollectionData(firestore, input.uid, 'algorithmUnlocks'),
+        listUserSubcollectionData(firestore, input.uid, 'contentAccess'),
+        listUserSubcollectionData(firestore, input.uid, 'demoCompletions'),
+        listUserSubcollectionData(firestore, input.uid, 'enrollments'),
+        listUserSubcollectionData(firestore, input.uid, 'moduleCompletions'),
+        listUserSubcollectionData(firestore, input.uid, 'postCompletions'),
+        listUserSubcollectionData(firestore, input.uid, 'quizProgress'),
       ]);
 
       return {
         statusCode: 200 as const,
-        data: createDeepLearningProgressSnapshot({
-          algorithmUnlock: algorithmUnlockSnapshot.data(),
-          contentAccess: [
-            moduleAccessSnapshot.data(),
-            postAccessSnapshot.data(),
-            demoAccessSnapshot.data(),
-            nextModuleAccessSnapshot.data(),
-            nextPostAccessSnapshot.data(),
-          ],
-          demoCompletion: demoCompletionSnapshot.data(),
-          enrollment: enrollmentSnapshot.data(),
-          moduleCompletion: moduleCompletionSnapshot.data(),
-          moduleQuizProgress: moduleQuizProgressSnapshot.data(),
-          postCompletion: postCompletionSnapshot.data(),
-          postQuizProgress: postQuizProgressSnapshot.data(),
+        data: createLearningProgressSnapshot({
+          algorithmUnlocks,
+          contentAccess,
+          demoCompletions,
+          enrollments,
+          moduleCompletions,
+          postCompletions,
+          quizProgress,
         }),
       };
     },
@@ -1165,11 +1327,25 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
               firestore.doc(`users/${input.uid}/postCompletions/${postId}`),
             )
           : [];
+        const nextPostId =
+          manifest.quizKind === 'post' && manifest.postId
+            ? getNextPostIdInModule(manifest.moduleId, manifest.postId)
+            : null;
+        const postDemoAccessSeed =
+          manifest.quizKind === 'post' && manifest.postId
+            ? getDemoAccessSeedByPostId(manifest.postId)
+            : null;
+        const postDemoSiblingCompletionRefs =
+          postDemoAccessSeed && manifest.postId
+            ? postDemoAccessSeed.requiredPostIds
+                .filter((postId) => postId !== manifest.postId)
+                .map((postId) => firestore.doc(`users/${input.uid}/postCompletions/${postId}`))
+            : [];
         const [
           progressSnapshot,
           enrollmentSnapshot,
           moduleDemoCompletionSnapshot,
-          ...moduleRequiredPostCompletionSnapshots
+          ...completionSnapshots
         ] = await Promise.all([
           transaction.get(progressRef),
           enrollmentRef ? transaction.get(enrollmentRef) : Promise.resolve(null),
@@ -1177,7 +1353,15 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
             ? transaction.get(moduleDemoCompletionRef)
             : Promise.resolve(null),
           ...moduleRequiredPostCompletionRefs.map((reference) => transaction.get(reference)),
+          ...postDemoSiblingCompletionRefs.map((reference) => transaction.get(reference)),
         ]);
+        const moduleRequiredPostCompletionSnapshots = completionSnapshots.slice(
+          0,
+          moduleRequiredPostCompletionRefs.length,
+        );
+        const postDemoSiblingCompletionSnapshots = completionSnapshots.slice(
+          moduleRequiredPostCompletionRefs.length,
+        );
         const previousProgress = progressSnapshot.data();
         const grade = gradeQuizSubmission({
           answers: input.answers,
@@ -1337,7 +1521,29 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
                 { merge: true },
               );
 
-              if (demoAccessSeed) {
+              if (nextPostId) {
+                transaction.set(
+                  firestore.doc(`users/${input.uid}/contentAccess/post_${nextPostId}`),
+                  {
+                    schemaVersion: 1,
+                    contentType: 'post',
+                    entityId: nextPostId,
+                    grantedAt: FieldValue.serverTimestamp(),
+                    reason: 'post-completed',
+                    sourceProgressId: `postCompletions/${unlocked.id}`,
+                  },
+                  { merge: true },
+                );
+              }
+
+              if (
+                demoAccessSeed &&
+                areAllOtherRequiredPostsComplete({
+                  completedPostId: unlocked.id,
+                  requiredPostIds: demoAccessSeed.requiredPostIds,
+                  snapshots: postDemoSiblingCompletionSnapshots,
+                })
+              ) {
                 transaction.set(
                   firestore.doc(`users/${input.uid}/contentAccess/demo_${demoAccessSeed.demoId}`),
                   {

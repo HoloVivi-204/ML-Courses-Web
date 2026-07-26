@@ -2,11 +2,90 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createQuizAttemptPayload,
+  getQuizManifest,
   gradeQuizSubmission,
   type StoredQuestionWrongCounts,
 } from './quiz-manifest.js';
+import {
+  getReleaseLearningCatalog,
+  getSubmissionLearningUnits,
+} from './release-learning-catalog.js';
 
 describe('quiz manifest', () => {
+  it('covers the locked Release 1 post and module quiz skeleton without exposing keys', () => {
+    const catalog = getReleaseLearningCatalog();
+    const modules = catalog.courses.flatMap((course) => course.modules);
+    const posts = modules.flatMap((module) => module.posts);
+
+    expect(posts).toHaveLength(18);
+    expect(modules).toHaveLength(12);
+
+    for (const post of posts) {
+      const manifest = getQuizManifest(post.postQuizId);
+      const attemptPayload = createQuizAttemptPayload({
+        attemptId: `attempt-${post.postQuizId}`,
+        attemptNumber: 1,
+        expiresAtIso: '2026-07-19T13:00:00.000Z',
+        quizId: post.postQuizId,
+        shuffleSeed: null,
+      });
+
+      expect(manifest).toMatchObject({
+        passingScorePercent: 100,
+        postId: post.postId,
+        questionCount: 3,
+        quizKind: 'post',
+        requiredCorrectCount: 3,
+      });
+      expect(attemptPayload.questions).toHaveLength(3);
+      expect(JSON.stringify(attemptPayload)).not.toMatch(
+        /correctAnswer|correctOption|correctOptionIds|hint|explanation/i,
+      );
+    }
+
+    for (const module of modules) {
+      const manifest = getQuizManifest(module.moduleQuizId);
+      const attemptPayload = createQuizAttemptPayload({
+        attemptId: `attempt-${module.moduleQuizId}`,
+        attemptNumber: 1,
+        expiresAtIso: '2026-07-19T13:00:00.000Z',
+        quizId: module.moduleQuizId,
+        shuffleSeed: null,
+      });
+
+      expect(manifest).toMatchObject({
+        moduleId: module.moduleId,
+        passingScorePercent: 70,
+        questionCount: 6,
+        quizKind: 'module',
+        requiredCorrectCount: null,
+      });
+      expect(new Set(attemptPayload.questions.map((question) => question.type))).toEqual(
+        new Set(['single-choice', 'multiple-choice', 'true-false']),
+      );
+      expect(JSON.stringify(attemptPayload)).not.toMatch(
+        /correctAnswer|correctOption|correctOptionIds|hint|explanation/i,
+      );
+    }
+  });
+
+  it('unlocks the seven submission algorithms only after their module quiz passes', () => {
+    for (const unit of getSubmissionLearningUnits()) {
+      const manifest = getQuizManifest(unit.moduleQuizId);
+
+      expect(manifest.unlocksOnPass).toEqual(
+        unit.unlockAlgorithmIds.map((algorithmId) => ({
+          id: algorithmId,
+          type: 'algorithm',
+        })),
+      );
+      expect(manifest.unlocksOnPass).toContainEqual({
+        id: unit.algorithmId,
+        type: 'algorithm',
+      });
+    }
+  });
+
   it('creates a post quiz attempt payload without answer keys, explanations or locked hints', () => {
     const attemptPayload = createQuizAttemptPayload({
       attemptId: 'attempt-01',

@@ -4,6 +4,7 @@ const baseURL = 'http://127.0.0.1:4173';
 
 export default defineConfig({
   fullyParallel: true,
+  workers: 1,
   projects: [
     {
       name: 'chromium-desktop',

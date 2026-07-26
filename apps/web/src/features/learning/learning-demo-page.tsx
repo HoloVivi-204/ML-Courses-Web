@@ -3,8 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/auth-context';
-import { localize, type Locale } from '../catalog/course-data';
-import { andGateDemo, getFixedDemo, type DemoStep } from './and-gate-demo-data';
+import { getCourse, localize, type Locale } from '../catalog/course-data';
+import {
+  andGateDemo,
+  getFixedDemo,
+  type DemoStep,
+  type FixedDemoManifest,
+} from './and-gate-demo-data';
 import {
   hasLearningDemoAccess,
   rememberLearningContentAccessGrants,
@@ -113,6 +118,11 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   const hasBackendAccess = accessKey !== null && verifiedAccessKey === accessKey;
   const hasAccess = hasStoredAccess || hasBackendAccess;
   const currentStep = demo?.steps[stepIndex];
+  const module = demo
+    ? getCourse(demo.courseId)?.modules?.find((item) => item.id === demo.moduleId)
+    : null;
+  const backPostId = module?.postIds.at(-1) ?? module?.postId ?? null;
+  const moduleQuizId = module ? createModuleQuizId(module.id) : null;
   const requiredStepIds = useMemo(() => new Set(demo?.requiredStepIds ?? []), [demo]);
   const requiredViewedCount = viewedStepIds.filter((stepId) => requiredStepIds.has(stepId)).length;
   const isComplete = demo ? requiredViewedCount === demo.requiredStepIds.length : false;
@@ -234,7 +244,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     <main className="learning-demo-page page-shell">
       <Link
         className="breadcrumb-link"
-        to={`/learn/${demo.courseId}/posts/dl-p01-neuron-perceptron`}
+        to={backPostId ? `/learn/${demo.courseId}/posts/${backPostId}` : `/learn/${demo.courseId}`}
       >
         <ArrowLeft aria-hidden="true" size={16} />
         {text.backToLesson}
@@ -242,7 +252,11 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
 
       <header className="demo-heading">
         <span className="eyebrow">{text.fixed}</span>
-        <h1>{text.heading}</h1>
+        <h1>
+          {demo.demoId === andGateDemo.demoId
+            ? text.heading
+            : `${demo.algorithmId}: ${demo.problemId}`}
+        </h1>
         <dl className="demo-meta">
           <div>
             <dt>{text.algorithm}</dt>
@@ -256,7 +270,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
       </header>
 
       <section className="and-demo-card" aria-labelledby="and-demo-step-title">
-        <AndGateFrame locale={locale} step={currentStep} stepIndex={stepIndex} />
+        <FixedDemoFrame demo={demo} locale={locale} step={currentStep} stepIndex={stepIndex} />
 
         <div className="and-demo-copy">
           <span className="demo-step-count">
@@ -301,7 +315,11 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
         {completionStatus === 'ready' ? (
           <Link
             className="secondary-link"
-            to={`/learn/${demo.courseId}/quizzes/quiz-module-dl-m01`}
+            to={
+              moduleQuizId
+                ? `/learn/${demo.courseId}/quizzes/${moduleQuizId}`
+                : `/learn/${demo.courseId}`
+            }
           >
             {text.moduleQuiz}
             <ArrowRight aria-hidden="true" size={16} />
@@ -309,6 +327,75 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
         ) : null}
       </section>
     </main>
+  );
+}
+
+function createModuleQuizId(moduleId: string) {
+  const stablePrefix = /^(cml|dl)-m\d{2}/.exec(moduleId)?.[0];
+
+  return stablePrefix ? `quiz-module-${stablePrefix}` : `quiz-module-${moduleId}`;
+}
+
+function FixedDemoFrame({
+  demo,
+  locale,
+  step,
+  stepIndex,
+}: {
+  demo: FixedDemoManifest;
+  locale: Locale;
+  step: DemoStep;
+  stepIndex: number;
+}) {
+  if (demo.demoId === andGateDemo.demoId) {
+    return <AndGateFrame locale={locale} step={step} stepIndex={stepIndex} />;
+  }
+
+  return (
+    <div className="and-demo-frame">
+      <svg
+        aria-label={localize(step.textAlternative, locale)}
+        className="and-demo-chart"
+        role="img"
+        viewBox="0 0 240 240"
+      >
+        <line className="axis-line" x1="36" x2="210" y1="196" y2="196" />
+        <line className="axis-line" x1="36" x2="36" y1="196" y2="34" />
+        <polyline
+          className="boundary-line"
+          fill="none"
+          points="52,168 92,132 132,112 172,78 204,62"
+        />
+        <AndPoint
+          isPositive={stepIndex >= 2}
+          label={step.id.slice(0, 2).toUpperCase()}
+          x={92}
+          y={132}
+        />
+        <AndPoint isPositive={stepIndex >= 3} label="OK" x={172} y={78} />
+        <text x="62" y="222">
+          {demo.algorithmId}
+        </text>
+      </svg>
+
+      <table className="and-truth-table">
+        <caption>{demo.problemId}</caption>
+        <tbody>
+          <tr>
+            <th>step</th>
+            <td>{step.id}</td>
+          </tr>
+          <tr>
+            <th>seed</th>
+            <td>{demo.seed}</td>
+          </tr>
+          <tr>
+            <th>status</th>
+            <td>fixed</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   );
 }
 

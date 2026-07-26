@@ -1,4 +1,4 @@
-import type { LocalizedText } from '../catalog/course-data';
+import { courses, localize, type LocalizedText } from '../catalog/course-data';
 import type { ContentBlock } from './content-block-renderer';
 
 export interface TrialPost {
@@ -10,6 +10,7 @@ export interface TrialPost {
   id: string;
   moduleId: string;
   postQuizId: string;
+  sourceReviewStatus: 'pending-operator-review';
   title: LocalizedText;
 }
 
@@ -375,6 +376,7 @@ const trialPosts = [
     id: TRIAL_POST_ID,
     moduleId: 'dl-m01-neuron-perceptron',
     postQuizId: 'quiz-post-dl-p01',
+    sourceReviewStatus: 'pending-operator-review',
     title: {
       en: 'How does a neuron make a decision?',
       vi: 'Một neuron đưa ra quyết định như thế nào?',
@@ -395,8 +397,207 @@ const fullLessonPosts: readonly TrialPost[] = [
   },
 ];
 
+function createPostQuizId(postId: string) {
+  const stablePrefix = /^(cml|dl)-p\d{2}/.exec(postId)?.[0];
+
+  return stablePrefix ? `quiz-post-${stablePrefix}` : `quiz-post-${postId}`;
+}
+
+function createGeneratedTitle(postId: string, moduleTitle: LocalizedText): LocalizedText {
+  const topic = postId
+    .replace(/^(cml|dl)-p\d{2}-/, '')
+    .split('-')
+    .join(' ');
+
+  return {
+    en: `${moduleTitle.en}: ${topic}`,
+    vi: `${moduleTitle.vi}: ${topic}`,
+  };
+}
+
+function createGenericBlocks(input: {
+  moduleTitle: LocalizedText;
+  postId: string;
+  title: LocalizedText;
+}): readonly ContentBlock[] {
+  const defaults = {
+    accessibility: { en: null, vi: null },
+    activityId: null,
+    assetIds: [],
+    postId: input.postId,
+    required: true,
+    schemaVersion: 1,
+    sourceIds: [],
+  } as const;
+
+  return [
+    {
+      ...defaults,
+      id: `${input.postId}-goal`,
+      locales: {
+        en: {
+          lede:
+            'This draft lesson focuses on one inspectable modelling decision before the ' +
+            'Playground task.',
+          navigationTitle: 'Learning goal',
+          title: input.title.en,
+        },
+        vi: {
+          lede:
+            'Bài học draft này tập trung vào một quyết định mô hình hóa có thể kiểm tra ' +
+            'trước nhiệm vụ Playground.',
+          navigationTitle: 'Mục tiêu học',
+          title: input.title.vi,
+        },
+      },
+      order: 1,
+      type: 'heading',
+    },
+    {
+      ...defaults,
+      id: `${input.postId}-model-check`,
+      locales: {
+        en: {
+          markdown:
+            `In **${input.moduleTitle.en}**, start from the data question, name the feature ` +
+            'signal, then choose the metric before reading the model output.',
+        },
+        vi: {
+          markdown:
+            `Trong **${input.moduleTitle.vi}**, hãy bắt đầu từ câu hỏi dữ liệu, nêu tín hiệu ` +
+            'feature, rồi chọn metric trước khi đọc đầu ra mô hình.',
+        },
+      },
+      order: 2,
+      type: 'markdown',
+    },
+    {
+      ...defaults,
+      id: `${input.postId}-draft-status`,
+      locales: {
+        en: {
+          body:
+            'This submission unit is draft learning content. External source, license and ' +
+            'instructor review evidence is still pending operator review.',
+          title: 'Draft status',
+        },
+        vi: {
+          body:
+            'Learning unit cho bản nộp này đang ở trạng thái draft. Bằng chứng nguồn, ' +
+            'license và review học thuật vẫn chờ operator xác nhận.',
+          title: 'Trạng thái draft',
+        },
+      },
+      order: 3,
+      type: 'callout',
+      variant: 'insight',
+    },
+    {
+      ...defaults,
+      activityId: `act-${input.postId}-example`,
+      id: `${input.postId}-example`,
+      locales: {
+        en: { navigationTitle: 'Inspect a small example' },
+        vi: { navigationTitle: 'Quan sát ví dụ nhỏ' },
+      },
+      order: 4,
+      type: 'example',
+    },
+    {
+      ...defaults,
+      id: `${input.postId}-quiz-prep`,
+      locales: {
+        en: {
+          markdown:
+            'Before the quiz, explain cause and effect in one sentence: what input signal ' +
+            'changes, what model decision follows, and which metric would reveal a mistake.',
+        },
+        vi: {
+          markdown:
+            'Trước quiz, hãy giải thích nhân quả bằng một câu: tín hiệu đầu vào nào đổi, ' +
+            'quyết định mô hình nào theo sau, và metric nào sẽ phát hiện lỗi.',
+        },
+      },
+      order: 5,
+      type: 'markdown',
+    },
+  ] satisfies readonly ContentBlock[];
+}
+
+function createGeneratedPost(input: {
+  accessLevel: 'full' | 'trial';
+  courseId: string;
+  durationMinutes: number;
+  moduleId: string;
+  moduleTitle: LocalizedText;
+  postId: string;
+}): TrialPost {
+  const title = createGeneratedTitle(input.postId, input.moduleTitle);
+
+  return {
+    accessLevel: input.accessLevel,
+    blocks: createGenericBlocks({
+      moduleTitle: input.moduleTitle,
+      postId: input.postId,
+      title,
+    }),
+    courseId: input.courseId,
+    description: {
+      en: `Draft unit for ${localize(input.moduleTitle, 'en')}; source review is pending.`,
+      vi: `Learning unit draft cho ${localize(input.moduleTitle, 'vi')}; nguồn đang chờ review.`,
+    },
+    durationMinutes: input.durationMinutes,
+    id: input.postId,
+    moduleId: input.moduleId,
+    postQuizId: createPostQuizId(input.postId),
+    sourceReviewStatus: 'pending-operator-review',
+    title,
+  };
+}
+
+const handAuthoredFullPostIds = new Set(fullLessonPosts.map((post) => post.id));
+const trialPostIdByCourseId = new Map([
+  ['course-classical-ml', 'cml-p01-problem-data-types'],
+  ['course-deep-learning-basic', TRIAL_POST_ID],
+]);
+const generatedFullLessonPosts = courses.flatMap((course) =>
+  (course.modules ?? []).flatMap((module) =>
+    module.postIds
+      .filter((postId) => !handAuthoredFullPostIds.has(postId))
+      .map((postId) =>
+        createGeneratedPost({
+          accessLevel: 'full',
+          courseId: course.id,
+          durationMinutes: module.durationMinutes,
+          moduleId: module.id,
+          moduleTitle: module.title,
+          postId,
+        }),
+      ),
+  ),
+);
+const generatedTrialPosts = courses.flatMap((course) =>
+  (course.modules ?? []).flatMap((module) =>
+    module.postIds
+      .filter((postId) => trialPostIdByCourseId.get(course.id) === postId)
+      .filter((postId) => !trialPosts.some((post) => post.id === postId))
+      .map((postId) =>
+        createGeneratedPost({
+          accessLevel: 'trial',
+          courseId: course.id,
+          durationMinutes: Math.min(10, module.durationMinutes),
+          moduleId: module.id,
+          moduleTitle: module.title,
+          postId,
+        }),
+      ),
+  ),
+);
+const releaseTrialPosts = [...trialPosts, ...generatedTrialPosts] as const;
+const releaseFullLessonPosts = [...fullLessonPosts, ...generatedFullLessonPosts] as const;
+
 export function getTrialPost(courseId: string | undefined, postId: string | undefined) {
-  return trialPosts.find((post) => post.courseId === courseId && post.id === postId);
+  return releaseTrialPosts.find((post) => post.courseId === courseId && post.id === postId);
 }
 
 export function getReadablePost(
@@ -404,7 +605,7 @@ export function getReadablePost(
   postId: string | undefined,
   isFullAccess: boolean,
 ) {
-  const posts = isFullAccess ? fullLessonPosts : trialPosts;
+  const posts = isFullAccess ? releaseFullLessonPosts : releaseTrialPosts;
 
   return posts.find((post) => post.courseId === courseId && post.id === postId);
 }

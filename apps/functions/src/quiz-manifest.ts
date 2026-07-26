@@ -1,4 +1,9 @@
 import { ApiError } from './api-error.js';
+import {
+  getReleaseLearningCatalog,
+  type ReleaseLearningModule,
+  type ReleaseLearningPost,
+} from './release-learning-catalog.js';
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
 
@@ -18,12 +23,12 @@ export interface StoredQuestionWrongCounts {
   [questionId: string]: number;
 }
 
-interface QuizOption {
+export interface QuizOption {
   optionId: string;
   text: LocalizedText;
 }
 
-interface QuizQuestion {
+export interface QuizQuestion {
   correctAnswer: QuizAnswerValue;
   explanation: LocalizedText;
   hints: readonly [LocalizedText, LocalizedText];
@@ -34,7 +39,7 @@ interface QuizQuestion {
   type: BaselineQuestionType;
 }
 
-interface QuizManifest {
+export interface QuizManifest {
   courseId: string;
   demoId: string | null;
   mastery: LocalizedText;
@@ -90,7 +95,7 @@ export interface QuizGradeResult {
   score: number;
 }
 
-const quizManifests: Readonly<Record<string, QuizManifest>> = {
+const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
   'quiz-post-dl-p01': {
     courseId: 'course-deep-learning-basic',
     demoId: null,
@@ -442,6 +447,427 @@ const quizManifests: Readonly<Record<string, QuizManifest>> = {
     ],
   },
 };
+
+function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
+  return {
+    courseId: module.courseId,
+    demoId: null,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: module.moduleId,
+    passingScorePercent: 100,
+    postId: post.postId,
+    questionCount: 3,
+    questions: [
+      {
+        correctAnswer: 'opt-core-idea',
+        explanation: {
+          en: `The lesson focuses on the core modelling idea in "${post.title.en}".`,
+          vi: `Bài học tập trung vào ý tưởng mô hình hóa cốt lõi trong "${post.title.vi}".`,
+        },
+        hints: [
+          {
+            en: 'Look for the option that names the modelling decision, not an app feature.',
+            vi: 'Tìm lựa chọn nêu quyết định mô hình hóa, không phải tính năng ứng dụng.',
+          },
+          {
+            en: 'The correct answer keeps the model idea tied to data and evaluation.',
+            vi: 'Đáp án đúng giữ ý tưởng mô hình gắn với dữ liệu và đánh giá.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-core-idea',
+            text: {
+              en: 'Connect a model choice to the data pattern being evaluated.',
+              vi: 'Gắn lựa chọn mô hình với mẫu dữ liệu đang được đánh giá.',
+            },
+          },
+          {
+            optionId: 'opt-secret-key',
+            text: {
+              en: 'Store the answer key in the browser.',
+              vi: 'Lưu đáp án trong trình duyệt.',
+            },
+          },
+          {
+            optionId: 'opt-random-ui',
+            text: {
+              en: 'Change the interface until the metric looks better.',
+              vi: 'Đổi giao diện cho đến khi metric trông tốt hơn.',
+            },
+          },
+        ],
+        prompt: {
+          en: `What is the main learning move in "${post.title.en}"?`,
+          vi: `Động tác học chính trong "${post.title.vi}" là gì?`,
+        },
+        questionId: `q-${post.postId}-core-idea`,
+        sourceId: post.activityIds[1]!,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-inputs', 'opt-metric'],
+        explanation: {
+          en: 'A defensible model run names the input signal and the metric used to judge it.',
+          vi: 'Một lần chạy mô hình có thể bảo vệ cần nêu tín hiệu đầu vào và metric đánh giá.',
+        },
+        hints: [
+          {
+            en: 'Keep the pieces that make a run inspectable.',
+            vi: 'Giữ các phần giúp kiểm tra được một lần chạy.',
+          },
+          {
+            en: 'A model needs evidence from inputs and a metric for judgment.',
+            vi: 'Mô hình cần bằng chứng từ đầu vào và một metric để đánh giá.',
+          },
+        ],
+        options: [
+          { optionId: 'opt-inputs', text: { en: 'Input features', vi: 'Feature đầu vào' } },
+          { optionId: 'opt-metric', text: { en: 'Evaluation metric', vi: 'Metric đánh giá' } },
+          { optionId: 'opt-theme', text: { en: 'Theme preference', vi: 'Tùy chọn giao diện' } },
+          { optionId: 'opt-password', text: { en: 'User password', vi: 'Mật khẩu người dùng' } },
+        ],
+        prompt: {
+          en: 'Which two pieces should be checked before trusting the model result?',
+          vi: 'Hai phần nào cần kiểm tra trước khi tin kết quả mô hình?',
+        },
+        questionId: `q-${post.postId}-evidence`,
+        sourceId: post.activityIds[2]!,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en:
+            'The course separates lesson examples, fixed demos and Playground tasks so progress ' +
+            'does not depend on repeating the exact same task.',
+          vi:
+            'Khóa học tách ví dụ bài học, demo cố định và nhiệm vụ Playground để tiến độ ' +
+            'không phụ thuộc vào việc lặp đúng cùng một nhiệm vụ.',
+        },
+        hints: [
+          {
+            en: 'Compare lesson practice with the later Playground scenario.',
+            vi: 'So sánh hoạt động trong bài với scenario Playground sau đó.',
+          },
+          {
+            en: 'The same idea can appear, but the exact task should differ.',
+            vi: 'Cùng ý tưởng có thể xuất hiện, nhưng nhiệm vụ cụ thể nên khác.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: lesson practice should not duplicate the exact Playground task.',
+          vi: 'Đúng hay sai: luyện tập trong bài không nên lặp đúng nhiệm vụ Playground.',
+        },
+        questionId: `q-${post.postId}-task-boundary`,
+        sourceId: post.activityIds[3]!,
+        type: 'true-false',
+      },
+    ],
+    quizId: post.postQuizId,
+    quizKind: 'post',
+    quizRevisionId: `${post.postQuizId}-rev-r1`,
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: post.postId, type: 'post' }],
+  } as const satisfies QuizManifest;
+}
+
+function createGeneratedModuleQuiz(module: ReleaseLearningModule) {
+  const unlockLabel = module.unlockAlgorithmIds.length
+    ? module.unlockAlgorithmIds.join(', ')
+    : 'no direct Playground algorithm';
+  const unlockCorrectAnswer = module.unlockAlgorithmIds.length
+    ? 'opt-algorithm-unlock'
+    : 'opt-no-direct-unlock';
+
+  return {
+    courseId: module.courseId,
+    demoId: module.demoId,
+    mastery: {
+      en: `Score at least 70% to complete the module and unlock ${unlockLabel}.`,
+      vi: `Đạt ít nhất 70% để hoàn thành module và mở khóa ${unlockLabel}.`,
+    },
+    moduleId: module.moduleId,
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    questions: [
+      {
+        correctAnswer: 'opt-model-purpose',
+        explanation: {
+          en: `The module "${module.title.en}" ties model behaviour to a specific data decision.`,
+          vi: `Module "${module.title.vi}" gắn hành vi mô hình với một quyết định dữ liệu cụ thể.`,
+        },
+        hints: [
+          {
+            en: 'Pick the option about modelling behaviour.',
+            vi: 'Chọn phương án nói về hành vi mô hình.',
+          },
+          {
+            en: 'Avoid answers about account or presentation state.',
+            vi: 'Tránh đáp án về tài khoản hoặc trạng thái trình bày.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-model-purpose',
+            text: {
+              en: 'Explain how the model makes or evaluates a data decision.',
+              vi: 'Giải thích cách mô hình tạo hoặc đánh giá quyết định trên dữ liệu.',
+            },
+          },
+          {
+            optionId: 'opt-profile-only',
+            text: {
+              en: 'Update the learner profile only.',
+              vi: 'Chỉ cập nhật hồ sơ người học.',
+            },
+          },
+          {
+            optionId: 'opt-color-only',
+            text: {
+              en: 'Choose a chart colour without reading the metric.',
+              vi: 'Chọn màu biểu đồ mà không đọc metric.',
+            },
+          },
+        ],
+        prompt: {
+          en: `What should a learner prove after "${module.title.en}"?`,
+          vi: `Người học cần chứng minh điều gì sau "${module.title.vi}"?`,
+        },
+        questionId: `q-${module.moduleId}-purpose`,
+        sourceId: `${module.moduleQuizId}-q01`,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-features', 'opt-target-or-metric'],
+        explanation: {
+          en: 'Features plus a target or metric make the learning task inspectable.',
+          vi: 'Feature cùng target hoặc metric giúp nhiệm vụ học có thể kiểm tra.',
+        },
+        hints: [
+          {
+            en: 'Look for data and evaluation signals.',
+            vi: 'Tìm tín hiệu dữ liệu và đánh giá.',
+          },
+          {
+            en: 'A theme or session ID is not model evidence.',
+            vi: 'Theme hoặc session ID không phải bằng chứng mô hình.',
+          },
+        ],
+        options: [
+          { optionId: 'opt-features', text: { en: 'Features', vi: 'Feature' } },
+          {
+            optionId: 'opt-target-or-metric',
+            text: { en: 'Target or metric', vi: 'Target hoặc metric' },
+          },
+          { optionId: 'opt-theme', text: { en: 'Theme', vi: 'Theme' } },
+          { optionId: 'opt-session', text: { en: 'Session id', vi: 'Session id' } },
+        ],
+        prompt: {
+          en: 'Which two signals make a module result defensible?',
+          vi: 'Hai tín hiệu nào giúp kết quả module có thể bảo vệ?',
+        },
+        questionId: `q-${module.moduleId}-signals`,
+        sourceId: `${module.moduleQuizId}-q02`,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: module.demoId
+            ? 'The fixed demo must be completed before the module quiz can complete the module.'
+            : 'This module has no fixed demo, so post mastery and the module quiz are sufficient.',
+          vi: module.demoId
+            ? 'Demo cố định phải hoàn thành trước khi quiz module có thể hoàn tất module.'
+            : 'Module này không có demo cố định, nên mastery post và quiz module là đủ.',
+        },
+        hints: [
+          {
+            en: 'Check whether the skeleton gives this module a demo id.',
+            vi: 'Kiểm tra skeleton có gán demo id cho module này không.',
+          },
+          {
+            en: 'The backend enforces the demo only when a fixed demo exists.',
+            vi: 'Backend chỉ bắt buộc demo khi có demo cố định.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: module completion must follow the fixed module requirements.',
+          vi: 'Đúng hay sai: hoàn thành module phải theo điều kiện cố định của module.',
+        },
+        questionId: `q-${module.moduleId}-requirements`,
+        sourceId: `${module.moduleQuizId}-q03`,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: unlockCorrectAnswer,
+        explanation: {
+          en: `The trusted unlock list for this module is ${unlockLabel}.`,
+          vi: `Danh sách mở khóa tin cậy của module này là ${unlockLabel}.`,
+        },
+        hints: [
+          {
+            en: 'Use the stable unlock list, not a Playground guess.',
+            vi: 'Dùng danh sách unlock stable, không đoán từ Playground.',
+          },
+          {
+            en: 'Only module quiz pass creates algorithm unlock documents.',
+            vi: 'Chỉ pass quiz module mới tạo document mở khóa thuật toán.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-algorithm-unlock',
+            text: { en: unlockLabel, vi: unlockLabel },
+          },
+          {
+            optionId: 'opt-no-direct-unlock',
+            text: {
+              en: 'No direct Playground algorithm',
+              vi: 'Không mở trực tiếp thuật toán Playground',
+            },
+          },
+          {
+            optionId: 'opt-all-should',
+            text: {
+              en: 'All Should algorithms',
+              vi: 'Tất cả thuật toán Should',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What does this module unlock after a trusted module quiz pass?',
+          vi: 'Module này mở khóa gì sau khi pass quiz module tin cậy?',
+        },
+        questionId: `q-${module.moduleId}-unlock`,
+        sourceId: `${module.moduleQuizId}-q04`,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-answer-server', 'opt-no-production-publish'],
+        explanation: {
+          en:
+            'Answer keys stay server-side and draft learning content must not pretend to be ' +
+            'production-published or externally reviewed.',
+          vi:
+            'Đáp án nằm ở server và nội dung draft không được giả là đã publish production ' +
+            'hoặc đã được review bên ngoài.',
+        },
+        hints: [
+          {
+            en: 'Pick the two safety rules.',
+            vi: 'Chọn hai quy tắc an toàn.',
+          },
+          {
+            en: 'The browser may render attempts, but not the key.',
+            vi: 'Trình duyệt có thể render attempt, nhưng không giữ đáp án.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-answer-server',
+            text: { en: 'Keep answer keys server-side.', vi: 'Giữ đáp án ở server.' },
+          },
+          {
+            optionId: 'opt-no-production-publish',
+            text: {
+              en: 'Do not claim production publish or external review.',
+              vi: 'Không tuyên bố publish production hoặc review bên ngoài.',
+            },
+          },
+          {
+            optionId: 'opt-key-in-web',
+            text: { en: 'Bundle keys in the web app.', vi: 'Đưa đáp án vào web app.' },
+          },
+          {
+            optionId: 'opt-fake-source',
+            text: { en: 'Invent a source if one is missing.', vi: 'Tự bịa nguồn nếu thiếu.' },
+          },
+        ],
+        prompt: {
+          en: 'Which guardrails keep this learning unit honest?',
+          vi: 'Guardrail nào giữ learning unit này trung thực?',
+        },
+        questionId: `q-${module.moduleId}-guardrails`,
+        sourceId: `${module.moduleQuizId}-q05`,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'Progress and unlocks are written by backend quiz submission, not local route state.',
+          vi: 'Progress và unlock do backend ghi khi nộp quiz, không phải state route cục bộ.',
+        },
+        hints: [
+          {
+            en: 'The route guard is only user experience.',
+            vi: 'Route guard chỉ là trải nghiệm người dùng.',
+          },
+          {
+            en: 'Trusted progress comes from the backend.',
+            vi: 'Tiến độ tin cậy đến từ backend.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a local route guard must not create trusted progress.',
+          vi: 'Đúng hay sai: route guard cục bộ không được tạo progress tin cậy.',
+        },
+        questionId: `q-${module.moduleId}-trusted-progress`,
+        sourceId: `${module.moduleQuizId}-q06`,
+        type: 'true-false',
+      },
+    ],
+    quizId: module.moduleQuizId,
+    quizKind: 'module',
+    quizRevisionId: `${module.moduleQuizId}-rev-r1`,
+    requiredCorrectCount: null,
+    unlocksOnPass: module.unlockAlgorithmIds.map((algorithmId) => ({
+      id: algorithmId,
+      type: 'algorithm',
+    })),
+  } as const satisfies QuizManifest;
+}
+
+function createReleaseQuizManifests() {
+  const generatedManifests: Record<string, QuizManifest> = {};
+
+  for (const course of getReleaseLearningCatalog().courses) {
+    for (const module of course.modules) {
+      if (!handAuthoredQuizManifests[module.moduleQuizId]) {
+        generatedManifests[module.moduleQuizId] = createGeneratedModuleQuiz(module);
+      }
+
+      for (const post of module.posts) {
+        if (!handAuthoredQuizManifests[post.postQuizId]) {
+          generatedManifests[post.postQuizId] = createGeneratedPostQuiz(post, module);
+        }
+      }
+    }
+  }
+
+  return {
+    ...generatedManifests,
+    ...handAuthoredQuizManifests,
+  };
+}
+
+const quizManifests: Readonly<Record<string, QuizManifest>> = createReleaseQuizManifests();
 
 export function getQuizManifest(quizId: string): QuizManifest {
   const manifest = quizManifests[quizId];

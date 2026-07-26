@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -614,6 +614,48 @@ function createModuleQuizAttemptResult() {
   };
 }
 
+function createLinearModuleQuizAttemptResult() {
+  return {
+    attempt: {
+      attemptId: 'attempt-quiz-module-cml-m02-01',
+      attemptNumber: 1,
+      expiresAt: '2026-07-19T13:00:00.000Z',
+      passingScorePercent: 70,
+      questionCount: 6,
+      quizId: 'quiz-module-cml-m02',
+      quizKind: 'module' as const,
+      quizRevisionId: 'quiz-module-cml-m02-rev-r1',
+      requiredCorrectCount: null,
+      shuffleSeed: null,
+    },
+    mastery: {
+      en: 'Score at least 70% to complete the module and unlock linear regression.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module và mở hồi quy tuyến tính.',
+    },
+    questions: [
+      {
+        options: [
+          {
+            optionId: 'opt-baseline',
+            text: { en: 'Use a simple baseline first', vi: 'Dùng baseline đơn giản trước' },
+          },
+          {
+            optionId: 'opt-memorize',
+            text: { en: 'Memorise every row', vi: 'Ghi nhớ từng dòng' },
+          },
+        ],
+        prompt: {
+          en: 'What is the first modelling move in this module?',
+          vi: 'Bước mô hình hóa đầu tiên trong module này là gì?',
+        },
+        questionId: 'q-cml-m02-baseline',
+        sourceId: 'quiz-module-cml-m02-q01',
+        type: 'single-choice' as const,
+      },
+    ],
+  };
+}
+
 function createInitialProgressSnapshot() {
   return {
     algorithmUnlocks: [],
@@ -808,6 +850,94 @@ function createUnlockedProgressSnapshot() {
         passed: true,
         quizId: 'quiz-module-dl-m01',
         quizKind: 'module',
+      },
+    ],
+  };
+}
+
+function createLinearModuleUnlockedProgressSnapshot() {
+  return {
+    algorithmUnlocks: [
+      {
+        algorithmId: 'linear-regression',
+        moduleId: 'cml-m02-linear-polynomial',
+      },
+    ],
+    contentAccess: [
+      {
+        contentType: 'module' as const,
+        entityId: 'cml-m02-linear-polynomial',
+      },
+      {
+        contentType: 'post' as const,
+        entityId: 'cml-p03-linear-regression',
+      },
+      {
+        contentType: 'post' as const,
+        entityId: 'cml-p04-polynomial-regression',
+      },
+      {
+        contentType: 'demo' as const,
+        entityId: 'demo-linear-calibration',
+      },
+    ],
+    demos: [
+      {
+        completed: true,
+        demoId: 'demo-linear-calibration',
+      },
+    ],
+    enrollment: {
+      courseId: 'course-classical-ml',
+      progressPercent: 22,
+      status: 'in-progress' as const,
+    },
+    modules: [
+      {
+        completedStepCount: 4,
+        moduleId: 'cml-m02-linear-polynomial',
+        progressPercent: 100,
+        requiredStepCount: 4,
+        status: 'completed' as const,
+      },
+    ],
+    posts: [
+      {
+        bestScore: 100,
+        completed: true,
+        postId: 'cml-p03-linear-regression',
+        quizId: 'quiz-post-cml-p03',
+        quizPassed: true,
+      },
+      {
+        bestScore: 100,
+        completed: true,
+        postId: 'cml-p04-polynomial-regression',
+        quizId: 'quiz-post-cml-p04',
+        quizPassed: true,
+      },
+    ],
+    quizzes: [
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: 'quiz-post-cml-p03',
+        quizKind: 'post' as const,
+      },
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: 'quiz-post-cml-p04',
+        quizKind: 'post' as const,
+      },
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: 'quiz-module-cml-m02',
+        quizKind: 'module' as const,
       },
     ],
   };
@@ -1350,6 +1480,28 @@ describe('public learning journey', () => {
         name: 'Why does XOR break a single-layer Perceptron?',
       }),
     ).toBeVisible();
+  });
+
+  it('opens a generic classical draft lesson on authenticated deep links with backend access', async () => {
+    window.history.pushState({}, '', '/learn/course-classical-ml/posts/cml-p03-linear-regression');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createLinearModuleUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: 'Hồi quy tuyến tính và đa thức: linear regression' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('Trạng thái draft')).toBeVisible();
+    expect(screen.getByText('cml-p03-linear-regression')).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
   });
 
   it('shows backend-verified progress and unlocked algorithms on the learning path', async () => {
@@ -1939,7 +2091,13 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Playground chưa mở khóa' })).toBeVisible();
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Playground chưa mở khóa' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
   });
@@ -2577,8 +2735,9 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
     ).toBeVisible();
-    await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '200');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Epochs' }), {
+      target: { value: '200' },
+    });
     await user.click(screen.getByRole('button', { name: 'Chạy' }));
     await user.click(await screen.findByRole('button', { name: 'Dừng' }));
     expect(await screen.findByText('Đang dừng worker')).toBeVisible();
@@ -2868,6 +3027,59 @@ describe('public learning journey', () => {
     });
   });
 
+  it('opens and completes a generic classical fixed demo with backend access', async () => {
+    window.history.pushState({}, '', '/learn/course-classical-ml/demos/demo-linear-calibration');
+    const user = userEvent.setup();
+    const completeDemo = vi.fn().mockResolvedValue({
+      completion: {
+        demoId: 'demo-linear-calibration',
+        status: 'completed',
+      },
+      event: {
+        demoId: 'demo-linear-calibration',
+        requiredStepIds: ['problem', 'data', 'decision', 'result'],
+        type: 'demo_completed',
+        viewedStepIds: ['problem', 'data', 'decision', 'result'],
+      },
+    });
+    const learningApiClient = createLearningApiClient({
+      completeDemo,
+      getProgress: vi.fn().mockResolvedValue(createLinearModuleUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'linear-regression: problem-demo-linear-calibration' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('img', {
+        name: /Một thẻ bài toán cố định cho problem-demo-linear-calibration/i,
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('status', { name: 'Tiến độ demo' })).toHaveTextContent(
+      'Bước bắt buộc 1 / 4',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+    await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
+
+    expect(await screen.findByText('demo_completed: demo-linear-calibration')).toBeVisible();
+    expect(completeDemo).toHaveBeenCalledWith({
+      demoId: 'demo-linear-calibration',
+      idToken: 'local-id-token',
+      idempotencyKey: expect.any(String),
+      viewedStepIds: ['problem', 'data', 'decision', 'result'],
+    });
+  });
+
   it('keeps the post quiz closed without a post access grant', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
     const learningApiClient = createLearningApiClient({
@@ -2984,6 +3196,37 @@ describe('public learning journey', () => {
     expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
       idToken: 'local-id-token',
       quizId: 'quiz-module-dl-m01',
+    });
+    expect(screen.getByTestId('quiz-attempt')).not.toHaveTextContent(
+      /correctAnswer|hint|explanation/i,
+    );
+  });
+
+  it('opens a generic classical module quiz after backend verifies posts and demo completion', async () => {
+    window.history.pushState({}, '', '/learn/course-classical-ml/quizzes/quiz-module-cml-m02');
+    const learningApiClient = createLearningApiClient({
+      createQuizAttempt: vi.fn().mockResolvedValue(createLinearModuleQuizAttemptResult()),
+      getProgress: vi.fn().mockResolvedValue(createLinearModuleUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Quiz module Hồi quy tuyến tính và đa thức' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Đạt ít nhất 70% để hoàn thành module và mở hồi quy tuyến tính.'),
+    ).toBeVisible();
+    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      quizId: 'quiz-module-cml-m02',
     });
     expect(screen.getByTestId('quiz-attempt')).not.toHaveTextContent(
       /correctAnswer|hint|explanation/i,

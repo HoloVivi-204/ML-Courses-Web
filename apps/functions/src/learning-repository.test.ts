@@ -2,6 +2,8 @@ import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 
 import { createFirestoreLearningRepository } from './learning-repository.js';
+import { getReleaseModule, getSubmissionLearningUnits } from './release-learning-catalog.js';
+import { getQuizManifest, type QuizAnswer } from './quiz-manifest.js';
 
 const revisionPinFieldNames = [
   'revisionId',
@@ -120,6 +122,27 @@ function expectStableContentAccessGrant(data: Record<string, unknown> | undefine
   for (const fieldName of revisionPinFieldNames) {
     expect(data).not.toHaveProperty(fieldName);
   }
+}
+
+function createOpenAttemptDocument(quizId: string) {
+  const manifest = getQuizManifest(quizId);
+
+  return {
+    attemptNumber: 1,
+    expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+    questionIds: manifest.questions.map((question) => question.questionId),
+    quizId,
+    quizRevisionId: manifest.quizRevisionId,
+    schemaVersion: 1,
+    status: 'in-progress',
+  };
+}
+
+function createPassingAnswers(quizId: string): QuizAnswer[] {
+  return getQuizManifest(quizId).questions.map((question) => ({
+    questionId: question.questionId,
+    value: question.correctAnswer,
+  }));
 }
 
 describe('Firestore learning repository', () => {
@@ -412,6 +435,41 @@ describe('Firestore learning repository', () => {
     );
   });
 
+  it('enrolls a Classical ML learner into the locked first module and post', async () => {
+    const { documents, firestore } = createFakeFirestore();
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.enrollLearner({
+      courseId: 'course-classical-ml',
+      displayName: 'Classical learner',
+      idempotencyKey: 'enroll-classical-key',
+      uid: 'learner-classical',
+    });
+
+    expect(result).toMatchObject({
+      statusCode: 201,
+      data: {
+        access: {
+          moduleId: 'cml-m01-foundations',
+          postId: 'cml-p01-problem-data-types',
+        },
+        nextPath: '/learn/course-classical-ml/posts/cml-p01-problem-data-types',
+      },
+    });
+    expect(
+      documents.get('users/learner-classical/contentAccess/module_cml-m01-foundations'),
+    ).toMatchObject({
+      contentType: 'module',
+      entityId: 'cml-m01-foundations',
+    });
+    expect(
+      documents.get('users/learner-classical/contentAccess/post_cml-p01-problem-data-types'),
+    ).toMatchObject({
+      contentType: 'post',
+      entityId: 'cml-p01-problem-data-types',
+    });
+  });
+
   it('rejects enrollment when an idempotency key belongs to another request', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/idempotencyKeys/enroll-conflict-key': {
@@ -568,6 +626,79 @@ describe('Firestore learning repository', () => {
     );
   });
 
+  it('unlocks all seven submission algorithms through trusted module quiz completion', async () => {
+    for (const unit of getSubmissionLearningUnits()) {
+      const module = getReleaseModule(unit.moduleId);
+
+      expect(module).not.toBeNull();
+
+      const initialDocuments: Record<string, Record<string, unknown>> = {
+        [`users/learner-${unit.algorithmId}/enrollments/${unit.courseId}`]: {
+          courseId: unit.courseId,
+          progressPercent: 0,
+          schemaVersion: 1,
+          status: 'in-progress',
+        },
+        [`users/learner-${unit.algorithmId}/quizAttempts/attempt-${unit.moduleQuizId}`]:
+          createOpenAttemptDocument(unit.moduleQuizId),
+        [`users/learner-${unit.algorithmId}/quizProgress/${unit.moduleQuizId}`]: {
+          attemptCount: 1,
+          bestScore: 0,
+          passed: false,
+          schemaVersion: 1,
+          wrongCounts: {},
+        },
+      };
+
+      for (const postId of unit.requiredPostIds) {
+        initialDocuments[`users/learner-${unit.algorithmId}/postCompletions/${postId}`] = {
+          postId,
+          schemaVersion: 1,
+          status: 'completed',
+        };
+      }
+
+      if (module?.demoId) {
+        initialDocuments[`users/learner-${unit.algorithmId}/demoCompletions/${module.demoId}`] = {
+          demoId: module.demoId,
+          schemaVersion: 1,
+          status: 'completed',
+        };
+      }
+
+      const { documents, firestore } = createFakeFirestore(initialDocuments);
+      const repository = createFirestoreLearningRepository(firestore);
+
+      const result = await repository.submitQuizAttempt({
+        answers: createPassingAnswers(unit.moduleQuizId),
+        attemptId: `attempt-${unit.moduleQuizId}`,
+        idempotencyKey: `pass-${unit.moduleQuizId}`,
+        uid: `learner-${unit.algorithmId}`,
+      });
+
+      expect(result.data).toMatchObject({
+        passed: true,
+        score: 100,
+      });
+      expect(result.data).toMatchObject({
+        newlyUnlocked: unit.unlockAlgorithmIds.map((algorithmId) => ({
+          id: algorithmId,
+          type: 'algorithm',
+        })),
+      });
+
+      for (const algorithmId of unit.unlockAlgorithmIds) {
+        expect(
+          documents.get(`users/learner-${unit.algorithmId}/algorithmUnlocks/${algorithmId}`),
+        ).toMatchObject({
+          algorithmId,
+          moduleId: unit.moduleId,
+          reason: 'module-completed',
+        });
+      }
+    }
+  });
+
   it('rejects direct module quiz completion when required post and demo completion are missing', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/quizAttempts/attempt-module-quiz-direct': {
@@ -667,6 +798,77 @@ describe('Firestore learning repository', () => {
     });
     expectStableContentAccessGrant(
       documents.get('users/learner-01/contentAccess/demo_demo-perceptron-and-gate'),
+    );
+  });
+
+  it('opens the next post in a multi-post module before granting the fixed demo', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/quizAttempts/attempt-cml-p03':
+        createOpenAttemptDocument('quiz-post-cml-p03'),
+      'users/learner-01/quizProgress/quiz-post-cml-p03': {
+        attemptCount: 1,
+        bestScore: 0,
+        passed: false,
+        schemaVersion: 1,
+        wrongCounts: {},
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await repository.submitQuizAttempt({
+      answers: createPassingAnswers('quiz-post-cml-p03'),
+      attemptId: 'attempt-cml-p03',
+      idempotencyKey: 'post-cml-p03-pass-key',
+      uid: 'learner-01',
+    });
+
+    expect(
+      documents.get('users/learner-01/contentAccess/post_cml-p04-polynomial-regression'),
+    ).toMatchObject({
+      contentType: 'post',
+      entityId: 'cml-p04-polynomial-regression',
+      reason: 'post-completed',
+    });
+    expect(
+      documents.get('users/learner-01/contentAccess/demo_demo-linear-calibration'),
+    ).toBeUndefined();
+  });
+
+  it('grants fixed demo access only after the last required module post is complete', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/postCompletions/cml-p03-linear-regression': {
+        postId: 'cml-p03-linear-regression',
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-01/quizAttempts/attempt-cml-p04':
+        createOpenAttemptDocument('quiz-post-cml-p04'),
+      'users/learner-01/quizProgress/quiz-post-cml-p04': {
+        attemptCount: 1,
+        bestScore: 0,
+        passed: false,
+        schemaVersion: 1,
+        wrongCounts: {},
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await repository.submitQuizAttempt({
+      answers: createPassingAnswers('quiz-post-cml-p04'),
+      attemptId: 'attempt-cml-p04',
+      idempotencyKey: 'post-cml-p04-pass-key',
+      uid: 'learner-01',
+    });
+
+    expect(
+      documents.get('users/learner-01/contentAccess/demo_demo-linear-calibration'),
+    ).toMatchObject({
+      contentType: 'demo',
+      entityId: 'demo-linear-calibration',
+      reason: 'post-completed',
+    });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/demo_demo-linear-calibration'),
     );
   });
 
@@ -785,6 +987,82 @@ describe('Firestore learning repository', () => {
         entityId: 'demo-perceptron-and-gate',
       },
     ]);
+  });
+
+  it('returns stable access and algorithm unlocks for non-Perceptron learning units', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/linear-regression': {
+        algorithmId: 'linear-regression',
+        moduleId: 'cml-m02-linear-polynomial',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/demo_demo-linear-calibration': {
+        contentType: 'demo',
+        entityId: 'demo-linear-calibration',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/module_cml-m02-linear-polynomial': {
+        contentType: 'module',
+        entityId: 'cml-m02-linear-polynomial',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/post_cml-p03-linear-regression': {
+        contentType: 'post',
+        entityId: 'cml-p03-linear-regression',
+        schemaVersion: 1,
+      },
+      'users/learner-01/demoCompletions/demo-linear-calibration': {
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-01/enrollments/course-classical-ml': {
+        courseId: 'course-classical-ml',
+        progressPercent: 22,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/moduleCompletions/cml-m02-linear-polynomial': {
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-01/postCompletions/cml-p03-linear-regression': {
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-01/quizProgress/quiz-module-cml-m02': {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        schemaVersion: 1,
+      },
+      'users/learner-01/quizProgress/quiz-post-cml-p03': {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.getProgress({ uid: 'learner-01' });
+
+    expect(result.data.enrollment).toEqual({
+      courseId: 'course-classical-ml',
+      progressPercent: 22,
+      status: 'in-progress',
+    });
+    expect(result.data.algorithmUnlocks).toContainEqual({
+      algorithmId: 'linear-regression',
+      moduleId: 'cml-m02-linear-polynomial',
+    });
+    expect(result.data.contentAccess).toContainEqual({
+      contentType: 'demo',
+      entityId: 'demo-linear-calibration',
+    });
+    expect(result.data.contentAccess).toContainEqual({
+      contentType: 'post',
+      entityId: 'cml-p03-linear-regression',
+    });
   });
 
   it('does not expose revision-pinned content access documents in progress snapshots', async () => {

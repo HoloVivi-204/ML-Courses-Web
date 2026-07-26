@@ -35,7 +35,6 @@ const copy: Readonly<
       attempt: (attemptNumber: number) => string;
       backToLesson: string;
       failed: string;
-      heading: string;
       loading: string;
       notFoundBack: string;
       notFoundBody: string;
@@ -51,7 +50,6 @@ const copy: Readonly<
     attempt: (attemptNumber) => `Attempt ${attemptNumber}`,
     backToLesson: 'Back to lesson',
     failed: 'The quiz could not be loaded or submitted. Try again.',
-    heading: 'Perceptron/XOR quiz',
     loading: 'Loading quiz…',
     notFoundBack: 'Back to course catalog',
     notFoundBody: 'This quiz is not available for the current learner access.',
@@ -65,7 +63,6 @@ const copy: Readonly<
     attempt: (attemptNumber) => `Lần làm ${attemptNumber}`,
     backToLesson: 'Quay lại bài học',
     failed: 'Chưa thể tải hoặc nộp quiz. Hãy thử lại.',
-    heading: 'Quiz Perceptron/XOR',
     loading: 'Đang tải quiz…',
     notFoundBack: 'Về danh sách khóa học',
     notFoundBody: 'Quiz này chưa khả dụng với quyền truy cập hiện tại.',
@@ -107,6 +104,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   );
   const isReadyToSubmit = attempt ? answers.length === attempt.questions.length : false;
   const isAttemptClosed = submissionResult !== null;
+  const backPostId = quizRoute?.postId ?? quizRoute?.requiredPostIds.at(-1) ?? null;
 
   useEffect(() => {
     if (!quizRoute || !canVerifyBackendProgress) {
@@ -297,7 +295,11 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     <main className="learning-quiz-page page-shell" data-testid="quiz-attempt">
       <Link
         className="breadcrumb-link"
-        to={`/learn/${quizRoute.courseId}/posts/dl-p01-neuron-perceptron`}
+        to={
+          backPostId
+            ? `/learn/${quizRoute.courseId}/posts/${backPostId}`
+            : `/learn/${quizRoute.courseId}`
+        }
       >
         <ArrowLeft aria-hidden="true" size={16} />
         {text.backToLesson}
@@ -305,7 +307,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
 
       <header className="quiz-heading">
         <span className="eyebrow">{text.attempt(attempt.attempt.attemptNumber)}</span>
-        <h1>{text.heading}</h1>
+        <h1>{localize(quizRoute.title, locale)}</h1>
         <p>{localize(attempt.mastery, locale)}</p>
       </header>
 
@@ -406,12 +408,12 @@ function hasVerifiedQuizProgress(
   const hasModuleAccess = progressSnapshot.contentAccess.some(
     (item) => item.contentType === 'module' && item.entityId === quizRoute.moduleId,
   );
-  const requiredPostCompleted = progressSnapshot.posts.some(
-    (post) => post.postId === 'dl-p01-neuron-perceptron' && post.completed,
+  const requiredPostCompleted = quizRoute.requiredPostIds.every((postId) =>
+    progressSnapshot.posts.some((post) => post.postId === postId && post.completed),
   );
-  const requiredDemoCompleted = progressSnapshot.demos.some(
-    (demo) => demo.demoId === 'demo-perceptron-and-gate' && demo.completed,
-  );
+  const requiredDemoCompleted =
+    quizRoute.demoId === null ||
+    progressSnapshot.demos.some((demo) => demo.demoId === quizRoute.demoId && demo.completed);
 
   return hasModuleAccess && requiredPostCompleted && requiredDemoCompleted;
 }
