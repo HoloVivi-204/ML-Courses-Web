@@ -3,8 +3,27 @@ setlocal EnableExtensions
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo ERROR: Node.js is not installed or not in PATH.
-  echo Install Node.js 22 LTS, then run this script again.
+  echo Node.js is needed the first time the demo runs.
+  where winget >nul 2>nul
+  if errorlevel 1 (
+    echo ERROR: Node.js is not installed and Windows App Installer is unavailable.
+    echo Install Node.js 22 LTS, then run START_DEMO.bat again.
+    exit /b 1
+  )
+
+  set /p INSTALL_NODE=Install Node.js now? [Y/n]:
+  if /i "%INSTALL_NODE%"=="N" (
+    echo Node.js is required before the demo can start.
+    exit /b 1
+  )
+
+  winget install --id OpenJS.NodeJS.LTS --exact --silent --accept-package-agreements --accept-source-agreements
+  if errorlevel 1 (
+    echo ERROR: Node.js installation did not finish.
+    exit /b 1
+  )
+
+  echo Node.js was installed. Close this window, then double-click START_DEMO.bat again.
   exit /b 1
 )
 
