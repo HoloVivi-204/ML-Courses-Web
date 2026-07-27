@@ -25,6 +25,7 @@ import { getAppCheckRuntimeConfig } from './api-security-config.js';
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { hasLocalCloudAuthDemoAdminRole } from './local-cloud-auth-demo.js';
 import { createFirestoreAdminContentRepository } from './firestore-admin-content-repository.js';
 import {
   createDefaultLearningRepository,
@@ -678,6 +679,7 @@ function createRateLimitMiddleware(
 
 async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser> {
   const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(idToken);
+  const email = typeof decodedToken.email === 'string' ? decodedToken.email : undefined;
 
   return {
     uid: decodedToken.uid,
@@ -686,8 +688,9 @@ async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser
         ? decodedToken.auth_time
         : undefined,
     displayName: typeof decodedToken.name === 'string' ? decodedToken.name : 'Learner',
-    email: typeof decodedToken.email === 'string' ? decodedToken.email : undefined,
-    role: decodedToken.role === 'admin' ? 'admin' : undefined,
+    email,
+    role:
+      decodedToken.role === 'admin' || hasLocalCloudAuthDemoAdminRole(email) ? 'admin' : undefined,
   };
 }
 

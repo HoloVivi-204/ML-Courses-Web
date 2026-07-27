@@ -21,8 +21,12 @@
     "firebase:validate": "node firebase/emulator-seed/dist/validate-environment.js",
     "prefirebase:emulators:start": "pnpm firebase:build",
     "firebase:emulators:start": "node firebase/emulator-seed/dist/run-emulators.js start",
+    "prefirebase:friend-demo:start": "pnpm firebase:build",
+    "firebase:friend-demo:start": "node firebase/emulator-seed/dist/run-hybrid-demo-emulators.js",
     "prefirebase:emulators:seed": "pnpm firebase:build",
     "firebase:emulators:seed": "node firebase/emulator-seed/dist/seed-emulators.js",
+    "prefirebase:friend-demo:seed": "pnpm firebase:build",
+    "firebase:friend-demo:seed": "node firebase/emulator-seed/dist/seed-hybrid-demo.js",
     "prefirebase:emulators:verify": "pnpm firebase:build",
     "firebase:emulators:verify": "node firebase/emulator-seed/dist/run-emulators.js verify"
   },

@@ -44,6 +44,14 @@ function createUnavailableTokenProvider(): AppCheckTokenProvider {
   };
 }
 
+export function shouldUseLocalAppCheckProvider(input: {
+  environment: 'local' | 'staging' | 'production';
+  isEmulator: boolean;
+  isTest: boolean;
+}): boolean {
+  return input.isEmulator || input.isTest || input.environment === 'local';
+}
+
 function configureDebugToken(environment: 'local' | 'staging' | 'production'): void {
   const debugToken = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN;
 
@@ -61,7 +69,15 @@ function configureDebugToken(environment: 'local' | 'staging' | 'production'): v
 }
 
 export function createFirebaseAppCheckTokenProvider(): AppCheckTokenProvider {
-  if (isFirebaseEmulator() || isTestEnvironment()) {
+  const environment = getAppEnvironment();
+
+  if (
+    shouldUseLocalAppCheckProvider({
+      environment,
+      isEmulator: isFirebaseEmulator(),
+      isTest: isTestEnvironment(),
+    })
+  ) {
     return createLocalTokenProvider();
   }
 
@@ -72,7 +88,7 @@ export function createFirebaseAppCheckTokenProvider(): AppCheckTokenProvider {
     return createUnavailableTokenProvider();
   }
 
-  configureDebugToken(getAppEnvironment());
+  configureDebugToken(environment);
   const appCheck = (initializedAppCheck ??= initializeAppCheck(app, {
     isTokenAutoRefreshEnabled: true,
     provider: new ReCaptchaEnterpriseProvider(siteKey),

@@ -4,6 +4,11 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { LocalAdminServices, LocalBucket } from './admin-services.js';
 import type { LocalSeedManifest } from './seed-manifest.js';
 
+export interface LocalDataEmulatorServices {
+  bucket: LocalBucket;
+  firestore: Firestore;
+}
+
 async function deleteAllAuthUsers(auth: Auth): Promise<void> {
   let pageToken: string | undefined;
 
@@ -61,10 +66,18 @@ export async function resetAndSeedLocalEmulators(
   manifest: LocalSeedManifest,
 ): Promise<void> {
   await deleteAllAuthUsers(services.auth);
+  await seedAuth(services.auth, manifest);
+
+  await resetAndSeedLocalDataEmulators(services, manifest);
+}
+
+export async function resetAndSeedLocalDataEmulators(
+  services: LocalDataEmulatorServices,
+  manifest: LocalSeedManifest,
+): Promise<void> {
   await deleteAllFirestoreDocuments(services.firestore);
   await deleteAllStorageObjects(services.bucket);
 
-  await seedAuth(services.auth, manifest);
   await seedFirestore(services.firestore, manifest);
   await seedStorage(services.bucket, manifest);
 }

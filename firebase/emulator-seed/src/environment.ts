@@ -26,7 +26,7 @@ function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function assertNoCloudCredentials(environment: Environment): void {
+export function assertNoCloudCredentials(environment: Environment): void {
   for (const variableName of CREDENTIAL_VARIABLES) {
     if (hasValue(environment[variableName])) {
       throw new Error(`${variableName} must be unset for local Firebase commands.`);
