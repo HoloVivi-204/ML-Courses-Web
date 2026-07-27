@@ -36,7 +36,7 @@ echo Leave this blank for normal learner testing.
 set /p LOCAL_DEMO_ADMIN_EMAIL=Admin email (optional):
 
 echo [4/6] Starting local services...
-start "ML Path Local Services" cmd /k "cd /d ""%CD%"" ^&^& set ""FIREBASE_PROJECT_ID=%FIREBASE_PROJECT_ID%"" ^&^& set ""GCLOUD_PROJECT=%GCLOUD_PROJECT%"" ^&^& set ""GOOGLE_CLOUD_PROJECT=%GOOGLE_CLOUD_PROJECT%"" ^&^& set ""LOCAL_CLOUD_AUTH_DEMO=true"" ^&^& set ""LOCAL_DEMO_ADMIN_EMAIL=%LOCAL_DEMO_ADMIN_EMAIL%"" ^&^& set ""APP_ENV=local"" ^&^& set ""APPCHECK_ENFORCEMENT_MODE=disabled"" ^&^& set ""FIREBASE_AUTH_EMULATOR_HOST="" ^&^& pnpm.cmd firebase:friend-demo:start"
+start "ML Path Local Services" /D "%CD%" cmd /k "pnpm.cmd firebase:friend-demo:start"
 
 echo Waiting for local services...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='SilentlyContinue'; for($attempt=0; $attempt -lt 45; $attempt++){ if((Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:4400/emulators').StatusCode -eq 200){ exit 0 }; Start-Sleep -Seconds 1 }; exit 1"
@@ -47,7 +47,7 @@ call pnpm.cmd firebase:friend-demo:seed
 if errorlevel 1 goto fail
 
 echo [6/6] Opening the web app...
-start "ML Path Web" cmd /k "cd /d ""%CD%"" ^&^& pnpm.cmd --filter @ml-path/web dev --mode friend-demo"
+start "ML Path Web" /D "%CD%" cmd /k "pnpm.cmd --filter @ml-path/web dev --mode friend-demo"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='SilentlyContinue'; for($attempt=0; $attempt -lt 45; $attempt++){ if((Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:5173').StatusCode -eq 200){ exit 0 }; Start-Sleep -Seconds 1 }; exit 1"
 if errorlevel 1 goto web_not_ready
 

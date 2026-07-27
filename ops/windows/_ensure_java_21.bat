@@ -2,7 +2,8 @@
 setlocal EnableExtensions
 
 set "JAVA_MAJOR="
-for /f "tokens=2 delims=\"" %%J in ('java -version 2^>^&1 ^| findstr /c:"version"') do set "JAVA_VERSION=%%J"
+for /f "tokens=3" %%J in ('java -version 2^>^&1 ^| findstr /c:"version"') do set "JAVA_VERSION=%%J"
+set "JAVA_VERSION=%JAVA_VERSION:"=%"
 for /f "tokens=1 delims=." %%J in ("%JAVA_VERSION%") do set "JAVA_MAJOR=%%J"
 
 if defined JAVA_MAJOR if %JAVA_MAJOR% GEQ 21 exit /b 0
