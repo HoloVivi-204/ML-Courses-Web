@@ -6,6 +6,7 @@ import express, {
   type Request,
   type Response,
 } from 'express';
+import { getAppCheck } from 'firebase-admin/app-check';
 import { getAuth } from 'firebase-admin/auth';
 import helmet from 'helmet';
 
@@ -20,6 +21,7 @@ import {
   createDefaultAdminReportRepository,
   type AdminReportRepository,
 } from './admin-report-repository.js';
+import { getAppCheckRuntimeConfig } from './api-security-config.js';
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
@@ -35,6 +37,13 @@ import {
   type UpdatePlaygroundConfigInput,
 } from './playground-repository.js';
 import type { QuizAnswer, QuizAnswerValue } from './quiz-manifest.js';
+import {
+  createFirestoreRateLimiter,
+  createNoopRateLimiter,
+  getApiRateLimitPolicies,
+  type RateLimitPolicy,
+  type RateLimiter,
+} from './rate-limiter.js';
 import { getRuntimeFeatureManifest } from './runtime-config.js';
 
 export interface VerifiedAuthUser {
@@ -54,9 +63,12 @@ interface ApiErrorBody {
 export interface ApiAppOptions {
   adminContentRepository?: AdminContentRepository | undefined;
   adminReportRepository?: AdminReportRepository | undefined;
+  appCheckEnforcement?: 'disabled' | 'enforced' | undefined;
   deleteAuthUser?: ((uid: string) => Promise<void>) | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
+  rateLimiter?: RateLimiter | undefined;
+  verifyAppCheckToken?: ((appCheckToken: string) => Promise<void>) | undefined;
   verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
 }
 
@@ -127,6 +139,16 @@ function getBearerToken(request: Request): string {
   }
 
   return token;
+}
+
+function getAppCheckToken(request: Request): string {
+  const appCheckToken = request.get('x-firebase-appcheck')?.trim() ?? '';
+
+  if (!appCheckToken) {
+    throw new ApiError(401, 'APP_CHECK_REQUIRED', 'A valid App Check token is required.');
+  }
+
+  return appCheckToken;
 }
 
 function getIdempotencyKey(request: Request): string {
@@ -598,6 +620,61 @@ function createAuthMiddleware(
   };
 }
 
+function createAppCheckMiddleware(
+  isEnforced: boolean,
+  verifyAppCheckToken: (appCheckToken: string) => Promise<void>,
+): express.RequestHandler {
+  if (!isEnforced) {
+    return (_request, _response, next) => next();
+  }
+
+  return async (request, _response, next) => {
+    try {
+      await verifyAppCheckToken(getAppCheckToken(request));
+      next();
+    } catch (error) {
+      next(
+        error instanceof ApiError
+          ? error
+          : new ApiError(401, 'APP_CHECK_INVALID', 'A valid App Check token is required.'),
+      );
+    }
+  };
+}
+
+function createRateLimitMiddleware(
+  rateLimiter: RateLimiter,
+  policy: RateLimitPolicy,
+  scope: string,
+): express.RequestHandler {
+  return async (_request, response, next) => {
+    try {
+      const decision = await rateLimiter.consume({
+        identity: getAuthUser(response).uid,
+        policy,
+        scope,
+      });
+
+      if (!decision.allowed) {
+        response.setHeader('retry-after', String(decision.retryAfterSeconds));
+        throw new ApiError(429, 'RATE_LIMITED', 'Too many requests. Please try again later.');
+      }
+
+      next();
+    } catch (error) {
+      next(
+        error instanceof ApiError
+          ? error
+          : new ApiError(
+              503,
+              'RATE_LIMIT_UNAVAILABLE',
+              'Request protection is temporarily unavailable.',
+            ),
+      );
+    }
+  };
+}
+
 async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser> {
   const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(idToken);
 
@@ -611,6 +688,14 @@ async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser
     email: typeof decodedToken.email === 'string' ? decodedToken.email : undefined,
     role: decodedToken.role === 'admin' ? 'admin' : undefined,
   };
+}
+
+async function defaultVerifyAppCheckToken(appCheckToken: string): Promise<void> {
+  await getAppCheck(getFirebaseAdminApp()).verifyToken(appCheckToken);
+}
+
+function isTestRuntime(): boolean {
+  return process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined;
 }
 
 async function defaultDeleteAuthUser(uid: string): Promise<void> {
@@ -702,7 +787,117 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
   const deleteAuthUser = options.deleteAuthUser ?? defaultDeleteAuthUser;
+  const appCheckEnforcement =
+    options.appCheckEnforcement ??
+    (isTestRuntime()
+      ? 'disabled'
+      : getAppCheckRuntimeConfig().isEnforced
+        ? 'enforced'
+        : 'disabled');
+  const requireAppCheck = createAppCheckMiddleware(
+    appCheckEnforcement === 'enforced',
+    options.verifyAppCheckToken ?? defaultVerifyAppCheckToken,
+  );
   const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
+  const rateLimitPolicies = getApiRateLimitPolicies();
+  const rateLimiter =
+    options.rateLimiter ??
+    (isTestRuntime() ? createNoopRateLimiter() : createFirestoreRateLimiter());
+  const requireAccountDeletionRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.accountDeletion,
+    'account-deletion',
+  );
+  const requireAdminMutationRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.adminMutation,
+    'admin-draft-create',
+  );
+  const requireAdminRevisionUpdateRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.adminMutation,
+    'admin-revision-update',
+  );
+  const requireAdminRevisionValidationRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.adminMutation,
+    'admin-revision-validation',
+  );
+  const requireAdminPublishRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.adminMutation,
+    'admin-publish',
+  );
+  const requireAdminRollbackRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.adminMutation,
+    'admin-rollback',
+  );
+  const requireAdminUnpublishRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.adminMutation,
+    'admin-unpublish',
+  );
+  const requireDemoCompletionRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.completion,
+    'demo-completion',
+  );
+  const requirePostCompletionRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.completion,
+    'post-completion',
+  );
+  const requireEnrollmentRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.enrollment,
+    'enrollment',
+  );
+  const requirePlaygroundConfigRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundConfig,
+    'playground-config-create',
+  );
+  const requirePlaygroundConfigUpdateRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundConfig,
+    'playground-config-update',
+  );
+  const requirePlaygroundConfigDeleteRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundConfig,
+    'playground-config-delete',
+  );
+  const requirePlaygroundRunRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundRun,
+    'playground-run-save',
+  );
+  const requirePlaygroundRunDeleteRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundRun,
+    'playground-run-delete',
+  );
+  const requirePlaygroundSessionRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundSession,
+    'playground-session-create',
+  );
+  const requirePlaygroundSessionCancellationRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.playgroundSession,
+    'playground-session-cancellation',
+  );
+  const requireQuizAttemptRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.quizAttempt,
+    'quiz-attempt',
+  );
+  const requireQuizSubmissionRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.quizSubmission,
+    'quiz-submission',
+  );
 
   function getAdminContentRepository(): AdminContentRepository {
     adminContentRepository ??= createDefaultAdminContentRepository();
@@ -745,7 +940,9 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     });
   });
 
-  /** Returns Release 1 runtime feature flags without touching learner data. */
+  app.use('/api/v1', requireAppCheck);
+
+  /** Returns Release 1 runtime feature flags after App Check verification. */
   app.get('/api/v1/system/features', (_request, response) => {
     sendSuccess(response, 200, getRuntimeFeatureManifest());
   });
@@ -784,25 +981,31 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
-  app.delete('/api/v1/users/me', requireAuth, async (request, response, next) => {
-    try {
-      assertNoAccountDeletionBody(request);
+  app.delete(
+    '/api/v1/users/me',
+    requireAuth,
+    requireAccountDeletionRateLimit,
+    async (request, response, next) => {
+      try {
+        assertNoAccountDeletionBody(request);
 
-      const authUser = getAuthUser(response);
-      requireRecentAuthentication(authUser);
-      await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
-      await getLearningRepository().deleteLearnerAccount({ uid: authUser.uid });
-      await getPlaygroundRepository().deleteLearnerPlaygroundData({ uid: authUser.uid });
+        const authUser = getAuthUser(response);
+        requireRecentAuthentication(authUser);
+        await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
+        await getLearningRepository().deleteLearnerAccount({ uid: authUser.uid });
+        await getPlaygroundRepository().deleteLearnerPlaygroundData({ uid: authUser.uid });
 
-      sendNoContent(response);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendNoContent(response);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.post(
     '/api/v1/courses/:courseId/enrollments',
     requireAuth,
+    requireEnrollmentRateLimit,
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
@@ -820,26 +1023,31 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     },
   );
 
-  app.post('/api/v1/demos/:demoId/completions', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
-      const demoId = getRouteParam(request, 'demoId');
-      const viewedStepIds = getStringArrayBodyField(request, 'viewedStepIds');
-      const seed = assertRequiredDemoStepsViewed(demoId, viewedStepIds);
-      const result = await getLearningRepository().completeDemo({
-        demoId,
-        idempotencyKey: getIdempotencyKey(request),
-        moduleId: seed.moduleId,
-        requiredStepIds: seed.requiredStepIds,
-        uid: authUser.uid,
-        viewedStepIds,
-      });
+  app.post(
+    '/api/v1/demos/:demoId/completions',
+    requireAuth,
+    requireDemoCompletionRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const demoId = getRouteParam(request, 'demoId');
+        const viewedStepIds = getStringArrayBodyField(request, 'viewedStepIds');
+        const seed = assertRequiredDemoStepsViewed(demoId, viewedStepIds);
+        const result = await getLearningRepository().completeDemo({
+          demoId,
+          idempotencyKey: getIdempotencyKey(request),
+          moduleId: seed.moduleId,
+          requiredStepIds: seed.requiredStepIds,
+          uid: authUser.uid,
+          viewedStepIds,
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.post('/api/v1/demos/:demoId/views', requireAuth, async (request, response, next) => {
     try {
@@ -891,38 +1099,49 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
-  app.post('/api/v1/posts/:postId/completions', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
-      const result = await getLearningRepository().completePost({
-        idempotencyKey: getIdempotencyKey(request),
-        postId: getRouteParam(request, 'postId'),
-        uid: authUser.uid,
-      });
+  app.post(
+    '/api/v1/posts/:postId/completions',
+    requireAuth,
+    requirePostCompletionRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getLearningRepository().completePost({
+          idempotencyKey: getIdempotencyKey(request),
+          postId: getRouteParam(request, 'postId'),
+          uid: authUser.uid,
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
-  app.post('/api/v1/quizzes/:quizId/attempts', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
-      const result = await getLearningRepository().createQuizAttempt({
-        quizId: getRouteParam(request, 'quizId'),
-        uid: authUser.uid,
-      });
+  app.post(
+    '/api/v1/quizzes/:quizId/attempts',
+    requireAuth,
+    requireQuizAttemptRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getLearningRepository().createQuizAttempt({
+          quizId: getRouteParam(request, 'quizId'),
+          uid: authUser.uid,
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.post(
     '/api/v1/quiz-attempts/:attemptId/submissions',
     requireAuth,
+    requireQuizSubmissionRateLimit,
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
@@ -985,6 +1204,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.post(
     '/api/v1/admin/content/:entityType/:entityId/drafts',
     requireAuth,
+    requireAdminMutationRateLimit,
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
@@ -1001,26 +1221,32 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     },
   );
 
-  app.patch('/api/v1/admin/revisions/:revisionId', requireAuth, async (request, response, next) => {
-    try {
-      const adminUser = requireAdminUser(response);
-      const updateBody = getAdminContentDraftPatchBody(request);
-      const result = await getAdminContentRepository().updateDraft({
-        actorUid: adminUser.uid,
-        patch: updateBody.patch,
-        revisionId: getRouteParam(request, 'revisionId'),
-        revisionVersion: updateBody.revisionVersion,
-      });
+  app.patch(
+    '/api/v1/admin/revisions/:revisionId',
+    requireAuth,
+    requireAdminRevisionUpdateRateLimit,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const updateBody = getAdminContentDraftPatchBody(request);
+        const result = await getAdminContentRepository().updateDraft({
+          actorUid: adminUser.uid,
+          patch: updateBody.patch,
+          revisionId: getRouteParam(request, 'revisionId'),
+          revisionVersion: updateBody.revisionVersion,
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.post(
     '/api/v1/admin/revisions/:revisionId/validate',
     requireAuth,
+    requireAdminRevisionValidationRateLimit,
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
@@ -1039,6 +1265,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.post(
     '/api/v1/admin/revisions/:revisionId/publish',
     requireAuth,
+    requireAdminPublishRateLimit,
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
@@ -1059,6 +1286,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.post(
     '/api/v1/admin/revisions/:revisionId/rollback',
     requireAuth,
+    requireAdminRollbackRateLimit,
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
@@ -1078,6 +1306,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.post(
     '/api/v1/admin/entities/:entityId/unpublish',
     requireAuth,
+    requireAdminUnpublishRateLimit,
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
@@ -1094,28 +1323,34 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     },
   );
 
-  app.post('/api/v1/playground-run-sessions', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
-      const body = getObjectBody(request);
-      const result = await getPlaygroundRepository().createRunSession({
-        uid: authUser.uid,
-        scenarioId: getStringBodyField(request, 'scenarioId'),
-        algorithmId: getStringBodyField(request, 'algorithmId'),
-        datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
-        config: body.config,
-        deviceProfile: getDeviceProfileBodyField(request),
-      });
+  app.post(
+    '/api/v1/playground-run-sessions',
+    requireAuth,
+    requirePlaygroundSessionRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const body = getObjectBody(request);
+        const result = await getPlaygroundRepository().createRunSession({
+          uid: authUser.uid,
+          scenarioId: getStringBodyField(request, 'scenarioId'),
+          algorithmId: getStringBodyField(request, 'algorithmId'),
+          datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
+          config: body.config,
+          deviceProfile: getDeviceProfileBodyField(request),
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.post(
     '/api/v1/playground-run-sessions/:sessionId/cancellations',
     requireAuth,
+    requirePlaygroundSessionCancellationRateLimit,
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
@@ -1131,21 +1366,26 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     },
   );
 
-  app.post('/api/v1/playground-runs', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
-      const result = await getPlaygroundRepository().saveRun({
-        uid: authUser.uid,
-        idempotencyKey: getIdempotencyKey(request),
-        sessionId: getStringBodyField(request, 'sessionId'),
-        result: getBodyField(request, 'result'),
-      });
+  app.post(
+    '/api/v1/playground-runs',
+    requireAuth,
+    requirePlaygroundRunRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const result = await getPlaygroundRepository().saveRun({
+          uid: authUser.uid,
+          idempotencyKey: getIdempotencyKey(request),
+          sessionId: getStringBodyField(request, 'sessionId'),
+          result: getBodyField(request, 'result'),
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.get('/api/v1/playground-runs', requireAuth, async (request, response, next) => {
     try {
@@ -1161,39 +1401,49 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
-  app.delete('/api/v1/playground-runs/:runId', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
+  app.delete(
+    '/api/v1/playground-runs/:runId',
+    requireAuth,
+    requirePlaygroundRunDeleteRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
 
-      await getPlaygroundRepository().deleteRun({
-        uid: authUser.uid,
-        runId: getRouteParam(request, 'runId'),
-      });
+        await getPlaygroundRepository().deleteRun({
+          uid: authUser.uid,
+          runId: getRouteParam(request, 'runId'),
+        });
 
-      sendNoContent(response);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendNoContent(response);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
-  app.post('/api/v1/playground-configs', requireAuth, async (request, response, next) => {
-    try {
-      const authUser = getAuthUser(response);
-      const body = getObjectBody(request);
-      const result = await getPlaygroundRepository().createConfig({
-        uid: authUser.uid,
-        name: getStringBodyField(request, 'name'),
-        scenarioId: getStringBodyField(request, 'scenarioId'),
-        algorithmId: getStringBodyField(request, 'algorithmId'),
-        datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
-        config: body.config,
-      });
+  app.post(
+    '/api/v1/playground-configs',
+    requireAuth,
+    requirePlaygroundConfigRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const body = getObjectBody(request);
+        const result = await getPlaygroundRepository().createConfig({
+          uid: authUser.uid,
+          name: getStringBodyField(request, 'name'),
+          scenarioId: getStringBodyField(request, 'scenarioId'),
+          algorithmId: getStringBodyField(request, 'algorithmId'),
+          datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
+          config: body.config,
+        });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.get('/api/v1/playground-configs', requireAuth, async (request, response, next) => {
     try {
@@ -1212,6 +1462,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.patch(
     '/api/v1/playground-configs/:configId',
     requireAuth,
+    requirePlaygroundConfigUpdateRateLimit,
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
@@ -1242,6 +1493,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.delete(
     '/api/v1/playground-configs/:configId',
     requireAuth,
+    requirePlaygroundConfigDeleteRateLimit,
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);

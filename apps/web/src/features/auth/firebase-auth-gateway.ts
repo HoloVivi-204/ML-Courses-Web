@@ -27,12 +27,12 @@ const FIREBASE_APP_NAME = 'ml-path-web';
 const LOCAL_AUTH_EMULATOR_URL = 'http://127.0.0.1:9099';
 const LOCAL_FIREBASE_PROJECT_ID = 'demo-ml-learning-local';
 
-function isLocalEmulator(): boolean {
+export function isFirebaseEmulator(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_FIREBASE_USE_EMULATOR !== 'false';
 }
 
 function getFirebaseOptions(): FirebaseOptions | null {
-  if (isLocalEmulator()) {
+  if (isFirebaseEmulator()) {
     return {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'local-emulator-api-key',
       appId: import.meta.env.VITE_FIREBASE_APP_ID ?? 'local-emulator-app',
@@ -69,6 +69,12 @@ function getFirebaseApp(options: FirebaseOptions): FirebaseApp {
   return getApps().some((app) => app.name === FIREBASE_APP_NAME)
     ? getApp(FIREBASE_APP_NAME)
     : initializeApp(options, FIREBASE_APP_NAME);
+}
+
+export function getConfiguredFirebaseApp(): FirebaseApp | null {
+  const options = getFirebaseOptions();
+
+  return options ? getFirebaseApp(options) : null;
 }
 
 function toAuthUser(user: User): AuthUser {
@@ -180,15 +186,15 @@ function createConfiguredGateway(auth: Auth): AuthGateway {
 }
 
 export function createFirebaseAuthGateway(): AuthGateway {
-  const options = getFirebaseOptions();
+  const app = getConfiguredFirebaseApp();
 
-  if (!options) {
+  if (!app) {
     return createUnavailableGateway();
   }
 
-  const auth = getAuth(getFirebaseApp(options));
+  const auth = getAuth(app);
 
-  if (isLocalEmulator() && !auth.emulatorConfig) {
+  if (isFirebaseEmulator() && !auth.emulatorConfig) {
     connectAuthEmulator(auth, LOCAL_AUTH_EMULATOR_URL, { disableWarnings: true });
   }
 

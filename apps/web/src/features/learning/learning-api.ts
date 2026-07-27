@@ -1,3 +1,8 @@
+import {
+  createFirebaseAppCheckTokenProvider,
+  type AppCheckTokenProvider,
+} from '../auth/firebase-app-check-gateway';
+
 export type LearnerLocalePreference = 'en' | 'vi';
 export type LearnerThemePreference = 'dark' | 'light' | 'system';
 
@@ -541,7 +546,29 @@ async function ensureSuccessResponse(response: Response): Promise<void> {
   }
 }
 
-export function createFetchLearningApiClient(): LearningApiClient {
+export function createFetchLearningApiClient(
+  options: {
+    appCheckTokenProvider?: AppCheckTokenProvider | undefined;
+  } = {},
+): LearningApiClient {
+  const appCheckTokenProvider =
+    options.appCheckTokenProvider ?? createFirebaseAppCheckTokenProvider();
+  const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const appCheckToken = await appCheckTokenProvider.getToken();
+
+    if (!appCheckToken) {
+      return globalThis.fetch(input, init);
+    }
+
+    const headers = new Headers(init?.headers);
+
+    headers.set('x-firebase-appcheck', appCheckToken);
+    return globalThis.fetch(input, {
+      ...init,
+      headers: Object.fromEntries(headers.entries()),
+    });
+  };
+
   return {
     async bootstrapProfile({ idToken, locale, theme }) {
       const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(

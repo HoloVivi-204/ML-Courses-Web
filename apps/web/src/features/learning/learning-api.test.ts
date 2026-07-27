@@ -36,7 +36,11 @@ describe('fetch learning API client', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createFetchLearningApiClient();
+    const client = createFetchLearningApiClient({
+      appCheckTokenProvider: {
+        getToken: async () => 'verified-app-check-token',
+      },
+    });
     const result = await client.bootstrapProfile({
       idToken: 'local-id-token',
       locale: 'en',
@@ -52,6 +56,7 @@ describe('fetch learning API client', () => {
       headers: {
         authorization: 'Bearer local-id-token',
         'content-type': 'application/json',
+        'x-firebase-appcheck': 'verified-app-check-token',
       },
       method: 'POST',
     });
@@ -104,6 +109,49 @@ describe('fetch learning API client', () => {
         'content-type': 'application/json',
       },
       method: 'PATCH',
+    });
+  });
+
+  it('adds the App Check token to protected read requests', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            profile: {
+              uid: 'learner-01',
+              schemaVersion: 1,
+              displayName: 'Local Student',
+              avatarUrl: null,
+              locale: 'vi',
+              theme: 'system',
+              status: 'active',
+            },
+            courseProgress: [],
+            moduleProgress: [],
+            postProgress: [],
+            quizAttempts: [],
+            algorithmUnlocks: [],
+          },
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient({
+      appCheckTokenProvider: {
+        getToken: async () => 'verified-app-check-token',
+      },
+    });
+
+    await client.getProgress('local-id-token');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me/progress', {
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'x-firebase-appcheck': 'verified-app-check-token',
+      },
     });
   });
 

@@ -156,8 +156,37 @@ describe('API foundation', () => {
     });
   });
 
-  it('returns the public runtime feature manifest without authentication', async () => {
-    const response = await request(createApiApp()).get('/api/v1/system/features').expect(200);
+  it('requires App Check for non-health routes while keeping health public', async () => {
+    const app = createApiApp({
+      appCheckEnforcement: 'enforced',
+      verifyAppCheckToken: async (token) => {
+        if (token !== 'verified-app-check-token') {
+          throw new Error('Invalid App Check token.');
+        }
+      },
+    });
+
+    await request(app).get('/api/v1/health').expect(200);
+
+    const missingTokenResponse = await request(app).get('/api/v1/system/features').expect(401);
+
+    expect(missingTokenResponse.body.error).toMatchObject({
+      code: 'APP_CHECK_REQUIRED',
+    });
+
+    const invalidTokenResponse = await request(app)
+      .get('/api/v1/system/features')
+      .set('x-firebase-appcheck', 'invalid-app-check-token')
+      .expect(401);
+
+    expect(invalidTokenResponse.body.error).toMatchObject({
+      code: 'APP_CHECK_INVALID',
+    });
+
+    const response = await request(app)
+      .get('/api/v1/system/features')
+      .set('x-firebase-appcheck', 'verified-app-check-token')
+      .expect(200);
 
     expect(response.body).toEqual({
       success: true,
@@ -188,6 +217,43 @@ describe('API foundation', () => {
       },
       requestId: response.headers['x-request-id'],
     });
+  });
+
+  it('rate limits quiz submissions by the authenticated UID before grading', async () => {
+    const consumedRequests: unknown[] = [];
+    const app = createApiApp({
+      appCheckEnforcement: 'disabled',
+      learningRepository: createLearningRepository({
+        submitQuizAttempt: async () => {
+          throw new Error('Quiz grading must not run after the rate limit is exceeded.');
+        },
+      }),
+      rateLimiter: {
+        consume: async (input) => {
+          consumedRequests.push(input);
+          return { allowed: false, retryAfterSeconds: 47 };
+        },
+      },
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/quiz-attempts/attempt-01/submissions')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ uid: 'attacker-uid' })
+      .expect(429);
+
+    expect(response.headers['retry-after']).toBe('47');
+    expect(response.body.error.code).toBe('RATE_LIMITED');
+    expect(consumedRequests).toEqual([
+      expect.objectContaining({
+        identity: 'learner-01',
+        scope: 'quiz-submission',
+      }),
+    ]);
   });
 
   it('bootstraps the authenticated learner profile without copying email into Firestore data', async () => {
