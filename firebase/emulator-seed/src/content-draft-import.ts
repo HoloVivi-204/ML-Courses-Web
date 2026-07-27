@@ -56,6 +56,11 @@ export interface ContentDraftImportResult {
   updated: number;
 }
 
+export interface ContentDraftDiff {
+  document: ReleaseContentDraftDocument;
+  status: 'create' | 'unchanged' | 'update';
+}
+
 interface ParsedPost {
   activityIds: readonly string[];
   postId: string;
@@ -432,27 +437,45 @@ export function createReleaseContentDraftManifest(): ReleaseContentDraftManifest
   };
 }
 
+export async function diffReleaseContentDrafts(input: {
+  manifest?: ReleaseContentDraftManifest;
+  store: DraftContentDocumentStore;
+}): Promise<readonly ContentDraftDiff[]> {
+  const manifest = input.manifest ?? createReleaseContentDraftManifest();
+
+  return Promise.all(
+    manifest.documents.map(async (document) => {
+      const existing = await input.store.get(document.storagePath);
+      const status =
+        existing?.contentHash === document.contentHash && existing?.inputHash === manifest.inputHash
+          ? 'unchanged'
+          : existing
+            ? 'update'
+            : 'create';
+
+      return { document, status };
+    }),
+  );
+}
+
 export async function importReleaseContentDrafts(input: {
   dryRun: boolean;
   manifest?: ReleaseContentDraftManifest;
   store: DraftContentDocumentStore;
 }): Promise<ContentDraftImportResult> {
   const manifest = input.manifest ?? createReleaseContentDraftManifest();
+  const changes = await diffReleaseContentDrafts({ manifest, store: input.store });
   let created = 0;
   let unchanged = 0;
   let updated = 0;
 
-  for (const document of manifest.documents) {
-    const existing = await input.store.get(document.storagePath);
-    const isUnchanged =
-      existing?.contentHash === document.contentHash && existing?.inputHash === manifest.inputHash;
-
-    if (isUnchanged) {
+  for (const { document, status } of changes) {
+    if (status === 'unchanged') {
       unchanged += 1;
       continue;
     }
 
-    if (existing) {
+    if (status === 'update') {
       updated += 1;
     } else {
       created += 1;

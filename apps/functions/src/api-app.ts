@@ -11,7 +11,7 @@ import { getAuth } from 'firebase-admin/auth';
 import helmet from 'helmet';
 
 import {
-  createDefaultAdminContentRepository,
+  createStaticAdminContentRepository,
   type AdminContentDraftPatch,
   type AdminContentMetadata,
   type AdminContentRepository,
@@ -25,6 +25,7 @@ import { getAppCheckRuntimeConfig } from './api-security-config.js';
 import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { createFirestoreAdminContentRepository } from './firestore-admin-content-repository.js';
 import {
   createDefaultLearningRepository,
   type LearnerLocalePreference,
@@ -900,7 +901,9 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   );
 
   function getAdminContentRepository(): AdminContentRepository {
-    adminContentRepository ??= createDefaultAdminContentRepository();
+    adminContentRepository ??= isTestRuntime()
+      ? createStaticAdminContentRepository()
+      : createFirestoreAdminContentRepository();
 
     return adminContentRepository;
   }
@@ -1274,6 +1277,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           idempotencyKey: getIdempotencyKey(request),
           reason: getAdminContentLifecycleReasonBody(request),
           revisionId: getRouteParam(request, 'revisionId'),
+          requestId: getRequestId(response),
         });
 
         sendSuccess(response, result.statusCode, result.data);
@@ -1294,6 +1298,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           actorUid: adminUser.uid,
           reason: getAdminContentLifecycleReasonBody(request),
           revisionId: getRouteParam(request, 'revisionId'),
+          requestId: getRequestId(response),
         });
 
         sendSuccess(response, result.statusCode, result.data);
@@ -1314,6 +1319,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           actorUid: adminUser.uid,
           entityId: getRouteParam(request, 'entityId'),
           reason: getAdminContentLifecycleReasonBody(request),
+          requestId: getRequestId(response),
         });
 
         sendSuccess(response, result.statusCode, result.data);

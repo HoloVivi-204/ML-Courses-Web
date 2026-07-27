@@ -207,6 +207,7 @@ async function assertDirectProgressMutationDenied(): Promise<void> {
     'users/local-student/algorithmUnlocks/perceptron',
     'users/local-student/contentAccess/demo_demo-perceptron-and-gate',
     'users/local-student/quizProgress/quiz-module-dl-m01',
+    'adminContentLifecycleEvents/forged-event',
     'playgroundRunSessions/forged-session',
     'users/local-student/playgroundRuns/forged-run',
     'users/local-student/playgroundConfigs/forged-config',
@@ -298,6 +299,273 @@ async function assertDraftContentImport(): Promise<void> {
   }
 }
 
+async function seedAdminContentLifecycleRepository(
+  firestore: ReturnType<typeof createLocalAdminServices>['firestore'],
+): Promise<void> {
+  const repositoryModulePath = new URL(
+    '../../../apps/functions/dist/firestore-admin-content-repository.js',
+    import.meta.url,
+  ).href;
+  const contentModulePath = new URL(
+    '../../../apps/functions/dist/admin-content-repository.js',
+    import.meta.url,
+  ).href;
+  const repositoryModule = (await import(repositoryModulePath)) as {
+    seedFirestoreAdminContentForEmulator: (input: {
+      content: readonly unknown[];
+      firestore: ReturnType<typeof createLocalAdminServices>['firestore'];
+    }) => Promise<void>;
+  };
+  const contentModule = (await import(contentModulePath)) as {
+    getReleaseOneAdminContentFixture: () => readonly unknown[];
+  };
+
+  await repositoryModule.seedFirestoreAdminContentForEmulator({
+    content: contentModule.getReleaseOneAdminContentFixture(),
+    firestore,
+  });
+}
+
+interface FirestoreLifecycleRepository {
+  createDraft(input: {
+    createdByUid: string;
+    entityId: string;
+    entityType: string;
+  }): Promise<{ data: { draft: { draftRevisionId: string; revisionVersion: number } } }>;
+  listContent(input: { entityType?: string }): Promise<{
+    data: {
+      content: Array<{
+        draftRevisionId: string | null;
+        entityId: string;
+        publishedRevisionId: string;
+        status: string;
+      }>;
+    };
+  }>;
+  publishRevision(input: {
+    actorUid: string;
+    idempotencyKey: string;
+    reason: string;
+    requestId: string;
+    revisionId: string;
+  }): Promise<{
+    data: {
+      content: { publishedRevisionId: string };
+      lifecycleEvent: Record<string, unknown>;
+    };
+  }>;
+  rollbackRevision(input: {
+    actorUid: string;
+    reason: string;
+    requestId: string;
+    revisionId: string;
+  }): Promise<unknown>;
+  unpublishEntity(input: {
+    actorUid: string;
+    entityId: string;
+    reason: string;
+    requestId: string;
+  }): Promise<{ data: { lifecycleEvent: Record<string, unknown> } }>;
+  updateDraft(input: {
+    actorUid: string;
+    patch: Record<string, unknown>;
+    revisionId: string;
+    revisionVersion: number;
+  }): Promise<unknown>;
+  validateDraft(input: { actorUid: string; revisionId: string }): Promise<unknown>;
+}
+
+async function createFirestoreLifecycleRepositoryForVerification(
+  firestore: ReturnType<typeof createLocalAdminServices>['firestore'],
+): Promise<FirestoreLifecycleRepository> {
+  const repositoryModulePath = new URL(
+    '../../../apps/functions/dist/firestore-admin-content-repository.js',
+    import.meta.url,
+  ).href;
+  const repositoryModule = (await import(repositoryModulePath)) as {
+    createFirestoreAdminContentRepository: (input: {
+      firestore: ReturnType<typeof createLocalAdminServices>['firestore'];
+      verifyPublishEvidence: () => void;
+    }) => FirestoreLifecycleRepository;
+  };
+
+  // The API default above proves missing evidence fails closed. This test double only isolates
+  // transaction and persistence behavior after an external verifier has accepted evidence.
+  return repositoryModule.createFirestoreAdminContentRepository({
+    firestore,
+    verifyPublishEvidence: () => undefined,
+  });
+}
+
+async function prepareValidatedDraftForPersistenceTest(
+  repository: FirestoreLifecycleRepository,
+): Promise<string> {
+  const created = await repository.createDraft({
+    createdByUid: 'admin-persistence-test',
+    entityId: 'dl-p01-neuron-perceptron',
+    entityType: 'post',
+  });
+  const revisionId = created.data.draft.draftRevisionId;
+
+  await repository.updateDraft({
+    actorUid: 'admin-persistence-test',
+    patch: {
+      metadata: {
+        attribution: {
+          en: 'Verified source attribution for transaction testing.',
+          vi: 'Attribution nguon cho kiem thu transaction.',
+        },
+        externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+      },
+      preview: {
+        en: 'Durable Firestore draft preview.',
+        vi: 'Preview draft Firestore ben vung.',
+      },
+      title: {
+        en: 'Durable neuron decision',
+        vi: 'Quyet dinh neuron ben vung',
+      },
+    },
+    revisionId,
+    revisionVersion: created.data.draft.revisionVersion,
+  });
+  await repository.validateDraft({ actorUid: 'admin-persistence-test', revisionId });
+
+  return revisionId;
+}
+
+async function assertFirestoreAdminContentPersistence(): Promise<void> {
+  const services = createLocalAdminServices();
+
+  try {
+    await resetAndSeedLocalEmulators(services, createLocalSeedManifest());
+    await seedAdminContentLifecycleRepository(services.firestore);
+
+    const firstRepository = await createFirestoreLifecycleRepositoryForVerification(
+      services.firestore,
+    );
+    const draftRevisionId = await prepareValidatedDraftForPersistenceTest(firstRepository);
+    const restartedRepository = await createFirestoreLifecycleRepositoryForVerification(
+      services.firestore,
+    );
+    const persistedDraft = (
+      await restartedRepository.listContent({ entityType: 'post' })
+    ).data.content.find((content) => content.entityId === 'dl-p01-neuron-perceptron');
+    assert.ok(persistedDraft, 'Restart-equivalent repository must retain the draft pointer.');
+    assert.equal(persistedDraft.draftRevisionId, draftRevisionId);
+
+    const publishInput = {
+      actorUid: 'admin-persistence-test',
+      idempotencyKey: 'publish-persistence-test',
+      reason: 'Verify Firestore transaction persistence.',
+      requestId: 'request-persistence-test',
+      revisionId: draftRevisionId,
+    };
+    const concurrentPublishRequests = [
+      { repository: firstRepository, input: publishInput },
+      {
+        repository: restartedRepository,
+        input: {
+          ...publishInput,
+          idempotencyKey: 'publish-persistence-test-concurrent',
+          requestId: 'request-persistence-test-concurrent',
+        },
+      },
+    ] as const;
+    const concurrentResults = await Promise.allSettled(
+      concurrentPublishRequests.map(({ input, repository }) => repository.publishRevision(input)),
+    );
+    assert.equal(
+      concurrentResults.filter((result) => result.status === 'fulfilled').length,
+      1,
+      'Concurrent publish must commit exactly one current revision.',
+    );
+
+    const committedPublish = concurrentResults.find(
+      (
+        result,
+      ): result is PromiseFulfilledResult<
+        Awaited<ReturnType<FirestoreLifecycleRepository['publishRevision']>>
+      > => result.status === 'fulfilled',
+    );
+    assert.ok(committedPublish, 'One concurrent publish result must be available.');
+    const committedRequest = concurrentPublishRequests[concurrentResults.indexOf(committedPublish)];
+    assert.ok(committedRequest, 'The successful publish request must be available.');
+    const publishedRevisionId = committedPublish.value.data.content.publishedRevisionId;
+    const afterPublishRepository = await createFirestoreLifecycleRepositoryForVerification(
+      services.firestore,
+    );
+    const persistedPublish = (
+      await afterPublishRepository.listContent({ entityType: 'post' })
+    ).data.content.find((content) => content.entityId === 'dl-p01-neuron-perceptron');
+    assert.ok(persistedPublish, 'Restart-equivalent repository must retain the published pointer.');
+    assert.equal(persistedPublish.draftRevisionId, null);
+    assert.equal(persistedPublish.publishedRevisionId, publishedRevisionId);
+
+    const idempotentRetry = await afterPublishRepository.publishRevision(committedRequest.input);
+    assert.equal(idempotentRetry.data.content.publishedRevisionId, publishedRevisionId);
+    await assert.rejects(
+      afterPublishRepository.publishRevision({
+        ...committedRequest.input,
+        reason: 'Conflicting publish request.',
+      }),
+      (error: unknown) => isRecord(error) && error.code === 'IDEMPOTENCY_CONFLICT',
+    );
+    const idempotencyRecords = await services.firestore
+      .collection('adminContentPublishIdempotency')
+      .get();
+    assert.equal(idempotencyRecords.size, 1);
+    assert.ok(idempotencyRecords.docs[0]?.get('expireAt'));
+
+    await services.firestore.doc('users/learner-progress/summary/current').set({ completed: true });
+    await afterPublishRepository.rollbackRevision({
+      actorUid: 'admin-persistence-test',
+      reason: 'Verify pointer rollback only.',
+      requestId: 'request-rollback-test',
+      revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+    });
+    assert.equal(
+      (await services.firestore.doc('users/learner-progress/summary/current').get()).get(
+        'completed',
+      ),
+      true,
+    );
+
+    const unpublished = await afterPublishRepository.unpublishEntity({
+      actorUid: 'admin-persistence-test',
+      entityId: 'course-deep-learning-basic',
+      reason: 'Verify durable planned unpublish.',
+      requestId: 'request-unpublish-test',
+    });
+    const afterUnpublishRepository = await createFirestoreLifecycleRepositoryForVerification(
+      services.firestore,
+    );
+    const unpublishedCourse = (
+      await afterUnpublishRepository.listContent({ entityType: 'course' })
+    ).data.content.find((content) => content.entityId === 'course-deep-learning-basic');
+    assert.ok(unpublishedCourse, 'The course entity must persist after unpublish.');
+    assert.equal(unpublishedCourse.status, 'unpublished');
+    const repeatUnpublish = await afterUnpublishRepository.unpublishEntity({
+      actorUid: 'admin-persistence-test',
+      entityId: 'course-deep-learning-basic',
+      reason: 'Verify durable planned unpublish.',
+      requestId: 'request-unpublish-retry-test',
+    });
+    assert.deepEqual(repeatUnpublish.data.lifecycleEvent, unpublished.data.lifecycleEvent);
+
+    const auditEvents = await services.firestore.collection('adminContentLifecycleEvents').get();
+    assert.equal(auditEvents.size, 3);
+    for (const event of auditEvents.docs) {
+      assert.equal(typeof event.get('actorUid'), 'string');
+      assert.equal(typeof event.get('reason'), 'string');
+      assert.equal(typeof event.get('requestId'), 'string');
+      assert.match(String(event.get('createdAt')), /^\d{4}-\d{2}-\d{2}T/);
+    }
+  } finally {
+    await deleteApp(services.app);
+  }
+}
+
 async function assertAdminContentLifecycleApi(): Promise<void> {
   const services = createLocalAdminServices();
   const adminUid = `admin-${randomUUID()}`;
@@ -305,9 +573,9 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
   const adminPassword = `test-${randomUUID()}`;
   const studentEmail = `student-${randomUUID()}@example.test`;
   const studentPassword = `test-${randomUUID()}`;
-  const draftRevisionId = 'draft-post-dl-p01-neuron-perceptron-rev-d1';
 
   try {
+    await seedAdminContentLifecycleRepository(services.firestore);
     const studentToken = await registerWithEmailPassword(studentEmail, studentPassword);
 
     await services.auth.createUser({
@@ -349,7 +617,8 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       201,
     );
     const createdDraft = getRecordField(createDraftData, 'draft');
-    assert.equal(createdDraft.draftRevisionId, draftRevisionId);
+    assert.equal(typeof createdDraft.draftRevisionId, 'string');
+    const draftRevisionId = String(createdDraft.draftRevisionId);
 
     const updateDraftData = await readSuccessData(
       await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}`, {
@@ -390,33 +659,21 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     assert.equal(getRecordField(validateData, 'draft').validationStatus, 'valid');
     assert.equal(getRecordField(validateData, 'validation').status, 'valid');
 
-    const idempotencyKey = `publish-${randomUUID()}`;
-    const publishInput = {
-      body: { reason: 'Reviewed localized draft copy for pilot release.' },
-      idToken: adminToken,
-      idempotencyKey,
-      method: 'POST' as const,
-    };
-    const publishData = await readSuccessData(
-      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/publish`, publishInput),
-      200,
+    const publishResponse = await requestApiJson(
+      `/api/v1/admin/revisions/${draftRevisionId}/publish`,
+      {
+        body: { reason: 'Reviewed localized draft copy for pilot release.' },
+        idToken: adminToken,
+        idempotencyKey: `publish-${randomUUID()}`,
+        method: 'POST',
+      },
     );
-    const publishedContent = getRecordField(publishData, 'content');
-    assert.equal(publishedContent.draftRevisionId, null);
-    assert.equal(publishedContent.entityId, 'dl-p01-neuron-perceptron');
+    assert.equal(publishResponse.status, 422);
+    const publishFailure = await readJsonObject(publishResponse);
     assert.equal(
-      publishedContent.previousPublishedRevisionId,
-      'post-dl-p01-neuron-perceptron-rev-r1',
+      getRecordField(publishFailure, 'error').code,
+      'ADMIN_CONTENT_EXTERNAL_EVIDENCE_REQUIRED',
     );
-    assert.equal(publishedContent.publishedRevisionId, draftRevisionId);
-    assert.equal(publishedContent.status, 'published');
-    assert.equal(publishedContent.validationStatus, 'valid');
-
-    const retryPublishData = await readSuccessData(
-      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/publish`, publishInput),
-      200,
-    );
-    assert.deepEqual(retryPublishData, publishData);
 
     const reportData = await readSuccessData(
       await requestApiJson('/api/v1/admin/reports/summary', { idToken: adminToken }),
@@ -441,6 +698,7 @@ await verifyResetAndSeed();
 await assertHealthEndpoint();
 await assertEmailPasswordAuthentication();
 await assertAdminContentLifecycleApi();
+await assertFirestoreAdminContentPersistence();
 await assertClientAccessDenied();
 await assertDirectProgressMutationDenied();
 await assertDraftContentImport();

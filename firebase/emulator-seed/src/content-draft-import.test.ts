@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createReleaseContentDraftManifest,
+  diffReleaseContentDrafts,
   importReleaseContentDrafts,
   type DraftContentDocumentStore,
 } from './content-draft-import.js';
@@ -65,6 +66,10 @@ describe('Release 1 content draft importer', () => {
 
   it('dry-runs and upserts draft documents idempotently without a published revision field', async () => {
     const store = createMemoryDocumentStore();
+
+    const initialDiff = await diffReleaseContentDrafts({ store });
+    expect(initialDiff).toHaveLength(72);
+    expect(initialDiff.every((change) => change.status === 'create')).toBe(true);
 
     const dryRun = await importReleaseContentDrafts({ dryRun: true, store });
     expect(dryRun).toMatchObject({ created: 72, dryRun: true, unchanged: 0, updated: 0 });

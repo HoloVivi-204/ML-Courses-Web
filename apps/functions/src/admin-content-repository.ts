@@ -52,6 +52,7 @@ export interface AdminContentLifecycleEvent {
   entityType: AdminContentEntityType;
   fromRevisionId: string | null;
   reason: string;
+  requestId: string;
   toRevisionId: string | null;
   type: 'published' | 'rolled-back' | 'unpublished';
 }
@@ -124,18 +125,21 @@ export interface PublishAdminContentRevisionInput {
   idempotencyKey: string;
   reason: string;
   revisionId: string;
+  requestId: string;
 }
 
 export interface UnpublishAdminContentEntityInput {
   actorUid: string;
   entityId: string;
   reason: string;
+  requestId: string;
 }
 
 export interface RollbackAdminContentRevisionInput {
   actorUid: string;
   reason: string;
   revisionId: string;
+  requestId: string;
 }
 
 export interface ListAdminContentInput {
@@ -476,11 +480,15 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   },
 ];
 
-function isAdminContentEntityType(value: string): value is AdminContentEntityType {
+export function getReleaseOneAdminContentFixture(): readonly AdminContentSummary[] {
+  return releaseOneAdminContent;
+}
+
+export function isAdminContentEntityType(value: string): value is AdminContentEntityType {
   return adminContentEntityTypes.includes(value as AdminContentEntityType);
 }
 
-function getContentKey(entityType: AdminContentEntityType, entityId: string): string {
+export function getAdminContentKey(entityType: AdminContentEntityType, entityId: string): string {
   return `${entityType}:${entityId}`;
 }
 
@@ -515,7 +523,7 @@ function createSeededAdminContentMetadata(): AdminContentMetadata {
   };
 }
 
-function createDraftFromPublished(published: AdminContentSummary): AdminContentDraft {
+export function createDraftFromPublished(published: AdminContentSummary): AdminContentDraft {
   return {
     baseRevisionId: published.publishedRevisionId,
     courseId: published.courseId,
@@ -537,11 +545,11 @@ function createDraftFromPublished(published: AdminContentSummary): AdminContentD
   };
 }
 
-function hasDraftPatchValue(patch: AdminContentDraftPatch): boolean {
+export function hasDraftPatchValue(patch: AdminContentDraftPatch): boolean {
   return patch.title !== undefined || patch.preview !== undefined || patch.metadata !== undefined;
 }
 
-function applyDraftPatch(
+export function applyDraftPatch(
   draft: AdminContentDraft,
   patch: AdminContentDraftPatch,
 ): AdminContentDraft {
@@ -756,7 +764,7 @@ function createValidationChecks(input: {
   ];
 }
 
-function createValidationResult(input: {
+export function createValidationResult(input: {
   draft: AdminContentDraft;
   publishCandidateContent: readonly AdminContentSummary[];
 }): AdminContentValidationResult {
@@ -779,7 +787,7 @@ function createValidationResult(input: {
   };
 }
 
-function createPublishedContentFromDraft(input: {
+export function createPublishedContentFromDraft(input: {
   draft: AdminContentDraft;
   previousPublishedRevisionId: string;
 }): AdminContentSummary {
@@ -803,22 +811,24 @@ function createPublishedContentFromDraft(input: {
   };
 }
 
-function createAdminContentLifecycleEvent(input: {
+export function createAdminContentLifecycleEvent(input: {
   actorUid: string;
+  createdAt?: string | undefined;
   entityId: string;
   entityType: AdminContentEntityType;
   fromRevisionId: string | null;
   reason: string;
+  requestId: string;
   toRevisionId: string | null;
   type: AdminContentLifecycleEvent['type'];
 }): AdminContentLifecycleEvent {
   return {
     ...input,
-    createdAt: new Date().toISOString(),
+    createdAt: input.createdAt ?? new Date().toISOString(),
   };
 }
 
-function createPublishRequestHash(input: PublishAdminContentRevisionInput): string {
+export function createPublishRequestHash(input: PublishAdminContentRevisionInput): string {
   return JSON.stringify({
     operation: 'admin-content-publish',
     actorUid: input.actorUid,
@@ -827,7 +837,10 @@ function createPublishRequestHash(input: PublishAdminContentRevisionInput): stri
   });
 }
 
-function getIdempotencyRecordKey(input: { actorUid: string; idempotencyKey: string }): string {
+export function getAdminContentIdempotencyRecordKey(input: {
+  actorUid: string;
+  idempotencyKey: string;
+}): string {
   return `${input.actorUid}:${input.idempotencyKey}`;
 }
 
@@ -846,7 +859,7 @@ function assertReleaseOnePublishedRevisionLimits(content: readonly AdminContentS
   const publishedRevisionIds = new Set<string>();
 
   for (const item of content) {
-    const contentKey = getContentKey(item.entityType, item.entityId);
+    const contentKey = getAdminContentKey(item.entityType, item.entityId);
 
     if (contentKeys.has(contentKey)) {
       throw new ApiError(
@@ -895,7 +908,7 @@ export function createStaticAdminContentRepository(
     entityType: AdminContentEntityType,
     entityId: string,
   ): AdminContentSummary | undefined {
-    const contentKey = getContentKey(entityType, entityId);
+    const contentKey = getAdminContentKey(entityType, entityId);
 
     return (
       publishedByContentKey.get(contentKey) ??
@@ -911,14 +924,16 @@ export function createStaticAdminContentRepository(
     }
 
     return (
-      publishedByContentKey.get(getContentKey(seededContent.entityType, seededContent.entityId)) ??
-      seededContent
+      publishedByContentKey.get(
+        getAdminContentKey(seededContent.entityType, seededContent.entityId),
+      ) ?? seededContent
     );
   }
 
   function listCurrentPublishedContent(): readonly AdminContentSummary[] {
     return content.map(
-      (item) => publishedByContentKey.get(getContentKey(item.entityType, item.entityId)) ?? item,
+      (item) =>
+        publishedByContentKey.get(getAdminContentKey(item.entityType, item.entityId)) ?? item,
     );
   }
 
@@ -926,14 +941,14 @@ export function createStaticAdminContentRepository(
     draft: AdminContentDraft,
     currentPublishedContent: AdminContentSummary,
   ): readonly AdminContentSummary[] {
-    const draftContentKey = getContentKey(draft.entityType, draft.entityId);
+    const draftContentKey = getAdminContentKey(draft.entityType, draft.entityId);
     const draftPublishedContent = createPublishedContentFromDraft({
       draft,
       previousPublishedRevisionId: currentPublishedContent.publishedRevisionId,
     });
 
     return listCurrentPublishedContent().map((item) =>
-      getContentKey(item.entityType, item.entityId) === draftContentKey
+      getAdminContentKey(item.entityType, item.entityId) === draftContentKey
         ? draftPublishedContent
         : item,
     );
@@ -953,7 +968,7 @@ export function createStaticAdminContentRepository(
         );
       }
 
-      const contentKey = getContentKey(input.entityType, input.entityId);
+      const contentKey = getAdminContentKey(input.entityType, input.entityId);
       const existingDraft = draftsByContentKey.get(contentKey);
 
       if (existingDraft !== undefined) {
@@ -997,7 +1012,7 @@ export function createStaticAdminContentRepository(
       }
 
       const requestHash = createPublishRequestHash(input);
-      const idempotencyRecordKey = getIdempotencyRecordKey(input);
+      const idempotencyRecordKey = getAdminContentIdempotencyRecordKey(input);
       const existingIdempotencyRecord = publishIdempotencyRecords.get(idempotencyRecordKey);
 
       if (existingIdempotencyRecord !== undefined) {
@@ -1050,6 +1065,7 @@ export function createStaticAdminContentRepository(
         entityType: draft.entityType,
         fromRevisionId: currentPublishedContent.publishedRevisionId,
         reason: input.reason,
+        requestId: input.requestId,
         toRevisionId: publishedContent.publishedRevisionId,
         type: 'published',
       });
@@ -1061,9 +1077,12 @@ export function createStaticAdminContentRepository(
         },
       };
 
-      publishedByContentKey.set(getContentKey(draft.entityType, draft.entityId), publishedContent);
+      publishedByContentKey.set(
+        getAdminContentKey(draft.entityType, draft.entityId),
+        publishedContent,
+      );
       publishedRevisionsByRevisionId.set(publishedContent.publishedRevisionId, publishedContent);
-      draftsByContentKey.delete(getContentKey(draft.entityType, draft.entityId));
+      draftsByContentKey.delete(getAdminContentKey(draft.entityType, draft.entityId));
       publishIdempotencyRecords.set(idempotencyRecordKey, {
         requestHash,
         result,
@@ -1119,12 +1138,13 @@ export function createStaticAdminContentRepository(
         entityType: targetRevision.entityType,
         fromRevisionId: currentContent.publishedRevisionId,
         reason: input.reason,
+        requestId: input.requestId,
         toRevisionId: targetRevision.publishedRevisionId,
         type: 'rolled-back',
       });
 
       publishedByContentKey.set(
-        getContentKey(rolledBackContent.entityType, rolledBackContent.entityId),
+        getAdminContentKey(rolledBackContent.entityType, rolledBackContent.entityId),
         rolledBackContent,
       );
 
@@ -1169,12 +1189,13 @@ export function createStaticAdminContentRepository(
         entityType: currentContent.entityType,
         fromRevisionId: currentContent.publishedRevisionId,
         reason: input.reason,
+        requestId: input.requestId,
         toRevisionId: null,
         type: 'unpublished',
       });
 
       publishedByContentKey.set(
-        getContentKey(unpublishedContent.entityType, unpublishedContent.entityId),
+        getAdminContentKey(unpublishedContent.entityType, unpublishedContent.entityId),
         unpublishedContent,
       );
 
@@ -1219,7 +1240,7 @@ export function createStaticAdminContentRepository(
 
       const updatedDraft = applyDraftPatch(existingDraft, input.patch);
       draftsByContentKey.set(
-        getContentKey(updatedDraft.entityType, updatedDraft.entityId),
+        getAdminContentKey(updatedDraft.entityType, updatedDraft.entityId),
         updatedDraft,
       );
 
@@ -1271,7 +1292,7 @@ export function createStaticAdminContentRepository(
       };
 
       draftsByContentKey.set(
-        getContentKey(validatedDraft.entityType, validatedDraft.entityId),
+        getAdminContentKey(validatedDraft.entityType, validatedDraft.entityId),
         validatedDraft,
       );
 
@@ -1313,19 +1334,16 @@ export function createStaticAdminContentRepository(
             })
             .map((item) => {
               const currentPublishedContent =
-                publishedByContentKey.get(getContentKey(item.entityType, item.entityId)) ?? item;
+                publishedByContentKey.get(getAdminContentKey(item.entityType, item.entityId)) ??
+                item;
 
               return withDraftRevision(
                 currentPublishedContent,
-                draftsByContentKey.get(getContentKey(item.entityType, item.entityId)),
+                draftsByContentKey.get(getAdminContentKey(item.entityType, item.entityId)),
               );
             }),
         },
       };
     },
   };
-}
-
-export function createDefaultAdminContentRepository(): AdminContentRepository {
-  return createStaticAdminContentRepository();
 }
