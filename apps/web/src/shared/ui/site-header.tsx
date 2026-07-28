@@ -7,6 +7,7 @@ import type { Locale } from '../../features/catalog/course-data';
 import type { Theme } from '../theme/use-theme';
 
 interface SiteHeaderProps {
+  hasAdminAccess: boolean;
   isAuthenticated: boolean;
   isAuthActionPending: boolean;
   locale: Locale;
@@ -21,6 +22,7 @@ function getNavClassName({ isActive }: { isActive: boolean }): string {
 }
 
 export function SiteHeader({
+  hasAdminAccess,
   isAuthenticated,
   isAuthActionPending,
   locale,
@@ -56,6 +58,11 @@ export function SiteHeader({
           <NavLink className={getNavClassName} to="/dashboard">
             {t('nav.dashboard')}
           </NavLink>
+          {isAuthenticated && hasAdminAccess ? (
+            <NavLink className={getNavClassName} to="/admin/content">
+              {t('nav.admin')}
+            </NavLink>
+          ) : null}
           <a className="site-nav-link" href="/#method">
             {t('nav.method')}
           </a>

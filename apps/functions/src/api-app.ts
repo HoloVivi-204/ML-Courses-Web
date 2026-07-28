@@ -1178,6 +1178,16 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
+  app.get('/api/v1/admin/access', requireAuth, (_request, response, next) => {
+    try {
+      sendSuccess(response, 200, {
+        isAdmin: getAuthUser(response).role === 'admin',
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get('/api/v1/admin/content', requireAuth, async (request, response, next) => {
     try {
       requireAdminUser(response);

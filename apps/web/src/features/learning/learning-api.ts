@@ -450,6 +450,7 @@ export interface LearningApiClient {
     idToken: string;
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
+  getAdminAccess?(idToken: string): Promise<boolean>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
   getAdminReportSummary(input: { idToken: string }): Promise<AdminReportSummary>;
   listAdminContent(input: {
@@ -768,6 +769,17 @@ export function createFetchLearningApiClient(
           },
         }),
       );
+    },
+    async getAdminAccess(idToken) {
+      const data = await readSuccessEnvelope<{ isAdmin: boolean }>(
+        await fetch('/api/v1/admin/access', {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+
+      return data.isAdmin;
     },
     async getAdminReportSummary({ idToken }) {
       return readSuccessEnvelope<AdminReportSummary>(

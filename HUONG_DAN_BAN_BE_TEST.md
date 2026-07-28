@@ -6,7 +6,7 @@ Bạn chỉ cần dùng máy Windows có Internet.
 2. Mở thư mục vừa tải về.
 3. Nhấn đúp file `START_DEMO.bat`.
 4. Nếu Windows hỏi cài Node.js hoặc Java 21 lần đầu, chọn đồng ý và chạy lại `START_DEMO.bat` khi cài xong.
-5. Khi hỏi `Admin email`, có thể để trống để test vai trò người học. Muốn xem trang Admin, nhập đúng email sẽ dùng để đăng nhập.
+5. Khi hỏi `Admin email`, có thể để trống để test vai trò người học. Muốn test Admin, nhập đúng email sẽ dùng để đăng nhập. Sau khi đăng nhập bằng email đó, menu `Quản trị` sẽ tự hiện trên thanh đầu trang.
 6. Trình duyệt sẽ tự mở tại `http://localhost:5173`.
 
 ## Đăng Nhập Và Test
