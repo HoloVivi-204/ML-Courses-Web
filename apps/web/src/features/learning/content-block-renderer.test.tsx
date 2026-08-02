@@ -86,11 +86,11 @@ describe('content block renderer', () => {
     );
   });
 
-  it('renders an allowlisted example from its stable activity ID', () => {
+  it('renders the Perceptron activity as the interactive neuron lab', () => {
     const blocks: ContentBlock[] = [
       {
         accessibility: { en: null, vi: null },
-        activityId: 'act-post-test-example',
+        activityId: 'act-dl-p01-neuron-perceptron-example',
         assetIds: [],
         id: 'try-example',
         locales: {
@@ -98,7 +98,7 @@ describe('content block renderer', () => {
           vi: { navigationTitle: 'Thử tạo quyết định' },
         },
         order: 3,
-        postId: 'post-test',
+        postId: 'dl-p01-neuron-perceptron',
         required: true,
         schemaVersion: 1,
         sourceIds: [],
@@ -108,12 +108,48 @@ describe('content block renderer', () => {
 
     render(
       <I18nextProvider i18n={createAppI18n()}>
-        <ContentBlockRenderer blocks={blocks} locale="vi" postId="post-test" />
+        <ContentBlockRenderer blocks={blocks} locale="vi" postId="dl-p01-neuron-perceptron" />
       </I18nextProvider>,
     );
 
     expect(screen.getByRole('heading', { name: 'Tạo một quyết định' })).toBeVisible();
-    expect(screen.getByText('act-post-test-example')).toBeVisible();
+    expect(screen.getByText('act-dl-p01-neuron-perceptron-example')).toBeVisible();
+  });
+
+  it('renders generic draft examples without reusing the neuron lab', () => {
+    const blocks: ContentBlock[] = [
+      {
+        accessibility: { en: null, vi: null },
+        activityId: 'act-cml-p03-linear-regression-example',
+        assetIds: [],
+        id: 'linear-example',
+        locales: {
+          en: { navigationTitle: 'Inspect a residual example' },
+          vi: { navigationTitle: 'Quan sát ví dụ phần dư' },
+        },
+        order: 1,
+        postId: 'cml-p03-linear-regression',
+        required: true,
+        schemaVersion: 1,
+        sourceIds: [],
+        type: 'example',
+      },
+    ];
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <ContentBlockRenderer blocks={blocks} locale="vi" postId="cml-p03-linear-regression" />
+      </I18nextProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Quan sát ví dụ phần dư' })).toBeVisible();
+    expect(
+      screen.getByText(
+        'Đọc ví dụ này theo chuỗi: tín hiệu đầu vào thay đổi, mô hình phản ứng, rồi metric kiểm tra lỗi.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('act-cml-p03-linear-regression-example')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Tạo một quyết định' })).not.toBeInTheDocument();
   });
 
   it('opens only safe HTTPS resources in an isolated tab', () => {

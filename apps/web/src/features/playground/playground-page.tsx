@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
-import { localize, type Locale } from '../catalog/course-data';
+import { courses, localize, type Locale } from '../catalog/course-data';
 import { useAuth } from '../auth/auth-context';
 import type {
   LearningApiClient,
@@ -247,6 +247,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           <span className="eyebrow">{t('playground.eyebrow')}</span>
           <h1>{t('playground.locked.title')}</h1>
           <p>{formatLockedMessage(scenarioRegistrations, locale)}</p>
+          <LockedPlaygroundLabList
+            locale={locale}
+            registrations={scenarioRegistrations}
+            unlockedAlgorithmIds={unlockedAlgorithmIds}
+          />
         </section>
       </main>
     );
@@ -967,6 +972,44 @@ function PlaygroundNotFoundPage() {
   );
 }
 
+function LockedPlaygroundLabList({
+  locale,
+  registrations,
+  unlockedAlgorithmIds,
+}: {
+  locale: Locale;
+  registrations: readonly PlaygroundPairRegistration[];
+  unlockedAlgorithmIds: ReadonlySet<string>;
+}) {
+  return (
+    <ul aria-label={formatLockedLabListLabel(locale)} className="playground-locked-lab-list">
+      {registrations.map((registration) => {
+        const isUnlocked = unlockedAlgorithmIds.has(registration.algorithmId);
+        const requiredModule = findUnlockModuleForAlgorithm(registration.algorithmId);
+
+        return (
+          <li className="playground-locked-lab-card" key={getRegistrationKey(registration)}>
+            <div>
+              <span className={isUnlocked ? 'is-open' : ''}>
+                {formatPlaygroundLockState(isUnlocked, locale)}
+              </span>
+              <code>{registration.datasetVersionId}</code>
+            </div>
+            <h2>{localize(registration.title, locale)}</h2>
+            <p>{localize(registration.intro, locale)}</p>
+            <p>
+              {formatUnlockRequirement(
+                requiredModule ? localize(requiredModule.title, locale) : null,
+                locale,
+              )}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function selectPlayableRegistration(input: {
   registrations: readonly PlaygroundPairRegistration[];
   selectedPairKey: string | null;
@@ -1399,6 +1442,30 @@ function formatStaticLabel(label: string, locale: Locale): string {
   return labels[label]?.[locale] ?? label;
 }
 
+function formatLockedLabListLabel(locale: Locale): string {
+  return locale === 'vi' ? 'Danh sách lab Playground đã khóa' : 'Locked Playground lab list';
+}
+
+function formatPlaygroundLockState(isUnlocked: boolean, locale: Locale): string {
+  if (isUnlocked) {
+    return locale === 'vi' ? 'Đã mở' : 'Unlocked';
+  }
+
+  return locale === 'vi' ? 'Đã khóa' : 'Locked';
+}
+
+function formatUnlockRequirement(moduleTitle: string | null, locale: Locale): string {
+  if (!moduleTitle) {
+    return locale === 'vi'
+      ? 'Hoàn thành module liên quan để mở lab này.'
+      : 'Complete the related module to unlock this lab.';
+  }
+
+  return locale === 'vi'
+    ? `Cần hoàn thành module: ${moduleTitle}.`
+    : `Required module: ${moduleTitle}.`;
+}
+
 function formatLockedMessage(
   registrations: readonly PlaygroundPairRegistration[],
   locale: Locale,
@@ -1412,6 +1479,14 @@ function formatLockedMessage(
   }
 
   return `Complete the related module to unlock at least one published algorithm for this scenario: ${algorithmList}.`;
+}
+
+function findUnlockModuleForAlgorithm(algorithmId: string) {
+  return (
+    courses
+      .flatMap((course) => course.modules ?? [])
+      .find((module) => module.unlockAlgorithmIds.includes(algorithmId)) ?? null
+  );
 }
 
 function formatFeedback(feedbackId: string, locale: Locale): string {

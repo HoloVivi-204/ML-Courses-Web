@@ -6,6 +6,7 @@ import { parseContentBlockCollection } from './content-block-validation';
 import type {
   CalloutBlock,
   ContentBlock,
+  ExampleBlock,
   FormulaBlock,
   HeadingBlock,
   MarkdownBlock,
@@ -88,17 +89,42 @@ function ContentBlockView({ block, displayIndex, locale }: ContentBlockViewProps
     case 'formula':
       return <FormulaBlockView block={block} locale={locale} />;
     case 'example':
-      return (
-        <div className="lesson-section lesson-lab-section">
-          <span className="lesson-section-index">{displayIndex}</span>
-          <NeuronDecisionLab activityId={block.activityId} />
-        </div>
-      );
+      return <ExampleBlockView block={block} displayIndex={displayIndex} locale={locale} />;
     case 'source-list':
       return <SourceListBlockView block={block} displayIndex={displayIndex} locale={locale} />;
     case 'callout':
       return <CalloutBlockView block={block} locale={locale} />;
   }
+}
+
+function ExampleBlockView({
+  block,
+  displayIndex,
+  locale,
+}: {
+  block: ExampleBlock;
+  displayIndex: string | null;
+  locale: Locale;
+}) {
+  if (isNeuronDecisionLabExample(block)) {
+    return (
+      <div className="lesson-section lesson-lab-section">
+        <span className="lesson-section-index">{displayIndex}</span>
+        <NeuronDecisionLab activityId={block.activityId} />
+      </div>
+    );
+  }
+
+  const headingId = `${block.id}-title`;
+
+  return (
+    <section aria-labelledby={headingId} className="lesson-section content-example-block">
+      <span className="lesson-section-index">{displayIndex}</span>
+      <h2 id={headingId}>{block.locales[locale].navigationTitle}</h2>
+      <p>{formatGenericExampleGuidance(locale)}</p>
+      <code>{block.activityId}</code>
+    </section>
+  );
 }
 
 function HeadingBlockView({
@@ -218,6 +244,27 @@ function InsightCallout({
         <p>{content.body}</p>
       </div>
     </aside>
+  );
+}
+
+function isNeuronDecisionLabExample(block: ExampleBlock): boolean {
+  return (
+    block.postId === 'dl-p01-neuron-perceptron' &&
+    block.activityId === 'act-dl-p01-neuron-perceptron-example'
+  );
+}
+
+function formatGenericExampleGuidance(locale: Locale): string {
+  if (locale === 'vi') {
+    return (
+      'Đọc ví dụ này theo chuỗi: tín hiệu đầu vào thay đổi, mô hình phản ứng, ' +
+      'rồi metric kiểm tra lỗi.'
+    );
+  }
+
+  return (
+    'Read this example as a chain: the input signal changes, the model responds, ' +
+    'then the metric checks the error.'
   );
 }
 

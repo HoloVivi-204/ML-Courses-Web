@@ -2159,6 +2159,17 @@ describe('public learning journey', () => {
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
+    const lockedLabList = screen.getByRole('list', {
+      name: 'Danh sách lab Playground đã khóa',
+    });
+
+    expect(
+      within(lockedLabList).getByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    expect(
+      within(lockedLabList).getByRole('heading', { name: 'Playground XOR: MLP' }),
+    ).toBeVisible();
+    expect(within(lockedLabList).getAllByText('Đã khóa')).toHaveLength(2);
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
   });

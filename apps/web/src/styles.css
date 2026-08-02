@@ -2690,6 +2690,51 @@ a {
   padding: clamp(24px, 5vw, 44px);
 }
 
+.playground-locked-lab-list {
+  display: grid;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 14px;
+}
+
+.playground-locked-lab-card {
+  display: grid;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgb(250 204 21 / 8%), transparent 34%), var(--paper);
+  gap: 10px;
+}
+
+.playground-locked-lab-card > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.playground-locked-lab-card span {
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.playground-locked-lab-card span.is-open {
+  color: var(--teal);
+}
+
+.playground-locked-lab-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+.playground-locked-lab-card code {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
 @media (max-width: 820px) {
   .admin-content-hero,
   .admin-content-grid {
@@ -2961,6 +3006,19 @@ a {
 
 .content-heading-block {
   padding-bottom: 0;
+}
+
+.content-example-block {
+  padding-bottom: 64px;
+}
+
+.content-example-block code {
+  display: inline-block;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 
 .content-markdown-block {
