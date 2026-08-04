@@ -4,6 +4,9 @@ import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { App } from './app';
+import { getFixedDemo } from '../../../functions/src/release-demo-content.js';
+import { getReadablePost } from '../../../functions/src/release-learning-content.js';
+import { getReleaseLearningCatalog } from '../../../functions/src/release-learning-catalog.js';
 import type { AuthGateway } from '../features/auth/auth-context';
 import type {
   AdminContentSourceReview,
@@ -388,6 +391,23 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       },
       nextPath: '/learn/course-deep-learning-basic',
     }),
+    getDemoContent: vi.fn().mockImplementation(({ demoId }) => {
+      const demo = getFixedDemo(demoId);
+
+      return demo
+        ? Promise.resolve(demo)
+        : Promise.reject(new Error(`Missing test demo content for ${demoId}.`));
+    }),
+    getFullPostContent: vi.fn().mockImplementation(({ postId }) => {
+      const course = getReleaseLearningCatalog().courses.find((candidate) =>
+        candidate.modules.some((module) => module.posts.some((post) => post.postId === postId)),
+      );
+      const post = course ? getReadablePost(course.courseId, postId, true) : undefined;
+
+      return post
+        ? Promise.resolve(post)
+        : Promise.reject(new Error(`Missing test full post content for ${postId}.`));
+    }),
     getProgress: vi.fn().mockResolvedValue({
       algorithmUnlocks: [],
       contentAccess: [
@@ -446,7 +466,18 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       ],
     }),
+    getTrialPostContent: vi.fn().mockImplementation((postId) => {
+      const course = getReleaseLearningCatalog().courses.find(
+        (candidate) => candidate.trialPostId === postId,
+      );
+      const post = course ? getReadablePost(course.courseId, postId, false) : undefined;
+
+      return post
+        ? Promise.resolve(post)
+        : Promise.reject(new Error(`Missing test trial post content for ${postId}.`));
+    }),
     getAdminReportSummary: vi.fn().mockResolvedValue(createAdminReportSummaryFixture()),
+    getAdminAccess: vi.fn().mockResolvedValue(false),
     listAdminContent: vi.fn().mockResolvedValue([]),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
@@ -1220,6 +1251,38 @@ describe('public learning journey', () => {
     );
   });
 
+  it('shows the Administration navigation item only after the server confirms admin access', async () => {
+    window.history.pushState({}, '', '/');
+    const learningApiClient = createLearningApiClient({
+      getAdminAccess: vi.fn().mockResolvedValue(true),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('link', { name: /quản trị|administration/i })).toHaveAttribute(
+      'href',
+      '/admin/content',
+    );
+  });
+
+  it('does not show the Administration navigation item to a learner', async () => {
+    window.history.pushState({}, '', '/');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await waitFor(() =>
+      expect(learningApiClient.getAdminAccess).toHaveBeenCalledWith('local-id-token'),
+    );
+    expect(
+      screen.queryByRole('link', { name: /quản trị|administration/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it('lets an authenticated learner sign out from the current device', async () => {
     window.history.pushState({}, '', '/dashboard');
     let authListener: ((user: { email: string | null; uid: string } | null) => void) | null = null;
@@ -1328,7 +1391,7 @@ describe('public learning journey', () => {
       window.history.pushState({}, '', '/courses/course-deep-learning-basic');
       const user = userEvent.setup();
 
-      render(<App />);
+      render(<App learningApiClient={createLearningApiClient()} />);
 
       await user.click(screen.getByRole('link', { name: /học thử neuron và perceptron/i }));
 
@@ -1358,7 +1421,7 @@ describe('public learning journey', () => {
       );
       const user = userEvent.setup();
 
-      render(<App />);
+      render(<App learningApiClient={createLearningApiClient()} />);
 
       expect(
         await screen.findByText('Neuron chưa kích hoạt: 0', undefined, {
@@ -1382,7 +1445,7 @@ describe('public learning journey', () => {
       '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     );
 
-    render(<App />);
+    render(<App learningApiClient={createLearningApiClient()} />);
 
     const contents = await screen.findByRole(
       'navigation',
@@ -1406,7 +1469,7 @@ describe('public learning journey', () => {
     );
     const user = userEvent.setup();
 
-    render(<App />);
+    render(<App learningApiClient={createLearningApiClient()} />);
 
     expect(
       await screen.findByRole(
@@ -1434,7 +1497,7 @@ describe('public learning journey', () => {
   it('does not expose an undesignated trial lesson', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic/posts/not-a-public-trial');
 
-    render(<App />);
+    render(<App learningApiClient={createLearningApiClient()} />);
 
     expect(
       await screen.findByRole(
@@ -1456,7 +1519,7 @@ describe('public learning journey', () => {
       '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     );
 
-    render(<App />);
+    render(<App learningApiClient={createLearningApiClient()} />);
 
     const resource = await screen.findByRole(
       'link',
@@ -1506,6 +1569,20 @@ describe('public learning journey', () => {
       }),
     ).toBeVisible();
     expect(screen.getByText('FULL LESSON')).toBeVisible();
+  });
+
+  it('deduplicates course enrollment when React StrictMode replays the route effect', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const learningApiClient = createLearningApiClient();
+
+    render(
+      <StrictMode>
+        <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    await waitFor(() => expect(learningApiClient.enrollCourse).toHaveBeenCalledTimes(1));
   });
 
   it('opens the full Perceptron/XOR lesson on authenticated deep links with backend access', async () => {
@@ -1561,6 +1638,10 @@ describe('public learning journey', () => {
     ).toBeVisible();
     expect(screen.getByText('Trạng thái provenance của draft')).toBeVisible();
     expect(screen.getByText('cml-p03-linear-regression')).toBeVisible();
+    expect(learningApiClient.getFullPostContent).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      postId: 'cml-p03-linear-regression',
+    });
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
   });
 
@@ -2885,10 +2966,7 @@ describe('public learning journey', () => {
       '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     );
     const learningApiClient = createLearningApiClient({
-      getProgress: vi.fn().mockResolvedValue({
-        ...createUnlockedProgressSnapshot(),
-        contentAccess: [],
-      }),
+      getFullPostContent: vi.fn().mockRejectedValue(new Error('Post access denied.')),
     });
 
     render(
@@ -2904,9 +2982,11 @@ describe('public learning journey', () => {
         { timeout: 3_000 },
       ),
     ).toBeVisible();
-    await waitFor(() =>
-      expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token'),
-    );
+    expect(learningApiClient.getFullPostContent).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      postId: 'dl-p01-neuron-perceptron',
+    });
+    expect(learningApiClient.getProgress).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('heading', {
         name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
@@ -2915,13 +2995,60 @@ describe('public learning journey', () => {
     expect(screen.queryByText(/post_dl-p01-neuron-perceptron/)).not.toBeInTheDocument();
   });
 
+  it('does not unlock full post content from a forged session storage grant', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    );
+    sessionStorage.setItem(
+      'ml-path-learning-access-grants',
+      JSON.stringify([
+        {
+          courseId: 'course-deep-learning-basic',
+          postId: 'dl-p01-neuron-perceptron',
+          uid: 'learner-01',
+        },
+      ]),
+    );
+    const learningApiClient = createLearningApiClient({
+      getFullPostContent: vi.fn().mockRejectedValue(new Error('Post access denied.')),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        {
+          name: /Một neuron đưa ra quyết định như thế nào/i,
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible();
+    expect(learningApiClient.getFullPostContent).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      postId: 'dl-p01-neuron-perceptron',
+    });
+    expect(learningApiClient.getProgress).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps the fixed AND gate demo closed without a module access grant', async () => {
     window.history.pushState(
       {},
       '',
       '/learn/course-deep-learning-basic/demos/demo-perceptron-and-gate',
     );
-    const learningApiClient = createLearningApiClient();
+    const learningApiClient = createLearningApiClient({
+      getDemoContent: vi.fn().mockRejectedValue(new Error('Demo access denied.')),
+    });
 
     render(
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
@@ -2934,7 +3061,9 @@ describe('public learning journey', () => {
   it('keeps the fixed AND gate demo closed until backend progress grants demo access', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     const user = userEvent.setup();
-    const learningApiClient = createLearningApiClient();
+    const learningApiClient = createLearningApiClient({
+      getDemoContent: vi.fn().mockRejectedValue(new Error('Demo access denied.')),
+    });
 
     render(
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
@@ -2964,17 +3093,7 @@ describe('public learning journey', () => {
       '',
       '/learn/course-deep-learning-basic/demos/demo-perceptron-and-gate',
     );
-    const learningApiClient = createLearningApiClient({
-      getProgress: vi.fn().mockResolvedValue({
-        ...createUnlockedProgressSnapshot(),
-        demos: [
-          {
-            completed: false,
-            demoId: 'demo-perceptron-and-gate',
-          },
-        ],
-      }),
-    });
+    const learningApiClient = createLearningApiClient();
 
     render(
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
@@ -2986,7 +3105,10 @@ describe('public learning journey', () => {
         name: /Bốn điểm dữ liệu AND và một đường quyết định/i,
       }),
     ).toBeVisible();
-    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.getDemoContent).toHaveBeenCalledWith({
+      demoId: 'demo-perceptron-and-gate',
+      idToken: 'local-id-token',
+    });
     expect(learningApiClient.completeDemo).not.toHaveBeenCalled();
   });
 

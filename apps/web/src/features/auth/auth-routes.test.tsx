@@ -300,6 +300,10 @@ function createLearningApiClient() {
       },
       nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     }),
+    getDemoContent: vi.fn().mockRejectedValue(new Error('Demo content is not part of this test.')),
+    getFullPostContent: vi
+      .fn()
+      .mockRejectedValue(new Error('Post content is not part of this test.')),
     getProgress: vi.fn().mockResolvedValue({
       algorithmUnlocks: [],
       contentAccess: [
@@ -351,6 +355,9 @@ function createLearningApiClient() {
         },
       ],
     }),
+    getTrialPostContent: vi
+      .fn()
+      .mockRejectedValue(new Error('Trial post content is not part of this test.')),
     getAdminReportSummary: vi.fn().mockResolvedValue({
       generatedAt: '2026-07-23T01:00:00.000Z',
       learningVerified: {

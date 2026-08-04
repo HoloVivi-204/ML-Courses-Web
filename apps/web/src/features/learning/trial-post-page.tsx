@@ -6,16 +6,28 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
-import {
-  hasLearningPostAccess,
-  rememberLearningContentAccessGrants,
-} from './learning-access-store';
-import type { LearningApiClient, PostViewResult } from './learning-api';
-import { getReadablePost } from './trial-post-data';
+import type { LearningApiClient, LearningPostContent, PostViewResult } from './learning-api';
 
 interface TrialPostPageProps {
   learningApiClient: LearningApiClient;
   locale: Locale;
+}
+
+interface PostContentLoadState {
+  fullStatus: 'failed' | 'idle' | 'loading' | 'ready';
+  routeKey: string;
+  trialStatus: 'failed' | 'loading' | 'ready';
+}
+
+function isRequiredContentBlock(value: unknown): value is { id: string; required: boolean } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'required' in value &&
+    typeof value.id === 'string' &&
+    value.required === true
+  );
 }
 
 export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps) {
@@ -24,9 +36,19 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const navigate = useNavigate();
   const { courseId, postId } = useParams();
   const uid = user?.uid;
-  const accessKey =
-    status === 'authenticated' && courseId && postId && uid ? `${uid}:${courseId}:${postId}` : null;
-  const [verifiedAccessKey, setVerifiedAccessKey] = useState<string | null>(null);
+  const routeKey = courseId && postId ? `${courseId}:${postId}` : null;
+  const [loadedTrialPost, setLoadedTrialPost] = useState<{
+    post: LearningPostContent;
+    routeKey: string;
+  } | null>(null);
+  const [loadedFullPost, setLoadedFullPost] = useState<{
+    post: LearningPostContent;
+    routeKey: string;
+    uid: string;
+  } | null>(null);
+  const [postContentLoadState, setPostContentLoadState] = useState<PostContentLoadState | null>(
+    null,
+  );
   const [savedReadingPosition, setSavedReadingPosition] = useState<string | null>(null);
   const [postViewSyncError, setPostViewSyncError] = useState(false);
   const articleRef = useRef<HTMLElement>(null);
@@ -34,11 +56,28 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const observedItemIdsRef = useRef(new Set<string>());
   const readingPositionRef = useRef<string | null>(null);
   const restoredReadingPositionRef = useRef<string | null>(null);
-  const hasStoredFullAccess =
-    status === 'authenticated' && hasLearningPostAccess(courseId, postId, uid);
-  const hasBackendFullAccess = accessKey !== null && verifiedAccessKey === accessKey;
-  const hasFullAccess = hasStoredFullAccess || hasBackendFullAccess;
-  const post = getReadablePost(courseId, postId, hasFullAccess);
+  const trialPost = loadedTrialPost?.routeKey === routeKey ? loadedTrialPost.post : null;
+  const fullPost =
+    status === 'authenticated' &&
+    loadedFullPost?.routeKey === routeKey &&
+    loadedFullPost.uid === uid
+      ? loadedFullPost.post
+      : null;
+  const post = fullPost ?? trialPost;
+  const hasFullAccess = post?.accessLevel === 'full';
+  const currentLoadState =
+    postContentLoadState?.routeKey === routeKey ? postContentLoadState : null;
+  const isTrialLoading =
+    routeKey !== null &&
+    !trialPost &&
+    (currentLoadState === null || currentLoadState.trialStatus === 'loading');
+  const isFullLoading =
+    status === 'authenticated' &&
+    routeKey !== null &&
+    !fullPost &&
+    (currentLoadState === null ||
+      (currentLoadState.fullStatus !== 'failed' && currentLoadState.fullStatus !== 'ready'));
+  const isContentLoading = !post && (isTrialLoading || isFullLoading);
 
   const syncPostView = useCallback(async (): Promise<PostViewResult | null> => {
     if (
@@ -104,20 +143,131 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       clearTimeout(postViewTimerRef.current);
       postViewTimerRef.current = null;
     }
-  }, [accessKey]);
+  }, [routeKey]);
 
   useEffect(() => {
-    if (status !== 'authenticated' || !accessKey || !courseId || !postId || !uid) {
+    if (!routeKey || !courseId || !postId) {
       return undefined;
     }
 
     let isActive = true;
-    const activeAccessKey = accessKey;
     const activeCourseId = courseId;
     const activePostId = postId;
+    const activeRouteKey = routeKey;
+
+    async function loadTrialPost() {
+      try {
+        const trialPost = await learningApiClient.getTrialPostContent(activePostId);
+
+        if (trialPost.courseId !== activeCourseId) {
+          throw new Error('The trial post does not belong to the requested course.');
+        }
+
+        if (isActive) {
+          setLoadedTrialPost({ post: trialPost, routeKey: activeRouteKey });
+          setPostContentLoadState((currentState) =>
+            currentState?.routeKey === activeRouteKey
+              ? { ...currentState, trialStatus: 'ready' }
+              : {
+                  fullStatus: 'idle',
+                  routeKey: activeRouteKey,
+                  trialStatus: 'ready',
+                },
+          );
+        }
+      } catch {
+        if (isActive) {
+          setPostContentLoadState((currentState) =>
+            currentState?.routeKey === activeRouteKey
+              ? { ...currentState, trialStatus: 'failed' }
+              : {
+                  fullStatus: 'idle',
+                  routeKey: activeRouteKey,
+                  trialStatus: 'failed',
+                },
+          );
+        }
+      }
+    }
+
+    void loadTrialPost();
+
+    return () => {
+      isActive = false;
+    };
+  }, [courseId, learningApiClient, postId, routeKey]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !routeKey || !courseId || !postId || !uid) {
+      return undefined;
+    }
+
+    let isActive = true;
+    const activeCourseId = courseId;
+    const activePostId = postId;
+    const activeRouteKey = routeKey;
     const activeUid = uid;
 
-    async function loadPostAccess() {
+    async function loadFullPost() {
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Authenticated user is missing an ID token.');
+        }
+
+        const fullPost = await learningApiClient.getFullPostContent({
+          idToken,
+          postId: activePostId,
+        });
+
+        if (fullPost.courseId !== activeCourseId || fullPost.accessLevel !== 'full') {
+          throw new Error('The full post response is not valid for this route.');
+        }
+
+        if (isActive) {
+          setLoadedFullPost({ post: fullPost, routeKey: activeRouteKey, uid: activeUid });
+          setPostContentLoadState((currentState) =>
+            currentState?.routeKey === activeRouteKey
+              ? { ...currentState, fullStatus: 'ready' }
+              : {
+                  fullStatus: 'ready',
+                  routeKey: activeRouteKey,
+                  trialStatus: 'loading',
+                },
+          );
+        }
+      } catch {
+        if (isActive) {
+          setPostContentLoadState((currentState) =>
+            currentState?.routeKey === activeRouteKey
+              ? { ...currentState, fullStatus: 'failed' }
+              : {
+                  fullStatus: 'failed',
+                  routeKey: activeRouteKey,
+                  trialStatus: 'loading',
+                },
+          );
+        }
+      }
+    }
+
+    void loadFullPost();
+
+    return () => {
+      isActive = false;
+    };
+  }, [courseId, getIdToken, learningApiClient, postId, routeKey, status, uid]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !post || !hasFullAccess || !postId || !uid) {
+      return undefined;
+    }
+
+    let isActive = true;
+    const activePostId = postId;
+
+    async function loadSavedPostProgress() {
       try {
         const idToken = await getIdToken();
 
@@ -126,22 +276,11 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         }
 
         const progressSnapshot = await learningApiClient.getProgress(idToken);
-
-        rememberLearningContentAccessGrants({
-          contentAccess: progressSnapshot.contentAccess,
-          courseId: activeCourseId,
-          uid: activeUid,
-        });
-
-        const hasProgressPostAccess = progressSnapshot.contentAccess.some(
-          (item) => item.contentType === 'post' && item.entityId === activePostId,
-        );
         const savedPostProgress = progressSnapshot.posts.find(
           (item) => item.postId === activePostId,
         );
 
         if (isActive) {
-          setVerifiedAccessKey(hasProgressPostAccess ? activeAccessKey : null);
           setSavedReadingPosition(savedPostProgress?.readingPosition ?? null);
           observedItemIdsRef.current = new Set([
             ...observedItemIdsRef.current,
@@ -151,18 +290,16 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
             savedPostProgress?.readingPosition ?? readingPositionRef.current;
         }
       } catch {
-        if (isActive) {
-          setVerifiedAccessKey(null);
-        }
+        // Full content remains readable after authorization; progress can be retried by later activity.
       }
     }
 
-    void loadPostAccess();
+    void loadSavedPostProgress();
 
     return () => {
       isActive = false;
     };
-  }, [accessKey, courseId, getIdToken, learningApiClient, postId, status, uid]);
+  }, [getIdToken, hasFullAccess, learningApiClient, post, postId, status, uid]);
 
   useEffect(() => {
     if (
@@ -176,7 +313,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
     }
 
     const requiredBlockIds = new Set(
-      post.blocks.filter((block) => block.required).map((block) => block.id),
+      post.blocks.filter(isRequiredContentBlock).map((block) => block.id),
     );
     const targets = [
       ...articleRef.current.querySelectorAll<HTMLElement>('[data-content-block-id]'),
@@ -229,6 +366,14 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
     restoredReadingPositionRef.current = savedReadingPosition;
     target.scrollIntoView({ block: 'start' });
   }, [savedReadingPosition]);
+
+  if (isContentLoading) {
+    return (
+      <main className="route-loading page-shell" role="status">
+        {t('route.loading')}
+      </main>
+    );
+  }
 
   if (!post) {
     return <TrialPostNotFoundPage />;

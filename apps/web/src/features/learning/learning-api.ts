@@ -74,6 +74,72 @@ export interface PostViewResult {
   };
 }
 
+export interface LearningPostContent {
+  accessLevel: 'full' | 'trial';
+  blocks: readonly unknown[];
+  courseId: string;
+  description: {
+    en: string;
+    vi: string;
+  };
+  durationMinutes: number;
+  id: string;
+  moduleId: string;
+  postQuizId: string;
+  revisionId: string;
+  title: {
+    en: string;
+    vi: string;
+  };
+}
+
+export interface LearningDemoContent {
+  algorithmId: string;
+  courseId: string;
+  demoId: string;
+  moduleId: string;
+  problemId: string;
+  requiredStepIds: readonly string[];
+  revisionId: string;
+  seed: number;
+  steps: readonly LearningDemoStep[];
+  title: {
+    en: string;
+    vi: string;
+  };
+  visualization: LearningDemoVisualization;
+}
+
+export interface LearningDemoVisualization {
+  boundary: readonly {
+    x: number;
+    y: number;
+  }[];
+  points: readonly {
+    label: string;
+    positiveFromStep: number;
+    x: number;
+    y: number;
+  }[];
+}
+
+export interface LearningDemoStep {
+  id: string;
+  narration: {
+    en: string;
+    vi: string;
+  };
+  required: boolean;
+  textAlternative: {
+    en: string;
+    vi: string;
+  };
+  title: {
+    en: string;
+    vi: string;
+  };
+}
+
 export type QuizQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
 
 export type QuizAnswerValue = readonly string[] | string;
@@ -451,7 +517,10 @@ export interface LearningApiClient {
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
   getAdminAccess?(idToken: string): Promise<boolean>;
+  getDemoContent(input: { demoId: string; idToken: string }): Promise<LearningDemoContent>;
+  getFullPostContent(input: { idToken: string; postId: string }): Promise<LearningPostContent>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
+  getTrialPostContent(postId: string): Promise<LearningPostContent>;
   getAdminReportSummary(input: { idToken: string }): Promise<AdminReportSummary>;
   listAdminContent(input: {
     courseId?: string | undefined;
@@ -761,6 +830,24 @@ export function createFetchLearningApiClient(
         }),
       );
     },
+    async getDemoContent({ demoId, idToken }) {
+      return readSuccessEnvelope<LearningDemoContent>(
+        await fetch(`/api/v1/demos/${encodeURIComponent(demoId)}/content`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+    },
+    async getFullPostContent({ idToken, postId }) {
+      return readSuccessEnvelope<LearningPostContent>(
+        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/content`, {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+      );
+    },
     async getProgress(idToken) {
       return readSuccessEnvelope<LearningProgressSnapshot>(
         await fetch('/api/v1/users/me/progress', {
@@ -768,6 +855,11 @@ export function createFetchLearningApiClient(
             authorization: `Bearer ${idToken}`,
           },
         }),
+      );
+    },
+    async getTrialPostContent(postId) {
+      return readSuccessEnvelope<LearningPostContent>(
+        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/trial-content`),
       );
     },
     async getAdminAccess(idToken) {

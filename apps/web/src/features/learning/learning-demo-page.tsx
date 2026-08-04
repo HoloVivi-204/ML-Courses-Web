@@ -4,17 +4,12 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
-import {
-  andGateDemo,
-  getFixedDemo,
-  type DemoStep,
-  type FixedDemoManifest,
-} from './and-gate-demo-data';
-import {
-  hasLearningDemoAccess,
-  rememberLearningContentAccessGrants,
-} from './learning-access-store';
-import type { DemoCompletionResult, LearningApiClient } from './learning-api';
+import type {
+  DemoCompletionResult,
+  LearningApiClient,
+  LearningDemoContent,
+  LearningDemoStep,
+} from './learning-api';
 
 interface LearningDemoPageProps {
   learningApiClient: LearningApiClient;
@@ -37,7 +32,6 @@ const copy: Readonly<
       completed: string;
       failed: string;
       fixed: string;
-      heading: string;
       moduleQuiz: string;
       next: string;
       notFoundBack: string;
@@ -58,7 +52,6 @@ const copy: Readonly<
     completed: 'demo_completed',
     failed: 'Demo completion could not be recorded. Revisit the required steps and try again.',
     fixed: 'FIXED DEMO',
-    heading: 'Perceptron demo: AND gate',
     moduleQuiz: 'Open the module quiz',
     next: 'Next step',
     notFoundBack: 'Back to course catalog',
@@ -77,7 +70,6 @@ const copy: Readonly<
     completed: 'demo_completed',
     failed: 'Chưa thể ghi nhận hoàn thành demo. Hãy xem lại các bước bắt buộc rồi thử lại.',
     fixed: 'DEMO CỐ ĐỊNH',
-    heading: 'Demo Perceptron: cổng AND',
     moduleQuiz: 'Mở quiz module',
     next: 'Bước tiếp theo',
     notFoundBack: 'Về danh sách khóa học',
@@ -92,31 +84,27 @@ const copy: Readonly<
 };
 
 export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPageProps) {
-  const { getIdToken, status, user } = useAuth();
+  const { getIdToken, status } = useAuth();
   const { courseId, demoId } = useParams();
-  const demo = getFixedDemo(demoId);
+  const routeKey = courseId && demoId ? `${courseId}:${demoId}` : null;
+  const [loadedDemo, setLoadedDemo] = useState<{
+    demo: LearningDemoContent;
+    routeKey: string;
+  } | null>(null);
+  const [demoLoadState, setDemoLoadState] = useState<{
+    routeKey: string;
+    status: 'failed' | 'ready';
+  } | null>(null);
+  const demo =
+    status === 'authenticated' && loadedDemo?.routeKey === routeKey ? loadedDemo.demo : null;
+  const currentDemoLoadState = demoLoadState?.routeKey === routeKey ? demoLoadState : null;
   const [stepIndex, setStepIndex] = useState(0);
-  const [viewedStepIds, setViewedStepIds] = useState<readonly string[]>(
-    demo?.steps[0]?.id ? [demo.steps[0].id] : [],
-  );
+  const [viewedStepIds, setViewedStepIds] = useState<readonly string[]>([]);
   const [completionStatus, setCompletionStatus] = useState<CompletionStatus>('idle');
   const [completionResult, setCompletionResult] = useState<DemoCompletionResult | null>(null);
   const idempotencyKey = useRef(createIdempotencyKey());
   const completionStarted = useRef(false);
   const text = copy[locale];
-  const uid = user?.uid;
-  const accessKey =
-    status === 'authenticated' && courseId && demo?.demoId && uid
-      ? `${uid}:${courseId}:${demo.demoId}`
-      : null;
-  const [verifiedAccessKey, setVerifiedAccessKey] = useState<string | null>(null);
-  const hasStoredAccess =
-    status === 'authenticated' &&
-    demo !== undefined &&
-    demo.courseId === courseId &&
-    hasLearningDemoAccess(courseId, demo.demoId, uid);
-  const hasBackendAccess = accessKey !== null && verifiedAccessKey === accessKey;
-  const hasAccess = hasStoredAccess || hasBackendAccess;
   const currentStep = demo?.steps[stepIndex];
   const module = demo
     ? getCourse(demo.courseId)?.modules?.find((item) => item.id === demo.moduleId)
@@ -145,17 +133,16 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   }
 
   useEffect(() => {
-    if (status !== 'authenticated' || !accessKey || !courseId || !demo || !uid || hasStoredAccess) {
+    if (!routeKey || !courseId || !demoId || status !== 'authenticated') {
       return undefined;
     }
 
     let isActive = true;
-    const activeAccessKey = accessKey;
     const activeCourseId = courseId;
-    const activeDemoId = demo.demoId;
-    const activeUid = uid;
+    const activeDemoId = demoId;
+    const activeRouteKey = routeKey;
 
-    async function loadDemoAccess() {
+    async function loadDemoContent() {
       try {
         const idToken = await getIdToken();
 
@@ -163,37 +150,38 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
           throw new Error('Authenticated user is missing an ID token.');
         }
 
-        const progressSnapshot = await learningApiClient.getProgress(idToken);
+        const content = await learningApiClient.getDemoContent({ demoId: activeDemoId, idToken });
 
-        rememberLearningContentAccessGrants({
-          contentAccess: progressSnapshot.contentAccess,
-          courseId: activeCourseId,
-          uid: activeUid,
-        });
-
-        const hasProgressDemoAccess = progressSnapshot.contentAccess.some(
-          (item) => item.contentType === 'demo' && item.entityId === activeDemoId,
-        );
+        if (content.courseId !== activeCourseId || content.demoId !== activeDemoId) {
+          throw new Error('The demo content response is not valid for this route.');
+        }
 
         if (isActive) {
-          setVerifiedAccessKey(hasProgressDemoAccess ? activeAccessKey : null);
+          completionStarted.current = false;
+          idempotencyKey.current = createIdempotencyKey();
+          setCompletionResult(null);
+          setCompletionStatus('idle');
+          setStepIndex(0);
+          setViewedStepIds(content.steps[0]?.id ? [content.steps[0].id] : []);
+          setLoadedDemo({ demo: content, routeKey: activeRouteKey });
+          setDemoLoadState({ routeKey: activeRouteKey, status: 'ready' });
         }
       } catch {
         if (isActive) {
-          setVerifiedAccessKey(null);
+          setDemoLoadState({ routeKey: activeRouteKey, status: 'failed' });
         }
       }
     }
 
-    void loadDemoAccess();
+    void loadDemoContent();
 
     return () => {
       isActive = false;
     };
-  }, [accessKey, courseId, demo, getIdToken, hasStoredAccess, learningApiClient, status, uid]);
+  }, [courseId, demoId, getIdToken, learningApiClient, routeKey, status]);
 
   useEffect(() => {
-    if (!demo || !hasAccess || viewedStepIds.length === 0) {
+    if (!demo || viewedStepIds.length === 0) {
       return;
     }
 
@@ -225,10 +213,10 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     return () => {
       isActive = false;
     };
-  }, [demo, getIdToken, hasAccess, learningApiClient, viewedStepIds]);
+  }, [demo, getIdToken, learningApiClient, viewedStepIds]);
 
   useEffect(() => {
-    if (!demo || !hasAccess || !isComplete || completionStarted.current) {
+    if (!demo || !isComplete || completionStarted.current) {
       return;
     }
 
@@ -269,9 +257,24 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     return () => {
       isActive = false;
     };
-  }, [demo, getIdToken, hasAccess, isComplete, learningApiClient, viewedStepIds]);
+  }, [demo, getIdToken, isComplete, learningApiClient, viewedStepIds]);
 
-  if (!demo || !currentStep || !hasAccess) {
+  const isDemoLoading =
+    status === 'loading' ||
+    (status === 'authenticated' &&
+      routeKey !== null &&
+      !demo &&
+      currentDemoLoadState?.status !== 'failed');
+
+  if (isDemoLoading) {
+    return (
+      <main className="route-loading page-shell" role="status">
+        Loading demo...
+      </main>
+    );
+  }
+
+  if (!demo || !currentStep) {
     return <DemoNotFoundPage locale={locale} />;
   }
 
@@ -287,11 +290,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
 
       <header className="demo-heading">
         <span className="eyebrow">{text.fixed}</span>
-        <h1>
-          {demo.demoId === andGateDemo.demoId
-            ? text.heading
-            : `${demo.algorithmId}: ${demo.problemId}`}
-        </h1>
+        <h1>{localize(demo.title, locale)}</h1>
         <dl className="demo-meta">
           <div>
             <dt>{text.algorithm}</dt>
@@ -377,15 +376,11 @@ function FixedDemoFrame({
   step,
   stepIndex,
 }: {
-  demo: FixedDemoManifest;
+  demo: LearningDemoContent;
   locale: Locale;
-  step: DemoStep;
+  step: LearningDemoStep;
   stepIndex: number;
 }) {
-  if (demo.demoId === andGateDemo.demoId) {
-    return <AndGateFrame locale={locale} step={step} stepIndex={stepIndex} />;
-  }
-
   return (
     <div className="and-demo-frame">
       <svg
@@ -399,15 +394,17 @@ function FixedDemoFrame({
         <polyline
           className="boundary-line"
           fill="none"
-          points="52,168 92,132 132,112 172,78 204,62"
+          points={demo.visualization.boundary.map((point) => `${point.x},${point.y}`).join(' ')}
         />
-        <AndPoint
-          isPositive={stepIndex >= 2}
-          label={step.id.slice(0, 2).toUpperCase()}
-          x={92}
-          y={132}
-        />
-        <AndPoint isPositive={stepIndex >= 3} label="OK" x={172} y={78} />
+        {demo.visualization.points.map((point) => (
+          <DemoPoint
+            isPositive={stepIndex >= point.positiveFromStep}
+            key={`${point.x}:${point.y}:${point.label}`}
+            label={point.label}
+            x={point.x}
+            y={point.y}
+          />
+        ))}
         <text x="62" y="222">
           {demo.algorithmId}
         </text>
@@ -434,79 +431,7 @@ function FixedDemoFrame({
   );
 }
 
-function AndGateFrame({
-  locale,
-  step,
-  stepIndex,
-}: {
-  locale: Locale;
-  step: DemoStep;
-  stepIndex: number;
-}) {
-  const highlightBoundary = stepIndex >= 2;
-  const highlightResult = stepIndex >= 3;
-
-  return (
-    <div className="and-demo-frame">
-      <svg
-        aria-label={localize(step.textAlternative, locale)}
-        className="and-demo-chart"
-        role="img"
-        viewBox="0 0 240 240"
-      >
-        <line className="axis-line" x1="40" x2="210" y1="200" y2="200" />
-        <line className="axis-line" x1="40" x2="40" y1="200" y2="30" />
-        {highlightBoundary ? (
-          <line className="boundary-line" x1="80" x2="200" y1="200" y2="80" />
-        ) : null}
-        <AndPoint isPositive={false} label="00" x={70} y={170} />
-        <AndPoint isPositive={false} label="01" x={70} y={70} />
-        <AndPoint isPositive={false} label="10" x={170} y={170} />
-        <AndPoint isPositive label="11" x={170} y={70} />
-        {highlightResult ? (
-          <text x="122" y="224">
-            accuracy 100%
-          </text>
-        ) : null}
-      </svg>
-
-      <table className="and-truth-table">
-        <caption>{andGateDemo.problemId}</caption>
-        <thead>
-          <tr>
-            <th>x1</th>
-            <th>x2</th>
-            <th>AND</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>0</td>
-            <td>0</td>
-            <td>0</td>
-          </tr>
-          <tr>
-            <td>0</td>
-            <td>1</td>
-            <td>0</td>
-          </tr>
-          <tr>
-            <td>1</td>
-            <td>0</td>
-            <td>0</td>
-          </tr>
-          <tr className="is-positive">
-            <td>1</td>
-            <td>1</td>
-            <td>1</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function AndPoint({
+function DemoPoint({
   isPositive,
   label,
   x,

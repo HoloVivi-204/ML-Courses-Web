@@ -6,6 +6,7 @@ import {
   createStaticAdminContentRepository,
   type AdminContentSummary,
 } from './admin-content-repository.js';
+import type { LearningContentRepository } from './learning-content-repository.js';
 import type { LearningRepository } from './learning-repository.js';
 import type { PlaygroundRepository } from './playground-repository.js';
 
@@ -46,6 +47,23 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     },
     updateLearnerPreferences: async () => {
       throw new Error('Learner preference update is not part of this test.');
+    },
+    ...overrides,
+  };
+}
+
+function createLearningContentRepository(
+  overrides: Partial<LearningContentRepository>,
+): LearningContentRepository {
+  return {
+    getDemoContent: async () => {
+      throw new Error('Demo content is not part of this test.');
+    },
+    getFullPostContent: async () => {
+      throw new Error('Full post content is not part of this test.');
+    },
+    getTrialPostContent: async () => {
+      throw new Error('Trial post content is not part of this test.');
     },
     ...overrides,
   };
@@ -217,6 +235,129 @@ describe('API foundation', () => {
       },
       requestId: response.headers['x-request-id'],
     });
+  });
+
+  it('returns full learning payloads only through the authenticated owner boundary', async () => {
+    const contentReads: unknown[] = [];
+    const app = createApiApp({
+      learningContentRepository: createLearningContentRepository({
+        getDemoContent: async (input) => {
+          contentReads.push({ type: 'demo', ...input });
+
+          return {
+            statusCode: 200,
+            data: {
+              algorithmId: 'perceptron',
+              courseId: 'course-deep-learning-basic',
+              demoId: input.demoId,
+              moduleId: 'dl-m01-neuron-perceptron',
+              problemId: 'problem-demo-perceptron-and-gate',
+              requiredStepIds: ['and-problem'],
+              revisionId: 'demo-perceptron-and-gate-rev-r1',
+              seed: 42,
+              steps: [],
+              title: { en: 'Demo', vi: 'Demo' },
+              visualization: {
+                boundary: [],
+                points: [],
+              },
+            },
+          };
+        },
+        getFullPostContent: async (input) => {
+          contentReads.push({ type: 'full-post', ...input });
+
+          return {
+            statusCode: 200,
+            data: {
+              accessLevel: 'full',
+              blocks: [{ id: 'server-only-xor' }],
+              courseId: 'course-deep-learning-basic',
+              description: { en: 'Full', vi: 'Day du' },
+              durationMinutes: 16,
+              id: input.postId,
+              moduleId: 'dl-m01-neuron-perceptron',
+              postQuizId: 'quiz-post-dl-p01',
+              revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+              title: { en: 'Full post', vi: 'Bai day du' },
+            },
+          };
+        },
+        getTrialPostContent: async (input) => {
+          contentReads.push({ type: 'trial-post', ...input });
+
+          return {
+            statusCode: 200,
+            data: {
+              accessLevel: 'trial',
+              blocks: [{ id: 'public-trial' }],
+              courseId: 'course-deep-learning-basic',
+              description: { en: 'Trial', vi: 'Dung thu' },
+              durationMinutes: 8,
+              id: input.postId,
+              moduleId: 'dl-m01-neuron-perceptron',
+              postQuizId: 'quiz-post-dl-p01',
+              revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+              title: { en: 'Trial post', vi: 'Bai dung thu' },
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const trialResponse = await request(app)
+      .get('/api/v1/posts/dl-p01-neuron-perceptron/trial-content')
+      .expect(200);
+
+    expect(trialResponse.body.data).toMatchObject({
+      accessLevel: 'trial',
+      blocks: [{ id: 'public-trial' }],
+    });
+    expect(trialResponse.headers['cache-control']).toMatch(/no-store/);
+
+    const staleRevisionResponse = await request(app)
+      .get(
+        '/api/v1/posts/dl-p01-neuron-perceptron/content?revisionId=post-dl-p01-neuron-perceptron-rev-r0',
+      )
+      .set('authorization', 'Bearer local-id-token')
+      .expect(400);
+
+    expect(staleRevisionResponse.body.error).toMatchObject({
+      code: 'CONTENT_REVISION_SELECTION_FORBIDDEN',
+    });
+
+    await request(app)
+      .get('/api/v1/posts/dl-p01-neuron-perceptron/content?uid=attacker-uid')
+      .expect(401);
+    await request(app)
+      .get('/api/v1/demos/demo-perceptron-and-gate/content?uid=attacker-uid')
+      .expect(401);
+
+    const fullPostResponse = await request(app)
+      .get('/api/v1/posts/dl-p01-neuron-perceptron/content?uid=attacker-uid')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+    const demoResponse = await request(app)
+      .get('/api/v1/demos/demo-perceptron-and-gate/content?uid=attacker-uid')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(200);
+
+    expect(fullPostResponse.body.data).toMatchObject({
+      accessLevel: 'full',
+      blocks: [{ id: 'server-only-xor' }],
+    });
+    expect(demoResponse.body.data).toMatchObject({ demoId: 'demo-perceptron-and-gate' });
+    expect(fullPostResponse.headers['cache-control']).toMatch(/no-store/);
+    expect(demoResponse.headers['cache-control']).toMatch(/no-store/);
+    expect(contentReads).toEqual([
+      { type: 'trial-post', postId: 'dl-p01-neuron-perceptron' },
+      { type: 'full-post', postId: 'dl-p01-neuron-perceptron', uid: 'learner-01' },
+      { type: 'demo', demoId: 'demo-perceptron-and-gate', uid: 'learner-01' },
+    ]);
   });
 
   it('rate limits quiz submissions by the authenticated UID before grading', async () => {
@@ -1065,6 +1206,51 @@ describe('API foundation', () => {
       },
       requestId: response.headers['x-request-id'],
     });
+  });
+
+  it("reports the authenticated user's own admin access without granting admin APIs", async () => {
+    const learnerResponse = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/access')
+      .set('authorization', 'Bearer learner-id-token')
+      .expect(200);
+
+    expect(learnerResponse.body.data).toEqual({ isAdmin: false });
+
+    const adminResponse = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'admin-01',
+          displayName: 'Operator',
+          role: 'admin',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/access')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(adminResponse.body.data).toEqual({ isAdmin: true });
+
+    const protectedApiResponse = await request(
+      createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'learner-01',
+          displayName: 'Local Student',
+        }),
+      }),
+    )
+      .get('/api/v1/admin/content')
+      .set('authorization', 'Bearer learner-id-token')
+      .expect(403);
+
+    expect(protectedApiResponse.body.error.code).toBe('ADMIN_FORBIDDEN');
   });
 
   it('rejects student access to the admin progress summary', async () => {

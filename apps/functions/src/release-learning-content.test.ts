@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { courses } from '../catalog/course-data';
-import { getFixedDemo } from './and-gate-demo-data';
-import { parseContentBlockCollection } from './content-block-validation';
-import { getReadablePost } from './trial-post-data';
+import { getFixedDemo } from './release-demo-content.js';
+import { getReadablePost } from './release-learning-content.js';
+import { getReleaseLearningCatalog } from './release-learning-catalog.js';
 
-describe('Release 1 content drafts', () => {
-  it('provides localized, traceable draft content for every locked post', () => {
-    const posts = courses.flatMap((course) =>
-      (course.modules ?? []).flatMap((module) =>
-        module.postIds.map((postId) => {
-          const post = getReadablePost(course.id, postId, true);
+describe('Release 1 protected learning content', () => {
+  it('provides draft vi/en full post content for every locked catalog post', () => {
+    const catalog = getReleaseLearningCatalog();
+    const posts = catalog.courses.flatMap((course) =>
+      course.modules.flatMap((module) =>
+        module.posts.map((releasePost) => {
+          const post = getReadablePost(course.courseId, releasePost.postId, true);
 
-          expect(post).toBeDefined();
+          expect(post).toMatchObject({
+            accessLevel: 'full',
+            courseId: course.courseId,
+            id: releasePost.postId,
+            moduleId: module.moduleId,
+            sourceReviewStatus: 'pending-operator-review',
+          });
           return post!;
         }),
       ),
@@ -22,6 +28,8 @@ describe('Release 1 content drafts', () => {
     expect(new Set(posts.map((post) => post.taskFingerprint)).size).toBe(18);
 
     for (const post of posts) {
+      expect(post.title.en.trim()).not.toHaveLength(0);
+      expect(post.title.vi.trim()).not.toHaveLength(0);
       expect(post.learningObjective.en.trim()).not.toHaveLength(0);
       expect(post.learningObjective.vi.trim()).not.toHaveLength(0);
       expect(post.provenance).toEqual({
@@ -33,7 +41,7 @@ describe('Release 1 content drafts', () => {
       expect(post.provenance.candidateSourceIds.length).toBeGreaterThan(0);
       expect(post.blocks.length).toBeGreaterThanOrEqual(6);
       expect(post.blocks.length).toBeLessThanOrEqual(12);
-      expect(parseContentBlockCollection(post.blocks, post.id)).not.toBeNull();
+      expect(new Set(post.blocks.map((block) => block.id)).size).toBe(post.blocks.length);
       expect(post.blocks).toContainEqual(
         expect.objectContaining({
           activityId: `act-${post.id}-example`,
@@ -43,9 +51,10 @@ describe('Release 1 content drafts', () => {
     }
   });
 
-  it('keeps every fixed demo as localized draft-only content with unique task fingerprints', () => {
-    const demos = courses.flatMap((course) =>
-      (course.modules ?? [])
+  it('keeps ten localized fixed demos server-side with unique task fingerprints', () => {
+    const catalog = getReleaseLearningCatalog();
+    const demos = catalog.courses.flatMap((course) =>
+      course.modules
         .map((module) => module.demoId)
         .filter((demoId): demoId is string => demoId !== null)
         .map((demoId) => getFixedDemo(demoId)!),
@@ -64,6 +73,8 @@ describe('Release 1 content drafts', () => {
         importStatus: 'draft-only',
       });
       expect(demo.steps).toHaveLength(4);
+      expect(demo.visualization.boundary).not.toHaveLength(0);
+      expect(demo.visualization.points).not.toHaveLength(0);
 
       for (const step of demo.steps) {
         expect(step.title.en.trim()).not.toHaveLength(0);

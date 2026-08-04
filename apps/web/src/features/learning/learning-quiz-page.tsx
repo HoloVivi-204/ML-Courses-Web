@@ -4,7 +4,6 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
-import { rememberLearningContentAccessGrants } from './learning-access-store';
 import type {
   LearningApiClient,
   LearningProgressSnapshot,
@@ -112,7 +111,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     }
 
     let isActive = true;
-    const activeQuizRoute = quizRoute;
 
     async function loadProgress() {
       setProgressStatus('loading');
@@ -125,12 +123,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
         }
 
         const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
-
-        rememberLearningContentAccessGrants({
-          contentAccess: nextProgressSnapshot.contentAccess,
-          courseId: activeQuizRoute.courseId,
-          uid: user.uid,
-        });
 
         if (isActive) {
           setProgressSnapshot(nextProgressSnapshot);
@@ -274,11 +266,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
 
           const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
 
-          rememberLearningContentAccessGrants({
-            contentAccess: nextProgressSnapshot.contentAccess,
-            courseId: activeQuizRoute.courseId,
-            uid: user.uid,
-          });
           setProgressSnapshot(nextProgressSnapshot);
         } catch {
           // Quiz submission is already committed; progress refresh can recover on next route load.

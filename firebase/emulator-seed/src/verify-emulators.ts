@@ -229,6 +229,121 @@ async function assertDirectProgressMutationDenied(): Promise<void> {
   }
 }
 
+async function assertProtectedLearningContentApi(): Promise<void> {
+  const services = createLocalAdminServices();
+  const otherUid = `content-other-${randomUUID()}`;
+  const ownerEmail = `content-owner-${randomUUID()}@example.test`;
+  const ownerPassword = `test-${randomUUID()}`;
+  const postId = 'dl-p01-neuron-perceptron';
+  const demoId = 'demo-perceptron-and-gate';
+
+  try {
+    const ownerToken = await registerWithEmailPassword(ownerEmail, ownerPassword);
+    const ownerUid = (await services.auth.getUserByEmail(ownerEmail)).uid;
+    const postAccessPath = `users/${ownerUid}/contentAccess/post_${postId}`;
+    const demoAccessPath = `users/${ownerUid}/contentAccess/demo_${demoId}`;
+    const trialResponse = await fetch(getApiEndpoint(`/api/v1/posts/${postId}/trial-content`));
+    const trialData = await readSuccessData(trialResponse, 200);
+
+    assert.equal(trialResponse.headers.get('cache-control'), 'private, no-store');
+    assert.equal(trialData.accessLevel, 'trial');
+    assert.equal(JSON.stringify(trialData).includes('xor-linear-limit'), false);
+
+    const unauthenticatedResponse = await fetch(getApiEndpoint(`/api/v1/posts/${postId}/content`));
+    assert.equal(unauthenticatedResponse.status, 401);
+
+    const missingGrantResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+      idToken: ownerToken,
+    });
+    assert.equal(missingGrantResponse.status, 403);
+    assert.equal(
+      getRecordField(await readJsonObject(missingGrantResponse), 'error').code,
+      'POST_ACCESS_REQUIRED',
+    );
+
+    await services.firestore.doc(`users/${otherUid}/contentAccess/post_${postId}`).set({
+      contentType: 'post',
+      entityId: postId,
+      schemaVersion: 1,
+    });
+    const wrongUidResponse = await requestApiJson(
+      `/api/v1/posts/${postId}/content?uid=${otherUid}`,
+      { idToken: ownerToken },
+    );
+    assert.equal(wrongUidResponse.status, 403);
+
+    await services.firestore.doc(postAccessPath).set({
+      contentType: 'post',
+      entityId: postId,
+      revisionId: 'post-dl-p01-neuron-perceptron-rev-r0',
+      schemaVersion: 1,
+    });
+    const revisionPinnedGrantResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+      idToken: ownerToken,
+    });
+    assert.equal(revisionPinnedGrantResponse.status, 403);
+
+    await services.firestore.doc(postAccessPath).set({
+      contentType: 'post',
+      entityId: postId,
+      schemaVersion: 1,
+    });
+    const staleRevisionResponse = await requestApiJson(
+      `/api/v1/posts/${postId}/content?revisionId=post-dl-p01-neuron-perceptron-rev-r0`,
+      { idToken: ownerToken },
+    );
+    assert.equal(staleRevisionResponse.status, 400);
+    assert.equal(
+      getRecordField(await readJsonObject(staleRevisionResponse), 'error').code,
+      'CONTENT_REVISION_SELECTION_FORBIDDEN',
+    );
+
+    const fullPostResponse = await requestApiJson(
+      `/api/v1/posts/${postId}/content?uid=${otherUid}`,
+      {
+        idToken: ownerToken,
+      },
+    );
+    const fullPostData = await readSuccessData(fullPostResponse, 200);
+
+    assert.equal(fullPostResponse.headers.get('cache-control'), 'private, no-store');
+    assert.equal(fullPostData.accessLevel, 'full');
+    assert.equal(JSON.stringify(fullPostData).includes('xor-linear-limit'), true);
+    assert.equal(
+      /answerKey|correctAnswer|correctOption/i.test(JSON.stringify(fullPostData)),
+      false,
+    );
+
+    await services.firestore.doc(postAccessPath).delete();
+    const replayAfterRevocationResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+      idToken: ownerToken,
+    });
+    assert.equal(replayAfterRevocationResponse.status, 403);
+
+    const missingDemoGrantResponse = await requestApiJson(`/api/v1/demos/${demoId}/content`, {
+      idToken: ownerToken,
+    });
+    assert.equal(missingDemoGrantResponse.status, 403);
+
+    await services.firestore.doc(demoAccessPath).set({
+      contentType: 'demo',
+      entityId: demoId,
+      schemaVersion: 1,
+    });
+    const demoResponse = await requestApiJson(`/api/v1/demos/${demoId}/content?uid=${otherUid}`, {
+      idToken: ownerToken,
+    });
+    const demoData = await readSuccessData(demoResponse, 200);
+
+    assert.equal(demoResponse.headers.get('cache-control'), 'private, no-store');
+    assert.equal(demoData.demoId, demoId);
+    assert.ok(Array.isArray(demoData.steps));
+    assert.ok(isRecord(demoData.visualization));
+  } finally {
+    await deleteApp(services.app);
+  }
+}
+
 async function verifyResetAndSeed(): Promise<void> {
   const services = createLocalAdminServices();
   const manifest = createLocalSeedManifest();
@@ -697,6 +812,7 @@ await assertEmulatorHub();
 await verifyResetAndSeed();
 await assertHealthEndpoint();
 await assertEmailPasswordAuthentication();
+await assertProtectedLearningContentApi();
 await assertAdminContentLifecycleApi();
 await assertFirestoreAdminContentPersistence();
 await assertClientAccessDenied();
@@ -713,5 +829,6 @@ console.log(
     clientAccess: 'deny-by-default',
     directProgressWrites: 'denied',
     adminContentLifecycle: 'verified',
+    protectedLearningContent: 'verified',
   }),
 );

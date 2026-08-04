@@ -1,4 +1,8 @@
-import { courses, type CourseModule, type LocalizedText } from '../catalog/course-data';
+import {
+  getReleaseLearningCatalog,
+  type LocalizedText,
+  type ReleaseLearningModule,
+} from './release-learning-catalog.js';
 
 export interface DemoStep {
   id: string;
@@ -6,6 +10,19 @@ export interface DemoStep {
   required: boolean;
   textAlternative: LocalizedText;
   title: LocalizedText;
+}
+
+export interface FixedDemoVisualization {
+  boundary: readonly {
+    x: number;
+    y: number;
+  }[];
+  points: readonly {
+    label: string;
+    positiveFromStep: number;
+    x: number;
+    y: number;
+  }[];
 }
 
 export interface FixedDemoManifest {
@@ -26,6 +43,8 @@ export interface FixedDemoManifest {
   seed: number;
   steps: readonly DemoStep[];
   taskFingerprint?: string;
+  title: LocalizedText;
+  visualization: FixedDemoVisualization;
 }
 
 export const andGateDemo: FixedDemoManifest = {
@@ -53,6 +72,23 @@ export const andGateDemo: FixedDemoManifest = {
   revisionId: 'demo-perceptron-and-gate-rev-r1',
   seed: 42,
   taskFingerprint: 'demo-perceptron-and-fixed-and-rule',
+  visualization: {
+    boundary: [
+      { x: 52, y: 168 },
+      { x: 92, y: 132 },
+      { x: 132, y: 112 },
+      { x: 172, y: 78 },
+      { x: 204, y: 62 },
+    ],
+    points: [
+      { label: 'AN', positiveFromStep: 2, x: 92, y: 132 },
+      { label: '4', positiveFromStep: 3, x: 172, y: 78 },
+    ],
+  },
+  title: {
+    en: 'Perceptron demo: AND gate',
+    vi: 'Demo Perceptron: cổng AND',
+  },
   steps: [
     {
       id: 'and-problem',
@@ -352,7 +388,7 @@ function createDemoDraftProvenance(courseId: string) {
 function createGenericDemo(input: {
   courseId: string;
   demoId: string;
-  module: CourseModule;
+  module: ReleaseLearningModule;
 }): FixedDemoManifest {
   const algorithmId = input.module.unlockAlgorithmIds[0] ?? 'learning-review';
   const problemId = demoProblemIdByDemoId[input.demoId] ?? `problem-${input.demoId}`;
@@ -362,11 +398,28 @@ function createGenericDemo(input: {
     algorithmId,
     courseId: input.courseId,
     demoId: input.demoId,
-    moduleId: input.module.id,
+    moduleId: input.module.moduleId,
     problemId,
     requiredStepIds: stepIds,
     revisionId: `${input.demoId}-rev-r1`,
     seed: 42,
+    visualization: {
+      boundary: [
+        { x: 52, y: 168 },
+        { x: 92, y: 132 },
+        { x: 132, y: 112 },
+        { x: 172, y: 78 },
+        { x: 204, y: 62 },
+      ],
+      points: [
+        { label: 'D1', positiveFromStep: 2, x: 92, y: 132 },
+        { label: 'D2', positiveFromStep: 3, x: 172, y: 78 },
+      ],
+    },
+    title: {
+      en: `${algorithmId}: ${problemId}`,
+      vi: `${algorithmId}: ${problemId}`,
+    },
     steps: [
       {
         id: 'problem',
@@ -439,7 +492,7 @@ function createGenericDemo(input: {
 function createExpandedDemo(input: {
   courseId: string;
   demoId: string;
-  module: CourseModule;
+  module: ReleaseLearningModule;
 }): FixedDemoManifest {
   const genericDemo = createGenericDemo(input);
   const definition = getDemoDraftDefinition(input.demoId);
@@ -498,12 +551,12 @@ function createExpandedDemo(input: {
   };
 }
 
-const generatedDemos = courses.flatMap((course) =>
-  (course.modules ?? [])
+const generatedDemos = getReleaseLearningCatalog().courses.flatMap((course) =>
+  course.modules
     .filter((module) => module.demoId !== null && module.demoId !== andGateDemo.demoId)
     .map((module) =>
       createExpandedDemo({
-        courseId: course.id,
+        courseId: course.courseId,
         demoId: module.demoId!,
         module,
       }),

@@ -26,6 +26,10 @@ import { ApiError } from './api-error.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { hasLocalCloudAuthDemoAdminRole } from './local-cloud-auth-demo.js';
+import {
+  createDefaultLearningContentRepository,
+  type LearningContentRepository,
+} from './learning-content-repository.js';
 import { createFirestoreAdminContentRepository } from './firestore-admin-content-repository.js';
 import {
   createDefaultLearningRepository,
@@ -67,6 +71,7 @@ export interface ApiAppOptions {
   adminReportRepository?: AdminReportRepository | undefined;
   appCheckEnforcement?: 'disabled' | 'enforced' | undefined;
   deleteAuthUser?: ((uid: string) => Promise<void>) | undefined;
+  learningContentRepository?: LearningContentRepository | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   rateLimiter?: RateLimiter | undefined;
@@ -122,6 +127,11 @@ function sendSuccess(response: Response, statusCode: number, data: unknown): voi
     data,
     requestId: getRequestId(response),
   });
+}
+
+function sendLearningContentSuccess(response: Response, data: unknown): void {
+  response.setHeader('cache-control', 'private, no-store');
+  sendSuccess(response, 200, data);
 }
 
 function sendNoContent(response: Response): void {
@@ -195,6 +205,16 @@ function getOptionalStringQueryField(request: Request, name: string): string | u
   }
 
   return value.trim();
+}
+
+function assertNoClientContentRevisionSelection(request: Request): void {
+  if (request.query.revisionId !== undefined) {
+    throw new ApiError(
+      400,
+      'CONTENT_REVISION_SELECTION_FORBIDDEN',
+      'Content revisions are selected by the server.',
+    );
+  }
 }
 
 function getStringArrayBodyField(request: Request, name: string): string[] {
@@ -788,6 +808,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   const app = express();
   let adminContentRepository = options.adminContentRepository;
   let adminReportRepository = options.adminReportRepository;
+  let learningContentRepository = options.learningContentRepository;
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
   const deleteAuthUser = options.deleteAuthUser ?? defaultDeleteAuthUser;
@@ -923,6 +944,12 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     return learningRepository;
   }
 
+  function getLearningContentRepository(): LearningContentRepository {
+    learningContentRepository ??= createDefaultLearningContentRepository();
+
+    return learningContentRepository;
+  }
+
   function getPlaygroundRepository(): PlaygroundRepository {
     playgroundRepository ??= createDefaultPlaygroundRepository();
 
@@ -1028,6 +1055,49 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       }
     },
   );
+
+  app.get('/api/v1/posts/:postId/trial-content', async (request, response, next) => {
+    try {
+      assertNoClientContentRevisionSelection(request);
+      const result = await getLearningContentRepository().getTrialPostContent({
+        postId: getRouteParam(request, 'postId'),
+      });
+
+      sendLearningContentSuccess(response, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/v1/posts/:postId/content', requireAuth, async (request, response, next) => {
+    try {
+      assertNoClientContentRevisionSelection(request);
+      const authUser = getAuthUser(response);
+      const result = await getLearningContentRepository().getFullPostContent({
+        postId: getRouteParam(request, 'postId'),
+        uid: authUser.uid,
+      });
+
+      sendLearningContentSuccess(response, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/v1/demos/:demoId/content', requireAuth, async (request, response, next) => {
+    try {
+      assertNoClientContentRevisionSelection(request);
+      const authUser = getAuthUser(response);
+      const result = await getLearningContentRepository().getDemoContent({
+        demoId: getRouteParam(request, 'demoId'),
+        uid: authUser.uid,
+      });
+
+      sendLearningContentSuccess(response, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.post(
     '/api/v1/demos/:demoId/completions',

@@ -5,10 +5,6 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
-import {
-  rememberLearningAccessGrant,
-  rememberLearningContentAccessGrants,
-} from './learning-access-store';
 import type { LearningApiClient, LearningProgressSnapshot } from './learning-api';
 import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
 
@@ -18,6 +14,11 @@ interface LearningCoursePageProps {
 }
 
 type EnrollmentStatus = 'failed' | 'ready' | 'syncing';
+
+interface EnrollmentTask {
+  key: string;
+  promise: Promise<LearningProgressSnapshot>;
+}
 
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
@@ -31,6 +32,7 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
   const course = getCourse(courseId);
   const firstModule = course?.modules?.[0];
   const idempotencyKey = useRef(createIdempotencyKey());
+  const enrollmentTaskRef = useRef<EnrollmentTask | null>(null);
   const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus>('syncing');
   const [overviewStatus, setOverviewStatus] = useState<EnrollmentStatus>('ready');
   const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
@@ -42,6 +44,7 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
 
     const selectedCourse = course;
     let isActive = true;
+    let enrollmentTask: EnrollmentTask | null = null;
 
     async function enroll() {
       setEnrollmentStatus('syncing');
@@ -53,31 +56,31 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
           throw new Error('Authenticated user is missing an ID token or user identity.');
         }
 
-        const enrollmentResult = await learningApiClient.enrollCourse({
-          courseId: selectedCourse.id,
-          idToken,
-          idempotencyKey: idempotencyKey.current,
-        });
+        const taskKey = `${user.uid}:${selectedCourse.id}`;
+        const existingTask = enrollmentTaskRef.current;
+        enrollmentTask =
+          existingTask?.key === taskKey
+            ? existingTask
+            : createEnrollmentTask({
+                courseId: selectedCourse.id,
+                idToken,
+                idempotencyKey: idempotencyKey.current,
+                key: taskKey,
+                learningApiClient,
+              });
 
-        rememberLearningAccessGrant({
-          courseId: selectedCourse.id,
-          moduleId: enrollmentResult.access.moduleId,
-          uid: user.uid,
-        });
-
-        const nextProgressSnapshot = await learningApiClient.getProgress(idToken);
-
-        rememberLearningContentAccessGrants({
-          contentAccess: nextProgressSnapshot.contentAccess,
-          courseId: selectedCourse.id,
-          uid: user.uid,
-        });
+        enrollmentTaskRef.current = enrollmentTask;
+        const nextProgressSnapshot = await enrollmentTask.promise;
 
         if (isActive) {
           setProgressSnapshot(nextProgressSnapshot);
           setEnrollmentStatus('ready');
         }
       } catch {
+        if (enrollmentTaskRef.current === enrollmentTask) {
+          enrollmentTaskRef.current = null;
+        }
+
         if (isActive) {
           setEnrollmentStatus('failed');
         }
@@ -124,12 +127,6 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
         moduleId: firstModule.id,
       });
 
-      rememberLearningAccessGrant({
-        courseId: course.id,
-        moduleId: result.moduleOverview.moduleId,
-        postId: result.moduleOverview.nextPostId,
-        uid: user.uid,
-      });
       setOverviewStatus('ready');
       navigate(`/learn/${course.id}/posts/${result.moduleOverview.nextPostId}`);
     } catch {
@@ -180,6 +177,27 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
       </section>
     </main>
   );
+}
+
+function createEnrollmentTask(input: {
+  courseId: string;
+  idToken: string;
+  idempotencyKey: string;
+  key: string;
+  learningApiClient: LearningApiClient;
+}): EnrollmentTask {
+  return {
+    key: input.key,
+    promise: (async () => {
+      await input.learningApiClient.enrollCourse({
+        courseId: input.courseId,
+        idToken: input.idToken,
+        idempotencyKey: input.idempotencyKey,
+      });
+
+      return input.learningApiClient.getProgress(input.idToken);
+    })(),
+  };
 }
 
 function VerifiedProgressPanel({

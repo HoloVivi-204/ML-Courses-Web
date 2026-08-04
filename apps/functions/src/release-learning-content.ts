@@ -1,9 +1,23 @@
-import { courses, type LocalizedText } from '../catalog/course-data';
-import type { ContentBlock } from './content-block-renderer';
+import { getReleaseLearningCatalog, type LocalizedText } from './release-learning-catalog.js';
+
+export interface LearningContentBlock {
+  accessibility: { en: string | null; vi: string | null };
+  activityId: string | null;
+  assetIds: readonly string[];
+  id: string;
+  locales: { en: Record<string, unknown>; vi: Record<string, unknown> };
+  order: number;
+  postId: string;
+  required: boolean;
+  schemaVersion: 1;
+  sourceIds: readonly string[];
+  type: 'callout' | 'example' | 'formula' | 'heading' | 'markdown' | 'source-list';
+  [field: string]: unknown;
+}
 
 export interface TrialPost {
   accessLevel: 'full' | 'trial';
-  blocks: readonly ContentBlock[];
+  blocks: readonly LearningContentBlock[];
   courseId: string;
   description: LocalizedText;
   durationMinutes: number;
@@ -308,7 +322,7 @@ const trialBlocks = [
     sourceIds: ['source-google-neural-nodes'],
     type: 'source-list',
   },
-] satisfies readonly ContentBlock[];
+] satisfies readonly LearningContentBlock[];
 
 const fullLessonBlocks = [
   ...trialBlocks.filter(
@@ -401,7 +415,7 @@ const fullLessonBlocks = [
     order: 12,
     type: 'heading',
   },
-] satisfies readonly ContentBlock[];
+] satisfies readonly LearningContentBlock[];
 
 const trialPosts = [
   {
@@ -797,7 +811,7 @@ function createGenericBlocks(input: {
   moduleTitle: LocalizedText;
   postId: string;
   title: LocalizedText;
-}): readonly ContentBlock[] {
+}): readonly LearningContentBlock[] {
   const defaults = {
     accessibility: { en: null, vi: null },
     activityId: null,
@@ -899,7 +913,7 @@ function createGenericBlocks(input: {
       order: 5,
       type: 'markdown',
     },
-  ] satisfies readonly ContentBlock[];
+  ] satisfies readonly LearningContentBlock[];
 }
 
 function createDraftBlocks(input: {
@@ -907,7 +921,7 @@ function createDraftBlocks(input: {
   moduleTitle: LocalizedText;
   postId: string;
   provenance: DraftProvenance;
-}): readonly ContentBlock[] {
+}): readonly LearningContentBlock[] {
   const defaults = {
     accessibility: { en: null, vi: null },
     activityId: null,
@@ -1020,7 +1034,7 @@ function createDraftBlocks(input: {
       order: 7,
       type: 'markdown',
     },
-  ] satisfies readonly ContentBlock[];
+  ] satisfies readonly LearningContentBlock[];
 }
 
 function createGeneratedPost(input: {
@@ -1062,35 +1076,35 @@ const trialPostIdByCourseId = new Map([
   ['course-classical-ml', 'cml-p01-problem-data-types'],
   ['course-deep-learning-basic', TRIAL_POST_ID],
 ]);
-const generatedFullLessonPosts = courses.flatMap((course) =>
-  (course.modules ?? []).flatMap((module) =>
-    module.postIds
-      .filter((postId) => !handAuthoredFullPostIds.has(postId))
-      .map((postId) =>
+const generatedFullLessonPosts = getReleaseLearningCatalog().courses.flatMap((course) =>
+  course.modules.flatMap((module) =>
+    module.posts
+      .filter((post) => !handAuthoredFullPostIds.has(post.postId))
+      .map((post) =>
         createGeneratedPost({
           accessLevel: 'full',
-          courseId: course.id,
-          durationMinutes: module.durationMinutes,
-          moduleId: module.id,
+          courseId: course.courseId,
+          durationMinutes: post.estimatedMinutes,
+          moduleId: module.moduleId,
           moduleTitle: module.title,
-          postId,
+          postId: post.postId,
         }),
       ),
   ),
 );
-const generatedTrialPosts = courses.flatMap((course) =>
-  (course.modules ?? []).flatMap((module) =>
-    module.postIds
-      .filter((postId) => trialPostIdByCourseId.get(course.id) === postId)
-      .filter((postId) => !trialPosts.some((post) => post.id === postId))
-      .map((postId) =>
+const generatedTrialPosts = getReleaseLearningCatalog().courses.flatMap((course) =>
+  course.modules.flatMap((module) =>
+    module.posts
+      .filter((post) => trialPostIdByCourseId.get(course.courseId) === post.postId)
+      .filter((post) => !trialPosts.some((trialPost) => trialPost.id === post.postId))
+      .map((post) =>
         createGeneratedPost({
           accessLevel: 'trial',
-          courseId: course.id,
-          durationMinutes: Math.min(10, module.durationMinutes),
-          moduleId: module.id,
+          courseId: course.courseId,
+          durationMinutes: Math.min(10, post.estimatedMinutes),
+          moduleId: module.moduleId,
           moduleTitle: module.title,
-          postId,
+          postId: post.postId,
         }),
       ),
   ),

@@ -155,6 +155,114 @@ describe('fetch learning API client', () => {
     });
   });
 
+  it('loads trial and protected learning content from separate Functions endpoints', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              accessLevel: 'trial',
+              blocks: [],
+              courseId: 'course-deep-learning-basic',
+              description: { en: 'Trial', vi: 'Dung thu' },
+              durationMinutes: 8,
+              id: 'dl-p01-neuron-perceptron',
+              moduleId: 'dl-m01-neuron-perceptron',
+              postQuizId: 'quiz-post-dl-p01',
+              revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+              title: { en: 'Trial', vi: 'Dung thu' },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              accessLevel: 'full',
+              blocks: [{ id: 'server-only-xor' }],
+              courseId: 'course-deep-learning-basic',
+              description: { en: 'Full', vi: 'Day du' },
+              durationMinutes: 16,
+              id: 'dl-p01-neuron-perceptron',
+              moduleId: 'dl-m01-neuron-perceptron',
+              postQuizId: 'quiz-post-dl-p01',
+              revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+              title: { en: 'Full', vi: 'Day du' },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              algorithmId: 'perceptron',
+              courseId: 'course-deep-learning-basic',
+              demoId: 'demo-perceptron-and-gate',
+              moduleId: 'dl-m01-neuron-perceptron',
+              problemId: 'problem-demo-perceptron-and-gate',
+              requiredStepIds: ['and-problem'],
+              revisionId: 'demo-perceptron-and-gate-rev-r1',
+              seed: 42,
+              steps: [],
+              title: { en: 'Demo', vi: 'Demo' },
+              visualization: {
+                boundary: [],
+                points: [],
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient({
+      appCheckTokenProvider: {
+        getToken: async () => 'verified-app-check-token',
+      },
+    });
+
+    await client.getTrialPostContent('dl-p01-neuron-perceptron');
+    await client.getFullPostContent({
+      idToken: 'local-id-token',
+      postId: 'dl-p01-neuron-perceptron',
+    });
+    await client.getDemoContent({
+      demoId: 'demo-perceptron-and-gate',
+      idToken: 'local-id-token',
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/posts/dl-p01-neuron-perceptron/trial-content',
+      {
+        headers: {
+          'x-firebase-appcheck': 'verified-app-check-token',
+        },
+      },
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/posts/dl-p01-neuron-perceptron/content', {
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'x-firebase-appcheck': 'verified-app-check-token',
+      },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/demos/demo-perceptron-and-gate/content', {
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'x-firebase-appcheck': 'verified-app-check-token',
+      },
+    });
+  });
+
   it('deletes the authenticated learner account with the owner bearer token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
 
@@ -377,6 +485,36 @@ describe('fetch learning API client', () => {
 
     expect(result).toEqual(reportSummary);
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/reports/summary', {
+      headers: {
+        authorization: 'Bearer admin-id-token',
+      },
+    });
+  });
+
+  it("reads the current user's admin access from the server", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            isAdmin: true,
+          },
+        }),
+        {
+          headers: {
+            'content-type': 'application/json',
+          },
+          status: 200,
+        },
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+
+    await expect(client.getAdminAccess!('admin-id-token')).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/access', {
       headers: {
         authorization: 'Bearer admin-id-token',
       },
