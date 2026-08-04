@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "content:fetch": "pnpm run build && node dist/content-fetch-cli.js",
     "content:import": "pnpm --filter @ml-path/emulator-seed build && pnpm run build && node dist/content-import-cli.js",
+    "content:scope:validate": "pnpm run build && node dist/content-scope-validate-cli.js",
+    "content:transform": "pnpm run build && node dist/content-transform-cli.js",
+    "content:validate": "pnpm run build && node dist/content-validate-cli.js",
     "admin:claim": "pnpm run build && node dist/admin-claim-cli.js",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",

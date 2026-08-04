@@ -39,3 +39,4 @@ Thumbs.db
 .tmp-*
 .edge-*
 .runtime/
+.content-pipeline/
