@@ -644,8 +644,20 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       unlockedAlgorithmIds,
       savedConfig,
     );
+    const deviceCompatibilityError = getSavedConfigDeviceCompatibilityError(
+      registration,
+      savedConfig,
+      deviceProfile,
+    );
 
-    if (savedConfig.compatibilityStatus !== 'compatible' || !registration) {
+    if (
+      savedConfig.compatibilityStatus !== 'compatible' ||
+      !registration ||
+      deviceCompatibilityError
+    ) {
+      if (deviceCompatibilityError) {
+        setPersistenceError(deviceCompatibilityError);
+      }
       return;
     }
 
@@ -910,6 +922,12 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                       <strong>{savedRun.runId}</strong>
                       <span>{savedRun.verificationLevel}</span>
                     </div>
+                    <code>
+                      {savedRun.scenarioId} / {savedRun.algorithmId} · {savedRun.datasetVersionId}
+                    </code>
+                    <small>
+                      {formatVersionSummary(savedRun.adapterVersion, savedRun.configSchemaVersion)}
+                    </small>
                     <p>
                       {metricSummary} ·{' '}
                       {t('playground.history.duration', {
@@ -933,15 +951,20 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           {savedConfigs.length > 0 ? (
             <ul className="playground-card-list">
               {savedConfigs.map((savedConfig) => {
+                const savedConfigRegistration = findUnlockedRegistrationForRecord(
+                  scenarioRegistrations,
+                  unlockedAlgorithmIds,
+                  savedConfig,
+                );
+                const deviceCompatibilityError = getSavedConfigDeviceCompatibilityError(
+                  savedConfigRegistration,
+                  savedConfig,
+                  deviceProfile,
+                );
                 const isRestorable =
                   savedConfig.compatibilityStatus === 'compatible' &&
-                  Boolean(
-                    findUnlockedRegistrationForRecord(
-                      scenarioRegistrations,
-                      unlockedAlgorithmIds,
-                      savedConfig,
-                    ),
-                  );
+                  Boolean(savedConfigRegistration) &&
+                  deviceCompatibilityError === null;
                 const isUpdatable = isRestorable && isSamePair(savedConfig, selectedRegistration);
 
                 return (
@@ -951,12 +974,23 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                       <span>{savedConfig.compatibilityStatus}</span>
                     </div>
                     <p>
-                      {savedConfig.algorithmId} · {formatSavedConfigSummary(savedConfig.config)}
+                      {savedConfig.algorithmId} · {savedConfig.datasetVersionId} ·{' '}
+                      {formatSavedConfigSummary(savedConfig.config)}
                     </p>
+                    <small>
+                      {formatVersionSummary(
+                        savedConfig.adapterVersion,
+                        savedConfig.configSchemaVersion,
+                      )}
+                    </small>
                     {savedConfig.compatibilityStatus === 'incompatible' ? (
                       <p className="playground-error">
                         {savedConfig.compatibilityReason ?? t('playground.configs.incompatible')}
                       </p>
+                    ) : null}
+                    {savedConfig.compatibilityStatus === 'compatible' &&
+                    deviceCompatibilityError ? (
+                      <p className="playground-error">{deviceCompatibilityError}</p>
                     ) : null}
                     <label className="playground-config-edit">
                       <span>{t('playground.configs.savedName')}</span>
@@ -1591,6 +1625,23 @@ function findUnlockedRegistrationForRecord(
   return registration;
 }
 
+function getSavedConfigDeviceCompatibilityError(
+  registration: PlaygroundPairRegistration | null,
+  savedConfig: PlaygroundConfigRecord,
+  deviceProfile: DeviceProfile,
+): string | null {
+  if (!registration || savedConfig.compatibilityStatus !== 'compatible') {
+    return null;
+  }
+
+  try {
+    validateConfigForRegistration(registration, savedConfig.config as MlConfig, deviceProfile);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Saved config is not valid for this device.';
+  }
+}
+
 function isSamePair(
   record: Pick<PlaygroundConfigRecord, 'algorithmId' | 'datasetVersionId' | 'scenarioId'>,
   registration: PlaygroundPairRegistration,
@@ -1763,6 +1814,13 @@ function formatSavedConfigSummary(config: PlaygroundConfig): string {
   }
 
   return summaryParts.length > 0 ? summaryParts.join(' · ') : 'custom parameters';
+}
+
+function formatVersionSummary(
+  adapterVersion: string | undefined,
+  configSchemaVersion: 1 | undefined,
+): string {
+  return `adapter ${adapterVersion ?? 'current'} · schema v${configSchemaVersion ?? 1}`;
 }
 
 function formatAlgorithmName(algorithmId: string, locale: Locale): string {

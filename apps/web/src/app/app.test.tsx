@@ -2899,6 +2899,37 @@ describe('public learning journey', () => {
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
   });
 
+  it('keeps a desktop-compatible config read-only when it exceeds the mobile limit', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    installMobileViewport();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundConfigs: vi.fn().mockResolvedValue([
+        createSavedPlaygroundConfigFixture({
+          config: {
+            epochs: 500,
+            learningRate: 0.1,
+            seed: 42,
+            trainRatio: 0.75,
+          },
+          configId: 'config-pg-xor-desktop-only',
+          name: 'Desktop only',
+        }),
+      ]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Desktop only')).toBeVisible();
+    const restoreButton = screen.getByRole('button', { name: /Khôi phục Desktop only/i });
+
+    expect(restoreButton).toBeDisabled();
+    expect(screen.getByText(/epochs must be between 10 and 200 for mobile/i)).toBeVisible();
+    vi.unstubAllGlobals();
+  });
+
   it('saves the current pg-xor config for later restore', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
     const user = userEvent.setup();
