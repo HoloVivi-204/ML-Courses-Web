@@ -2527,6 +2527,13 @@ a {
   text-transform: uppercase;
 }
 
+.playground-dataset-card code,
+.playground-history-card code,
+.playground-config-card small,
+.playground-history-card small {
+  overflow-wrap: anywhere;
+}
+
 .playground-dataset-facts {
   display: flex;
   flex-wrap: wrap;
@@ -2605,6 +2612,7 @@ a {
   background: var(--paper);
   color: var(--ink-soft);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .playground-workspace {
@@ -3006,6 +3014,12 @@ a {
 .playground-muted {
   margin: 0;
   color: var(--ink-soft);
+}
+
+.playground-history-card small,
+.playground-config-card small {
+  color: var(--ink-soft);
+  font-size: 11px;
 }
 
 .playground-card-actions {

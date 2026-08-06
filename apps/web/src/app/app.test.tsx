@@ -2366,6 +2366,8 @@ describe('public learning journey', () => {
 
     expect(await screen.findByText('Đã chạy xong')).toBeVisible();
     expect(screen.getAllByText('50%').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('playground-chart-decision-boundary')).toBeVisible();
+    expect(screen.getByTestId('playground-loss-chart')).toBeVisible();
     expect(
       screen.getByText('Giới hạn tuyến tính: một ranh giới thẳng không tách được XOR.'),
     ).toBeVisible();

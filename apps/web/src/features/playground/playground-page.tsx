@@ -1826,12 +1826,20 @@ function formatVersionSummary(
 function formatAlgorithmName(algorithmId: string, locale: Locale): string {
   const labels: Record<string, { en: string; vi: string }> = {
     'decision-tree': { en: 'Decision tree', vi: 'Decision tree' },
+    'hierarchical-clustering': { en: 'Hierarchical clustering', vi: 'Phân cụm phân cấp' },
     kmeans: { en: 'K-Means', vi: 'K-Means' },
+    knn: { en: 'K-Nearest Neighbors', vi: 'K-Nearest Neighbors' },
+    'lasso-regression': { en: 'Lasso regression', vi: 'Hồi quy Lasso' },
     'linear-regression': { en: 'Linear regression', vi: 'Hồi quy tuyến tính' },
     'logistic-regression': { en: 'Logistic regression', vi: 'Hồi quy logistic' },
     mlp: { en: 'MLP', vi: 'MLP' },
+    'naive-bayes': { en: 'Naive Bayes', vi: 'Naive Bayes' },
     pca: { en: 'PCA', vi: 'PCA' },
     perceptron: { en: 'Perceptron', vi: 'Perceptron' },
+    'polynomial-regression': { en: 'Polynomial regression', vi: 'Hồi quy đa thức' },
+    'random-forest': { en: 'Random forest', vi: 'Random forest' },
+    'ridge-regression': { en: 'Ridge regression', vi: 'Hồi quy Ridge' },
+    svm: { en: 'Support vector machine', vi: 'Support vector machine' },
   };
 
   return labels[algorithmId]?.[locale] ?? algorithmId;
