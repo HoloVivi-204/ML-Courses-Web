@@ -2445,9 +2445,13 @@ a {
 }
 
 .playground-access-list span {
-  color: var(--amber);
+  color: #8c4d00;
   font-size: 12px;
   font-weight: 900;
+}
+
+:root[data-theme='dark'] .playground-access-list span {
+  color: var(--amber);
 }
 
 .playground-access-list span.is-open {

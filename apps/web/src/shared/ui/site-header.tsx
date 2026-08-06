@@ -93,7 +93,7 @@ export function SiteHeader({
           />
           {isAuthenticated ? (
             <>
-              <Link className="header-profile" to="/profile">
+              <Link aria-label={t('nav.profile')} className="header-profile" to="/profile">
                 <UserRound aria-hidden="true" size={16} />
                 <span>{t('nav.profile')}</span>
               </Link>

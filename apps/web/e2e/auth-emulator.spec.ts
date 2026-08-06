@@ -81,11 +81,11 @@ test.describe('Firebase local Emulator journey', () => {
     });
     await page.getByRole('button', { name: /Mở tổng quan module/i }).click();
     await expect(
-      page.getByRole('heading', { name: 'Vì sao XOR làm Perceptron một lớp thất bại?' }),
+      page.getByRole('heading', { name: 'Một neuron đưa ra quyết định như thế nào?' }),
     ).toBeVisible();
 
-    await viewAllRequiredPostBlocks(page);
     const postContentViewed = waitForPostContentViewed(page, 'dl-p01-neuron-perceptron');
+    await viewAllRequiredPostBlocks(page);
     await page.getByRole('link', { name: /Mở quiz bài học/i }).click();
     await postContentViewed;
     await expect(page.getByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible({
@@ -167,9 +167,29 @@ async function viewAllRequiredPostBlocks(page: Page) {
 
 async function waitForPostContentViewed(page: Page, postId: string) {
   const response = await page.waitForResponse(
-    (candidate) =>
-      candidate.request().method() === 'POST' &&
-      candidate.url().includes(`/api/v1/posts/${postId}/views`),
+    async (candidate) => {
+      if (
+        candidate.request().method() !== 'POST' ||
+        !candidate.url().includes(`/api/v1/posts/${postId}/views`)
+      ) {
+        return false;
+      }
+
+      try {
+        const payload = (await candidate.json()) as {
+          data?: { postView?: { contentViewed?: boolean } };
+          success?: boolean;
+        };
+
+        return (
+          candidate.status() === 200 &&
+          payload.success === true &&
+          payload.data?.postView?.contentViewed === true
+        );
+      } catch {
+        return false;
+      }
+    },
     { timeout: 15_000 },
   );
   const payload = (await response.json()) as {

@@ -595,7 +595,7 @@ describe('Firestore learning repository', () => {
 
     const secondView = await repository.recordPostView({
       postId: 'dl-p01-neuron-perceptron',
-      readingPosition: 'from-perceptron-to-next-step',
+      readingPosition: 'and-linearly-separable',
       uid: 'learner-01',
       viewedItemIds: [
         'weighted-sum',
@@ -605,22 +605,21 @@ describe('Firestore learning repository', () => {
         'read-result',
         'xor-linear-limit',
         'xor-truth-table',
-        'stable-content-access',
-        'from-perceptron-to-next-step',
+        'and-linearly-separable',
       ],
     });
 
     expect(secondView.data.postView).toMatchObject({
       contentViewed: true,
-      readingPosition: 'from-perceptron-to-next-step',
+      readingPosition: 'and-linearly-separable',
       postId: 'dl-p01-neuron-perceptron',
       started: true,
     });
     expect(documents.get('users/learner-01/postViews/dl-p01-neuron-perceptron')).toMatchObject({
       contentViewed: true,
-      readingPosition: 'from-perceptron-to-next-step',
+      readingPosition: 'and-linearly-separable',
       status: 'content-viewed',
-      viewedItemIds: expect.arrayContaining(['what-is-a-neuron', 'from-perceptron-to-next-step']),
+      viewedItemIds: expect.arrayContaining(['what-is-a-neuron', 'and-linearly-separable']),
     });
 
     await expect(

@@ -26,8 +26,7 @@ const PERCEPTRON_REQUIRED_BLOCK_IDS = [
   'read-result',
   'xor-linear-limit',
   'xor-truth-table',
-  'stable-content-access',
-  'from-perceptron-to-next-step',
+  'and-linearly-separable',
 ] as const;
 
 const PERCEPTRON_POST_ID = 'dl-p01-neuron-perceptron';
