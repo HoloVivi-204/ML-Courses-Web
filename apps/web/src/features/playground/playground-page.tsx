@@ -1,5 +1,22 @@
-import { ArrowLeft, RotateCcw, Square, Zap } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Database,
+  LockKeyhole,
+  RotateCcw,
+  Square,
+  Zap,
+} from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
@@ -15,11 +32,14 @@ import type { PlaygroundPairRegistration, PlaygroundParameterField } from './alg
 import type { MlConfig, MlMetricValue, MlProgressEvent, MlRunResult } from './ml-engine-contract';
 import { createMlWorkerController } from './ml-worker-controller';
 import { getPlaygroundPairRegistry } from './playground-adapter-registry';
+import { getPlaygroundDataset } from './playground-datasets';
 
 interface PlaygroundPageProps {
   learningApiClient: LearningApiClient;
   locale: Locale;
 }
+
+type PlaygroundCatalogStatus = 'error' | 'loading' | 'ready';
 
 type DeviceProfile = 'desktop' | 'mobile';
 type RunStatus = 'idle' | 'running' | 'stopping' | 'cancelled' | 'completed' | 'failed';
@@ -37,6 +57,134 @@ const PERCENT_METRIC_IDS = new Set([
   'trainAccuracy',
 ]);
 
+export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundPageProps) {
+  const { t } = useTranslation();
+  const { getIdToken } = useAuth();
+  const [status, setStatus] = useState<PlaygroundCatalogStatus>('loading');
+  const [unlockedAlgorithmIds, setUnlockedAlgorithmIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const scenarioGroups = useMemo(() => getScenarioGroups(), []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAccess() {
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Missing learner token.');
+        }
+
+        const snapshot = await learningApiClient.getProgress(idToken);
+
+        if (isMounted) {
+          setUnlockedAlgorithmIds(
+            new Set(snapshot.algorithmUnlocks.map((unlock) => unlock.algorithmId)),
+          );
+          setStatus('ready');
+        }
+      } catch {
+        if (isMounted) {
+          setUnlockedAlgorithmIds(new Set());
+          setStatus('error');
+        }
+      }
+    }
+
+    void loadAccess();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [getIdToken, learningApiClient]);
+
+  if (status === 'loading') {
+    return (
+      <main className="playground-page page-shell" role="status">
+        {t('route.loading')}
+      </main>
+    );
+  }
+
+  return (
+    <main className="playground-catalog page-shell">
+      <header className="playground-catalog-heading">
+        <span className="eyebrow">{t('playground.eyebrow')}</span>
+        <h1>{t('playground.catalog.title')}</h1>
+        <p>{t('playground.catalog.intro')}</p>
+        {status === 'error' ? (
+          <p className="playground-error" role="alert">
+            {t('playground.error.progress')}
+          </p>
+        ) : null}
+      </header>
+
+      <section aria-label={t('playground.catalog.listLabel')} className="playground-catalog-grid">
+        {scenarioGroups.map(({ registrations, scenarioId }) => {
+          const dataset = getPlaygroundDataset(registrations[0]?.datasetVersionId ?? '');
+
+          return (
+            <article
+              className="playground-scenario-card"
+              data-testid={`playground-scenario-card-${scenarioId}`}
+              key={scenarioId}
+            >
+              <div className="playground-scenario-card-heading">
+                <div>
+                  <code>{scenarioId}</code>
+                  <h2>{formatScenarioName(scenarioId, locale)}</h2>
+                </div>
+                <Database aria-hidden="true" size={20} />
+              </div>
+              <p>{localize(dataset.textAlternative, locale)}</p>
+              <ul className="playground-access-list">
+                {registrations.map((registration) => {
+                  const isUnlocked = unlockedAlgorithmIds.has(registration.algorithmId);
+                  const requiredModule = findUnlockModuleForAlgorithm(registration.algorithmId);
+
+                  return (
+                    <li key={getRegistrationKey(registration)}>
+                      <div>
+                        {isUnlocked ? (
+                          <Check aria-hidden="true" size={15} />
+                        ) : (
+                          <LockKeyhole aria-hidden="true" size={15} />
+                        )}
+                        <strong>{formatAlgorithmName(registration.algorithmId, locale)}</strong>
+                        <span className={isUnlocked ? 'is-open' : ''}>
+                          {formatPlaygroundLockState(isUnlocked, locale)}
+                        </span>
+                      </div>
+                      {!isUnlocked ? (
+                        <p>
+                          {formatUnlockRequirement(
+                            requiredModule ? localize(requiredModule.title, locale) : null,
+                            locale,
+                          )}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              <Link
+                aria-label={`${t('playground.catalog.open')} ${scenarioId}`}
+                className="playground-catalog-link"
+                to={`/playground/${scenarioId}`}
+              >
+                {t('playground.catalog.open')}
+                <ArrowRight aria-hidden="true" size={16} />
+              </Link>
+            </article>
+          );
+        })}
+      </section>
+    </main>
+  );
+}
+
 export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProps) {
   const { t } = useTranslation();
   const { scenarioId } = useParams();
@@ -46,6 +194,26 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     [routeScenarioId],
   );
   const initialRegistration = scenarioRegistrations[0] ?? null;
+  const scenarioDatasetIds = useMemo(
+    () => [...new Set(scenarioRegistrations.map((entry) => entry.datasetVersionId))],
+    [scenarioRegistrations],
+  );
+  const [datasetSelection, setDatasetSelection] = useState<{
+    datasetVersionId: string | null;
+    scenarioId: string;
+  }>(() => ({
+    datasetVersionId: initialRegistration?.datasetVersionId ?? null,
+    scenarioId: routeScenarioId,
+  }));
+  const selectedDatasetVersionId =
+    datasetSelection.scenarioId === routeScenarioId
+      ? datasetSelection.datasetVersionId
+      : (initialRegistration?.datasetVersionId ?? null);
+  const activeScenarioRegistrations = useMemo(
+    () =>
+      scenarioRegistrations.filter((entry) => entry.datasetVersionId === selectedDatasetVersionId),
+    [scenarioRegistrations, selectedDatasetVersionId],
+  );
   const { getIdToken, user } = useAuth();
   const controller = useMemo(() => createMlWorkerController(), []);
   const deviceProfile = useMemo(() => getDeviceProfile(), []);
@@ -56,11 +224,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   const selectedRegistration = useMemo(
     () =>
       selectPlayableRegistration({
-        registrations: scenarioRegistrations,
+        registrations: activeScenarioRegistrations,
         selectedPairKey,
         unlockedAlgorithmIds,
       }),
-    [scenarioRegistrations, selectedPairKey, unlockedAlgorithmIds],
+    [activeScenarioRegistrations, selectedPairKey, unlockedAlgorithmIds],
   );
   const [isProgressLoading, setIsProgressLoading] = useState(true);
   const [config, setConfig] = useState<MlConfig>(() =>
@@ -133,7 +301,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         const nextUnlockedAlgorithmIds = new Set(
           snapshot.algorithmUnlocks.map((unlock) => unlock.algorithmId),
         );
-        const unlockedRegistrations = scenarioRegistrations.filter((registration) =>
+        const unlockedRegistrations = activeScenarioRegistrations.filter((registration) =>
           nextUnlockedAlgorithmIds.has(registration.algorithmId),
         );
 
@@ -198,7 +366,8 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     loadSavedArtifacts,
     readRequiredIdToken,
     routeScenarioId,
-    scenarioRegistrations,
+    activeScenarioRegistrations,
+    scenarioRegistrations.length,
     t,
   ]);
 
@@ -259,6 +428,26 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
   const activePairKey = getRegistrationKey(selectedRegistration);
   const isRunBusy = status === 'running' || status === 'stopping';
+  const selectedDataset = selectedDatasetVersionId
+    ? getPlaygroundDataset(selectedDatasetVersionId)
+    : null;
+
+  function handleDatasetSelect(nextDatasetVersionId: string) {
+    if (isRunBusy || !scenarioDatasetIds.includes(nextDatasetVersionId)) {
+      return;
+    }
+
+    previousActivePairKeyRef.current = null;
+    setDatasetSelection({
+      datasetVersionId: nextDatasetVersionId,
+      scenarioId: routeScenarioId,
+    });
+    setSelectedPairKey(null);
+    setProgress(null);
+    setResult(null);
+    setSafeError(null);
+    setStatus('idle');
+  }
 
   async function handleRun() {
     if (!user || isRunBusy || !selectedRegistration) {
@@ -567,6 +756,16 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         </div>
       </section>
 
+      {selectedDataset ? (
+        <DatasetTray
+          disabled={isRunBusy}
+          locale={locale}
+          onSelect={handleDatasetSelect}
+          selectedDatasetVersionId={selectedDatasetVersionId}
+          scenarioDatasetIds={scenarioDatasetIds}
+        />
+      ) : null}
+
       <section className="playground-workspace">
         <form className="playground-controls" onSubmit={(event) => event.preventDefault()}>
           <h2>{t('playground.controls.title')}</h2>
@@ -786,6 +985,104 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       </section>
       {persistenceError ? <p className="playground-error">{persistenceError}</p> : null}
     </main>
+  );
+}
+
+function DatasetTray({
+  disabled,
+  locale,
+  onSelect,
+  scenarioDatasetIds,
+  selectedDatasetVersionId,
+}: {
+  disabled: boolean;
+  locale: Locale;
+  onSelect: (datasetVersionId: string) => void;
+  scenarioDatasetIds: readonly string[];
+  selectedDatasetVersionId: string | null;
+}) {
+  const { t } = useTranslation();
+  const [dropMessage, setDropMessage] = useState<string | null>(null);
+
+  function handleDragStart(event: DragEvent<HTMLElement>, datasetVersionId: string): void {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('text/plain', datasetVersionId);
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>): void {
+    event.preventDefault();
+    const droppedDatasetVersionId = event.dataTransfer.getData('text/plain');
+
+    if (droppedDatasetVersionId && scenarioDatasetIds.includes(droppedDatasetVersionId)) {
+      setDropMessage(null);
+      onSelect(droppedDatasetVersionId);
+      return;
+    }
+
+    setDropMessage(t('playground.dataset.unsupportedUpload'));
+  }
+
+  return (
+    <section
+      aria-label={t('playground.dataset.trayLabel')}
+      className="playground-dataset-tray"
+      data-testid="playground-dataset-tray"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
+      <div className="playground-dataset-tray-heading">
+        <div>
+          <span className="eyebrow">{t('playground.dataset.eyebrow')}</span>
+          <h2>{t('playground.dataset.title')}</h2>
+        </div>
+        <p>{t('playground.dataset.hint')}</p>
+      </div>
+      <div className="playground-dataset-list">
+        {scenarioDatasetIds.map((datasetVersionId) => {
+          const dataset = getPlaygroundDataset(datasetVersionId);
+          const isSelected = datasetVersionId === selectedDatasetVersionId;
+
+          return (
+            <article
+              className={
+                isSelected ? 'playground-dataset-card is-selected' : 'playground-dataset-card'
+              }
+              data-testid={`playground-dataset-card-${datasetVersionId}`}
+              draggable={!disabled}
+              key={datasetVersionId}
+              onDragStart={(event) => handleDragStart(event, datasetVersionId)}
+            >
+              <div className="playground-dataset-card-heading">
+                <div>
+                  <Database aria-hidden="true" size={17} />
+                  <code>{dataset.datasetVersionId}</code>
+                </div>
+                <span>{isSelected ? t('playground.dataset.selected') : dataset.task}</span>
+              </div>
+              <p>{localize(dataset.textAlternative, locale)}</p>
+              <div className="playground-dataset-facts">
+                <span>{t('playground.dataset.rows', { count: dataset.rows.length })}</span>
+                <span>
+                  {t('playground.dataset.features', { count: dataset.featureColumns.length })}
+                </span>
+              </div>
+              <button
+                aria-pressed={isSelected}
+                disabled={disabled}
+                onClick={() => onSelect(datasetVersionId)}
+                type="button"
+              >
+                {t('playground.dataset.use')}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+      <p className="playground-dataset-selection" data-testid="playground-selected-dataset">
+        {t('playground.dataset.current', { dataset: selectedDatasetVersionId ?? '—' })}
+      </p>
+      {dropMessage ? <p className="playground-error">{dropMessage}</p> : null}
+    </section>
   );
 }
 
@@ -1487,6 +1784,62 @@ function findUnlockModuleForAlgorithm(algorithmId: string) {
       .flatMap((course) => course.modules ?? [])
       .find((module) => module.unlockAlgorithmIds.includes(algorithmId)) ?? null
   );
+}
+
+function getScenarioGroups(): Array<{
+  registrations: PlaygroundPairRegistration[];
+  scenarioId: string;
+}> {
+  const grouped = new Map<string, PlaygroundPairRegistration[]>();
+
+  for (const registration of getPlaygroundPairRegistry()) {
+    const current = grouped.get(registration.scenarioId) ?? [];
+    current.push(registration);
+    grouped.set(registration.scenarioId, current);
+  }
+
+  return [...grouped.entries()]
+    .sort(
+      ([firstScenarioId], [secondScenarioId]) =>
+        getScenarioOrder(firstScenarioId) - getScenarioOrder(secondScenarioId),
+    )
+    .map(([scenarioId, registrations]) => ({ registrations, scenarioId }));
+}
+
+function getScenarioOrder(scenarioId: string): number {
+  const index = SCENARIO_DISPLAY_ORDER.indexOf(scenarioId);
+
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+const SCENARIO_DISPLAY_ORDER: readonly string[] = [
+  'pg-house-price',
+  'pg-insurance-cost',
+  'pg-spam-detection',
+  'pg-customer-churn',
+  'pg-credit-risk',
+  'pg-wine-cultivar',
+  'pg-retail-segments',
+  'pg-country-indicators',
+  'pg-xor',
+  'pg-nonlinear-2d',
+] as const;
+
+function formatScenarioName(scenarioId: string, locale: Locale): string {
+  const labels: Record<string, { en: string; vi: string }> = {
+    'pg-country-indicators': { en: 'Country indicators', vi: 'Chỉ báo quốc gia' },
+    'pg-credit-risk': { en: 'Credit risk', vi: 'Rủi ro tín dụng' },
+    'pg-customer-churn': { en: 'Customer churn', vi: 'Rời bỏ khách hàng' },
+    'pg-house-price': { en: 'House price', vi: 'Giá nhà' },
+    'pg-insurance-cost': { en: 'Insurance cost', vi: 'Chi phí bảo hiểm' },
+    'pg-nonlinear-2d': { en: 'Nonlinear 2D', vi: '2D phi tuyến' },
+    'pg-retail-segments': { en: 'Retail segments', vi: 'Phân khúc bán lẻ' },
+    'pg-spam-detection': { en: 'Spam detection', vi: 'Phát hiện spam' },
+    'pg-wine-cultivar': { en: 'Wine cultivar', vi: 'Giống nho' },
+    'pg-xor': { en: 'XOR', vi: 'XOR' },
+  };
+
+  return labels[scenarioId]?.[locale] ?? scenarioId;
 }
 
 function formatFeedback(feedbackId: string, locale: Locale): string {

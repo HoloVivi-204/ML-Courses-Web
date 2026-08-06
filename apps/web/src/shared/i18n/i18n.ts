@@ -268,6 +268,23 @@ const resources = {
       'playground.title': 'XOR Playground: Perceptron',
       'playground.intro':
         'Run a one-layer Perceptron on the fixed XOR dataset and inspect why a linear boundary fails.',
+      'playground.catalog.title': 'Playground catalog',
+      'playground.catalog.intro':
+        'Choose one of the ten Release 1 scenarios. Only the 18 Must algorithm pairs are available.',
+      'playground.catalog.listLabel': 'Playground scenarios',
+      'playground.catalog.open': 'Open scenario',
+      'playground.dataset.trayLabel': 'Fixed dataset tray',
+      'playground.dataset.eyebrow': 'DATASET TRAY',
+      'playground.dataset.title': 'Fixed dataset',
+      'playground.dataset.hint':
+        'Drag a published card here or use its button. Arbitrary uploads are not supported.',
+      'playground.dataset.selected': 'Using dataset',
+      'playground.dataset.use': 'Use dataset',
+      'playground.dataset.rows': '{{count}} rows',
+      'playground.dataset.features': '{{count}} features',
+      'playground.dataset.current': 'Current dataset: {{dataset}}',
+      'playground.dataset.unsupportedUpload':
+        'Custom dataset uploads are not supported. Choose a fixed dataset card.',
       'playground.verification': 'client-computed result',
       'playground.locked.title': 'Playground is locked',
       'playground.locked.body':
@@ -619,6 +636,23 @@ const resources = {
       'playground.title': 'Playground XOR: Perceptron',
       'playground.intro':
         'Chạy Perceptron một lớp trên dataset XOR cố định và quan sát vì sao ranh giới tuyến tính thất bại.',
+      'playground.catalog.title': 'Danh mục Playground',
+      'playground.catalog.intro':
+        'Chọn một trong mười scenario Release 1. Chỉ 18 pair thuật toán Must được mở.',
+      'playground.catalog.listLabel': 'Các scenario Playground',
+      'playground.catalog.open': 'Mở scenario',
+      'playground.dataset.trayLabel': 'Khay dataset cố định',
+      'playground.dataset.eyebrow': 'DATASET TRAY',
+      'playground.dataset.title': 'Dataset cố định',
+      'playground.dataset.hint':
+        'Kéo thẻ đã publish vào đây hoặc dùng nút. Không hỗ trợ upload tùy ý.',
+      'playground.dataset.selected': 'Đang dùng',
+      'playground.dataset.use': 'Sử dụng dataset',
+      'playground.dataset.rows': '{{count}} mẫu',
+      'playground.dataset.features': '{{count}} feature',
+      'playground.dataset.current': 'Dataset hiện tại: {{dataset}}',
+      'playground.dataset.unsupportedUpload':
+        'Không hỗ trợ upload dataset tùy ý. Hãy chọn thẻ dataset cố định.',
       'playground.verification': 'kết quả client-computed',
       'playground.locked.title': 'Playground chưa mở khóa',
       'playground.locked.body':

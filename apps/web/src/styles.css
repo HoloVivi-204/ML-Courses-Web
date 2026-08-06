@@ -2340,11 +2340,228 @@ a {
   opacity: 0.55;
 }
 
+.playground-catalog,
 .playground-page {
   display: grid;
   gap: 24px;
   padding-bottom: 64px;
   padding-top: 32px;
+}
+
+.playground-catalog-heading {
+  display: grid;
+  max-width: 780px;
+  gap: 10px;
+}
+
+.playground-catalog-heading h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(34px, 5vw, 64px);
+}
+
+.playground-catalog-heading > p:not(.playground-error) {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.playground-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.playground-scenario-card {
+  display: grid;
+  align-content: start;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  gap: 14px;
+}
+
+.playground-scenario-card-heading,
+.playground-dataset-tray-heading,
+.playground-dataset-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.playground-scenario-card-heading > div,
+.playground-dataset-card-heading > div {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+}
+
+.playground-scenario-card-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(21px, 3vw, 30px);
+}
+
+.playground-scenario-card-heading svg,
+.playground-dataset-card-heading svg {
+  color: var(--teal);
+  flex: 0 0 auto;
+}
+
+.playground-scenario-card > p,
+.playground-dataset-card > p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.playground-access-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.playground-access-list li {
+  display: grid;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 5px;
+}
+
+.playground-access-list li > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.playground-access-list li > div svg {
+  color: var(--amber);
+}
+
+.playground-access-list li > div svg + strong {
+  flex: 1;
+}
+
+.playground-access-list span {
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.playground-access-list span.is-open {
+  color: var(--teal);
+}
+
+.playground-access-list p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.playground-catalog-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  color: var(--teal);
+  font-weight: 900;
+  gap: 7px;
+}
+
+.playground-dataset-tray {
+  display: grid;
+  padding: 18px;
+  border: 1px dashed color-mix(in srgb, var(--teal) 55%, var(--line));
+  background: color-mix(in srgb, var(--teal) 5%, var(--surface));
+  gap: 14px;
+}
+
+.playground-dataset-tray-heading {
+  align-items: end;
+}
+
+.playground-dataset-tray-heading h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+.playground-dataset-tray-heading p {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.playground-dataset-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.playground-dataset-card {
+  display: grid;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  gap: 10px;
+}
+
+.playground-dataset-card.is-selected {
+  border-color: var(--teal);
+  box-shadow: inset 0 0 0 1px var(--teal);
+}
+
+.playground-dataset-card-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.playground-dataset-card-heading span {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.playground-dataset-facts {
+  display: flex;
+  flex-wrap: wrap;
+  color: var(--ink-soft);
+  font-size: 12px;
+  gap: 10px;
+}
+
+.playground-dataset-card button {
+  justify-self: start;
+  padding: 9px 12px;
+  border: 0;
+  background: var(--ink);
+  color: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.playground-dataset-card button[aria-pressed='true'] {
+  background: var(--teal);
+  color: white;
+}
+
+.playground-dataset-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.playground-dataset-selection {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .playground-hero,
@@ -2761,8 +2978,43 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .playground-catalog-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .playground-dataset-tray-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
   .playground-identity {
     justify-items: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .playground-catalog,
+  .playground-page {
+    gap: 16px;
+    padding-top: 20px;
+  }
+
+  .playground-scenario-card,
+  .playground-dataset-tray,
+  .playground-controls,
+  .playground-history,
+  .playground-configs {
+    padding: 14px;
+  }
+
+  .playground-scenario-card-heading,
+  .playground-dataset-tray-heading,
+  .playground-dataset-card-heading {
+    gap: 8px;
+  }
+
+  .playground-dataset-list {
+    grid-template-columns: 1fr;
   }
 }
 

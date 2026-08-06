@@ -2267,6 +2267,63 @@ describe('public learning journey', () => {
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
   });
 
+  it('shows all ten Playground scenarios with Must access states in the catalog', async () => {
+    window.history.pushState({}, '', '/playground');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Danh mục Playground' })).toBeVisible();
+    expect(screen.getAllByTestId(/playground-scenario-card-/)).toHaveLength(10);
+    expect(screen.getByTestId('playground-scenario-card-pg-xor')).toHaveTextContent('Đã mở');
+    expect(screen.getByTestId('playground-scenario-card-pg-house-price')).toHaveTextContent(
+      'Đã khóa',
+    );
+    expect(screen.getByTestId('playground-scenario-card-pg-house-price')).toHaveTextContent(
+      'Cần hoàn thành module',
+    );
+    expect(screen.getAllByRole('link', { name: /Mở scenario/i })).toHaveLength(10);
+  });
+
+  it('selects a fixed dataset through the dataset button and drag-drop command', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    const tray = screen.getByTestId('playground-dataset-tray');
+    const datasetCard = screen.getByTestId('playground-dataset-card-ds-xor-noisy-v1');
+
+    expect(tray).toHaveTextContent('ds-xor-noisy-v1');
+    const useDatasetButton = within(datasetCard).getByRole('button', {
+      name: /Sử dụng dataset/i,
+    });
+    await user.click(useDatasetButton);
+    expect(useDatasetButton).toHaveAttribute('aria-pressed', 'true');
+
+    const dataTransfer = {
+      files: [],
+      getData: vi.fn().mockReturnValue('ds-xor-noisy-v1'),
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragOver(tray, { dataTransfer });
+    fireEvent.drop(tray, { dataTransfer });
+    expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent('ds-xor-noisy-v1');
+  });
+
   it('runs pg-xor Perceptron through a verified run session and worker result', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
     installImmediatePlaygroundWorker();
