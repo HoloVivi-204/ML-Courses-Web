@@ -34,6 +34,7 @@ import type { MlConfig, MlMetricValue, MlProgressEvent, MlRunResult } from './ml
 import { createMlWorkerController } from './ml-worker-controller';
 import { getPlaygroundPairRegistry } from './playground-adapter-registry';
 import { createSeededRandom, getPlaygroundDataset } from './playground-datasets';
+import { PlaygroundVisualization } from './playground-visualizations';
 
 interface PlaygroundPageProps {
   learningApiClient: LearningApiClient;
@@ -883,7 +884,9 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           <h2>{t('playground.output.title')}</h2>
           <p className={`playground-status status-${status}`}>{t(`playground.status.${status}`)}</p>
           {progress ? <p>{formatProgressEvent(progress, locale)}</p> : null}
-          {result ? <PlaygroundResult locale={locale} result={result} /> : null}
+          {result ? (
+            <PlaygroundResult dataset={selectedDataset} locale={locale} result={result} />
+          ) : null}
           {safeError ? <p className="playground-error">{safeError}</p> : null}
         </section>
       </section>
@@ -1230,7 +1233,15 @@ function NumberField({
   );
 }
 
-function PlaygroundResult({ locale, result }: { locale: Locale; result: MlRunResult }) {
+function PlaygroundResult({
+  dataset,
+  locale,
+  result,
+}: {
+  dataset: ReturnType<typeof getPlaygroundDataset> | null;
+  locale: Locale;
+  result: MlRunResult;
+}) {
   const metricEntries = Object.entries(result.metrics);
 
   return (
@@ -1246,6 +1257,7 @@ function PlaygroundResult({ locale, result }: { locale: Locale; result: MlRunRes
       {result.textAlternative ? (
         <p className="playground-result-text">{result.textAlternative[locale]}</p>
       ) : null}
+      <PlaygroundVisualization dataset={dataset} locale={locale} result={result} />
       <ResultSummary locale={locale} result={result} />
       {result.feedback.length > 0 ? (
         <ul className="playground-feedback">
