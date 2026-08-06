@@ -6,6 +6,7 @@ import {
 } from './release-learning-catalog.js';
 import {
   cmlM01SourceTrace,
+  cmlM02SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -16,6 +17,7 @@ const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => sourc
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const dlM02DraftProvenance = {
   candidateSourceIds: DL_M02_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -36,6 +38,13 @@ const cmlM01DraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM01SourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM02DraftProvenance = {
+  candidateSourceIds: CML_M02_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM02SourceTrace,
 } as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
@@ -1968,6 +1977,565 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-cml-p03': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM02DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m02-linear-polynomial',
+    passingScorePercent: 100,
+    postId: 'cml-p03-linear-regression',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p03',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p03-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p03-linear-regression', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-observed-minus-predicted',
+        explanation: {
+          en: 'A residual compares the observed target with the line prediction for the same input. It records the vertical miss for that row.',
+          vi: 'Phần dư so sánh mục tiêu quan sát với dự đoán đường tại cùng đầu vào. Nó ghi sai lệch theo phương đứng của dòng đó.',
+        },
+        hints: [
+          {
+            en: 'Use the same input for both values.',
+            vi: 'Dùng cùng một đầu vào cho cả hai giá trị.',
+          },
+          {
+            en: 'The residual is about a gap, not the slope alone.',
+            vi: 'Phần dư nói về khoảng cách, không chỉ độ dốc.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-observed-minus-predicted',
+            text: {
+              en: 'The gap between the observed target and predicted value',
+              vi: 'Khoảng cách giữa mục tiêu quan sát và giá trị dự đoán',
+            },
+          },
+          {
+            optionId: 'opt-input-only',
+            text: {
+              en: 'The input value without an output',
+              vi: 'Giá trị đầu vào không có đầu ra',
+            },
+          },
+          {
+            optionId: 'opt-intercept-only',
+            text: {
+              en: 'The intercept without a row comparison',
+              vi: 'Hệ số chặn không có so sánh dòng',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What does a residual describe for one regression row?',
+          vi: 'Phần dư mô tả gì cho một dòng hồi quy?',
+        },
+        questionId: 'q-cml-p03-residual-gap',
+        sourceId: 'act-cml-p03-linear-regression-quiz-01',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-square-gaps', 'opt-emphasise-large-miss'],
+        explanation: {
+          en: 'Least squares sums squared residuals. Squaring stops opposite signs from cancelling and makes a larger miss contribute more than a smaller one.',
+          vi: 'Least squares cộng các phần dư bình phương. Bình phương ngăn dấu đối nhau triệt tiêu và khiến sai lệch lớn đóng góp nhiều hơn sai lệch nhỏ.',
+        },
+        hints: [
+          {
+            en: 'Choose the effects of squaring the residuals.',
+            vi: 'Chọn các tác động của việc bình phương phần dư.',
+          },
+          {
+            en: 'The rule cares about the total error, not one signed sum.',
+            vi: 'Quy tắc quan tâm đến tổng lỗi, không phải một tổng có dấu.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-square-gaps',
+            text: {
+              en: 'Square the residual gaps before adding them',
+              vi: 'Bình phương các khoảng cách phần dư trước khi cộng',
+            },
+          },
+          {
+            optionId: 'opt-emphasise-large-miss',
+            text: {
+              en: 'Give a larger miss more influence than a small miss',
+              vi: 'Cho sai lệch lớn ảnh hưởng nhiều hơn sai lệch nhỏ',
+            },
+          },
+          {
+            optionId: 'opt-cancel-signs',
+            text: {
+              en: 'Let positive and negative gaps cancel exactly',
+              vi: 'Để khoảng cách dương và âm triệt tiêu chính xác',
+            },
+          },
+          {
+            optionId: 'opt-ignore-target',
+            text: {
+              en: 'Ignore the observed target once a line is drawn',
+              vi: 'Bỏ qua mục tiêu quan sát sau khi vẽ đường',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements describe why least squares uses squared residuals?',
+          vi: 'Hai phát biểu nào mô tả vì sao least squares dùng phần dư bình phương?',
+        },
+        questionId: 'q-cml-p03-least-squares-effects',
+        sourceId: 'act-cml-p03-linear-regression-quiz-02',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'A test split is held out so the fitted line can be evaluated on target values it did not use while learning its coefficients.',
+          vi: 'Phần test được giữ lại để đường đã khớp có thể được đánh giá trên mục tiêu nó không dùng khi học hệ số.',
+        },
+        hints: [
+          {
+            en: 'Separate fitting evidence from evaluation evidence.',
+            vi: 'Tách bằng chứng khớp khỏi bằng chứng đánh giá.',
+          },
+          {
+            en: 'Held-out rows answer a new-example question.',
+            vi: 'Dòng giữ lại trả lời câu hỏi về ví dụ mới.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a test split helps evaluate a fitted line on targets not used to fit its coefficients.',
+          vi: 'Đúng hay sai: phần test giúp đánh giá đường đã khớp trên mục tiêu không dùng để khớp hệ số.',
+        },
+        questionId: 'q-cml-p03-heldout-line',
+        sourceId: 'act-cml-p03-linear-regression-quiz-03',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-post-cml-p04': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM02DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m02-linear-polynomial',
+    passingScorePercent: 100,
+    postId: 'cml-p04-polynomial-regression',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p04',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p04-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p04-polynomial-regression', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-squared-input',
+        explanation: {
+          en: 'For one input, degree-two polynomial features include the original input and its square, enabling a parabolic relationship.',
+          vi: 'Với một đầu vào, feature đa thức bậc hai gồm đầu vào gốc và bình phương của nó, cho phép quan hệ parabol.',
+        },
+        hints: [
+          { en: 'Think of the extra term added beyond x.', vi: 'Hãy nghĩ đến hạng thêm ngoài x.' },
+          { en: 'Degree two introduces a square.', vi: 'Bậc hai đưa vào bình phương.' },
+        ],
+        options: [
+          {
+            optionId: 'opt-squared-input',
+            text: { en: 'A squared input feature x²', vi: 'Feature đầu vào bình phương x²' },
+          },
+          {
+            optionId: 'opt-random-label',
+            text: { en: 'A random replacement label', vi: 'Nhãn thay thế ngẫu nhiên' },
+          },
+          {
+            optionId: 'opt-test-answer',
+            text: { en: 'The held-out target as a feature', vi: 'Mục tiêu giữ lại làm feature' },
+          },
+        ],
+        prompt: {
+          en: 'With one input x, what does a degree-two polynomial representation add?',
+          vi: 'Với một đầu vào x, biểu diễn đa thức bậc hai thêm gì?',
+        },
+        questionId: 'q-cml-p04-degree-two-feature',
+        sourceId: 'act-cml-p04-polynomial-regression-quiz-01',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-same-split', 'opt-heldout-error'],
+        explanation: {
+          en: 'A fair comparison keeps the held-out rows the same and compares the resulting error. Changing both the representation and the evidence would not isolate the effect of curvature.',
+          vi: 'So sánh công bằng giữ các dòng giữ lại giống nhau và so sánh lỗi kết quả. Đổi cả biểu diễn lẫn bằng chứng sẽ không cô lập được tác động của độ cong.',
+        },
+        hints: [
+          {
+            en: 'Keep the evidence constant while changing the candidate model.',
+            vi: 'Giữ bằng chứng không đổi khi thay mô hình ứng viên.',
+          },
+          {
+            en: 'A lower degree or higher degree must face the same test question.',
+            vi: 'Bậc thấp hay cao phải đối mặt cùng câu hỏi test.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-same-split',
+            text: {
+              en: 'Use the same held-out split for both candidates',
+              vi: 'Dùng cùng phần giữ lại cho cả hai ứng viên',
+            },
+          },
+          {
+            optionId: 'opt-heldout-error',
+            text: {
+              en: 'Compare error on the held-out rows',
+              vi: 'So sánh lỗi trên các dòng giữ lại',
+            },
+          },
+          {
+            optionId: 'opt-highest-degree',
+            text: {
+              en: 'Choose the highest degree before seeing evidence',
+              vi: 'Chọn bậc cao nhất trước khi xem bằng chứng',
+            },
+          },
+          {
+            optionId: 'opt-train-only',
+            text: {
+              en: 'Use only the training fit to decide',
+              vi: 'Chỉ dùng độ khớp train để quyết định',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two practices make a linear-versus-polynomial comparison defensible?',
+          vi: 'Hai thực hành nào làm so sánh tuyến tính với đa thức có cơ sở?',
+        },
+        questionId: 'q-cml-p04-heldout-comparison',
+        sourceId: 'act-cml-p04-polynomial-regression-quiz-02',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'A higher degree gives a more flexible candidate, not a guaranteed improvement. It still needs held-out evidence that the added shape helps the decision.',
+          vi: 'Bậc cao hơn tạo ứng viên linh hoạt hơn, không phải cải thiện được bảo đảm. Nó vẫn cần bằng chứng giữ lại rằng hình dạng thêm giúp quyết định.',
+        },
+        hints: [
+          {
+            en: 'More flexibility can follow noise as well as signal.',
+            vi: 'Linh hoạt hơn có thể bám nhiễu cũng như tín hiệu.',
+          },
+          {
+            en: 'Evidence, not degree alone, decides.',
+            vi: 'Bằng chứng, không chỉ bậc, quyết định.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: raising polynomial degree always produces the better model.',
+          vi: 'Đúng hay sai: tăng bậc đa thức luôn tạo mô hình tốt hơn.',
+        },
+        questionId: 'q-cml-p04-degree-not-guarantee',
+        sourceId: 'act-cml-p04-polynomial-regression-quiz-03',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-cml-m02': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-linear-calibration',
+    draftProvenance: cmlM02DraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m02-linear-polynomial',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m02',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m02-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [
+      { id: 'linear-regression', type: 'algorithm' },
+      { id: 'polynomial-regression', type: 'algorithm' },
+    ],
+    questions: [
+      {
+        correctAnswer: 'opt-numerical-estimate',
+        explanation: {
+          en: 'Regression estimates a numerical target such as price, wait time, or a sensor reading.',
+          vi: 'Hồi quy ước lượng mục tiêu số như giá, thời gian chờ hoặc số đọc cảm biến.',
+        },
+        hints: [
+          {
+            en: 'Look at the output type, not the algorithm name.',
+            vi: 'Hãy nhìn kiểu đầu ra, không phải tên thuật toán.',
+          },
+          { en: 'A line predicts a quantity.', vi: 'Đường thẳng dự đoán một đại lượng.' },
+        ],
+        options: [
+          {
+            optionId: 'opt-numerical-estimate',
+            text: { en: 'Estimate a numerical value', vi: 'Ước lượng một giá trị số' },
+          },
+          {
+            optionId: 'opt-named-class',
+            text: { en: 'Choose one named category only', vi: 'Chỉ chọn một danh mục có tên' },
+          },
+          {
+            optionId: 'opt-unlabeled-group',
+            text: { en: 'Discover unlabeled groups only', vi: 'Chỉ khám phá nhóm không nhãn' },
+          },
+        ],
+        prompt: {
+          en: 'What kind of target is linear regression designed to estimate?',
+          vi: 'Hồi quy tuyến tính được thiết kế để ước lượng loại mục tiêu nào?',
+        },
+        questionId: 'q-cml-m02-numerical-target',
+        sourceId: 'quiz-module-cml-m02-q01',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'For one row, the residual compares the observed target with its prediction, so it tells both direction and size of that row’s miss.',
+          vi: 'Với một dòng, phần dư so sánh mục tiêu quan sát với dự đoán của nó, nên nó cho biết cả hướng lẫn độ lớn sai lệch của dòng đó.',
+        },
+        hints: [
+          {
+            en: 'Use the observed and predicted values from the same row.',
+            vi: 'Dùng giá trị quan sát và dự đoán từ cùng dòng.',
+          },
+          { en: 'Residuals are not coefficients.', vi: 'Phần dư không phải hệ số.' },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a residual compares an observed target with the prediction for that same row.',
+          vi: 'Đúng hay sai: phần dư so sánh mục tiêu quan sát với dự đoán cho chính dòng đó.',
+        },
+        questionId: 'q-cml-m02-residual-row',
+        sourceId: 'quiz-module-cml-m02-q02',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: ['opt-transform-first', 'opt-repeat-transform'],
+        explanation: {
+          en: 'A polynomial pipeline first expands features, fits regression on that representation, and repeats the same transformation before predicting a held-out row.',
+          vi: 'Pipeline đa thức trước hết mở rộng feature, khớp hồi quy trên biểu diễn đó và lặp lại đúng biến đổi trước khi dự đoán dòng giữ lại.',
+        },
+        hints: [
+          {
+            en: 'Choose the steps that keep fitting and prediction representations consistent.',
+            vi: 'Chọn các bước giữ biểu diễn khớp và dự đoán nhất quán.',
+          },
+          {
+            en: 'The same feature construction must be used again at prediction time.',
+            vi: 'Cùng cách tạo feature phải được dùng lại lúc dự đoán.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-transform-first',
+            text: {
+              en: 'Create polynomial features before fitting regression',
+              vi: 'Tạo feature đa thức trước khi khớp hồi quy',
+            },
+          },
+          {
+            optionId: 'opt-repeat-transform',
+            text: {
+              en: 'Apply the same transformation before prediction',
+              vi: 'Áp dụng cùng biến đổi trước khi dự đoán',
+            },
+          },
+          {
+            optionId: 'opt-test-label-feature',
+            text: {
+              en: 'Add held-out labels as a new feature',
+              vi: 'Thêm nhãn giữ lại làm feature mới',
+            },
+          },
+          {
+            optionId: 'opt-random-degree',
+            text: {
+              en: 'Choose a random degree for each prediction row',
+              vi: 'Chọn bậc ngẫu nhiên cho từng dòng dự đoán',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two steps describe a consistent polynomial regression pipeline?',
+          vi: 'Hai bước nào mô tả pipeline hồi quy đa thức nhất quán?',
+        },
+        questionId: 'q-cml-m02-pipeline-order',
+        sourceId: 'quiz-module-cml-m02-q03',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'opt-new-example-evidence',
+        explanation: {
+          en: 'Held-out rows were not used to choose coefficients, so their error is evidence about behavior on new examples.',
+          vi: 'Dòng giữ lại không được dùng để chọn hệ số, nên lỗi của chúng là bằng chứng về hành vi trên ví dụ mới.',
+        },
+        hints: [
+          {
+            en: 'Ask whether the model already saw the target while fitting.',
+            vi: 'Hãy hỏi mô hình đã thấy mục tiêu khi khớp hay chưa.',
+          },
+          {
+            en: 'Evaluation evidence comes from unused rows.',
+            vi: 'Bằng chứng đánh giá đến từ dòng chưa dùng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-new-example-evidence',
+            text: {
+              en: 'Evidence about predictions on new examples',
+              vi: 'Bằng chứng về dự đoán trên ví dụ mới',
+            },
+          },
+          {
+            optionId: 'opt-second-fit',
+            text: {
+              en: 'A second opportunity to fit the same coefficients',
+              vi: 'Cơ hội thứ hai để khớp cùng hệ số',
+            },
+          },
+          {
+            optionId: 'opt-no-residuals',
+            text: { en: 'A reason not to inspect residuals', vi: 'Lý do không xem phần dư' },
+          },
+        ],
+        prompt: {
+          en: 'What does held-out error provide after a regression model is fitted?',
+          vi: 'Lỗi giữ lại cung cấp điều gì sau khi mô hình hồi quy được khớp?',
+        },
+        questionId: 'q-cml-m02-heldout-error',
+        sourceId: 'quiz-module-cml-m02-q04',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-prediction-seven', 'opt-residual-plus-one'],
+        explanation: {
+          en: 'For y_pred = 2x + 1 at x=3, the prediction is 7. With observed target 8, observed minus predicted is +1.',
+          vi: 'Với y_pred = 2x + 1 tại x=3, dự đoán là 7. Với mục tiêu quan sát 8, quan sát trừ dự đoán là +1.',
+        },
+        hints: [
+          {
+            en: 'Calculate the fixed line before comparing it with the target.',
+            vi: 'Tính đường cố định trước khi so sánh với mục tiêu.',
+          },
+          {
+            en: 'Use observed minus predicted for the displayed residual.',
+            vi: 'Dùng quan sát trừ dự đoán cho phần dư được hiển thị.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-prediction-seven',
+            text: { en: 'The prediction is 7', vi: 'Dự đoán là 7' },
+          },
+          {
+            optionId: 'opt-residual-plus-one',
+            text: { en: 'The residual is +1', vi: 'Phần dư là +1' },
+          },
+          {
+            optionId: 'opt-prediction-eight',
+            text: { en: 'The prediction is 8', vi: 'Dự đoán là 8' },
+          },
+          {
+            optionId: 'opt-residual-negative-one',
+            text: { en: 'The residual is -1', vi: 'Phần dư là -1' },
+          },
+        ],
+        prompt: {
+          en: 'For the fixed rule y_pred = 2x + 1 at x=3 with observed target 8, which two statements are correct?',
+          vi: 'Với quy tắc cố định y_pred = 2x + 1 tại x=3 và mục tiêu quan sát 8, hai phát biểu nào đúng?',
+        },
+        questionId: 'q-cml-m02-fixed-line-residual',
+        sourceId: 'quiz-module-cml-m02-q05',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'opt-not-guaranteed',
+        explanation: {
+          en: 'Polynomial complexity is a hypothesis to test. It must earn its use through the same held-out evidence, not through degree alone.',
+          vi: 'Độ phức tạp đa thức là giả thuyết cần kiểm tra. Nó phải chứng minh giá trị qua cùng bằng chứng giữ lại, không phải chỉ qua bậc.',
+        },
+        hints: [
+          {
+            en: 'Do not turn model flexibility into a guarantee.',
+            vi: 'Đừng biến tính linh hoạt mô hình thành bảo đảm.',
+          },
+          { en: 'Use held-out evidence to decide.', vi: 'Dùng bằng chứng giữ lại để quyết định.' },
+        ],
+        options: [
+          {
+            optionId: 'opt-not-guaranteed',
+            text: {
+              en: 'A higher degree still needs held-out evidence',
+              vi: 'Bậc cao hơn vẫn cần bằng chứng giữ lại',
+            },
+          },
+          {
+            optionId: 'opt-always-best',
+            text: { en: 'The highest degree is always best', vi: 'Bậc cao nhất luôn tốt nhất' },
+          },
+          {
+            optionId: 'opt-no-test',
+            text: {
+              en: 'A curved line removes the need for a test split',
+              vi: 'Đường cong loại bỏ nhu cầu phần test',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which statement is the sound conclusion when considering a higher polynomial degree?',
+          vi: 'Phát biểu nào là kết luận đúng khi cân nhắc bậc đa thức cao hơn?',
+        },
+        questionId: 'q-cml-m02-complexity-evidence',
+        sourceId: 'quiz-module-cml-m02-q06',
+        sourceIds: CML_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -2107,26 +2675,6 @@ interface PostQuizDraftDefinition {
 }
 
 const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {
-  'cml-p03-linear-regression': {
-    coreMove: {
-      en: 'Start with an interpretable line and inspect residual patterns before adding complexity.',
-      vi: 'Bắt đầu bằng đường thẳng dễ giải thích và xem mẫu phần dư trước khi tăng độ phức tạp.',
-    },
-    trueAssertion: {
-      en: 'A repeated residual pattern can show that a straight baseline misses structure in the data.',
-      vi: 'Mẫu phần dư lặp lại có thể cho thấy baseline đường thẳng bỏ sót cấu trúc trong dữ liệu.',
-    },
-  },
-  'cml-p04-polynomial-regression': {
-    coreMove: {
-      en: 'Compare added curvature against held-out error instead of assuming a higher degree is better.',
-      vi: 'So sánh độ cong tăng thêm với lỗi trên dữ liệu giữ lại thay vì cho rằng bậc cao luôn tốt hơn.',
-    },
-    trueAssertion: {
-      en: 'A high-degree curve can fit accidental noise even when it looks better on the training examples.',
-      vi: 'Đường cong bậc cao có thể khớp nhiễu ngẫu nhiên dù trông tốt hơn trên ví dụ train.',
-    },
-  },
   'cml-p05-regularization-ridge-lasso': {
     coreMove: {
       en: 'Use regularisation to favour stable coefficients when signals overlap or contain noise.',

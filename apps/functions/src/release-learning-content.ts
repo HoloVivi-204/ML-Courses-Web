@@ -1,6 +1,7 @@
 import { getReleaseLearningCatalog, type LocalizedText } from './release-learning-catalog.js';
 import {
   cmlM01SourceTrace,
+  cmlM02SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -45,12 +46,15 @@ const MLP_POST_ID = 'dl-p02-mlp-forward-activation';
 const TRAINING_POST_ID = 'dl-p03-backprop-overfitting';
 const CML_M01_PROBLEM_POST_ID = 'cml-p01-problem-data-types';
 const CML_M01_EVALUATION_POST_ID = 'cml-p02-train-test-metrics';
+const CML_M02_LINEAR_POST_ID = 'cml-p03-linear-regression';
+const CML_M02_POLYNOMIAL_POST_ID = 'cml-p04-polynomial-regression';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -102,12 +106,40 @@ const cmlM01EvaluationBlockDefaults = {
   sourceIds: CML_M01_SOURCE_IDS,
 } as const;
 
+const cmlM02LinearBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M02_LINEAR_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M02_SOURCE_IDS,
+} as const;
+
+const cmlM02PolynomialBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M02_POLYNOMIAL_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M02_SOURCE_IDS,
+} as const;
+
 const cmlM01DraftProvenance = {
   candidateSourceIds: CML_M01_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM01SourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM02DraftProvenance = {
+  candidateSourceIds: CML_M02_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM02SourceTrace,
 } as const satisfies DraftProvenance;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -1473,6 +1505,390 @@ const cmlM01EvaluationFullLessonBlocks = [
   },
 ] satisfies readonly LearningContentBlock[];
 
+const cmlM02LinearFullLessonBlocks = [
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-numerical-target',
+    locales: {
+      en: {
+        lede: 'Linear regression starts with a numerical target and asks whether a straight relationship is a useful first approximation for a new case.',
+        navigationTitle: 'Start with a number',
+        title: 'Use a line as an inspectable numerical baseline',
+      },
+      vi: {
+        lede: 'Hồi quy tuyến tính bắt đầu với một mục tiêu số và hỏi liệu quan hệ đường thẳng có là xấp xỉ đầu tiên hữu ích cho trường hợp mới hay không.',
+        navigationTitle: 'Bắt đầu với một con số',
+        title: 'Dùng đường thẳng làm baseline số có thể quan sát',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-line-meaning',
+    locales: {
+      en: {
+        markdown:
+          'A simple line has the form $y_{pred} = a + bx$. The intercept $a$ is the baseline estimate when the input is zero; the slope $b$ describes how the estimate changes as the input changes. This is a model claim, not a guarantee that every observed point lies on the line.',
+      },
+      vi: {
+        markdown:
+          'Một đường đơn giản có dạng $y_{pred} = a + bx$. Hệ số chặn $a$ là ước lượng nền khi đầu vào bằng không; độ dốc $b$ mô tả ước lượng đổi thế nào khi đầu vào đổi. Đây là một khẳng định của mô hình, không phải bảo đảm mọi điểm quan sát nằm trên đường.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-residual-meaning',
+    locales: {
+      en: {
+        body: 'A residual is the vertical gap between the observed target and the line’s prediction for the same input. Its sign shows direction; its size shows how far that one prediction missed.',
+        title: 'Every point can challenge the line',
+      },
+      vi: {
+        body: 'Phần dư là khoảng cách theo phương đứng giữa mục tiêu quan sát và dự đoán của đường tại cùng đầu vào. Dấu của nó cho biết hướng; độ lớn cho biết dự đoán đó sai bao xa.',
+        title: 'Mỗi điểm đều có thể thách thức đường',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-least-squares-question',
+    locales: {
+      en: {
+        lede: 'A fitted line needs a rule for trading many misses against one another. Least squares uses the total of squared residuals for that rule.',
+        navigationTitle: 'Read the fitting rule',
+        title: 'Squaring makes large misses visible',
+      },
+      vi: {
+        lede: 'Một đường được khớp cần quy tắc để đánh đổi các lần bỏ lỡ với nhau. Least squares dùng tổng phần dư bình phương cho quy tắc đó.',
+        navigationTitle: 'Đọc quy tắc khớp',
+        title: 'Bình phương làm các sai lệch lớn trở nên rõ ràng',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-squared-error-reading',
+    locales: {
+      en: {
+        markdown:
+          'For each row, first compare $y_{actual}$ with $y_{pred}$, then square the gap. Squaring prevents a negative residual from cancelling a positive residual and gives a larger miss more influence than a small miss. The chosen line is the one that reduces the total squared error for the training rows.',
+      },
+      vi: {
+        markdown:
+          'Với mỗi dòng, trước hết so sánh $y_{actual}$ với $y_{pred}$, rồi bình phương khoảng cách. Bình phương ngăn phần dư âm triệt tiêu phần dư dương và khiến sai lệch lớn có ảnh hưởng nhiều hơn sai lệch nhỏ. Đường được chọn là đường giảm tổng lỗi bình phương trên các dòng train.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    activityId: 'act-cml-p03-linear-regression-example',
+    id: 'linear-fixed-residual-example',
+    locales: {
+      en: {
+        description:
+          'Read the fixed calibration rule $y_{pred} = 2x + 1$. At $x=3$, the line predicts 7 while the observed target is 8, so the residual is +1. Explain why this is evidence about one row rather than proof that the line should be discarded.',
+        navigationTitle: 'Read one residual',
+      },
+      vi: {
+        description:
+          'Đọc quy tắc hiệu chuẩn cố định $y_{pred} = 2x + 1$. Tại $x=3$, đường dự đoán 7 còn mục tiêu quan sát là 8, nên phần dư là +1. Giải thích vì sao đây là bằng chứng về một dòng chứ chưa phải bằng chứng phải loại đường thẳng.',
+        navigationTitle: 'Đọc một phần dư',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-held-out-check',
+    locales: {
+      en: {
+        lede: 'Fitting finds coefficients from training data. Evaluation asks a separate question by predicting targets in a held-out test split.',
+        navigationTitle: 'Separate fit from evaluation',
+        title: 'Measure a new claim on held-out rows',
+      },
+      vi: {
+        lede: 'Khớp tìm hệ số từ dữ liệu train. Đánh giá đặt câu hỏi riêng bằng cách dự đoán mục tiêu trong phần test giữ lại.',
+        navigationTitle: 'Tách khớp khỏi đánh giá',
+        title: 'Đo một khẳng định mới trên dòng giữ lại',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-rmse-meaning',
+    locales: {
+      en: {
+        markdown:
+          'On held-out rows, root mean squared error (RMSE) turns the squared prediction gaps back into the target’s unit. Compare it with the scale of the target and inspect the residual pattern; one summary number cannot explain every mismatch.',
+      },
+      vi: {
+        markdown:
+          'Trên các dòng giữ lại, root mean squared error (RMSE) đưa các khoảng cách dự đoán bình phương trở về đơn vị của mục tiêu. Hãy so sánh nó với thang của mục tiêu và quan sát mẫu phần dư; một con số tóm tắt không thể giải thích mọi sai lệch.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-baseline-decision',
+    locales: {
+      en: {
+        body: 'A straight line is valuable because it makes its assumption visible. If residuals show repeated structure or held-out error is not adequate for the decision, investigate a different representation rather than treating the first line as final.',
+        title: 'A baseline is a question to test',
+      },
+      vi: {
+        body: 'Đường thẳng có giá trị vì nó làm giả định của mình hiển thị. Nếu phần dư cho cấu trúc lặp lại hoặc lỗi giữ lại chưa đủ cho quyết định, hãy khảo sát biểu diễn khác thay vì xem đường đầu tiên là cuối cùng.',
+        title: 'Baseline là câu hỏi cần kiểm tra',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM02LinearBlockDefaults,
+    id: 'linear-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM02SourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM02SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM02SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM02SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Build a regression model using Scikit-learn: regression four ways',
+        url: 'https://github.com/microsoft/ML-For-Beginners/blob/main/2-Regression/3-Linear/README.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM02PolynomialFullLessonBlocks = [
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-curvature-question',
+    locales: {
+      en: {
+        lede: 'A line is not the only possible relationship. When the evidence suggests smooth curvature, polynomial features create a more flexible hypothesis to test.',
+        navigationTitle: 'Ask whether curvature matters',
+        title: 'Add curvature only when the relationship calls for it',
+      },
+      vi: {
+        lede: 'Đường thẳng không phải quan hệ duy nhất có thể có. Khi bằng chứng gợi ý độ cong mượt, feature đa thức tạo giả thuyết linh hoạt hơn để kiểm tra.',
+        navigationTitle: 'Hỏi độ cong có quan trọng không',
+        title: 'Chỉ thêm độ cong khi quan hệ cần đến nó',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-second-degree',
+    locales: {
+      en: {
+        markdown:
+          'With one input, a degree-two polynomial adds an $x^2$ feature alongside $x$. The resulting model can bend into a parabola, which gives it a way to represent a curved trend that a straight line cannot express.',
+      },
+      vi: {
+        markdown:
+          'Với một đầu vào, đa thức bậc hai thêm feature $x^2$ bên cạnh $x$. Mô hình kết quả có thể uốn thành parabol, cho nó cách biểu diễn xu hướng cong mà đường thẳng không thể diễn đạt.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-representation-tradeoff',
+    locales: {
+      en: {
+        body: 'Cause: extra polynomial features give the model more shapes it can fit. Effect: they can capture meaningful curvature, but they can also follow accidental variation unless the held-out comparison supports the added complexity.',
+        title: 'Flexibility changes both fit and risk',
+      },
+      vi: {
+        body: 'Nguyên nhân: feature đa thức thêm cho mô hình nhiều hình dạng hơn để khớp. Kết quả: chúng có thể nắm độ cong có nghĩa, nhưng cũng có thể bám biến động tình cờ nếu so sánh giữ lại không ủng hộ độ phức tạp thêm.',
+        title: 'Tính linh hoạt làm đổi cả độ khớp lẫn rủi ro',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-pipeline-order',
+    locales: {
+      en: {
+        lede: 'Keep feature transformation and regression in a visible order so the same steps are applied when fitting and predicting.',
+        navigationTitle: 'Keep the transformation explicit',
+        title: 'A pipeline records the two-stage model',
+      },
+      vi: {
+        lede: 'Giữ biến đổi feature và hồi quy theo thứ tự hiển thị để cùng các bước được áp dụng khi khớp và dự đoán.',
+        navigationTitle: 'Giữ biến đổi rõ ràng',
+        title: 'Pipeline ghi lại mô hình hai giai đoạn',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-pipeline-reading',
+    locales: {
+      en: {
+        markdown:
+          'Read a degree-two pipeline in order: first create polynomial features from each input row, then fit a linear regression on that expanded representation, then apply those same transformations before predicting a held-out row. The output may curve in the original input space even though the last fitting step is linear in its features.',
+      },
+      vi: {
+        markdown:
+          'Đọc pipeline bậc hai theo thứ tự: đầu tiên tạo feature đa thức từ mỗi dòng đầu vào, rồi khớp hồi quy tuyến tính trên biểu diễn đã mở rộng, sau đó áp dụng đúng biến đổi đó trước khi dự đoán dòng giữ lại. Đầu ra có thể cong trong không gian đầu vào gốc dù bước khớp cuối vẫn tuyến tính theo feature của nó.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    activityId: 'act-cml-p04-polynomial-regression-example',
+    id: 'polynomial-fixed-comparison-example',
+    locales: {
+      en: {
+        description:
+          'Compare two fixed candidate descriptions for the same held-out rows: a straight line misses a U-shaped pattern in both tails; a degree-two curve reduces those repeated tail misses. State the evidence you would still require before choosing the curve: the same split, an error comparison, and a check that the gain matters for the decision.',
+        navigationTitle: 'Compare two candidates',
+      },
+      vi: {
+        description:
+          'So sánh hai mô tả ứng viên cố định trên cùng dòng giữ lại: đường thẳng bỏ lỡ mẫu chữ U ở cả hai đuôi; đường cong bậc hai giảm các lần bỏ lỡ đuôi lặp lại đó. Nêu bằng chứng vẫn cần trước khi chọn đường cong: cùng phần chia, so sánh lỗi và kiểm tra lợi ích có ý nghĩa với quyết định.',
+        navigationTitle: 'So sánh hai ứng viên',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-heldout-comparison',
+    locales: {
+      en: {
+        lede: 'A higher degree is a changed hypothesis, not an automatic improvement. Compare candidates on the same held-out evidence.',
+        navigationTitle: 'Compare on the same evidence',
+        title: 'Let held-out error decide whether curvature helped',
+      },
+      vi: {
+        lede: 'Bậc cao hơn là một giả thuyết đã đổi, không phải cải thiện tự động. Hãy so sánh các ứng viên trên cùng bằng chứng giữ lại.',
+        navigationTitle: 'So sánh trên cùng bằng chứng',
+        title: 'Để lỗi giữ lại quyết định độ cong có giúp không',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-fixed-table',
+    locales: {
+      en: {
+        markdown:
+          'Use this fixed instructional comparison, not a reported experiment:\n\n| candidate | repeated residual pattern | held-out reading |\n|---|---|---|\n| straight line | misses both tails in the same direction | inspect whether curvature is warranted |\n| degree-two curve | fewer repeated tail misses | compare its held-out error on the same rows |\n\nA curved drawing is only a candidate explanation until the held-out evidence improves in a way that matters to the decision.',
+      },
+      vi: {
+        markdown:
+          'Dùng so sánh cố định để học này, không phải thí nghiệm được báo cáo:\n\n| ứng viên | mẫu phần dư lặp lại | cách đọc giữ lại |\n|---|---|---|\n| đường thẳng | bỏ lỡ cả hai đuôi theo cùng chiều | kiểm tra độ cong có cần thiết không |\n| đường cong bậc hai | ít lần bỏ lỡ đuôi lặp lại hơn | so sánh lỗi giữ lại trên cùng dòng |\n\nBản vẽ cong chỉ là giải thích ứng viên cho tới khi bằng chứng giữ lại cải thiện theo cách quan trọng với quyết định.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-next-step',
+    locales: {
+      en: {
+        body: 'If a degree-two curve produces only a tiny held-out improvement, look for missing informative features or a simpler explanation before increasing degree again. The goal is useful prediction, not the most ornate curve.',
+        title: 'Prefer evidence over an impressive curve',
+      },
+      vi: {
+        body: 'Nếu đường cong bậc hai chỉ cải thiện giữ lại rất nhỏ, hãy tìm feature thông tin còn thiếu hoặc lời giải thích đơn giản hơn trước khi tăng bậc tiếp. Mục tiêu là dự đoán hữu ích, không phải đường cong cầu kỳ nhất.',
+        title: 'Ưu tiên bằng chứng hơn đường cong ấn tượng',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM02PolynomialBlockDefaults,
+    id: 'polynomial-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM02SourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM02SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM02SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM02SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Build a regression model using Scikit-learn: regression four ways',
+        url: 'https://github.com/microsoft/ML-For-Beginners/blob/main/2-Regression/3-Linear/README.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -1643,6 +2059,54 @@ const fullLessonPosts: readonly TrialPost[] = [
       vi: 'Kiểm tra khẳng định bằng bằng chứng giữ lại',
     },
   },
+  {
+    accessLevel: 'full',
+    blocks: cmlM02LinearFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Read a straight numerical baseline through its coefficients, residuals, and held-out error before claiming it is useful for a new case.',
+      vi: 'Đọc baseline số đường thẳng qua hệ số, phần dư và lỗi giữ lại trước khi khẳng định nó hữu ích cho trường hợp mới.',
+    },
+    durationMinutes: 16,
+    id: CML_M02_LINEAR_POST_ID,
+    learningObjective: {
+      en: 'Explain a linear prediction, interpret a residual, and use held-out RMSE evidence to decide whether the straight baseline is adequate.',
+      vi: 'Giải thích dự đoán tuyến tính, diễn giải phần dư và dùng bằng chứng RMSE giữ lại để quyết định baseline đường thẳng có đủ hay không.',
+    },
+    moduleId: 'cml-m02-linear-polynomial',
+    postQuizId: 'quiz-post-cml-p03',
+    provenance: cmlM02DraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-linear-residual-and-heldout-evidence',
+    title: {
+      en: 'Read a linear baseline through residual evidence',
+      vi: 'Đọc baseline tuyến tính qua bằng chứng phần dư',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM02PolynomialFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Treat polynomial curvature as a testable representation change and compare it with a straight line on the same held-out evidence.',
+      vi: 'Xem độ cong đa thức là thay đổi biểu diễn có thể kiểm tra và so sánh nó với đường thẳng trên cùng bằng chứng giữ lại.',
+    },
+    durationMinutes: 16,
+    id: CML_M02_POLYNOMIAL_POST_ID,
+    learningObjective: {
+      en: 'Explain what a degree-two feature adds and use residual and held-out comparisons to decide whether polynomial complexity is justified.',
+      vi: 'Giải thích feature bậc hai thêm gì và dùng so sánh phần dư cùng giữ lại để quyết định độ phức tạp đa thức có chính đáng không.',
+    },
+    moduleId: 'cml-m02-linear-polynomial',
+    postQuizId: 'quiz-post-cml-p04',
+    provenance: cmlM02DraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-polynomial-curvature-heldout-comparison',
+    title: {
+      en: 'Test whether polynomial curvature earns its complexity',
+      vi: 'Kiểm tra độ cong đa thức có xứng đáng độ phức tạp',
+    },
+  },
 ];
 
 interface PostDraftDefinition {
@@ -1654,44 +2118,6 @@ interface PostDraftDefinition {
 }
 
 const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
-  'cml-p03-linear-regression': {
-    concept: {
-      en: 'Linear regression uses a straight relationship as an interpretable baseline. Residuals show where that simple relationship consistently misses.',
-      vi: 'Hồi quy tuyến tính dùng quan hệ đường thẳng làm baseline dễ giải thích. Phần dư cho biết nơi quan hệ đơn giản đó bỏ sót một cách có hệ thống.',
-    },
-    examplePrompt: {
-      en: 'Estimate a study session duration from the number of planned exercises, then inspect whether the residuals lean positive or negative.',
-      vi: 'Ước lượng thời lượng một buổi học từ số bài tập dự kiến, rồi quan sát phần dư thiên dương hay âm.',
-    },
-    learningObjective: {
-      en: 'Use a linear baseline and read residual patterns before adding model complexity.',
-      vi: 'Dùng baseline tuyến tính và đọc mẫu phần dư trước khi tăng độ phức tạp của mô hình.',
-    },
-    taskFingerprint: 'lesson-cml-p03-linear-baseline-residuals',
-    title: {
-      en: 'Use a linear baseline',
-      vi: 'Dùng baseline tuyến tính',
-    },
-  },
-  'cml-p04-polynomial-regression': {
-    concept: {
-      en: 'Polynomial terms can represent smooth curvature, but each extra degree can also follow accidental noise. Compare the shape with held-out error.',
-      vi: 'Các hạng đa thức có thể biểu diễn độ cong mượt, nhưng mỗi bậc tăng thêm cũng có thể bám theo nhiễu. Hãy so sánh hình dạng với lỗi trên dữ liệu giữ lại.',
-    },
-    examplePrompt: {
-      en: 'Model the cooling time of a drink with a line and then with a curve; ask which model stays credible on a new afternoon.',
-      vi: 'Mô hình hóa thời gian nguội của đồ uống bằng đường thẳng rồi bằng đường cong; hãy hỏi mô hình nào còn đáng tin vào một buổi chiều mới.',
-    },
-    learningObjective: {
-      en: 'Recognise when curvature helps and when a higher degree only memorises noise.',
-      vi: 'Nhận biết khi độ cong hữu ích và khi bậc cao chỉ ghi nhớ nhiễu.',
-    },
-    taskFingerprint: 'lesson-cml-p04-curvature-generalisation',
-    title: {
-      en: 'Choose curvature deliberately',
-      vi: 'Chọn độ cong có chủ đích',
-    },
-  },
   'cml-p05-regularization-ridge-lasso': {
     concept: {
       en: 'Regularisation trades a small amount of training fit for more stable coefficients. Ridge spreads weight; Lasso can remove weak signals.',

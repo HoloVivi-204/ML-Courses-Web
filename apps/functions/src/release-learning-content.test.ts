@@ -363,4 +363,88 @@ describe('Release 1 protected learning content', () => {
       ).toBe(true);
     }
   });
+
+  it('pins the Classical ML M02 regression batch to the Microsoft snapshot used for prose, fixed calibration, and quizzes', () => {
+    const linearPost = getReadablePost('course-classical-ml', 'cml-p03-linear-regression', true)!;
+    const polynomialPost = getReadablePost(
+      'course-classical-ml',
+      'cml-p04-polynomial-regression',
+      true,
+    )!;
+    const demo = getFixedDemo('demo-linear-calibration')!;
+    const linearQuiz = getQuizManifest('quiz-post-cml-p03');
+    const polynomialQuiz = getQuizManifest('quiz-post-cml-p04');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m02');
+    const expectedSourceSnapshot = {
+      contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
+      contentUrls: [
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/2-Regression/3-Linear/README.md',
+      ],
+      sourceId: 'microsoft-ml-for-beginners',
+    };
+
+    for (const provenance of [
+      linearPost.provenance,
+      polynomialPost.provenance,
+      demo.draftProvenance,
+      linearQuiz.draftProvenance,
+      polynomialQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['microsoft-ml-for-beginners'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(expectedSourceSnapshot)],
+        },
+      });
+    }
+
+    for (const post of [linearPost, polynomialPost]) {
+      expect(post.blocks).toHaveLength(10);
+      expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+      expect(post.blocks).toContainEqual(
+        expect.objectContaining({ sourceIds: ['microsoft-ml-for-beginners'], type: 'source-list' }),
+      );
+    }
+
+    expect(linearPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p03-linear-regression-example',
+        type: 'example',
+      }),
+    );
+    expect(polynomialPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p04-polynomial-regression-example',
+        type: 'example',
+      }),
+    );
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-linear-calibration-v1',
+        parameterValues: [
+          { id: 'slope', value: 2 },
+          { id: 'intercept', value: 1 },
+        ],
+        rows: [
+          { input: [0], predictedOutput: 1, targetOutput: 1 },
+          { input: [1], predictedOutput: 3, targetOutput: 3 },
+          { input: [2], predictedOutput: 5, targetOutput: 5 },
+          { input: [3], predictedOutput: 7, targetOutput: 8 },
+        ],
+      },
+      requiredStepIds: ['linear-problem', 'linear-data', 'linear-line', 'linear-residual'],
+    });
+
+    for (const quiz of [linearQuiz, polynomialQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'microsoft-ml-for-beginners'),
+        ),
+      ).toBe(true);
+    }
+  });
 });

@@ -4,6 +4,7 @@ import {
   type ReleaseLearningModule,
 } from './release-learning-catalog.js';
 import {
+  cmlM02SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   type DraftProvenance,
@@ -11,6 +12,15 @@ import {
 
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+
+const cmlM02DemoDraftProvenance = {
+  candidateSourceIds: CML_M02_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM02SourceTrace,
+} as const satisfies DraftProvenance;
 
 export interface DemoStep {
   id: string;
@@ -313,6 +323,122 @@ export const mlpCheckerboardDemo: FixedDemoManifest = {
   },
 };
 
+export const linearCalibrationDemo: FixedDemoManifest = {
+  algorithmId: 'linear-regression',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-linear-calibration',
+  draftProvenance: cmlM02DemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'Fixed linear calibration readings',
+      vi: 'Các số đọc hiệu chuẩn tuyến tính cố định',
+    },
+    datasetVersionId: 'dataset-demo-linear-calibration-v1',
+    parameterValues: [
+      { id: 'slope', value: 2 },
+      { id: 'intercept', value: 1 },
+    ],
+    rows: [
+      { input: [0], predictedOutput: 1, targetOutput: 1 },
+      { input: [1], predictedOutput: 3, targetOutput: 3 },
+      { input: [2], predictedOutput: 5, targetOutput: 5 },
+      { input: [3], predictedOutput: 7, targetOutput: 8 },
+    ],
+  },
+  learningObjective: {
+    en: 'Trace one fixed linear rule from its slope and intercept to predictions, then interpret a residual without claiming a live fit.',
+    vi: 'Lần theo một quy tắc tuyến tính cố định từ độ dốc và hệ số chặn đến dự đoán, rồi diễn giải phần dư mà không khẳng định có lượt khớp live.',
+  },
+  moduleId: 'cml-m02-linear-polynomial',
+  problemId: 'problem-demo-linear-calibration',
+  requiredStepIds: ['linear-problem', 'linear-data', 'linear-line', 'linear-residual'],
+  revisionId: 'demo-linear-calibration-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'linear-problem',
+      narration: {
+        en: 'The fixed task is numerical calibration: estimate one output from one input with the displayed rule. It is an instructional baseline, not a model trained in this browser.',
+        vi: 'Nhiệm vụ cố định là hiệu chuẩn số: ước lượng một đầu ra từ một đầu vào bằng quy tắc hiển thị. Đây là baseline để học, không phải mô hình được train trong trình duyệt này.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The problem card states a fixed numerical input and output relationship for calibration.',
+        vi: 'Thẻ bài toán nêu một quan hệ đầu vào và đầu ra số cố định để hiệu chuẩn.',
+      },
+      title: {
+        en: 'Define the numerical task',
+        vi: 'Xác định nhiệm vụ số',
+      },
+    },
+    {
+      id: 'linear-data',
+      narration: {
+        en: 'Inspect four fixed rows. The first three match the line exactly; the final row preserves a one-unit gap so the residual has something concrete to explain.',
+        vi: 'Quan sát bốn dòng cố định. Ba dòng đầu khớp đường chính xác; dòng cuối giữ khoảng cách một đơn vị để phần dư có điều cụ thể cần giải thích.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A static table lists inputs 0, 1, 2, 3 with targets 1, 3, 5, 8.',
+        vi: 'Bảng tĩnh liệt kê đầu vào 0, 1, 2, 3 với mục tiêu 1, 3, 5, 8.',
+      },
+      title: {
+        en: 'Inspect fixed readings',
+        vi: 'Quan sát số đọc cố định',
+      },
+    },
+    {
+      id: 'linear-line',
+      narration: {
+        en: 'Apply the displayed rule y_pred = 2x + 1. The slope adds two output units for each input unit, and the intercept is the prediction at input zero.',
+        vi: 'Áp dụng quy tắc hiển thị y_pred = 2x + 1. Độ dốc thêm hai đơn vị đầu ra cho mỗi đơn vị đầu vào, còn hệ số chặn là dự đoán tại đầu vào không.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A straight line represents the fixed prediction rule with slope two and intercept one.',
+        vi: 'Một đường thẳng biểu diễn quy tắc dự đoán cố định với độ dốc hai và hệ số chặn một.',
+      },
+      title: {
+        en: 'Apply the fixed line',
+        vi: 'Áp dụng đường cố định',
+      },
+    },
+    {
+      id: 'linear-residual',
+      narration: {
+        en: 'At input 3, the line predicts 7 while the target is 8. The residual is +1: one observed point above the line, not proof of a fitted model or a final verdict on the relationship.',
+        vi: 'Tại đầu vào 3, đường dự đoán 7 còn mục tiêu là 8. Phần dư là +1: một điểm quan sát nằm trên đường, không phải bằng chứng mô hình đã được fit hay phán quyết cuối về quan hệ.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The final row reports prediction 7 against target 8, leaving a positive residual of one.',
+        vi: 'Dòng cuối báo dự đoán 7 so với mục tiêu 8, để lại phần dư dương bằng một.',
+      },
+      title: {
+        en: 'Interpret the residual',
+        vi: 'Diễn giải phần dư',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-linear-fixed-calibration-residual',
+  title: {
+    en: 'Linear regression demo: fixed calibration line',
+    vi: 'Demo hồi quy tuyến tính: đường hiệu chuẩn cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 42, y: 188 },
+      { x: 210, y: 52 },
+    ],
+    points: [
+      { label: 'x=0, y=1', positiveFromStep: 1, x: 52, y: 181 },
+      { label: 'x=1, y=3', positiveFromStep: 1, x: 104, y: 137 },
+      { label: 'x=2, y=5', positiveFromStep: 1, x: 156, y: 94 },
+      { label: 'x=3, y=8', positiveFromStep: 1, x: 208, y: 34 },
+    ],
+  },
+};
+
 const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
   'demo-linear-calibration': 'problem-demo-linear-calibration',
   'demo-regularization-noisy-signal': 'problem-demo-regularization-noisy-signal',
@@ -335,26 +461,6 @@ interface DemoDraftDefinition {
 }
 
 const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {
-  'demo-linear-calibration': {
-    decision: {
-      en: 'A straight calibration line turns the observed input into an estimate; the residual shows the remaining gap.',
-      vi: 'Một đường hiệu chuẩn thẳng biến đầu vào quan sát thành ước lượng; phần dư cho thấy khoảng cách còn lại.',
-    },
-    evidence: {
-      en: 'The fixed readings are ordered from a reference instrument and a simple sensor; no learner parameter is editable.',
-      vi: 'Các số đo cố định đến từ dụng cụ tham chiếu và cảm biến đơn giản; người học không thể sửa tham số.',
-    },
-    learningObjective: {
-      en: 'Read a fixed linear calibration and use residuals to judge its limitation.',
-      vi: 'Đọc một hiệu chuẩn tuyến tính cố định và dùng phần dư để đánh giá giới hạn của nó.',
-    },
-    result: {
-      en: 'The result is a fixed baseline, not a replacement for checking new measurements.',
-      vi: 'Kết quả là baseline cố định, không thay thế việc kiểm tra số đo mới.',
-    },
-    taskFingerprint: 'demo-linear-calibration-residual-reading',
-    topic: { en: 'linear calibration', vi: 'hiệu chuẩn tuyến tính' },
-  },
   'demo-regularization-noisy-signal': {
     decision: {
       en: 'Ridge keeps related signal weights smaller, while Lasso can suppress a weak redundant signal in the fixed comparison.',
@@ -687,7 +793,7 @@ function createExpandedDemo(input: {
   };
 }
 
-const handAuthoredDemos = [andGateDemo, mlpCheckerboardDemo] as const;
+const handAuthoredDemos = [andGateDemo, mlpCheckerboardDemo, linearCalibrationDemo] as const;
 const handAuthoredDemoIds = new Set(handAuthoredDemos.map((demo) => demo.demoId));
 
 const generatedDemos = getReleaseLearningCatalog().courses.flatMap((course) =>

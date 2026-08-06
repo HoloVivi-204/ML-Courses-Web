@@ -244,6 +244,79 @@ describe('learning content repository', () => {
     );
   });
 
+  it('returns the two source-backed regression lessons and fixed calibration demo only after access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const [linearPost, polynomialPost, demo] = await Promise.all([
+      repository.getFullPostContent({
+        postId: 'cml-p03-linear-regression',
+        uid: 'learner-01',
+      }),
+      repository.getFullPostContent({
+        postId: 'cml-p04-polynomial-regression',
+        uid: 'learner-01',
+      }),
+      repository.getDemoContent({
+        demoId: 'demo-linear-calibration',
+        uid: 'learner-01',
+      }),
+    ]);
+
+    expect(linearPost.data).toMatchObject({
+      id: 'cml-p03-linear-regression',
+      moduleId: 'cml-m02-linear-polynomial',
+      postQuizId: 'quiz-post-cml-p03',
+      title: {
+        en: 'Read a linear baseline through residual evidence',
+        vi: 'Đọc baseline tuyến tính qua bằng chứng phần dư',
+      },
+    });
+    expect(linearPost.data.blocks).toHaveLength(10);
+    expect(linearPost.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p03-linear-regression-example',
+        type: 'example',
+      }),
+    );
+
+    expect(polynomialPost.data).toMatchObject({
+      id: 'cml-p04-polynomial-regression',
+      moduleId: 'cml-m02-linear-polynomial',
+      postQuizId: 'quiz-post-cml-p04',
+      title: {
+        en: 'Test whether polynomial curvature earns its complexity',
+        vi: 'Kiểm tra độ cong đa thức có xứng đáng độ phức tạp',
+      },
+    });
+    expect(polynomialPost.data.blocks).toHaveLength(10);
+    expect(polynomialPost.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p04-polynomial-regression-example',
+        type: 'example',
+      }),
+    );
+
+    expect(demo.data).toMatchObject({
+      demoId: 'demo-linear-calibration',
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-linear-calibration-v1',
+        parameterValues: [
+          { id: 'slope', value: 2 },
+          { id: 'intercept', value: 1 },
+        ],
+        rows: [
+          { input: [0], predictedOutput: 1, targetOutput: 1 },
+          { input: [1], predictedOutput: 3, targetOutput: 3 },
+          { input: [2], predictedOutput: 5, targetOutput: 5 },
+          { input: [3], predictedOutput: 7, targetOutput: 8 },
+        ],
+      },
+      requiredStepIds: ['linear-problem', 'linear-data', 'linear-line', 'linear-residual'],
+    });
+  });
+
   it('returns the fixed MLP checkerboard and its distinct completion path only after demo access is granted', async () => {
     const repository = createLearningContentRepository({
       accessReader: createAccessReader(() => true),
