@@ -59,6 +59,29 @@ function createFirestoreForPersistedList(): Firestore {
 }
 
 describe('Firestore Admin content repository', () => {
+  it('rejects an Emulator-only publication outside the Emulator before a transaction starts', async () => {
+    const repository = createFirestoreAdminContentRepository({
+      firestore: {
+        collection: vi.fn().mockReturnValue({}),
+      } as unknown as Firestore,
+      isEmulator: () => false,
+    });
+
+    await expect(
+      repository.publishRevision({
+        actorUid: 'admin-01',
+        idempotencyKey: 'emulator-demo-key',
+        publicationScope: 'emulator-demo',
+        reason: 'Attempt an Emulator-only publish outside the Emulator.',
+        requestId: 'request-emulator-demo',
+        revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ADMIN_CONTENT_EMULATOR_PUBLISH_ONLY',
+      statusCode: 403,
+    });
+  });
+
   it('reads the durable draft pointer rather than a process-local repository', async () => {
     const repository = createFirestoreAdminContentRepository({
       firestore: createFirestoreForPersistedList(),

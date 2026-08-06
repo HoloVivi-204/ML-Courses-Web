@@ -14,6 +14,10 @@ import {
   type AdminContentExternalEvidence,
 } from './admin-content-evidence.js';
 import {
+  applyAdminDraftToPublishedLearnerContent,
+  type PublishedLearnerContent,
+} from './learning-content-repository.js';
+import {
   applyDraftPatch,
   createAdminContentLifecycleEvent,
   createDraftFromPublished,
@@ -24,9 +28,11 @@ import {
   getAdminContentKey,
   hasDraftPatchValue,
   isAdminContentEntityType,
+  isAdminContentPublicationScope,
   type AdminContentDraft,
   type AdminContentEntityType,
   type AdminContentLifecycleEvent,
+  type AdminContentPublicationScope,
   type AdminContentRepository,
   type AdminContentSummary,
   type PublishAdminContentRevisionResult,
@@ -55,6 +61,7 @@ interface StoredDraftRevision {
   createdAt: string;
   draft: AdminContentDraft;
   entityKey: string;
+  learnerContent: PublishedLearnerContent | null;
   schemaVersion: 1;
   state: 'draft';
   updatedAt: string;
@@ -64,6 +71,7 @@ interface StoredPublishedRevision {
   contentChecksum: string;
   createdAt: string;
   entityKey: string;
+  learnerContent: PublishedLearnerContent | null;
   publishedAt: string;
   publishedContent: AdminContentSummary;
   schemaVersion: 1;
@@ -88,6 +96,7 @@ export interface FirestoreAdminContentRepositoryOptions {
         evidence: readonly AdminContentExternalEvidence[];
       }) => void | Promise<void>)
     | undefined;
+  isEmulator?: (() => boolean) | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -156,7 +165,11 @@ function readStoredDraftRevision(snapshot: DocumentSnapshot): StoredDraftRevisio
     );
   }
 
-  return value as unknown as StoredDraftRevision;
+  return {
+    ...(value as unknown as StoredDraftRevision),
+    learnerContent:
+      (value as { learnerContent?: PublishedLearnerContent | undefined }).learnerContent ?? null,
+  };
 }
 
 function readStoredPublishedRevision(snapshot: DocumentSnapshot): StoredPublishedRevision {
@@ -177,7 +190,11 @@ function readStoredPublishedRevision(snapshot: DocumentSnapshot): StoredPublishe
     );
   }
 
-  return value as unknown as StoredPublishedRevision;
+  return {
+    ...(value as unknown as StoredPublishedRevision),
+    learnerContent:
+      (value as { learnerContent?: PublishedLearnerContent | undefined }).learnerContent ?? null,
+  };
 }
 
 function readStoredIdempotencyRecord(snapshot: DocumentSnapshot): StoredPublishIdempotencyRecord {
@@ -200,6 +217,22 @@ function assertIdempotencyKey(idempotencyKey: string): void {
   if (!idempotencyKey) {
     throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key header is required.');
   }
+}
+
+function getPublicationScope(value: string | undefined): AdminContentPublicationScope {
+  if (value === undefined) {
+    return 'publish-quality';
+  }
+
+  if (!isAdminContentPublicationScope(value)) {
+    throw new ApiError(
+      400,
+      'ADMIN_CONTENT_PUBLICATION_SCOPE_INVALID',
+      'The requested publication scope is not supported.',
+    );
+  }
+
+  return value;
 }
 
 function createDraftRevisionId(entityType: AdminContentEntityType, entityId: string): string {
@@ -258,6 +291,7 @@ export function createFirestoreAdminContentRepository(
   const firestore = options.firestore ?? getFirestore(getFirebaseAdminApp());
   const now = options.now ?? (() => new Date());
   const verifyPublishEvidence = options.verifyPublishEvidence ?? assertPublishEvidenceIsComplete;
+  const isEmulator = options.isEmulator ?? (() => Boolean(process.env.FIRESTORE_EMULATOR_HOST));
   const entities = firestore.collection(ADMIN_CONTENT_ENTITIES_COLLECTION);
   const revisions = firestore.collection(ADMIN_CONTENT_REVISIONS_COLLECTION);
   const lifecycleEvents = firestore.collection(ADMIN_CONTENT_LIFECYCLE_EVENTS_COLLECTION);
@@ -291,6 +325,17 @@ export function createFirestoreAdminContentRepository(
           );
         }
 
+        const currentRevision = readStoredPublishedRevision(
+          await transaction.get(revisions.doc(entity.currentContent.publishedRevisionId)),
+        );
+
+        if (
+          currentRevision.entityKey !==
+          getAdminContentKey(entity.currentContent.entityType, entity.currentContent.entityId)
+        ) {
+          throw createDataIntegrityError();
+        }
+
         const draft = {
           ...createDraftFromPublished(entity.currentContent),
           draftRevisionId,
@@ -301,6 +346,7 @@ export function createFirestoreAdminContentRepository(
           createdAt: currentTime,
           draft,
           entityKey: getAdminContentKey(draft.entityType, draft.entityId),
+          learnerContent: currentRevision.learnerContent,
           schemaVersion: 1,
           state: 'draft',
           updatedAt: currentTime,
@@ -423,6 +469,16 @@ export function createFirestoreAdminContentRepository(
       assertActorUid(input.actorUid);
       assertIdempotencyKey(input.idempotencyKey);
 
+      const publicationScope = getPublicationScope(input.publicationScope);
+
+      if (publicationScope === 'emulator-demo' && !isEmulator()) {
+        throw new ApiError(
+          403,
+          'ADMIN_CONTENT_EMULATOR_PUBLISH_ONLY',
+          'Emulator demo publication is only available in the Firestore Emulator Suite.',
+        );
+      }
+
       const requestHash = createPublishRequestHash(input);
       const idempotencyReference = idempotencyRecords.doc(
         getIdempotencyDocumentId(input.actorUid, input.idempotencyKey),
@@ -463,16 +519,27 @@ export function createFirestoreAdminContentRepository(
           getEntityDocumentId(storedDraft.draft.entityType, storedDraft.draft.entityId),
         );
         const entity = readStoredEntity(await transaction.get(entityReference));
-        const evidence = await readPublishEvidence(transaction, firestore, input.revisionId);
 
-        await verifyPublishEvidence({
-          artifactId: storedDraft.draft.entityId,
-          contentChecksum: storedDraft.contentChecksum,
-          evidence,
-        });
+        if (entity.currentContent.publishedRevisionId !== storedDraft.draft.baseRevisionId) {
+          throw new ApiError(
+            409,
+            'ADMIN_CONTENT_DRAFT_STALE',
+            'The current published revision changed. Create a new draft before publishing.',
+          );
+        }
+        if (publicationScope === 'publish-quality') {
+          const evidence = await readPublishEvidence(transaction, firestore, input.revisionId);
+
+          await verifyPublishEvidence({
+            artifactId: storedDraft.draft.entityId,
+            contentChecksum: storedDraft.contentChecksum,
+            evidence,
+          });
+        }
 
         const content = createPublishedContentFromDraft({
           draft: storedDraft.draft,
+          publicationScope,
           previousPublishedRevisionId: entity.currentContent.publishedRevisionId,
         });
         const lifecycleEvent = createAdminContentLifecycleEvent({
@@ -485,6 +552,7 @@ export function createFirestoreAdminContentRepository(
           requestId: input.requestId,
           toRevisionId: content.publishedRevisionId,
           type: 'published',
+          publicationScope,
         });
         const result: PublishAdminContentRevisionResult = {
           statusCode: 200,
@@ -494,6 +562,10 @@ export function createFirestoreAdminContentRepository(
           contentChecksum: storedDraft.contentChecksum,
           createdAt: storedDraft.createdAt,
           entityKey: storedDraft.entityKey,
+          learnerContent: applyAdminDraftToPublishedLearnerContent({
+            draft: storedDraft.draft,
+            learnerContent: storedDraft.learnerContent,
+          }),
           publishedAt: createdAt,
           publishedContent: content,
           schemaVersion: 1,
@@ -562,6 +634,7 @@ export function createFirestoreAdminContentRepository(
           requestId: input.requestId,
           toRevisionId: content.publishedRevisionId,
           type: 'rolled-back',
+          publicationScope: content.publicationScope,
         });
 
         transaction.set(entityReference, {
@@ -639,6 +712,7 @@ export function createFirestoreAdminContentRepository(
           requestId: input.requestId,
           toRevisionId: null,
           type: 'unpublished',
+          publicationScope: content.publicationScope,
         });
 
         transaction.set(entityReference, {
@@ -655,8 +729,19 @@ export function createFirestoreAdminContentRepository(
   };
 }
 
+export interface FirestoreAdminContentSeed {
+  content: AdminContentSummary;
+  learnerContent?: PublishedLearnerContent | undefined;
+}
+
+function normalizeSeedRecord(
+  record: AdminContentSummary | FirestoreAdminContentSeed,
+): FirestoreAdminContentSeed {
+  return 'content' in record ? record : { content: record };
+}
+
 export async function seedFirestoreAdminContentForEmulator(input: {
-  content: readonly AdminContentSummary[];
+  content: readonly (AdminContentSummary | FirestoreAdminContentSeed)[];
   firestore: Firestore;
 }): Promise<void> {
   if (!process.env.FIRESTORE_EMULATOR_HOST) {
@@ -666,7 +751,8 @@ export async function seedFirestoreAdminContentForEmulator(input: {
   const batch = input.firestore.batch();
   const seededAt = new Date().toISOString();
 
-  for (const content of input.content) {
+  for (const record of input.content) {
+    const { content, learnerContent } = normalizeSeedRecord(record);
     const entityReference = input.firestore
       .collection(ADMIN_CONTENT_ENTITIES_COLLECTION)
       .doc(getEntityDocumentId(content.entityType, content.entityId));
@@ -685,6 +771,7 @@ export async function seedFirestoreAdminContentForEmulator(input: {
       contentChecksum: createHash('sha256').update(content.publishedRevisionId).digest('hex'),
       createdAt: seededAt,
       entityKey: getAdminContentKey(content.entityType, content.entityId),
+      learnerContent: learnerContent ?? null,
       publishedAt: seededAt,
       publishedContent: withDraftRevision(content, null),
       schemaVersion: 1,

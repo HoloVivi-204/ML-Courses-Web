@@ -15,9 +15,9 @@ const services = createHybridDemoServices(process.env);
 try {
   await resetAndSeedLocalDataEmulators(services, createLocalSeedManifest());
 
-  const [contentModule, repositoryModule] = await Promise.all([
+  const [contentSeedModule, repositoryModule] = await Promise.all([
     import(
-      new URL('../../../apps/functions/dist/admin-content-repository.js', import.meta.url).href
+      new URL('../../../apps/functions/dist/admin-content-emulator-seed.js', import.meta.url).href
     ),
     import(
       new URL('../../../apps/functions/dist/firestore-admin-content-repository.js', import.meta.url)
@@ -26,7 +26,7 @@ try {
   ]);
 
   await repositoryModule.seedFirestoreAdminContentForEmulator({
-    content: contentModule.getReleaseOneAdminContentFixture(),
+    content: contentSeedModule.createReleaseOneFirestoreAdminContentSeed(),
     firestore: services.firestore,
   });
 } finally {

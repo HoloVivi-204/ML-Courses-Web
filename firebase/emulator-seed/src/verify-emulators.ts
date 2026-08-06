@@ -238,6 +238,7 @@ async function assertProtectedLearningContentApi(): Promise<void> {
   const demoId = 'demo-perceptron-and-gate';
 
   try {
+    await seedAdminContentLifecycleRepository(services.firestore);
     const ownerToken = await registerWithEmailPassword(ownerEmail, ownerPassword);
     const ownerUid = (await services.auth.getUserByEmail(ownerEmail)).uid;
     const postAccessPath = `users/${ownerUid}/contentAccess/post_${postId}`;
@@ -421,8 +422,8 @@ async function seedAdminContentLifecycleRepository(
     '../../../apps/functions/dist/firestore-admin-content-repository.js',
     import.meta.url,
   ).href;
-  const contentModulePath = new URL(
-    '../../../apps/functions/dist/admin-content-repository.js',
+  const contentSeedModulePath = new URL(
+    '../../../apps/functions/dist/admin-content-emulator-seed.js',
     import.meta.url,
   ).href;
   const repositoryModule = (await import(repositoryModulePath)) as {
@@ -431,12 +432,12 @@ async function seedAdminContentLifecycleRepository(
       firestore: ReturnType<typeof createLocalAdminServices>['firestore'];
     }) => Promise<void>;
   };
-  const contentModule = (await import(contentModulePath)) as {
-    getReleaseOneAdminContentFixture: () => readonly unknown[];
+  const contentSeedModule = (await import(contentSeedModulePath)) as {
+    createReleaseOneFirestoreAdminContentSeed: () => readonly unknown[];
   };
 
   await repositoryModule.seedFirestoreAdminContentForEmulator({
-    content: contentModule.getReleaseOneAdminContentFixture(),
+    content: contentSeedModule.createReleaseOneFirestoreAdminContentSeed(),
     firestore,
   });
 }
@@ -632,6 +633,8 @@ async function assertFirestoreAdminContentPersistence(): Promise<void> {
     assert.equal(idempotencyRecords.size, 1);
     assert.ok(idempotencyRecords.docs[0]?.get('expireAt'));
 
+    const staleDraftRevisionId =
+      await prepareValidatedDraftForPersistenceTest(afterPublishRepository);
     await services.firestore.doc('users/learner-progress/summary/current').set({ completed: true });
     await afterPublishRepository.rollbackRevision({
       actorUid: 'admin-persistence-test',
@@ -644,6 +647,16 @@ async function assertFirestoreAdminContentPersistence(): Promise<void> {
         'completed',
       ),
       true,
+    );
+    await assert.rejects(
+      afterPublishRepository.publishRevision({
+        actorUid: 'admin-persistence-test',
+        idempotencyKey: 'publish-stale-revision-test',
+        reason: 'Reject a draft whose base pointer is stale.',
+        requestId: 'request-stale-revision-test',
+        revisionId: staleDraftRevisionId,
+      }),
+      (error: unknown) => isRecord(error) && error.code === 'ADMIN_CONTENT_DRAFT_STALE',
     );
 
     const unpublished = await afterPublishRepository.unpublishEntity({
@@ -692,6 +705,20 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
   try {
     await seedAdminContentLifecycleRepository(services.firestore);
     const studentToken = await registerWithEmailPassword(studentEmail, studentPassword);
+    const studentUid = (await services.auth.getUserByEmail(studentEmail)).uid;
+    const postId = 'dl-p01-neuron-perceptron';
+    const postAccessPath = `users/${studentUid}/contentAccess/post_${postId}`;
+    const postProgressPath = `users/${studentUid}/postProgress/${postId}`;
+
+    await services.firestore.doc(postAccessPath).set({
+      contentType: 'post',
+      entityId: postId,
+      schemaVersion: 1,
+    });
+    await services.firestore.doc(postProgressPath).set({
+      completed: true,
+      schemaVersion: 1,
+    });
 
     await services.auth.createUser({
       uid: adminUid,
@@ -723,6 +750,12 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       'dl-p01-neuron-perceptron',
     );
     assert.equal(initialPost.publishedRevisionId, 'post-dl-p01-neuron-perceptron-rev-r1');
+
+    const learnerBeforeDraft = await readSuccessData(
+      await requestApiJson(`/api/v1/posts/${postId}/content`, { idToken: studentToken }),
+      200,
+    );
+    const initialLearnerTitle = getRecordField(learnerBeforeDraft, 'title').en;
 
     const createDraftData = await readSuccessData(
       await requestApiJson('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts', {
@@ -789,6 +822,49 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       getRecordField(publishFailure, 'error').code,
       'ADMIN_CONTENT_EXTERNAL_EVIDENCE_REQUIRED',
     );
+
+    const localPublishData = await readSuccessData(
+      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/publish`, {
+        body: {
+          publicationScope: 'emulator-demo',
+          reason: 'Publish the validated revision for the local Emulator demo only.',
+        },
+        idToken: adminToken,
+        idempotencyKey: `emulator-demo-publish-${randomUUID()}`,
+        method: 'POST',
+      }),
+      200,
+    );
+    const locallyPublishedContent = getRecordField(localPublishData, 'content');
+    assert.equal(locallyPublishedContent.publicationScope, 'emulator-demo');
+
+    const learnerAfterLocalPublish = await readSuccessData(
+      await requestApiJson(`/api/v1/posts/${postId}/content`, { idToken: studentToken }),
+      200,
+    );
+    assert.equal(
+      getRecordField(learnerAfterLocalPublish, 'title').en,
+      'Draft neuron decision title',
+    );
+
+    await readSuccessData(
+      await requestApiJson(
+        '/api/v1/admin/revisions/post-dl-p01-neuron-perceptron-rev-r1/rollback',
+        {
+          body: { reason: 'Return the Emulator learner view to the previous revision.' },
+          idToken: adminToken,
+          method: 'POST',
+        },
+      ),
+      200,
+    );
+
+    const learnerAfterRollback = await readSuccessData(
+      await requestApiJson(`/api/v1/posts/${postId}/content`, { idToken: studentToken }),
+      200,
+    );
+    assert.equal(getRecordField(learnerAfterRollback, 'title').en, initialLearnerTitle);
+    assert.equal((await services.firestore.doc(postProgressPath).get()).get('completed'), true);
 
     const reportData = await readSuccessData(
       await requestApiJson('/api/v1/admin/reports/summary', { idToken: adminToken }),

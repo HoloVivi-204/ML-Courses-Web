@@ -12,8 +12,10 @@ import helmet from 'helmet';
 
 import {
   createStaticAdminContentRepository,
+  isAdminContentPublicationScope,
   type AdminContentDraftPatch,
   type AdminContentMetadata,
+  type AdminContentPublicationScope,
   type AdminContentRepository,
   type LocalizedText,
 } from './admin-content-repository.js';
@@ -436,6 +438,36 @@ function getAdminContentLifecycleReasonBody(request: Request): string {
   assertBodyFieldsAllowlisted(body, ['reason']);
 
   return getTrimmedStringValue(body.reason, 'reason', 240);
+}
+
+function getAdminContentPublishBody(request: Request): {
+  publicationScope: AdminContentPublicationScope;
+  reason: string;
+} {
+  const body = getObjectBody(request);
+
+  assertBodyFieldsAllowlisted(body, ['publicationScope', 'reason']);
+  const publicationScope = body.publicationScope;
+
+  if (publicationScope === undefined) {
+    return {
+      publicationScope: 'publish-quality',
+      reason: getTrimmedStringValue(body.reason, 'reason', 240),
+    };
+  }
+
+  if (typeof publicationScope !== 'string' || !isAdminContentPublicationScope(publicationScope)) {
+    throw new ApiError(
+      400,
+      'ADMIN_CONTENT_PUBLICATION_SCOPE_INVALID',
+      'publicationScope must be emulator-demo or publish-quality.',
+    );
+  }
+
+  return {
+    publicationScope,
+    reason: getTrimmedStringValue(body.reason, 'reason', 240),
+  };
 }
 
 function getOptionalObjectBody(request: Request): Record<string, unknown> {
@@ -1355,10 +1387,12 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
+        const publishBody = getAdminContentPublishBody(request);
         const result = await getAdminContentRepository().publishRevision({
           actorUid: adminUser.uid,
           idempotencyKey: getIdempotencyKey(request),
-          reason: getAdminContentLifecycleReasonBody(request),
+          publicationScope: publishBody.publicationScope,
+          reason: publishBody.reason,
           revisionId: getRouteParam(request, 'revisionId'),
           requestId: getRequestId(response),
         });

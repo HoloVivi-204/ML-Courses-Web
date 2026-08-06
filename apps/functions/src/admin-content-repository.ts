@@ -4,6 +4,10 @@ export const adminContentEntityTypes = ['course', 'module', 'post', 'demo', 'qui
 
 export type AdminContentEntityType = (typeof adminContentEntityTypes)[number];
 
+export const adminContentPublicationScopes = ['emulator-demo', 'publish-quality'] as const;
+
+export type AdminContentPublicationScope = (typeof adminContentPublicationScopes)[number];
+
 export interface LocalizedText {
   en: string;
   vi: string;
@@ -55,6 +59,7 @@ export interface AdminContentLifecycleEvent {
   requestId: string;
   toRevisionId: string | null;
   type: 'published' | 'rolled-back' | 'unpublished';
+  publicationScope?: AdminContentPublicationScope | undefined;
 }
 
 export interface AdminContentSummary {
@@ -65,6 +70,7 @@ export interface AdminContentSummary {
   localeAvailability: readonly ['en', 'vi'];
   moduleId?: string | undefined;
   postId?: string | undefined;
+  publicationScope?: AdminContentPublicationScope | undefined;
   previousPublishedRevisionId?: string | null | undefined;
   preview: LocalizedText;
   publishedRevisionId: string;
@@ -126,6 +132,7 @@ export interface PublishAdminContentRevisionInput {
   reason: string;
   revisionId: string;
   requestId: string;
+  publicationScope?: AdminContentPublicationScope | undefined;
 }
 
 export interface UnpublishAdminContentEntityInput {
@@ -488,6 +495,12 @@ export function isAdminContentEntityType(value: string): value is AdminContentEn
   return adminContentEntityTypes.includes(value as AdminContentEntityType);
 }
 
+export function isAdminContentPublicationScope(
+  value: string,
+): value is AdminContentPublicationScope {
+  return adminContentPublicationScopes.includes(value as AdminContentPublicationScope);
+}
+
 export function getAdminContentKey(entityType: AdminContentEntityType, entityId: string): string {
   return `${entityType}:${entityId}`;
 }
@@ -789,6 +802,7 @@ export function createValidationResult(input: {
 
 export function createPublishedContentFromDraft(input: {
   draft: AdminContentDraft;
+  publicationScope?: AdminContentPublicationScope | undefined;
   previousPublishedRevisionId: string;
 }): AdminContentSummary {
   return {
@@ -799,6 +813,7 @@ export function createPublishedContentFromDraft(input: {
     localeAvailability: input.draft.localeAvailability,
     ...(input.draft.moduleId !== undefined ? { moduleId: input.draft.moduleId } : {}),
     ...(input.draft.postId !== undefined ? { postId: input.draft.postId } : {}),
+    publicationScope: input.publicationScope ?? 'publish-quality',
     previousPublishedRevisionId: input.previousPublishedRevisionId,
     preview: { ...input.draft.preview },
     publishedRevisionId: input.draft.draftRevisionId,
@@ -821,6 +836,7 @@ export function createAdminContentLifecycleEvent(input: {
   requestId: string;
   toRevisionId: string | null;
   type: AdminContentLifecycleEvent['type'];
+  publicationScope?: AdminContentPublicationScope | undefined;
 }): AdminContentLifecycleEvent {
   return {
     ...input,
@@ -832,6 +848,7 @@ export function createPublishRequestHash(input: PublishAdminContentRevisionInput
   return JSON.stringify({
     operation: 'admin-content-publish',
     actorUid: input.actorUid,
+    publicationScope: input.publicationScope ?? 'publish-quality',
     revisionId: input.revisionId,
     reason: input.reason,
   });
@@ -1057,6 +1074,7 @@ export function createStaticAdminContentRepository(
 
       const publishedContent = createPublishedContentFromDraft({
         draft,
+        publicationScope: input.publicationScope,
         previousPublishedRevisionId: currentPublishedContent.publishedRevisionId,
       });
       const lifecycleEvent = createAdminContentLifecycleEvent({
@@ -1068,6 +1086,7 @@ export function createStaticAdminContentRepository(
         requestId: input.requestId,
         toRevisionId: publishedContent.publishedRevisionId,
         type: 'published',
+        publicationScope: publishedContent.publicationScope,
       });
       const result: PublishAdminContentRevisionResult = {
         statusCode: 200,
@@ -1141,6 +1160,7 @@ export function createStaticAdminContentRepository(
         requestId: input.requestId,
         toRevisionId: targetRevision.publishedRevisionId,
         type: 'rolled-back',
+        publicationScope: rolledBackContent.publicationScope,
       });
 
       publishedByContentKey.set(
@@ -1192,6 +1212,7 @@ export function createStaticAdminContentRepository(
         requestId: input.requestId,
         toRevisionId: null,
         type: 'unpublished',
+        publicationScope: unpublishedContent.publicationScope,
       });
 
       publishedByContentKey.set(
