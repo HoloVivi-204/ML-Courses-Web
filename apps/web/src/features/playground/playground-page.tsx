@@ -6,6 +6,7 @@ import {
   LockKeyhole,
   RotateCcw,
   Square,
+  Shuffle,
   Zap,
 } from 'lucide-react';
 import {
@@ -32,7 +33,7 @@ import type { PlaygroundPairRegistration, PlaygroundParameterField } from './alg
 import type { MlConfig, MlMetricValue, MlProgressEvent, MlRunResult } from './ml-engine-contract';
 import { createMlWorkerController } from './ml-worker-controller';
 import { getPlaygroundPairRegistry } from './playground-adapter-registry';
-import { getPlaygroundDataset } from './playground-datasets';
+import { createSeededRandom, getPlaygroundDataset } from './playground-datasets';
 
 interface PlaygroundPageProps {
   learningApiClient: LearningApiClient;
@@ -449,6 +450,26 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     setStatus('idle');
   }
 
+  function handleReshuffle() {
+    if (
+      isRunBusy ||
+      !selectedRegistration ||
+      typeof config.seed !== 'number' ||
+      !Number.isFinite(config.seed)
+    ) {
+      return;
+    }
+
+    const nextSeed = createReshuffledSeed(config.seed);
+
+    setConfig((currentConfig) => ({ ...currentConfig, seed: nextSeed }));
+    setProgress(null);
+    setResult(null);
+    setSafeError(null);
+    setPersistenceError(null);
+    setStatus('idle');
+  }
+
   async function handleRun() {
     if (!user || isRunBusy || !selectedRegistration) {
       return;
@@ -828,6 +849,16 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
             <button onClick={handleReset} type="button">
               <RotateCcw aria-hidden="true" size={16} />
               {t('playground.reset')}
+            </button>
+            <button
+              disabled={
+                isRunBusy || typeof config.seed !== 'number' || !Number.isFinite(config.seed)
+              }
+              onClick={handleReshuffle}
+              type="button"
+            >
+              <Shuffle aria-hidden="true" size={16} />
+              {t('playground.reshuffle')}
             </button>
           </div>
           <div className="playground-config-save">
@@ -1568,6 +1599,16 @@ function parseIntegerArrayFieldValue(value: string): number[] {
     .split(/[\s,]+/)
     .filter((part) => part.length > 0)
     .map((part) => Number(part));
+}
+
+function createReshuffledSeed(seed: number): number {
+  const nextSeed = Math.floor(createSeededRandom(seed + 1)() * 1_000_001);
+
+  if (nextSeed !== seed) {
+    return nextSeed;
+  }
+
+  return seed === 1_000_000 ? 0 : seed + 1;
 }
 
 function createRunId(): string {

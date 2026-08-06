@@ -2324,6 +2324,29 @@ describe('public learning journey', () => {
     expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent('ds-xor-noisy-v1');
   });
 
+  it('reshuffles a seeded dataset without starting a new run', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    expect(screen.getByRole('spinbutton', { name: 'Seed' })).toHaveValue(42);
+
+    await user.click(screen.getByRole('button', { name: 'Chia lại dữ liệu' }));
+
+    expect(screen.getByRole('spinbutton', { name: 'Seed' })).not.toHaveValue(42);
+    expect(screen.getByText('Sẵn sàng chạy')).toBeVisible();
+    expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+  });
+
   it('runs pg-xor Perceptron through a verified run session and worker result', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
     installImmediatePlaygroundWorker();
