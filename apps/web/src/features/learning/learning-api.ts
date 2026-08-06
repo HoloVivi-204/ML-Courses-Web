@@ -97,6 +97,7 @@ export interface LearningDemoContent {
   algorithmId: string;
   courseId: string;
   demoId: string;
+  fixedRun?: LearningDemoFixedRun;
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
@@ -116,10 +117,24 @@ export interface LearningDemoVisualization {
     y: number;
   }[];
   points: readonly {
+    classification?: 'negative' | 'positive';
     label: string;
     positiveFromStep: number;
     x: number;
     y: number;
+  }[];
+}
+
+export interface LearningDemoFixedRun {
+  datasetVersionId: string;
+  parameterValues: readonly {
+    id: string;
+    value: number;
+  }[];
+  rows: readonly {
+    input: readonly number[];
+    predictedOutput: number;
+    targetOutput: number;
   }[];
 }
 

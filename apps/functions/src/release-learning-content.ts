@@ -1,4 +1,7 @@
 import { getReleaseLearningCatalog, type LocalizedText } from './release-learning-catalog.js';
+import { dlM01SourceTrace, type DraftProvenance } from './content-source-trace.js';
+
+export type { DraftProvenance } from './content-source-trace.js';
 
 export interface LearningContentBlock {
   accessibility: { en: string | null; vi: string | null };
@@ -31,17 +34,10 @@ export interface TrialPost {
   title: LocalizedText;
 }
 
-export interface DraftProvenance {
-  candidateSourceIds: readonly string[];
-  contentReviewStatus: 'pending-operator-review';
-  externalEvidenceStatus: 'not-collected';
-  importStatus: 'draft-only';
-}
-
 const TRIAL_POST_ID = 'dl-p01-neuron-perceptron';
-const GOOGLE_NEURAL_NODES_URL =
-  'https://developers.google.com/machine-learning/crash-course/' +
-  'neural-networks/nodes-hidden-layers';
+const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
+const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
+const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -50,7 +46,7 @@ const blockDefaults = {
   postId: TRIAL_POST_ID,
   required: true,
   schemaVersion: 1,
-  sourceIds: [],
+  sourceIds: DL_M01_PRIMARY_SOURCE_IDS,
 } as const;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -90,17 +86,17 @@ const trialBlocks = [
     locales: {
       en: {
         lede:
-          'A neuron is a tiny decision unit. It receives signals, scores their importance, ' +
-          'then produces one output.',
-        navigationTitle: 'What does a neuron do?',
-        title: 'From signals to a decision',
+          'A Perceptron is a small binary classifier: it receives a feature vector and chooses ' +
+          'one of two output classes.',
+        navigationTitle: 'What does a Perceptron do?',
+        title: 'From features to a binary choice',
       },
       vi: {
         lede:
-          'Neuron là một đơn vị ra quyết định rất nhỏ. Nó nhận tín hiệu, đánh giá mức ' +
-          'quan trọng rồi tạo ra một đầu ra.',
-        navigationTitle: 'Một neuron làm gì?',
-        title: 'Từ tín hiệu đến quyết định',
+          'Perceptron là một bộ phân loại nhị phân nhỏ: nó nhận một vector feature và chọn ' +
+          'một trong hai lớp đầu ra.',
+        navigationTitle: 'Perceptron làm gì?',
+        title: 'Từ feature đến lựa chọn nhị phân',
       },
     },
     order: 1,
@@ -112,16 +108,17 @@ const trialBlocks = [
     locales: {
       en: {
         markdown:
-          'Think of each input as one piece of **evidence**. The neuron combines numbers ' +
-          'using a fixed, inspectable rule: $z = w_1x_1 + w_2x_2 + b$.',
+          'Treat each input as one piece of **evidence**. The model first combines it with a ' +
+          'weight: $z = w_1x_1 + w_2x_2 + b$. An activation rule then turns $z$ into the class.',
       },
       vi: {
         markdown:
-          'Hãy xem mỗi đầu vào như một mẩu **bằng chứng**. Neuron kết hợp các con số bằng ' +
-          'một quy tắc cố định, có thể kiểm tra: $z = w_1x_1 + w_2x_2 + b$.',
+          'Hãy xem mỗi đầu vào như một mẩu **bằng chứng**. Mô hình trước hết kết hợp chúng với ' +
+          'trọng số: $z = w_1x_1 + w_2x_2 + b$. Sau đó một quy tắc kích hoạt biến $z$ thành lớp.',
       },
     },
     order: 2,
+    sourceIds: ['d2l-vi', 'microsoft-ai-for-beginners'],
     type: 'markdown',
   },
   {
@@ -130,15 +127,15 @@ const trialBlocks = [
     locales: {
       en: {
         body:
-          'A model decision becomes explainable when you can trace the inputs, weights, ' +
-          'bias, and threshold that produced it.',
-        title: 'The useful idea',
+          'Cause and effect stay visible: changing an input changes the weighted score; the ' +
+          'activation rule converts that score into the final class.',
+        title: 'Keep the decision chain inspectable',
       },
       vi: {
         body:
-          'Quyết định của mô hình trở nên giải thích được khi bạn lần theo đầu vào, ' +
-          'trọng số, độ lệch và ngưỡng đã tạo ra nó.',
-        title: 'Ý tưởng cần giữ lại',
+          'Quan hệ nguyên nhân-kết quả luôn thấy được: đổi một đầu vào sẽ đổi tổng có trọng số; ' +
+          'quy tắc kích hoạt biến tổng đó thành lớp cuối cùng.',
+        title: 'Giữ chuỗi quyết định có thể kiểm tra',
       },
     },
     order: 3,
@@ -151,17 +148,17 @@ const trialBlocks = [
     locales: {
       en: {
         lede:
-          'Before adding the inputs, the neuron multiplies each one by a weight. ' +
-          'Larger weights create a stronger influence.',
+          'Each feature is multiplied by a weight before the values are added. The resulting ' +
+          'score shows how the model balances the available evidence.',
         navigationTitle: 'Why weights matter',
-        title: 'Weights say which signals matter',
+        title: 'Weights shape the score',
       },
       vi: {
         lede:
-          'Trước khi cộng các đầu vào, neuron nhân từng đầu vào với một trọng số. ' +
-          'Trọng số lớn tạo ảnh hưởng mạnh hơn.',
+          'Mỗi feature được nhân với một trọng số trước khi các giá trị được cộng. Điểm số thu ' +
+          'được cho biết mô hình cân bằng các bằng chứng sẵn có như thế nào.',
         navigationTitle: 'Vì sao trọng số quan trọng?',
-        title: 'Trọng số cho biết tín hiệu nào quan trọng',
+        title: 'Trọng số định hình điểm số',
       },
     },
     order: 4,
@@ -173,16 +170,17 @@ const trialBlocks = [
     locales: {
       en: {
         markdown:
-          'The bias shifts the decision point. A step function compares $z$ with zero and ' +
-          'returns either **0** or **1**.',
+          'The bias shifts where the boundary sits. For this introductory model, a step ' +
+          'activation compares $z$ with zero and returns either **0** or **1**.',
       },
       vi: {
         markdown:
-          'Độ lệch dịch chuyển điểm ra quyết định. Hàm bước so sánh $z$ với 0 và trả về ' +
-          '**0** hoặc **1**.',
+          'Độ lệch dịch vị trí của ranh giới. Với mô hình nhập môn này, hàm bước so sánh $z$ với ' +
+          '0 và trả về **0** hoặc **1**.',
       },
     },
     order: 5,
+    sourceIds: ['d2l-vi', 'microsoft-ai-for-beginners'],
     type: 'markdown',
   },
   {
@@ -197,20 +195,23 @@ const trialBlocks = [
     locales: {
       en: {
         bias: 'bias',
-        description: 'The sign of z determines whether the step function returns 0 or 1.',
+        description:
+          'Compute the weighted score first; the step rule maps its sign to a binary output.',
         inputs: 'inputs',
         score: 'score',
         weights: 'weights',
       },
       vi: {
         bias: 'độ lệch',
-        description: 'Dấu của z quyết định hàm bước trả về 0 hay 1.',
+        description:
+          'Tính tổng có trọng số trước; quy tắc bước ánh xạ dấu của nó thành đầu ra nhị phân.',
         inputs: 'đầu vào',
         score: 'điểm',
         weights: 'trọng số',
       },
     },
     order: 6,
+    sourceIds: ['d2l-vi', 'microsoft-ai-for-beginners'],
     type: 'formula',
   },
   {
@@ -229,14 +230,14 @@ const trialBlocks = [
     id: 'read-result',
     locales: {
       en: {
-        lede: 'The output is not magic. It follows directly from the sign of the weighted score.',
-        navigationTitle: 'Read the result',
-        title: 'Read the result, do not guess',
+        lede: 'The output follows a reproducible calculation: inputs, weighted score, activation, class.',
+        navigationTitle: 'Read the calculation',
+        title: 'Read the result from the calculation',
       },
       vi: {
-        lede: 'Đầu ra không phải phép màu. Nó đi thẳng từ dấu của tổng có trọng số.',
-        navigationTitle: 'Đọc kết quả',
-        title: 'Đọc kết quả, không đoán mò',
+        lede: 'Đầu ra theo một phép tính lặp lại được: đầu vào, tổng có trọng số, kích hoạt, lớp.',
+        navigationTitle: 'Đọc phép tính',
+        title: 'Đọc kết quả từ phép tính',
       },
     },
     order: 8,
@@ -248,16 +249,16 @@ const trialBlocks = [
     locales: {
       en: {
         body:
-          'Toggle the two inputs again and narrate the chain aloud: inputs, weighted sum, ' +
-          'threshold, output.',
+          'Use the fixed AND rows and narrate the same chain each time: inputs, weighted score, ' +
+          'step activation, output.',
         items: [
           {
-            body: 'The combined evidence has not reached the threshold.',
+            body: 'The weighted score is below the decision threshold.',
             label: 'z < 0',
             title: 'Output 0',
           },
           {
-            body: 'The combined evidence has reached or crossed the threshold.',
+            body: 'The weighted score reaches or crosses the decision threshold.',
             label: 'z ≥ 0',
             title: 'Output 1',
           },
@@ -266,12 +267,16 @@ const trialBlocks = [
       },
       vi: {
         body:
-          'Hãy đổi hai đầu vào lần nữa và đọc thành tiếng chuỗi này: đầu vào, ' +
-          'tổng có trọng số, ngưỡng, đầu ra.',
+          'Dùng các hàng AND cố định và đọc cùng một chuỗi mỗi lần: đầu vào, tổng có trọng số, ' +
+          'hàm bước, đầu ra.',
         items: [
-          { body: 'Bằng chứng kết hợp chưa chạm ngưỡng.', label: 'z < 0', title: 'Đầu ra 0' },
           {
-            body: 'Bằng chứng kết hợp đã chạm hoặc vượt ngưỡng.',
+            body: 'Tổng có trọng số thấp hơn ngưỡng quyết định.',
+            label: 'z < 0',
+            title: 'Đầu ra 0',
+          },
+          {
+            body: 'Tổng có trọng số chạm hoặc vượt ngưỡng quyết định.',
             label: 'z ≥ 0',
             title: 'Đầu ra 1',
           },
@@ -288,41 +293,54 @@ const trialBlocks = [
     id: 'further-reading',
     locales: {
       en: {
-        heading: 'Continue from a primary source',
-        intro: 'Further reading is optional and does not affect lesson progress.',
-        navigationTitle: 'Further reading',
+        heading: 'Sources used for this lesson',
+        intro:
+          'These pinned source references support the concise lesson summary; source review is still pending.',
+        navigationTitle: 'Lesson sources',
       },
       vi: {
-        heading: 'Đọc tiếp từ nguồn chính thống',
-        intro: 'Tài liệu mở rộng là tùy chọn và không ảnh hưởng tiến độ bài học.',
-        navigationTitle: 'Tài liệu mở rộng',
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Các tham chiếu nguồn đã pin này hỗ trợ phần diễn giải ngắn; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
       },
     },
     order: 10,
     required: false,
     resources: [
       {
-        attribution: {
-          en: 'Reference material by Google for Developers.',
-          vi: 'Tài liệu tham khảo của Google for Developers.',
-        },
+        attribution: dlM01SourceTrace.sourceSnapshots[0].attribution,
         language: 'en',
-        license: {
-          name: 'CC BY 4.0',
-          url: 'https://creativecommons.org/licenses/by/4.0/',
-        },
+        license: dlM01SourceTrace.sourceSnapshots[0].license,
         relatedTopicIds: [],
         resourceType: 'documentation',
-        sourceId: 'source-google-neural-nodes',
-        sourceName: 'Google for Developers',
-        title: 'Neural networks: Nodes and hidden layers',
-        url: GOOGLE_NEURAL_NODES_URL,
+        sourceId: dlM01SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: dlM01SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Introduction to Neural Networks: Perceptron',
+        url: 'https://github.com/microsoft/AI-For-Beginners/blob/main/lessons/3-NeuralNetworks/03-Perceptron/README.md',
+      },
+      {
+        attribution: dlM01SourceTrace.sourceSnapshots[1].attribution,
+        language: 'vi',
+        license: dlM01SourceTrace.sourceSnapshots[1].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: dlM01SourceTrace.sourceSnapshots[1].sourceId,
+        sourceName: dlM01SourceTrace.sourceSnapshots[1].sourceName,
+        title: 'Multilayer Perceptrons',
+        url: 'https://github.com/d2l-ai/d2l-vi/blob/main/chapter_multilayer-perceptrons/mlp.md',
       },
     ],
-    sourceIds: ['source-google-neural-nodes'],
+    sourceIds: dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId),
     type: 'source-list',
   },
 ] satisfies readonly LearningContentBlock[];
+
+const fullLessonSourceListBlock = trialBlocks.find((block) => block.type === 'source-list');
+
+if (!fullLessonSourceListBlock) {
+  throw new Error('The full lesson requires a source-list block.');
+}
 
 const fullLessonBlocks = [
   ...trialBlocks.filter(
@@ -334,20 +352,21 @@ const fullLessonBlocks = [
     locales: {
       en: {
         lede:
-          'XOR uses two positive cases that sit across from each other. One straight ' +
-          'decision boundary cannot separate them from the negative cases.',
+          'A single affine transformation makes a strong linear assumption. XOR exposes that ' +
+          'assumption because its positive cases occupy opposite corners.',
         navigationTitle: 'Why XOR breaks the line',
-        title: 'Why does XOR break a single-layer Perceptron?',
+        title: 'Where a single linear layer stops',
       },
       vi: {
         lede:
-          'XOR có hai trường hợp dương nằm chéo nhau. Một ranh giới quyết định thẳng ' +
-          'không thể tách chúng khỏi hai trường hợp âm.',
+          'Một phép biến đổi affine duy nhất mang giả định tuyến tính mạnh. XOR bộc lộ giả định ' +
+          'đó vì các trường hợp dương nằm ở hai góc đối diện.',
         navigationTitle: 'Vì sao XOR phá đường thẳng?',
-        title: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        title: 'Nơi một lớp tuyến tính dừng lại',
       },
     },
     order: 9,
+    sourceIds: DL_M01_MLP_SOURCE_IDS,
     type: 'heading',
   },
   {
@@ -356,65 +375,50 @@ const fullLessonBlocks = [
     locales: {
       en: {
         markdown:
-          'Read the stable XOR target before thinking about weights:\n\n' +
+          'Inspect the fixed XOR target before choosing weights:\n\n' +
           '| x1 | x2 | XOR |\n|---:|---:|---:|\n| 0 | 0 | 0 |\n| 0 | 1 | 1 |\n| 1 | 0 | 1 |\n| 1 | 1 | 0 |\n\n' +
-          'The positive points are diagonal, so pushing one side of a line up also ' +
-          'pushes the wrong negative point up.',
+          'The two positive cases are diagonal. Any one straight boundary that includes one of ' +
+          'them leaves the other arrangement unresolved.',
       },
       vi: {
         markdown:
-          'Hãy đọc target XOR ổn định trước khi nghĩ về trọng số:\n\n' +
+          'Hãy quan sát target XOR cố định trước khi chọn trọng số:\n\n' +
           '| x1 | x2 | XOR |\n|---:|---:|---:|\n| 0 | 0 | 0 |\n| 0 | 1 | 1 |\n| 1 | 0 | 1 |\n| 1 | 1 | 0 |\n\n' +
-          'Hai điểm dương nằm chéo nhau, nên khi đẩy một phía của đường thẳng lên, ' +
-          'một điểm âm sai cũng bị đẩy lên theo.',
+          'Hai trường hợp dương nằm chéo nhau. Một ranh giới thẳng bao được một trường hợp sẽ ' +
+          'không giải quyết được cách sắp xếp còn lại.',
       },
     },
     order: 10,
+    sourceIds: DL_M01_MLP_SOURCE_IDS,
     type: 'markdown',
   },
   {
     ...blockDefaults,
-    id: 'stable-content-access',
+    id: 'and-linearly-separable',
     locales: {
       en: {
         body:
-          'Full reading is granted by stable content access post_dl-p01-neuron-perceptron. ' +
-          'The grant does not pin a revision, so a safe publish can move the current text forward.',
-        title: 'Stable access, current content',
+          'In the fixed AND example, only the 1,1 corner is positive. A single boundary can keep ' +
+          'that corner on one side and the other three cases on the other side. XOR changes the ' +
+          'arrangement, so a single linear rule is no longer enough. A hidden layer adds another ' +
+          'transformation and activation before the final decision.',
+        title: 'Why AND works but XOR does not',
       },
       vi: {
         body:
-          'Quyền đọc đầy đủ được cấp bằng stable content access post_dl-p01-neuron-perceptron. ' +
-          'Grant này không pin revision, nên một lần publish an toàn vẫn có thể chuyển nội dung hiện tại về phía trước.',
-        title: 'Stable access, nội dung hiện tại',
+          'Trong ví dụ AND cố định, chỉ góc 1,1 là dương. Một ranh giới có thể giữ góc đó ở một ' +
+          'phía và ba trường hợp còn lại ở phía kia. XOR đổi cách sắp xếp, nên một quy tắc tuyến ' +
+          'tính duy nhất không còn đủ. Hidden layer thêm một phép biến đổi và hàm kích hoạt trước ' +
+          'quyết định cuối.',
+        title: 'Vì sao AND được nhưng XOR không',
       },
     },
     order: 11,
+    sourceIds: DL_M01_MLP_SOURCE_IDS,
     type: 'callout',
     variant: 'insight',
   },
-  {
-    ...blockDefaults,
-    id: 'from-perceptron-to-next-step',
-    locales: {
-      en: {
-        lede:
-          'The useful failure tells you what to look for next: a hidden layer can bend ' +
-          'the representation before the final decision.',
-        navigationTitle: 'What this unlocks next',
-        title: 'The failure points to the next model',
-      },
-      vi: {
-        lede:
-          'Thất bại hữu ích này cho bạn biết cần quan sát gì tiếp theo: một hidden layer ' +
-          'có thể bẻ cong biểu diễn trước quyết định cuối.',
-        navigationTitle: 'Điều này mở gì tiếp theo?',
-        title: 'Thất bại chỉ sang mô hình kế tiếp',
-      },
-    },
-    order: 12,
-    type: 'heading',
-  },
+  { ...fullLessonSourceListBlock, order: 12 },
 ] satisfies readonly LearningContentBlock[];
 
 const trialPosts = [
@@ -423,18 +427,22 @@ const trialPosts = [
     blocks: trialBlocks,
     courseId: 'course-deep-learning-basic',
     description: {
-      en: 'See how inputs, weights, and a bias become one explainable decision.',
-      vi: 'Quan sát cách đầu vào, trọng số và độ lệch tạo thành một quyết định có thể giải thích.',
+      en: 'Trace a binary decision from feature values through a weighted score and step activation.',
+      vi: 'Theo dõi một quyết định nhị phân từ giá trị feature qua tổng có trọng số đến hàm bước.',
     },
     durationMinutes: 8,
     id: TRIAL_POST_ID,
     learningObjective: {
-      en: 'Explain how inputs, weights, bias, and a threshold form one Perceptron decision.',
-      vi: 'Giải thích cách đầu vào, trọng số, độ lệch và ngưỡng tạo thành một quyết định Perceptron.',
+      en: 'Compute a fixed two-input Perceptron decision and explain how weights, bias, and activation determine its binary output.',
+      vi: 'Tính một quyết định Perceptron hai đầu vào cố định và giải thích cách trọng số, độ lệch, hàm kích hoạt quyết định đầu ra nhị phân.',
     },
     moduleId: 'dl-m01-neuron-perceptron',
     postQuizId: 'quiz-post-dl-p01',
-    provenance: createDraftProvenance('course-deep-learning-basic'),
+    provenance: {
+      ...createDraftProvenance('course-deep-learning-basic'),
+      candidateSourceIds: DL_M01_SOURCE_IDS,
+      sourceTrace: dlM01SourceTrace,
+    },
     sourceReviewStatus: 'pending-operator-review',
     taskFingerprint: 'lesson-neuron-decision-rule',
     title: {
@@ -450,8 +458,8 @@ const fullLessonPosts: readonly TrialPost[] = [
     accessLevel: 'full',
     blocks: fullLessonBlocks,
     description: {
-      en: 'Read from a single neuron decision to the XOR limit that motivates the next model.',
-      vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR mở đường cho mô hình kế tiếp.',
+      en: 'Move from one binary Perceptron decision to the linear limit that motivates a hidden layer.',
+      vi: 'Đi từ một quyết định Perceptron nhị phân đến giới hạn tuyến tính gợi ý hidden layer.',
     },
     durationMinutes: 16,
   },

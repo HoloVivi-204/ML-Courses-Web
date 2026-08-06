@@ -4,6 +4,9 @@ import {
   type ReleaseLearningModule,
   type ReleaseLearningPost,
 } from './release-learning-catalog.js';
+import { dlM01SourceTrace, type DraftProvenance } from './content-source-trace.js';
+
+const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
 
@@ -36,18 +39,14 @@ export interface QuizQuestion {
   prompt: LocalizedText;
   questionId: string;
   sourceId: string;
+  sourceIds?: readonly string[];
   type: BaselineQuestionType;
 }
 
 export interface QuizManifest {
   courseId: string;
   demoId: string | null;
-  draftProvenance?: {
-    candidateSourceIds: readonly string[];
-    contentReviewStatus: 'pending-operator-review';
-    externalEvidenceStatus: 'not-collected';
-    importStatus: 'draft-only';
-  };
+  draftProvenance?: DraftProvenance;
   mastery: LocalizedText;
   moduleId: string;
   passingScorePercent: number;
@@ -105,6 +104,13 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
   'quiz-post-dl-p01': {
     courseId: 'course-deep-learning-basic',
     demoId: null,
+    draftProvenance: {
+      candidateSourceIds: DL_M01_SOURCE_IDS,
+      contentReviewStatus: 'pending-operator-review',
+      externalEvidenceStatus: 'not-collected',
+      importStatus: 'draft-only',
+      sourceTrace: dlM01SourceTrace,
+    },
     mastery: {
       en: 'Answer all 3 questions correctly to complete this lesson.',
       vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
@@ -168,6 +174,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-p01-perceptron-role',
         sourceId: 'act-dl-p01-neuron-perceptron-quiz-01',
+        sourceIds: ['d2l-vi'],
         type: 'single-choice',
       },
       {
@@ -226,6 +233,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-p01-perceptron-parts',
         sourceId: 'act-dl-p01-neuron-perceptron-quiz-02',
+        sourceIds: ['microsoft-ai-for-beginners'],
         type: 'multiple-choice',
       },
       {
@@ -254,6 +262,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-p01-and-linearly-separable',
         sourceId: 'act-dl-p01-neuron-perceptron-quiz-03',
+        sourceIds: ['d2l-vi', 'microsoft-ai-for-beginners'],
         type: 'true-false',
       },
     ],
@@ -261,6 +270,13 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
   'quiz-module-dl-m01': {
     courseId: 'course-deep-learning-basic',
     demoId: 'demo-perceptron-and-gate',
+    draftProvenance: {
+      candidateSourceIds: DL_M01_SOURCE_IDS,
+      contentReviewStatus: 'pending-operator-review',
+      externalEvidenceStatus: 'not-collected',
+      importStatus: 'draft-only',
+      sourceTrace: dlM01SourceTrace,
+    },
     mastery: {
       en: 'Score at least 70% to complete the module and unlock the Perceptron playground.',
       vi: 'Đạt ít nhất 70% để hoàn thành module và mở Playground Perceptron.',
@@ -302,6 +318,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-m01-boundary',
         sourceId: 'quiz-module-dl-m01-q01',
+        sourceIds: ['microsoft-ai-for-beginners'],
         type: 'single-choice',
       },
       {
@@ -325,6 +342,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-m01-inputs',
         sourceId: 'quiz-module-dl-m01-q02',
+        sourceIds: ['microsoft-ai-for-beginners'],
         type: 'multiple-choice',
       },
       {
@@ -350,6 +368,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-m01-xor-linearly-separable',
         sourceId: 'quiz-module-dl-m01-q03',
+        sourceIds: ['d2l-vi'],
         type: 'true-false',
       },
       {
@@ -382,6 +401,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         prompt: { en: 'What role does bias play?', vi: 'Độ lệch có vai trò gì?' },
         questionId: 'q-dl-m01-bias',
         sourceId: 'quiz-module-dl-m01-q04',
+        sourceIds: ['d2l-vi', 'microsoft-ai-for-beginners'],
         type: 'single-choice',
       },
       {
@@ -420,6 +440,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-m01-and-xor',
         sourceId: 'quiz-module-dl-m01-q05',
+        sourceIds: ['d2l-vi'],
         type: 'multiple-choice',
       },
       {
@@ -448,6 +469,7 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
         },
         questionId: 'q-dl-m01-hidden-layer',
         sourceId: 'quiz-module-dl-m01-q06',
+        sourceIds: ['d2l-vi'],
         type: 'true-false',
       },
     ],
@@ -1134,7 +1156,7 @@ function createReleaseQuizManifests() {
       quizId,
       {
         ...manifest,
-        draftProvenance: {
+        draftProvenance: manifest.draftProvenance ?? {
           candidateSourceIds:
             manifest.courseId === 'course-classical-ml'
               ? ['microsoft-ml-for-beginners', 'google-ml-crash-course', 'mit-ocw', 'sklearn-docs']

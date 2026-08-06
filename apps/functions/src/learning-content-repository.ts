@@ -5,6 +5,7 @@ import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import {
   getFixedDemo,
   type FixedDemoManifest,
+  type FixedDemoRun,
   type FixedDemoVisualization,
 } from './release-demo-content.js';
 import { getReadablePost, getTrialPost, type TrialPost } from './release-learning-content.js';
@@ -27,6 +28,7 @@ export interface LearnerDemoContent {
   algorithmId: string;
   courseId: string;
   demoId: string;
+  fixedRun?: FixedDemoRun;
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
@@ -86,6 +88,7 @@ function toLearnerDemoContent(demo: FixedDemoManifest): LearnerDemoContent {
     algorithmId: demo.algorithmId,
     courseId: demo.courseId,
     demoId: demo.demoId,
+    ...(demo.fixedRun ? { fixedRun: demo.fixedRun } : {}),
     moduleId: demo.moduleId,
     problemId: demo.problemId,
     requiredStepIds: demo.requiredStepIds,

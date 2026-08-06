@@ -398,7 +398,11 @@ function FixedDemoFrame({
         />
         {demo.visualization.points.map((point) => (
           <DemoPoint
-            isPositive={stepIndex >= point.positiveFromStep}
+            isPositive={
+              point.classification
+                ? point.classification === 'positive'
+                : stepIndex >= point.positiveFromStep
+            }
             key={`${point.x}:${point.y}:${point.label}`}
             label={point.label}
             x={point.x}
@@ -410,23 +414,49 @@ function FixedDemoFrame({
         </text>
       </svg>
 
-      <table className="and-truth-table">
-        <caption>{demo.problemId}</caption>
-        <tbody>
-          <tr>
-            <th>step</th>
-            <td>{step.id}</td>
-          </tr>
-          <tr>
-            <th>seed</th>
-            <td>{demo.seed}</td>
-          </tr>
-          <tr>
-            <th>status</th>
-            <td>fixed</td>
-          </tr>
-        </tbody>
-      </table>
+      {demo.fixedRun ? (
+        <table className="and-truth-table">
+          <caption>
+            {locale === 'vi' ? 'Dữ liệu và kết quả AND cố định' : 'Fixed AND data and results'}
+          </caption>
+          <thead>
+            <tr>
+              <th>x1</th>
+              <th>x2</th>
+              <th>{locale === 'vi' ? 'Nhãn' : 'Target'}</th>
+              <th>{locale === 'vi' ? 'Dự đoán' : 'Prediction'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {demo.fixedRun.rows.map((row) => (
+              <tr key={row.input.join(':')}>
+                <td>{row.input[0]}</td>
+                <td>{row.input[1]}</td>
+                <td>{row.targetOutput}</td>
+                <td>{row.predictedOutput}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <table className="and-truth-table">
+          <caption>{demo.problemId}</caption>
+          <tbody>
+            <tr>
+              <th>step</th>
+              <td>{step.id}</td>
+            </tr>
+            <tr>
+              <th>seed</th>
+              <td>{demo.seed}</td>
+            </tr>
+            <tr>
+              <th>status</th>
+              <td>fixed</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

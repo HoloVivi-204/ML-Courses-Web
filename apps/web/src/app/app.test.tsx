@@ -102,17 +102,23 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         status: 'completed',
       },
     }),
-    recordPostView: vi.fn().mockImplementation(({ postId, readingPosition, viewedItemIds }) =>
-      Promise.resolve({
+    recordPostView: vi.fn().mockImplementation(({ postId, readingPosition, viewedItemIds }) => {
+      const course = getReleaseLearningCatalog().courses.find((candidate) =>
+        candidate.modules.some((module) => module.posts.some((post) => post.postId === postId)),
+      );
+      const post = course ? getReadablePost(course.courseId, postId, true) : undefined;
+      const requiredBlockCount = post?.blocks.filter((block) => block.required).length ?? 0;
+
+      return Promise.resolve({
         postView: {
-          contentViewed: viewedItemIds.length >= 12,
+          contentViewed: viewedItemIds.length >= requiredBlockCount,
           postId,
           readingPosition,
           started: true,
           viewedItemIds,
         },
-      }),
-    ),
+      });
+    }),
     createAdminContentDraft: vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',
@@ -1453,12 +1459,12 @@ describe('public learning journey', () => {
       { timeout: LAZY_ROUTE_TIMEOUT_MS },
     );
     expect(contents).toBeVisible();
-    expect(within(contents).getByRole('link', { name: 'Một neuron làm gì?' })).toHaveAttribute(
+    expect(within(contents).getByRole('link', { name: 'Perceptron làm gì?' })).toHaveAttribute(
       'href',
       '#what-is-a-neuron',
     );
-    expect(screen.getByRole('heading', { name: 'Từ tín hiệu đến quyết định' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Đọc kết quả, không đoán mò' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Từ feature đến lựa chọn nhị phân' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Đọc kết quả từ phép tính' })).toBeVisible();
   });
 
   it('keeps the trial lesson open when a guest switches to English', async () => {
@@ -1524,13 +1530,13 @@ describe('public learning journey', () => {
     const resource = await screen.findByRole(
       'link',
       {
-        name: 'Neural networks: Nodes and hidden layers',
+        name: 'Introduction to Neural Networks: Perceptron',
       },
       { timeout: LAZY_ROUTE_TIMEOUT_MS },
     );
     expect(resource).toHaveAttribute('target', '_blank');
     expect(resource).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.getByText(/developers\.google\.com/i)).toBeVisible();
+    expect(screen.getAllByText(/microsoft ai for beginners/i)).toHaveLength(2);
   });
 
   it('shows the full Perceptron/XOR lesson only to an authenticated learner', async () => {
@@ -1554,18 +1560,18 @@ describe('public learning journey', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+          name: 'Nơi một lớp tuyến tính dừng lại',
         },
         { timeout: 3_000 },
       ),
     ).toBeVisible();
-    expect(screen.getByText(/post_dl-p01-neuron-perceptron/)).toBeVisible();
+    expect(screen.getByText('Vì sao AND được nhưng XOR không')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Why does XOR break a single-layer Perceptron?',
+        name: 'Where a single linear layer stops',
       }),
     ).toBeVisible();
     expect(screen.getByText('FULL LESSON')).toBeVisible();
@@ -1602,19 +1608,19 @@ describe('public learning journey', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+          name: 'Nơi một lớp tuyến tính dừng lại',
         },
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
-    expect(screen.getByText(/post_dl-p01-neuron-perceptron/)).toBeVisible();
+    expect(screen.getByText('Vì sao AND được nhưng XOR không')).toBeVisible();
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
 
     await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Why does XOR break a single-layer Perceptron?',
+        name: 'Where a single linear layer stops',
       }),
     ).toBeVisible();
   });
@@ -2989,7 +2995,7 @@ describe('public learning journey', () => {
     expect(learningApiClient.getProgress).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('heading', {
-        name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        name: 'Nơi một lớp tuyến tính dừng lại',
       }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/post_dl-p01-neuron-perceptron/)).not.toBeInTheDocument();
@@ -3035,7 +3041,7 @@ describe('public learning journey', () => {
     expect(learningApiClient.getProgress).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('heading', {
-        name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+        name: 'Nơi một lớp tuyến tính dừng lại',
       }),
     ).not.toBeInTheDocument();
   });
@@ -3075,7 +3081,7 @@ describe('public learning journey', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+          name: 'Nơi một lớp tuyến tính dừng lại',
         },
         { timeout: 3_000 },
       ),
@@ -3102,7 +3108,7 @@ describe('public learning journey', () => {
     expect(await screen.findByRole('heading', { name: 'Demo Perceptron: cổng AND' })).toBeVisible();
     expect(
       screen.getByRole('img', {
-        name: /Bốn điểm dữ liệu AND và một đường quyết định/i,
+        name: /Bảng chân trị AND cố định có ba hàng âm/i,
       }),
     ).toBeVisible();
     expect(learningApiClient.getDemoContent).toHaveBeenCalledWith({
@@ -3191,7 +3197,7 @@ describe('public learning journey', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+          name: 'Nơi một lớp tuyến tính dừng lại',
         },
         { timeout: 3_000 },
       ),
@@ -3202,7 +3208,7 @@ describe('public learning journey', () => {
     expect(await screen.findByRole('heading', { name: 'Demo Perceptron: cổng AND' })).toBeVisible();
     expect(
       screen.getByRole('img', {
-        name: /Bốn điểm dữ liệu AND và một đường quyết định/i,
+        name: /Bảng chân trị AND cố định có ba hàng âm/i,
       }),
     ).toBeVisible();
     expect(screen.getByRole('status', { name: 'Tiến độ demo' })).toHaveTextContent(
@@ -3444,7 +3450,7 @@ describe('public learning journey', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+          name: 'Nơi một lớp tuyến tính dừng lại',
         },
         { timeout: 3_000 },
       ),
@@ -3582,7 +3588,7 @@ describe('public learning journey', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Vì sao XOR làm Perceptron một lớp thất bại?',
+          name: 'Nơi một lớp tuyến tính dừng lại',
         },
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),

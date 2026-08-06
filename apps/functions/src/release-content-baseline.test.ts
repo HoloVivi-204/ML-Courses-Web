@@ -68,7 +68,7 @@ describe('Release 1 content baseline contract', () => {
     for (const quiz of quizzes) {
       expect(quiz.mastery.en.trim()).not.toHaveLength(0);
       expect(quiz.mastery.vi.trim()).not.toHaveLength(0);
-      expect(quiz.draftProvenance).toEqual({
+      expect(quiz.draftProvenance).toMatchObject({
         candidateSourceIds: expect.any(Array),
         contentReviewStatus: 'pending-operator-review',
         externalEvidenceStatus: 'not-collected',

@@ -129,4 +129,30 @@ describe('learning content repository', () => {
       uid: 'learner-02',
     });
   });
+
+  it('returns the fixed AND inputs, parameters, and predictions only after demo access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const demo = await repository.getDemoContent({
+      demoId: 'demo-perceptron-and-gate',
+      uid: 'learner-01',
+    });
+
+    expect(demo.data.fixedRun).toMatchObject({
+      datasetVersionId: 'dataset-demo-perceptron-and-gate-v1',
+      parameterValues: [
+        { id: 'w1', value: 1 },
+        { id: 'w2', value: 1 },
+        { id: 'bias', value: -1.5 },
+      ],
+      rows: [
+        { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+        { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+        { input: [1, 0], predictedOutput: 0, targetOutput: 0 },
+        { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+      ],
+    });
+  });
 });

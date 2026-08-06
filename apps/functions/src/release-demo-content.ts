@@ -3,6 +3,9 @@ import {
   type LocalizedText,
   type ReleaseLearningModule,
 } from './release-learning-catalog.js';
+import { dlM01SourceTrace, type DraftProvenance } from './content-source-trace.js';
+
+const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 export interface DemoStep {
   id: string;
@@ -18,6 +21,7 @@ export interface FixedDemoVisualization {
     y: number;
   }[];
   points: readonly {
+    classification?: 'negative' | 'positive';
     label: string;
     positiveFromStep: number;
     x: number;
@@ -25,16 +29,25 @@ export interface FixedDemoVisualization {
   }[];
 }
 
+export interface FixedDemoRun {
+  datasetVersionId: string;
+  parameterValues: readonly {
+    id: string;
+    value: number;
+  }[];
+  rows: readonly {
+    input: readonly number[];
+    predictedOutput: number;
+    targetOutput: number;
+  }[];
+}
+
 export interface FixedDemoManifest {
   algorithmId: string;
   courseId: string;
   demoId: string;
-  draftProvenance?: {
-    candidateSourceIds: readonly string[];
-    contentReviewStatus: 'pending-operator-review';
-    externalEvidenceStatus: 'not-collected';
-    importStatus: 'draft-only';
-  };
+  draftProvenance?: DraftProvenance;
+  fixedRun?: FixedDemoRun;
   learningObjective?: LocalizedText;
   moduleId: string;
   problemId: string;
@@ -52,19 +65,29 @@ export const andGateDemo: FixedDemoManifest = {
   courseId: 'course-deep-learning-basic',
   demoId: 'demo-perceptron-and-gate',
   draftProvenance: {
-    candidateSourceIds: [
-      'd2l-vi',
-      'microsoft-ai-for-beginners',
-      'google-ml-crash-course',
-      'tensorflow-tutorials',
-    ],
+    candidateSourceIds: DL_M01_SOURCE_IDS,
     contentReviewStatus: 'pending-operator-review',
     externalEvidenceStatus: 'not-collected',
     importStatus: 'draft-only',
+    sourceTrace: dlM01SourceTrace,
   },
   learningObjective: {
-    en: 'Explain one fixed linearly separable decision without changing the dataset or model.',
-    vi: 'Giải thích một quyết định tách tuyến tính cố định mà không thay đổi dataset hoặc mô hình.',
+    en: 'Calculate how one fixed Perceptron classifies all four AND inputs from weights, bias, and a step rule.',
+    vi: 'Tính cách một Perceptron cố định phân loại bốn đầu vào AND từ trọng số, độ lệch và quy tắc bước.',
+  },
+  fixedRun: {
+    datasetVersionId: 'dataset-demo-perceptron-and-gate-v1',
+    parameterValues: [
+      { id: 'w1', value: 1 },
+      { id: 'w2', value: 1 },
+      { id: 'bias', value: -1.5 },
+    ],
+    rows: [
+      { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+      { input: [1, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+    ],
   },
   moduleId: 'dl-m01-neuron-perceptron',
   problemId: 'problem-demo-perceptron-and-gate',
@@ -74,15 +97,14 @@ export const andGateDemo: FixedDemoManifest = {
   taskFingerprint: 'demo-perceptron-and-fixed-and-rule',
   visualization: {
     boundary: [
-      { x: 52, y: 168 },
-      { x: 92, y: 132 },
-      { x: 132, y: 112 },
-      { x: 172, y: 78 },
-      { x: 204, y: 62 },
+      { x: 122, y: 34 },
+      { x: 210, y: 115 },
     ],
     points: [
-      { label: 'AN', positiveFromStep: 2, x: 92, y: 132 },
-      { label: '4', positiveFromStep: 3, x: 172, y: 78 },
+      { classification: 'negative', label: '0,0', positiveFromStep: 1, x: 62, y: 172 },
+      { classification: 'negative', label: '0,1', positiveFromStep: 1, x: 62, y: 58 },
+      { classification: 'negative', label: '1,0', positiveFromStep: 1, x: 190, y: 172 },
+      { classification: 'positive', label: '1,1', positiveFromStep: 1, x: 190, y: 58 },
     ],
   },
   title: {
@@ -93,13 +115,13 @@ export const andGateDemo: FixedDemoManifest = {
     {
       id: 'and-problem',
       narration: {
-        en: 'AND returns 1 only when both inputs are 1. This gives a linearly separable target.',
-        vi: 'AND chỉ trả về 1 khi cả hai đầu vào đều bằng 1. Mục tiêu này tách được bằng một đường thẳng.',
+        en: 'A Perceptron is a binary classifier. Here the target is AND: only the input pair 1,1 has label 1.',
+        vi: 'Perceptron là bộ phân loại nhị phân. Ở đây target là AND: chỉ cặp đầu vào 1,1 có nhãn 1.',
       },
       required: true,
       textAlternative: {
-        en: 'The AND truth table has three negative cases and one positive case at x1 equals 1 and x2 equals 1.',
-        vi: 'Bốn điểm dữ liệu AND và một đường quyết định sẽ được dùng để kiểm tra Perceptron; chỉ điểm x1 bằng 1 và x2 bằng 1 là dương.',
+        en: 'The fixed AND truth table has three negative rows: 0,0; 0,1; and 1,0. Its only positive row is 1,1.',
+        vi: 'Bảng chân trị AND cố định có ba hàng âm: 0,0; 0,1; và 1,0. Hàng dương duy nhất là 1,1.',
       },
       title: {
         en: 'Define the AND target',
@@ -109,13 +131,13 @@ export const andGateDemo: FixedDemoManifest = {
     {
       id: 'and-data',
       narration: {
-        en: 'The four points are fixed: 00, 01, 10, and 11. No live training or random sampling happens in this demo.',
-        vi: 'Bốn điểm dữ liệu được cố định: 00, 01, 10 và 11. Demo này không train live hoặc lấy mẫu ngẫu nhiên.',
+        en: 'The four input rows are fixed, so you can inspect the same evidence before and after the decision without live training or sampling.',
+        vi: 'Bốn hàng đầu vào được cố định, nên bạn có thể quan sát cùng bằng chứng trước và sau quyết định mà không train hay lấy mẫu live.',
       },
       required: true,
       textAlternative: {
-        en: 'Four AND data points are shown in a square. Only the top-right point is positive.',
-        vi: 'Bốn điểm dữ liệu AND nằm trên một hình vuông. Chỉ điểm góc trên bên phải là dương.',
+        en: 'A square plot shows 0,0; 0,1; 1,0; and 1,1. The first three points are negative and the top-right 1,1 point is positive.',
+        vi: 'Đồ thị hình vuông cho thấy 0,0; 0,1; 1,0; và 1,1. Ba điểm đầu là âm, còn điểm 1,1 góc trên bên phải là dương.',
       },
       title: {
         en: 'Inspect the fixed dataset',
@@ -125,13 +147,13 @@ export const andGateDemo: FixedDemoManifest = {
     {
       id: 'and-boundary',
       narration: {
-        en: 'A Perceptron with weights 1 and 1 plus bias -1.5 draws one line between the positive and negative cases.',
-        vi: 'Perceptron với trọng số 1 và 1, bias -1.5, vẽ một đường giữa điểm dương và các điểm âm.',
+        en: 'Use z = x1 + x2 - 1.5. The score is negative for 0,0; 0,1; and 1,0, but it is 0.5 for 1,1.',
+        vi: 'Dùng z = x1 + x2 - 1.5. Điểm số âm với 0,0; 0,1; và 1,0, nhưng bằng 0,5 với 1,1.',
       },
       required: true,
       textAlternative: {
-        en: 'A diagonal decision boundary separates the top-right positive point from the other three points.',
-        vi: 'Một đường quyết định chéo tách điểm dương góc trên bên phải khỏi ba điểm còn lại.',
+        en: 'The line x1 plus x2 equals 1.5 separates the top-right positive point from the three negative points.',
+        vi: 'Đường x1 cộng x2 bằng 1,5 tách điểm dương góc trên bên phải khỏi ba điểm âm.',
       },
       title: {
         en: 'Read the decision boundary',
@@ -141,13 +163,13 @@ export const andGateDemo: FixedDemoManifest = {
     {
       id: 'and-result',
       narration: {
-        en: 'Every point matches the AND label, so this fixed demo completes before the module quiz opens later.',
-        vi: 'Mọi điểm đều khớp nhãn AND, nên demo cố định này hoàn thành trước khi module quiz mở ở slice sau.',
+        en: 'The step rule maps negative scores to 0 and the 0.5 score to 1. All four predictions match the fixed AND labels.',
+        vi: 'Quy tắc bước ánh xạ điểm âm thành 0 và điểm 0,5 thành 1. Cả bốn dự đoán khớp nhãn AND cố định.',
       },
       required: true,
       textAlternative: {
-        en: 'The final frame marks all four AND predictions as correct and reports 100 percent accuracy.',
-        vi: 'Frame cuối đánh dấu cả bốn dự đoán AND là đúng và báo độ chính xác 100 phần trăm.',
+        en: 'The fixed result table reports predictions 0, 0, 0, 1 against targets 0, 0, 0, 1: four of four correct.',
+        vi: 'Bảng kết quả cố định báo dự đoán 0, 0, 0, 1 so với target 0, 0, 0, 1: đúng bốn trên bốn.',
       },
       title: {
         en: 'Confirm the fixed result',
@@ -371,7 +393,7 @@ function getDemoDraftDefinition(demoId: string): DemoDraftDefinition {
   return definition;
 }
 
-function createDemoDraftProvenance(courseId: string) {
+function createDemoDraftProvenance(courseId: string): DraftProvenance {
   const candidateSourceIds =
     courseId === 'course-classical-ml'
       ? ['microsoft-ml-for-beginners', 'google-ml-crash-course', 'mit-ocw', 'sklearn-docs']
