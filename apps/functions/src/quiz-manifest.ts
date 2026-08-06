@@ -8,6 +8,9 @@ import {
   cmlM01SourceTrace,
   cmlM02SourceTrace,
   cmlM03SourceTrace,
+  cmlM04LogisticSourceTrace,
+  cmlM04MetricsSourceTrace,
+  cmlM04ModuleSourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -20,6 +23,15 @@ const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => sourc
 const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M04_LOGISTIC_SOURCE_IDS = cmlM04LogisticSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M04_METRICS_SOURCE_IDS = cmlM04MetricsSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M04_MODULE_SOURCE_IDS = cmlM04ModuleSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
 const dlM02DraftProvenance = {
   candidateSourceIds: DL_M02_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -54,6 +66,27 @@ const cmlM03DraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM03SourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM04LogisticDraftProvenance = {
+  candidateSourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM04LogisticSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM04MetricsDraftProvenance = {
+  candidateSourceIds: CML_M04_METRICS_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM04MetricsSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM04ModuleDraftProvenance = {
+  candidateSourceIds: CML_M04_MODULE_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM04ModuleSourceTrace,
 } as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
@@ -2930,6 +2963,497 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-cml-p06': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM04LogisticDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m04-logistic-classification',
+    passingScorePercent: 100,
+    postId: 'cml-p06-logistic-regression',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p06',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p06-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p06-logistic-regression', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-binary-category',
+        explanation: {
+          en: 'The pinned lesson presents logistic regression as a classification method for binary categories, unlike linear regression for continuous values.',
+          vi: 'Bài đã pin trình bày hồi quy logistic là phương pháp phân loại cho category nhị phân, khác với hồi quy tuyến tính cho giá trị liên tục.',
+        },
+        hints: [
+          {
+            en: 'Choose the output type with two possibilities.',
+            vi: 'Chọn kiểu đầu ra có hai khả năng.',
+          },
+          {
+            en: 'Contrast it with a continuous price prediction.',
+            vi: 'Đối chiếu nó với dự đoán giá liên tục.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-binary-category',
+            text: { en: 'A binary category', vi: 'Một category nhị phân' },
+          },
+          {
+            optionId: 'opt-continuous-value',
+            text: { en: 'A continuous quantity', vi: 'Một đại lượng liên tục' },
+          },
+          {
+            optionId: 'opt-unlabeled-cluster',
+            text: { en: 'An unlabeled cluster', vi: 'Một cụm không nhãn' },
+          },
+        ],
+        prompt: {
+          en: 'What kind of outcome is logistic regression used to predict in the pinned lesson?',
+          vi: 'Hồi quy logistic được dùng để dự đoán loại kết quả nào trong bài đã pin?',
+        },
+        questionId: 'q-cml-p06-binary-category',
+        sourceId: 'act-cml-p06-logistic-regression-quiz-01',
+        sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-map-zero-one', 'opt-read-before-class'],
+        explanation: {
+          en: 'The sigmoid maps a score to a value between zero and one. The lesson asks the learner to read that value before a class convention converts it to a category.',
+          vi: 'Sigmoid ánh xạ điểm thành giá trị giữa không và một. Bài học yêu cầu người học đọc giá trị đó trước khi quy ước lớp biến nó thành category.',
+        },
+        hints: [
+          {
+            en: 'Pick the two stages of the fixed score reading.',
+            vi: 'Chọn hai giai đoạn của cách đọc điểm cố định.',
+          },
+          {
+            en: 'A bounded score is not yet the category.',
+            vi: 'Điểm bị chặn chưa phải category.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-map-zero-one',
+            text: { en: 'Map a score between 0 and 1', vi: 'Ánh xạ điểm giữa 0 và 1' },
+          },
+          {
+            optionId: 'opt-read-before-class',
+            text: {
+              en: 'Read the score before applying a class rule',
+              vi: 'Đọc điểm trước khi áp dụng quy tắc lớp',
+            },
+          },
+          {
+            optionId: 'opt-price-output',
+            text: { en: 'Return an unbounded price', vi: 'Trả về giá không bị chặn' },
+          },
+          {
+            optionId: 'opt-live-policy',
+            text: { en: 'Set a live policy automatically', vi: 'Tự động đặt chính sách live' },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly describe the sigmoid reading in this lesson?',
+          vi: 'Hai phát biểu nào mô tả đúng cách đọc sigmoid trong bài này?',
+        },
+        questionId: 'q-cml-p06-sigmoid-before-class',
+        sourceId: 'act-cml-p06-logistic-regression-quiz-02',
+        sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'The pinned source uses the fixed convention that a sigmoid outcome greater than 0.5 is assigned class 1; otherwise it is class 0.',
+          vi: 'Nguồn đã pin dùng quy ước cố định: đầu ra sigmoid lớn hơn 0,5 được gán lớp 1; nếu không là lớp 0.',
+        },
+        hints: [
+          {
+            en: 'Pay attention to “greater than,” not “greater than or equal.”',
+            vi: 'Chú ý “lớn hơn”, không phải “lớn hơn hoặc bằng”.',
+          },
+          { en: 'Recall the displayed classroom convention.', vi: 'Nhớ quy ước lớp hiển thị.' },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: under the fixed source convention, a sigmoid output greater than 0.50 receives class 1.',
+          vi: 'Đúng hay sai: theo quy ước nguồn cố định, đầu ra sigmoid lớn hơn 0,50 nhận lớp 1.',
+        },
+        questionId: 'q-cml-p06-fixed-threshold',
+        sourceId: 'act-cml-p06-logistic-regression-quiz-03',
+        sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-post-cml-p07': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM04MetricsDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m04-logistic-classification',
+    passingScorePercent: 100,
+    postId: 'cml-p07-classification-metrics',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p07',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p07-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p07-classification-metrics', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-error-cells',
+        explanation: {
+          en: 'A confusion matrix preserves the outcome cells: true positives, false positives, false negatives, and true negatives. It makes error types visible before a single metric is selected.',
+          vi: 'Confusion matrix giữ các ô kết quả: true positive, false positive, false negative và true negative. Nó làm loại lỗi hiển thị trước khi chọn một metric.',
+        },
+        hints: [
+          {
+            en: 'Think of the four possible prediction/observation outcomes.',
+            vi: 'Hãy nghĩ đến bốn kết quả dự đoán/quan sát có thể có.',
+          },
+          {
+            en: 'It does not replace the records with one label.',
+            vi: 'Nó không thay bản ghi bằng một nhãn.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-error-cells',
+            text: { en: 'The four classification outcome cells', vi: 'Bốn ô kết quả phân loại' },
+          },
+          {
+            optionId: 'opt-feature-ranks',
+            text: { en: 'Only feature importance ranks', vi: 'Chỉ xếp hạng độ quan trọng feature' },
+          },
+          {
+            optionId: 'opt-live-users',
+            text: { en: 'Live user records', vi: 'Bản ghi người dùng live' },
+          },
+        ],
+        prompt: {
+          en: 'What does a confusion matrix make visible for a binary classifier?',
+          vi: 'Confusion matrix làm hiển thị điều gì cho classifier nhị phân?',
+        },
+        questionId: 'q-cml-p07-confusion-cells',
+        sourceId: 'act-cml-p07-classification-metrics-quiz-01',
+        sourceIds: CML_M04_METRICS_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-recall',
+        explanation: {
+          en: 'Recall asks how many actual positives were found. When missing a positive is the costly error, it directs attention to false negatives rather than an overall accuracy alone.',
+          vi: 'Recall hỏi mô hình tìm được bao nhiêu dương thực tế. Khi bỏ sót ca dương là lỗi tốn kém, nó hướng chú ý vào false negative thay vì chỉ accuracy tổng thể.',
+        },
+        hints: [
+          { en: 'Start from actual positive cases.', vi: 'Bắt đầu từ các ca dương thực tế.' },
+          { en: 'The costly outcome is a miss.', vi: 'Kết quả tốn kém là bỏ sót.' },
+        ],
+        options: [
+          { optionId: 'opt-recall', text: { en: 'Recall', vi: 'Recall' } },
+          { optionId: 'opt-precision', text: { en: 'Precision only', vi: 'Chỉ precision' } },
+          {
+            optionId: 'opt-browser-score',
+            text: { en: 'Browser performance score', vi: 'Điểm hiệu năng trình duyệt' },
+          },
+        ],
+        prompt: {
+          en: 'Which metric should be inspected first when the main concern is missing actual positive cases?',
+          vi: 'Nên xem metric nào trước khi mối quan tâm chính là bỏ sót các ca dương thực tế?',
+        },
+        questionId: 'q-cml-p07-recall-missed-positive',
+        sourceId: 'act-cml-p07-classification-metrics-quiz-02',
+        sourceIds: CML_M04_METRICS_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-precision-predicted', 'opt-recall-actual'],
+        explanation: {
+          en: 'Precision starts from predicted positives and recall starts from actual positives. The two metrics therefore expose different sides of the same confusion table.',
+          vi: 'Precision bắt đầu từ các dự đoán dương còn recall bắt đầu từ các dương thực tế. Vì vậy hai metric làm lộ hai phía khác nhau của cùng confusion table.',
+        },
+        hints: [
+          { en: 'Choose the two denominator statements.', vi: 'Chọn hai phát biểu về mẫu số.' },
+          {
+            en: 'One begins from predictions; the other from reality.',
+            vi: 'Một bắt đầu từ dự đoán; một từ thực tế.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-precision-predicted',
+            text: {
+              en: 'Precision starts from predicted positives',
+              vi: 'Precision bắt đầu từ dự đoán dương',
+            },
+          },
+          {
+            optionId: 'opt-recall-actual',
+            text: {
+              en: 'Recall starts from actual positives',
+              vi: 'Recall bắt đầu từ dương thực tế',
+            },
+          },
+          {
+            optionId: 'opt-accuracy-miss',
+            text: {
+              en: 'Accuracy lists every error type by itself',
+              vi: 'Accuracy tự liệt kê mọi loại lỗi',
+            },
+          },
+          {
+            optionId: 'opt-threshold-static',
+            text: { en: 'A threshold cannot change the table', vi: 'Ngưỡng không thể đổi bảng' },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly distinguish precision and recall?',
+          vi: 'Hai phát biểu nào phân biệt đúng precision và recall?',
+        },
+        questionId: 'q-cml-p07-precision-recall-denominators',
+        sourceId: 'act-cml-p07-classification-metrics-quiz-03',
+        sourceIds: CML_M04_METRICS_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
+  'quiz-module-cml-m04': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-logistic-admission',
+    draftProvenance: cmlM04ModuleDraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m04-logistic-classification',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m04',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m04-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [{ id: 'logistic-regression', type: 'algorithm' }],
+    questions: [
+      {
+        correctAnswer: 'opt-binary-classification',
+        explanation: {
+          en: 'Logistic regression is a linear-based classification method for binary categories. It differs from using linear regression to estimate a continuous target.',
+          vi: 'Hồi quy logistic là phương pháp phân loại dựa trên tuyến tính cho category nhị phân. Nó khác với dùng hồi quy tuyến tính để ước lượng mục tiêu liên tục.',
+        },
+        hints: [
+          {
+            en: 'Read the kind of outcome, not the word regression.',
+            vi: 'Đọc loại đầu ra, không chỉ chữ regression.',
+          },
+          { en: 'There are two categories.', vi: 'Có hai category.' },
+        ],
+        options: [
+          {
+            optionId: 'opt-binary-classification',
+            text: { en: 'Binary classification', vi: 'Phân loại nhị phân' },
+          },
+          {
+            optionId: 'opt-continuous-regression',
+            text: { en: 'Continuous-value regression only', vi: 'Chỉ hồi quy giá trị liên tục' },
+          },
+          {
+            optionId: 'opt-unlabeled-clustering',
+            text: { en: 'Unlabeled clustering', vi: 'Phân cụm không nhãn' },
+          },
+        ],
+        prompt: {
+          en: 'Which task best matches logistic regression in this module?',
+          vi: 'Nhiệm vụ nào phù hợp nhất với hồi quy logistic trong module này?',
+        },
+        questionId: 'q-cml-m04-logistic-task',
+        sourceId: 'quiz-module-cml-m04-q01',
+        sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-half-class-zero', 'opt-seventy-three-class-one'],
+        explanation: {
+          en: 'The fixed convention is strictly greater than 0.50 for class 1. Therefore 0.50 stays class 0, while 0.73 becomes class 1.',
+          vi: 'Quy ước cố định là lớn hơn nghiêm ngặt 0,50 mới là lớp 1. Vì vậy 0,50 vẫn là lớp 0, còn 0,73 thành lớp 1.',
+        },
+        hints: [
+          {
+            en: 'Compare each score with the displayed boundary.',
+            vi: 'So sánh từng điểm với ranh giới hiển thị.',
+          },
+          {
+            en: 'Equality does not cross a strictly greater threshold.',
+            vi: 'Bằng nhau không vượt qua ngưỡng lớn hơn nghiêm ngặt.',
+          },
+        ],
+        options: [
+          { optionId: 'opt-half-class-zero', text: { en: '0.50 is class 0', vi: '0,50 là lớp 0' } },
+          {
+            optionId: 'opt-seventy-three-class-one',
+            text: { en: '0.73 is class 1', vi: '0,73 là lớp 1' },
+          },
+          { optionId: 'opt-half-class-one', text: { en: '0.50 is class 1', vi: '0,50 là lớp 1' } },
+          {
+            optionId: 'opt-twenty-seven-class-one',
+            text: { en: '0.27 is class 1', vi: '0,27 là lớp 1' },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly read the fixed sigmoid demo?',
+          vi: 'Hai phát biểu nào đọc đúng demo sigmoid cố định?',
+        },
+        questionId: 'q-cml-m04-fixed-score-class-rule',
+        sourceId: 'quiz-module-cml-m04-q02',
+        sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'At the fixed midpoint, the output is 0.50. The source convention assigns class 1 only when the output is greater than 0.50, so equality remains class 0.',
+          vi: 'Tại điểm giữa cố định, đầu ra là 0,50. Quy ước nguồn chỉ gán lớp 1 khi đầu ra lớn hơn 0,50, nên bằng nhau vẫn là lớp 0.',
+        },
+        hints: [
+          { en: 'The inequality is strict.', vi: 'Bất đẳng thức là nghiêm ngặt.' },
+          { en: 'Read the midpoint row in the demo.', vi: 'Đọc dòng điểm giữa trong demo.' },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: the fixed source convention gives a score exactly equal to 0.50 class 1.',
+          vi: 'Đúng hay sai: quy ước nguồn cố định gán điểm đúng bằng 0,50 là lớp 1.',
+        },
+        questionId: 'q-cml-m04-midpoint-not-class-one',
+        sourceId: 'quiz-module-cml-m04-q03',
+        sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-ninety-five-percent',
+        explanation: {
+          en: 'The fixed table has 8 true positives plus 87 true negatives, or 95 correct decisions out of 100. Its accuracy is therefore 95%, but the table still reveals the separate false-positive and false-negative counts.',
+          vi: 'Bảng cố định có 8 true positive cộng 87 true negative, tức 95 quyết định đúng trong 100. Accuracy vì vậy là 95%, nhưng bảng vẫn cho thấy riêng số false positive và false negative.',
+        },
+        hints: [
+          { en: 'Add the two correct outcome cells.', vi: 'Cộng hai ô kết quả đúng.' },
+          { en: 'Then divide by all 100 rows.', vi: 'Sau đó chia cho toàn bộ 100 dòng.' },
+        ],
+        options: [
+          { optionId: 'opt-ninety-five-percent', text: { en: '95%', vi: '95%' } },
+          { optionId: 'opt-eighty-seven-percent', text: { en: '87%', vi: '87%' } },
+          { optionId: 'opt-eleven-percent', text: { en: '11%', vi: '11%' } },
+        ],
+        prompt: {
+          en: 'A fixed confusion table has TP=8, FP=2, FN=3, and TN=87. What is its accuracy?',
+          vi: 'Một confusion table cố định có TP=8, FP=2, FN=3 và TN=87. Accuracy là bao nhiêu?',
+        },
+        questionId: 'q-cml-m04-fixed-accuracy',
+        sourceId: 'quiz-module-cml-m04-q04',
+        sourceIds: CML_M04_METRICS_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-recall-and-fn',
+        explanation: {
+          en: 'When the decision consequence is missing an actual positive, inspect recall and the false-negative count. Accuracy alone can remain high while missed positives are still material.',
+          vi: 'Khi hậu quả quyết định là bỏ sót dương thực tế, hãy xem recall và số false negative. Accuracy một mình vẫn có thể cao trong khi ca dương bị bỏ sót vẫn đáng kể.',
+        },
+        hints: [
+          { en: 'Identify the costly error first.', vi: 'Xác định lỗi tốn kém trước.' },
+          {
+            en: 'A missed positive is a false negative.',
+            vi: 'Một dương bị bỏ sót là false negative.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-recall-and-fn',
+            text: { en: 'Recall and the false-negative count', vi: 'Recall và số false negative' },
+          },
+          { optionId: 'opt-precision-only', text: { en: 'Precision only', vi: 'Chỉ precision' } },
+          { optionId: 'opt-ui-theme', text: { en: 'The interface theme', vi: 'Giao diện theme' } },
+        ],
+        prompt: {
+          en: 'Which evidence should lead when missing an actual positive is the costly error?',
+          vi: 'Bằng chứng nào nên dẫn đầu khi bỏ sót dương thực tế là lỗi tốn kém?',
+        },
+        questionId: 'q-cml-m04-recall-false-negative',
+        sourceId: 'quiz-module-cml-m04-q05',
+        sourceIds: CML_M04_METRICS_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-threshold-changes-cells', 'opt-metric-follows-consequence'],
+        explanation: {
+          en: 'A threshold changes which predictions enter the confusion-matrix cells, and a metric should be selected because it exposes the error consequence that matters. Both steps must be made explicit before the classifier is trusted.',
+          vi: 'Ngưỡng làm đổi dự đoán đi vào các ô confusion matrix, và metric nên được chọn vì nó làm lộ hậu quả lỗi quan trọng. Cả hai bước phải rõ ràng trước khi tin classifier.',
+        },
+        hints: [
+          {
+            en: 'Choose the two statements about decision evidence.',
+            vi: 'Chọn hai phát biểu về bằng chứng quyết định.',
+          },
+          {
+            en: 'One concerns thresholding; one concerns metric selection.',
+            vi: 'Một về thresholding; một về chọn metric.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-threshold-changes-cells',
+            text: {
+              en: 'A threshold can change the confusion-matrix cells',
+              vi: 'Ngưỡng có thể đổi các ô confusion matrix',
+            },
+          },
+          {
+            optionId: 'opt-metric-follows-consequence',
+            text: {
+              en: 'Select a metric from the error consequence',
+              vi: 'Chọn metric từ hậu quả lỗi',
+            },
+          },
+          {
+            optionId: 'opt-accuracy-alone',
+            text: {
+              en: 'Accuracy alone always explains every error',
+              vi: 'Chỉ accuracy luôn giải thích mọi lỗi',
+            },
+          },
+          {
+            optionId: 'opt-fixed-policy',
+            text: {
+              en: 'One threshold is correct for every policy',
+              vi: 'Một ngưỡng đúng cho mọi chính sách',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two practices keep a classification decision inspectable?',
+          vi: 'Hai thực hành nào giữ quyết định phân loại có thể kiểm tra?',
+        },
+        questionId: 'q-cml-m04-threshold-metric-evidence',
+        sourceId: 'quiz-module-cml-m04-q06',
+        sourceIds: CML_M04_METRICS_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -3069,26 +3593,6 @@ interface PostQuizDraftDefinition {
 }
 
 const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {
-  'cml-p06-logistic-regression': {
-    coreMove: {
-      en: 'Read a probability estimate before deciding which threshold should trigger an action.',
-      vi: 'Đọc ước lượng xác suất trước khi quyết định ngưỡng nào kích hoạt hành động.',
-    },
-    trueAssertion: {
-      en: 'The same probability can lead to different actions when the cost of a false negative changes.',
-      vi: 'Cùng một xác suất có thể dẫn đến hành động khác khi chi phí âm tính giả thay đổi.',
-    },
-  },
-  'cml-p07-classification-metrics': {
-    coreMove: {
-      en: 'Choose a classification metric from the false-positive and false-negative trade-off.',
-      vi: 'Chọn metric phân loại từ đánh đổi giữa dương tính giả và âm tính giả.',
-    },
-    trueAssertion: {
-      en: 'Accuracy can hide an important error type when classes or error costs are uneven.',
-      vi: 'Accuracy có thể che giấu loại lỗi quan trọng khi lớp hoặc chi phí lỗi không cân bằng.',
-    },
-  },
   'cml-p08-knn': {
     coreMove: {
       en: 'Make distance meaningful by scaling features before trusting nearby examples.',

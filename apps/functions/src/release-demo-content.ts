@@ -6,6 +6,7 @@ import {
 import {
   cmlM02SourceTrace,
   cmlM03SourceTrace,
+  cmlM04LogisticSourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   type DraftProvenance,
@@ -15,6 +16,9 @@ const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => sourc
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M04_LOGISTIC_SOURCE_IDS = cmlM04LogisticSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
 
 const cmlM02DemoDraftProvenance = {
   candidateSourceIds: CML_M02_SOURCE_IDS,
@@ -30,6 +34,14 @@ const cmlM03DemoDraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM03SourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM04LogisticDemoDraftProvenance = {
+  candidateSourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM04LogisticSourceTrace,
 } as const satisfies DraftProvenance;
 
 export interface DemoStep {
@@ -576,6 +588,130 @@ export const regularizationNoisySignalDemo: FixedDemoManifest = {
   },
 };
 
+export const logisticAdmissionDemo: FixedDemoManifest = {
+  algorithmId: 'logistic-regression',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-logistic-admission',
+  draftProvenance: cmlM04LogisticDemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'Fixed sigmoid score and class-rule readings',
+      vi: 'Các cách đọc điểm sigmoid và quy tắc lớp cố định',
+    },
+    datasetVersionId: 'dataset-demo-logistic-admission-v1',
+    parameterValues: [
+      { id: 'sigmoid-midpoint', value: 2 },
+      { id: 'classification-threshold', value: 0.5 },
+    ],
+    rows: [
+      { input: [1], predictedOutput: 0.27, targetOutput: 0 },
+      { input: [2], predictedOutput: 0.5, targetOutput: 0 },
+      { input: [3], predictedOutput: 0.73, targetOutput: 1 },
+      { input: [4], predictedOutput: 0.88, targetOutput: 1 },
+    ],
+  },
+  learningObjective: {
+    en: 'Read a fixed sigmoid output before a visible class rule, and distinguish the instructional category from a real-world admission or policy decision.',
+    vi: 'Đọc đầu ra sigmoid cố định trước quy tắc lớp hiển thị, và phân biệt category để học với một quyết định tuyển sinh hoặc chính sách thực tế.',
+  },
+  moduleId: 'cml-m04-logistic-classification',
+  problemId: 'problem-demo-logistic-admission',
+  requiredStepIds: [
+    'logistic-problem',
+    'logistic-scores',
+    'logistic-probability',
+    'logistic-threshold',
+  ],
+  revisionId: 'demo-logistic-admission-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'logistic-problem',
+      narration: {
+        en: 'The fixed task is a binary category exercise with anonymous records. Although the locked demo identifier mentions admission, this is not a live admission workflow, a recommendation, or a policy tool.',
+        vi: 'Nhiệm vụ cố định là bài tập category nhị phân với các bản ghi ẩn danh. Dù demo ID cố định có chữ tuyển sinh, đây không phải quy trình tuyển sinh live, khuyến nghị hay công cụ chính sách.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A problem card states that four anonymous records will be read through a fixed binary class rule.',
+        vi: 'Thẻ bài toán nêu bốn bản ghi ẩn danh sẽ được đọc qua quy tắc lớp nhị phân cố định.',
+      },
+      title: {
+        en: 'Frame the binary category task',
+        vi: 'Đặt khung nhiệm vụ category nhị phân',
+      },
+    },
+    {
+      id: 'logistic-scores',
+      narration: {
+        en: 'Inspect four fixed input scores 1, 2, 3, and 4. They are instructional inputs only; the table does not collect, rank, or evaluate real people.',
+        vi: 'Quan sát bốn điểm đầu vào cố định 1, 2, 3, 4. Chúng chỉ là đầu vào để học; bảng không thu thập, xếp hạng hay đánh giá người thật.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A static table lists four anonymous input scores with no personal attributes.',
+        vi: 'Bảng tĩnh liệt kê bốn điểm đầu vào ẩn danh, không có thuộc tính cá nhân.',
+      },
+      title: {
+        en: 'Inspect fixed anonymous scores',
+        vi: 'Quan sát điểm ẩn danh cố định',
+      },
+    },
+    {
+      id: 'logistic-probability',
+      narration: {
+        en: 'The fixed sigmoid readings are 0.27, 0.50, 0.73, and 0.88. A sigmoid maps a score to a value between zero and one, so read each value before turning it into a class.',
+        vi: 'Các cách đọc sigmoid cố định là 0,27; 0,50; 0,73; 0,88. Sigmoid ánh xạ điểm thành giá trị giữa không và một, nên hãy đọc từng giá trị trước khi biến nó thành lớp.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The probability card lists four bounded sigmoid outputs: 0.27, 0.50, 0.73, and 0.88.',
+        vi: 'Thẻ xác suất liệt kê bốn đầu ra sigmoid bị chặn: 0,27; 0,50; 0,73; 0,88.',
+      },
+      title: {
+        en: 'Read the fixed sigmoid outputs',
+        vi: 'Đọc đầu ra sigmoid cố định',
+      },
+    },
+    {
+      id: 'logistic-threshold',
+      narration: {
+        en: 'Apply the displayed classroom convention: values greater than 0.50 receive class 1, otherwise class 0. The two values above the threshold become class 1. This fixed rule illustrates the separation of score and class; it does not set a real decision threshold.',
+        vi: 'Áp dụng quy ước lớp hiển thị: giá trị lớn hơn 0,50 nhận lớp 1, nếu không nhận lớp 0. Hai giá trị trên ngưỡng thành lớp 1. Quy tắc cố định này minh họa việc tách điểm và lớp; nó không đặt ngưỡng quyết định thực tế.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A threshold card marks 0.50 and labels only the 0.73 and 0.88 rows as class 1.',
+        vi: 'Thẻ ngưỡng đánh dấu 0,50 và chỉ gán nhãn hai dòng 0,73, 0,88 là lớp 1.',
+      },
+      title: {
+        en: 'Apply the fixed class rule',
+        vi: 'Áp dụng quy tắc lớp cố định',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-logistic-fixed-sigmoid-score-class-rule',
+  title: {
+    en: 'Logistic regression demo: fixed sigmoid class reading',
+    vi: 'Demo hồi quy logistic: đọc lớp sigmoid cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 38, y: 188 },
+      { x: 96, y: 158 },
+      { x: 136, y: 112 },
+      { x: 174, y: 64 },
+      { x: 210, y: 40 },
+    ],
+    points: [
+      { classification: 'negative', label: '1 → 0.27', positiveFromStep: 1, x: 56, y: 172 },
+      { classification: 'negative', label: '2 → 0.50', positiveFromStep: 1, x: 102, y: 132 },
+      { classification: 'positive', label: '3 → 0.73', positiveFromStep: 3, x: 158, y: 78 },
+      { classification: 'positive', label: '4 → 0.88', positiveFromStep: 3, x: 204, y: 50 },
+    ],
+  },
+};
+
 const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
   'demo-linear-calibration': 'problem-demo-linear-calibration',
   'demo-regularization-noisy-signal': 'problem-demo-regularization-noisy-signal',
@@ -598,26 +734,6 @@ interface DemoDraftDefinition {
 }
 
 const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {
-  'demo-logistic-admission': {
-    decision: {
-      en: 'The fixed logistic score becomes a probability, then a policy threshold turns it into a review decision.',
-      vi: 'Điểm logistic cố định trở thành xác suất, rồi ngưỡng chính sách biến nó thành quyết định xem xét.',
-    },
-    evidence: {
-      en: 'The fixed records show preparation signals and a binary outcome without asking the learner to alter a threshold.',
-      vi: 'Các hồ sơ cố định cho thấy tín hiệu chuẩn bị và kết quả nhị phân mà không yêu cầu người học đổi ngưỡng.',
-    },
-    learningObjective: {
-      en: 'Separate a probability estimate from the policy decision made with it.',
-      vi: 'Tách ước lượng xác suất khỏi quyết định chính sách dùng xác suất đó.',
-    },
-    result: {
-      en: 'The fixed outcome illustrates a threshold choice; it does not claim that one threshold fits every context.',
-      vi: 'Kết quả cố định minh họa việc chọn ngưỡng; nó không khẳng định một ngưỡng phù hợp mọi bối cảnh.',
-    },
-    taskFingerprint: 'demo-logistic-probability-policy-threshold',
-    topic: { en: 'probability and threshold', vi: 'xác suất và ngưỡng' },
-  },
   'demo-neighbor-flower': {
     decision: {
       en: 'The fixed KNN view assigns the new sample from its nearest labelled neighbours after all displayed features share a scale.',
@@ -915,6 +1031,7 @@ const handAuthoredDemos = [
   mlpCheckerboardDemo,
   linearCalibrationDemo,
   regularizationNoisySignalDemo,
+  logisticAdmissionDemo,
 ] as const;
 const handAuthoredDemoIds = new Set(handAuthoredDemos.map((demo) => demo.demoId));
 

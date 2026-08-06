@@ -178,3 +178,55 @@ export const cmlM03SourceTrace = {
     },
   ],
 } as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM04LogisticSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from Microsoft ML for Beginners; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft ML for Beginners; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
+      contentUrls: [
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/2-Regression/4-Logistic/README.md',
+      ],
+      license: {
+        id: 'MIT',
+        name: 'MIT License',
+        url: 'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/LICENSE',
+      },
+      sourceId: 'microsoft-ml-for-beginners',
+      sourceName: 'Microsoft ML for Beginners',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM04MetricsSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from Google Machine Learning Crash Course; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Google Machine Learning Crash Course; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: 'be3f8c79a7ba8e6e03f326de4ab92dc966792ae91cac36c9225348d9c0cdf60b',
+      contentUrls: ['https://developers.google.com/machine-learning/crash-course/classification'],
+      license: {
+        id: 'CC-BY-4.0',
+        name: 'Creative Commons Attribution 4.0',
+        url: 'https://creativecommons.org/licenses/by/4.0/',
+      },
+      sourceId: 'google-ml-crash-course',
+      sourceName: 'Google Machine Learning Crash Course',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM04ModuleSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    ...cmlM04LogisticSourceTrace.sourceSnapshots,
+    ...cmlM04MetricsSourceTrace.sourceSnapshots,
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;

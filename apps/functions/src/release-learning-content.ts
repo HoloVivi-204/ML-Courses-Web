@@ -3,6 +3,8 @@ import {
   cmlM01SourceTrace,
   cmlM02SourceTrace,
   cmlM03SourceTrace,
+  cmlM04LogisticSourceTrace,
+  cmlM04MetricsSourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -50,6 +52,8 @@ const CML_M01_EVALUATION_POST_ID = 'cml-p02-train-test-metrics';
 const CML_M02_LINEAR_POST_ID = 'cml-p03-linear-regression';
 const CML_M02_POLYNOMIAL_POST_ID = 'cml-p04-polynomial-regression';
 const CML_M03_REGULARIZATION_POST_ID = 'cml-p05-regularization-ridge-lasso';
+const CML_M04_LOGISTIC_POST_ID = 'cml-p06-logistic-regression';
+const CML_M04_METRICS_POST_ID = 'cml-p07-classification-metrics';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
@@ -58,6 +62,12 @@ const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => sourc
 const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M04_LOGISTIC_SOURCE_IDS = cmlM04LogisticSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M04_METRICS_SOURCE_IDS = cmlM04MetricsSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -139,6 +149,26 @@ const cmlM03RegularizationBlockDefaults = {
   sourceIds: CML_M03_SOURCE_IDS,
 } as const;
 
+const cmlM04LogisticBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M04_LOGISTIC_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+} as const;
+
+const cmlM04MetricsBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M04_METRICS_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M04_METRICS_SOURCE_IDS,
+} as const;
+
 const cmlM01DraftProvenance = {
   candidateSourceIds: CML_M01_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -161,6 +191,22 @@ const cmlM03DraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM03SourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM04LogisticDraftProvenance = {
+  candidateSourceIds: CML_M04_LOGISTIC_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM04LogisticSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM04MetricsDraftProvenance = {
+  candidateSourceIds: CML_M04_METRICS_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM04MetricsSourceTrace,
 } as const satisfies DraftProvenance;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -2102,6 +2148,390 @@ const cmlM03RegularizationFullLessonBlocks = [
   },
 ] satisfies readonly LearningContentBlock[];
 
+const cmlM04LogisticFullLessonBlocks = [
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-binary-question',
+    locales: {
+      en: {
+        lede: 'Use logistic regression when the learning question asks which of two categories a record belongs to, not how large a continuous quantity will be.',
+        navigationTitle: 'Frame a binary category',
+        title: 'Turn a two-category question into a modelled score',
+      },
+      vi: {
+        lede: 'Dùng hồi quy logistic khi câu hỏi học hỏi một bản ghi thuộc một trong hai category nào, không phải một đại lượng liên tục lớn bao nhiêu.',
+        navigationTitle: 'Đặt khung category nhị phân',
+        title: 'Biến câu hỏi hai category thành điểm được mô hình hóa',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-category-not-continuous',
+    locales: {
+      en: {
+        markdown:
+          'The pinned Microsoft lesson distinguishes logistic regression from linear regression: linear regression predicts a continuous value, while logistic regression is used to predict a binary category. Begin by naming the two categories and the evidence available for each record.',
+      },
+      vi: {
+        markdown:
+          'Bài Microsoft đã pin phân biệt hồi quy logistic với hồi quy tuyến tính: hồi quy tuyến tính dự đoán giá trị liên tục, còn hồi quy logistic dùng để dự đoán category nhị phân. Hãy bắt đầu bằng cách nêu hai category và bằng chứng có cho mỗi bản ghi.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-sigmoid-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: the sigmoid maps a score into the interval from zero to one. Effect: the displayed value can be read before a class rule is applied, rather than being confused with the category itself.',
+        title: 'A score and a category are different outputs',
+      },
+      vi: {
+        body: 'Nguyên nhân: sigmoid ánh xạ một điểm vào khoảng từ không đến một. Kết quả: có thể đọc giá trị hiển thị trước khi áp dụng quy tắc lớp, thay vì nhầm nó với chính category.',
+        title: 'Điểm và category là hai đầu ra khác nhau',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-sigmoid-reading',
+    locales: {
+      en: {
+        lede: 'The S-shaped sigmoid is the bridge between an input score and a bounded output. Inspect the value before deciding how a fixed classroom rule will label it.',
+        navigationTitle: 'Read the sigmoid output',
+        title: 'Map an input score into a bounded probability reading',
+      },
+      vi: {
+        lede: 'Sigmoid hình chữ S là cầu nối giữa điểm đầu vào và đầu ra bị chặn. Hãy quan sát giá trị trước khi quyết định quy tắc lớp cố định trong bài học sẽ gán nhãn nó thế nào.',
+        navigationTitle: 'Đọc đầu ra sigmoid',
+        title: 'Ánh xạ điểm đầu vào thành cách đọc xác suất bị chặn',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-sigmoid-range',
+    locales: {
+      en: {
+        markdown:
+          'In the source lesson, the sigmoid takes a value and maps it somewhere between 0 and 1. At the midpoint score, the fixed reading is 0.50. Values below and above that midpoint remain scores to interpret; this lesson does not claim that any one threshold is correct for every real decision.',
+      },
+      vi: {
+        markdown:
+          'Trong bài nguồn, sigmoid lấy một giá trị và ánh xạ nó vào đâu đó giữa 0 và 1. Tại điểm giữa, cách đọc cố định là 0,50. Giá trị dưới và trên điểm giữa vẫn là điểm cần diễn giải; bài này không khẳng định một ngưỡng nào đúng cho mọi quyết định thực tế.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    activityId: 'act-cml-p06-logistic-regression-example',
+    id: 'logistic-fixed-score-example',
+    locales: {
+      en: {
+        description:
+          'Read the fixed instructional scores 0.27, 0.50, 0.73, and 0.88 for four anonymous records. With the displayed classroom convention “greater than 0.50 is class 1”, only 0.73 and 0.88 become class 1. Explain the cause and effect: the score is produced first; the threshold rule turns it into a category. This is not a live admission decision or a recommendation for a real policy.',
+        navigationTitle: 'Classify fixed scores',
+      },
+      vi: {
+        description:
+          'Đọc các điểm để học cố định 0,27; 0,50; 0,73; 0,88 cho bốn bản ghi ẩn danh. Với quy ước lớp hiển thị “lớn hơn 0,50 là lớp 1”, chỉ 0,73 và 0,88 thành lớp 1. Giải thích nguyên nhân và kết quả: điểm được tạo trước; quy tắc ngưỡng biến nó thành category. Đây không phải quyết định tuyển sinh live hay khuyến nghị cho chính sách thực tế.',
+        navigationTitle: 'Phân lớp điểm cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-fixed-rule-question',
+    locales: {
+      en: {
+        lede: 'A threshold is a rule placed after the score. Keep the rule visible so a learner can tell whether a changed category came from changed evidence or from changed decision criteria.',
+        navigationTitle: 'Separate score from threshold',
+        title: 'Make the category rule inspectable',
+      },
+      vi: {
+        lede: 'Ngưỡng là quy tắc đặt sau điểm. Hãy giữ quy tắc hiển thị để người học phân biệt category đổi do bằng chứng đổi hay do tiêu chí quyết định đổi.',
+        navigationTitle: 'Tách điểm khỏi ngưỡng',
+        title: 'Làm quy tắc category có thể kiểm tra',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-threshold-reading',
+    locales: {
+      en: {
+        markdown:
+          'The pinned lesson uses a simple convention: a sigmoid outcome greater than 0.5 receives class 1; otherwise it receives class 0. Use the convention to reason about this fixed table, then carry the separate question of threshold consequences into the metrics lesson.',
+      },
+      vi: {
+        markdown:
+          'Bài đã pin dùng quy ước đơn giản: đầu ra sigmoid lớn hơn 0,5 nhận lớp 1; nếu không nhận lớp 0. Dùng quy ước để lập luận về bảng cố định này, rồi mang câu hỏi riêng về hậu quả của ngưỡng sang bài metrics.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-next-evidence',
+    locales: {
+      en: {
+        body: 'Do not stop at a plausible score. Before a classifier is trusted, inspect its error pattern and the consequence of each category mistake. A score is evidence; a class rule is an additional decision.',
+        title: 'Carry score interpretation into evaluation',
+      },
+      vi: {
+        body: 'Đừng dừng ở một điểm có vẻ hợp lý. Trước khi tin classifier, hãy quan sát mẫu lỗi và hậu quả của từng nhầm lẫn category. Điểm là bằng chứng; quy tắc lớp là một quyết định bổ sung.',
+        title: 'Mang diễn giải điểm sang đánh giá',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM04LogisticBlockDefaults,
+    id: 'logistic-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM04LogisticSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM04LogisticSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM04LogisticSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM04LogisticSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Logistic regression to predict categories',
+        url: 'https://github.com/microsoft/ML-For-Beginners/blob/main/2-Regression/4-Logistic/README.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM04MetricsFullLessonBlocks = [
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-error-question',
+    locales: {
+      en: {
+        lede: 'A classification score is useful only when it reveals the mistakes that matter. Start by counting outcomes, not by accepting one headline number.',
+        navigationTitle: 'Ask which mistake matters',
+        title: 'Evaluate categories through their error consequences',
+      },
+      vi: {
+        lede: 'Một điểm phân loại chỉ hữu ích khi nó làm lộ các nhầm lẫn quan trọng. Hãy bắt đầu bằng đếm kết quả, không phải chấp nhận một con số tiêu đề.',
+        navigationTitle: 'Hỏi nhầm lẫn nào quan trọng',
+        title: 'Đánh giá category qua hậu quả của lỗi',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-classification-landscape',
+    locales: {
+      en: {
+        markdown:
+          'The pinned Google classification overview puts thresholding, the confusion matrix, and metrics such as accuracy, precision, and recall in one evaluation workflow. Each asks a different question about the same set of predicted and observed categories.',
+      },
+      vi: {
+        markdown:
+          'Tổng quan phân loại Google đã pin đặt thresholding, confusion matrix và các metric như accuracy, precision, recall trong cùng một quy trình đánh giá. Mỗi phần hỏi một câu khác về cùng tập category dự đoán và quan sát.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-confusion-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: a threshold converts scores into positive and negative predictions. Effect: the confusion matrix records true positives, false positives, false negatives, and true negatives so an aggregate score cannot hide every error type.',
+        title: 'A confusion matrix preserves the error story',
+      },
+      vi: {
+        body: 'Nguyên nhân: ngưỡng biến điểm thành dự đoán dương và âm. Kết quả: confusion matrix ghi true positive, false positive, false negative và true negative để một điểm tổng hợp không che mọi loại lỗi.',
+        title: 'Confusion matrix giữ lại câu chuyện lỗi',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-read-three-views',
+    locales: {
+      en: {
+        lede: 'Accuracy, precision, and recall do not compete as labels for the same fact. They focus attention on different denominators and different failure consequences.',
+        navigationTitle: 'Read metric denominators',
+        title: 'Choose the metric from the question being asked',
+      },
+      vi: {
+        lede: 'Accuracy, precision và recall không cạnh tranh như các nhãn cho cùng một sự thật. Chúng tập trung vào các mẫu số khác nhau và hậu quả lỗi khác nhau.',
+        navigationTitle: 'Đọc mẫu số của metric',
+        title: 'Chọn metric từ câu hỏi đang được hỏi',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-denominator-reading',
+    locales: {
+      en: {
+        markdown:
+          'Accuracy asks how many decisions were correct overall. Precision asks, among predicted positives, how many were actually positive. Recall asks, among actual positives, how many the model found. The Google overview explicitly pairs these metrics with thresholding and the confusion matrix, so read the table before choosing one.',
+      },
+      vi: {
+        markdown:
+          'Accuracy hỏi bao nhiêu quyết định đúng trên toàn bộ. Precision hỏi trong các dự đoán dương, bao nhiêu thực sự dương. Recall hỏi trong các dương thực tế, mô hình tìm được bao nhiêu. Tổng quan Google ghép các metric này với thresholding và confusion matrix, nên hãy đọc bảng trước khi chọn một metric.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    activityId: 'act-cml-p07-classification-metrics-example',
+    id: 'metrics-fixed-confusion-example',
+    locales: {
+      en: {
+        description:
+          'Inspect a fixed review table: 8 true positives, 2 false positives, 3 false negatives, and 87 true negatives. If the learner’s task is to avoid missing a positive case, identify recall as the metric to inspect next and explain why accuracy alone cannot show the three false negatives. The numbers are an instructional table, not a model report.',
+        navigationTitle: 'Read a fixed confusion table',
+      },
+      vi: {
+        description:
+          'Quan sát bảng review cố định: 8 true positive, 2 false positive, 3 false negative và 87 true negative. Nếu nhiệm vụ là tránh bỏ sót ca dương, hãy xác định recall là metric cần xem tiếp và giải thích vì sao accuracy một mình không thể cho thấy ba false negative. Các số là bảng để học, không phải báo cáo mô hình.',
+        navigationTitle: 'Đọc bảng confusion cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-threshold-question',
+    locales: {
+      en: {
+        lede: 'Changing a threshold changes which predictions enter each confusion-matrix cell. That is why a threshold choice and a metric choice must be discussed together.',
+        navigationTitle: 'Connect threshold to errors',
+        title: 'A threshold changes the error trade-off',
+      },
+      vi: {
+        lede: 'Đổi ngưỡng làm đổi dự đoán đi vào từng ô confusion matrix. Đó là lý do phải thảo luận lựa chọn ngưỡng và metric cùng nhau.',
+        navigationTitle: 'Nối ngưỡng với lỗi',
+        title: 'Ngưỡng thay đổi đánh đổi lỗi',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-threshold-comparison',
+    locales: {
+      en: {
+        markdown:
+          'For this fixed table, do not announce a universally correct threshold. Instead, state the decision consequence first: if false negatives are costly, inspect recall and the false-negative count; if false positives are costly, inspect precision and the false-positive count. Then compare candidate thresholds on held-out evidence.',
+      },
+      vi: {
+        markdown:
+          'Với bảng cố định này, đừng tuyên bố một ngưỡng đúng phổ quát. Thay vào đó, nêu hậu quả quyết định trước: nếu false negative tốn kém, hãy xem recall và số false negative; nếu false positive tốn kém, hãy xem precision và số false positive. Sau đó so sánh ngưỡng ứng viên trên bằng chứng giữ lại.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-decision-summary',
+    locales: {
+      en: {
+        body: 'A metric is not a badge of model quality. It is a measurement selected because it exposes the error that affects the decision. Always carry the confusion counts beside the selected metric.',
+        title: 'Report the error trade-off, not only a score',
+      },
+      vi: {
+        body: 'Metric không phải huy hiệu chất lượng mô hình. Nó là phép đo được chọn vì làm lộ lỗi ảnh hưởng đến quyết định. Luôn đặt các số đếm confusion bên cạnh metric đã chọn.',
+        title: 'Báo cáo đánh đổi lỗi, không chỉ điểm',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM04MetricsBlockDefaults,
+    id: 'metrics-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM04MetricsSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM04MetricsSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM04MetricsSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM04MetricsSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Classification — Google Machine Learning Crash Course',
+        url: 'https://developers.google.com/machine-learning/crash-course/classification',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -2344,6 +2774,54 @@ const fullLessonPosts: readonly TrialPost[] = [
       vi: 'Chọn shrinkage và tính thưa từ bằng chứng',
     },
   },
+  {
+    accessLevel: 'full',
+    blocks: cmlM04LogisticFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Read a fixed logistic score through its sigmoid range and visible class rule, then separate that score from any real-world decision policy.',
+      vi: 'Đọc điểm logistic cố định qua khoảng sigmoid và quy tắc lớp hiển thị, rồi tách điểm đó khỏi bất kỳ chính sách quyết định thực tế nào.',
+    },
+    durationMinutes: 16,
+    id: CML_M04_LOGISTIC_POST_ID,
+    learningObjective: {
+      en: 'Distinguish a binary logistic score from a continuous prediction and explain how a visible threshold turns the score into a fixed category.',
+      vi: 'Phân biệt điểm logistic nhị phân với dự đoán liên tục và giải thích ngưỡng hiển thị biến điểm thành category cố định thế nào.',
+    },
+    moduleId: 'cml-m04-logistic-classification',
+    postQuizId: 'quiz-post-cml-p06',
+    provenance: cmlM04LogisticDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-logistic-sigmoid-score-and-fixed-threshold',
+    title: {
+      en: 'Read a logistic score before its class rule',
+      vi: 'Đọc điểm logistic trước quy tắc lớp',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM04MetricsFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Use a fixed confusion table to connect threshold outcomes with accuracy, precision, and recall, then select evidence from the error consequence that matters.',
+      vi: 'Dùng bảng confusion cố định để nối kết quả ngưỡng với accuracy, precision và recall, rồi chọn bằng chứng từ hậu quả lỗi thực sự quan trọng.',
+    },
+    durationMinutes: 16,
+    id: CML_M04_METRICS_POST_ID,
+    learningObjective: {
+      en: 'Read a confusion matrix and choose accuracy, precision, or recall from the false-positive and false-negative consequence being evaluated.',
+      vi: 'Đọc confusion matrix và chọn accuracy, precision hoặc recall từ hậu quả false positive và false negative đang được đánh giá.',
+    },
+    moduleId: 'cml-m04-logistic-classification',
+    postQuizId: 'quiz-post-cml-p07',
+    provenance: cmlM04MetricsDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-confusion-matrix-metric-error-consequence',
+    title: {
+      en: 'Choose a classification metric from the error trade-off',
+      vi: 'Chọn metric phân loại từ đánh đổi lỗi',
+    },
+  },
 ];
 
 interface PostDraftDefinition {
@@ -2355,44 +2833,6 @@ interface PostDraftDefinition {
 }
 
 const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
-  'cml-p06-logistic-regression': {
-    concept: {
-      en: 'Logistic regression maps evidence to a probability. A threshold turns that probability into an action, so the threshold belongs to the decision context.',
-      vi: 'Hồi quy logistic biến bằng chứng thành xác suất. Ngưỡng biến xác suất thành hành động, nên ngưỡng phải thuộc về bối cảnh ra quyết định.',
-    },
-    examplePrompt: {
-      en: 'For a study-support check-in, compare a 0.45 probability with a 0.70 probability and choose a threshold that matches the cost of missing a learner.',
-      vi: 'Với một lần kiểm tra hỗ trợ học tập, hãy so sánh xác suất 0,45 với 0,70 và chọn ngưỡng phù hợp với chi phí bỏ sót người học.',
-    },
-    learningObjective: {
-      en: 'Interpret a classification probability separately from the thresholded action.',
-      vi: 'Diễn giải xác suất phân loại tách biệt với hành động sau khi áp dụng ngưỡng.',
-    },
-    taskFingerprint: 'lesson-cml-p06-probability-threshold',
-    title: {
-      en: 'Interpret probabilities before thresholds',
-      vi: 'Diễn giải xác suất trước khi đặt ngưỡng',
-    },
-  },
-  'cml-p07-classification-metrics': {
-    concept: {
-      en: 'Accuracy hides which error happened. Precision, recall, and the confusion matrix expose the trade-off between false positives and false negatives.',
-      vi: 'Accuracy che giấu loại lỗi đã xảy ra. Precision, recall và confusion matrix cho thấy đánh đổi giữa dương tính giả và âm tính giả.',
-    },
-    examplePrompt: {
-      en: 'Review a safety checklist classifier where missing a hazardous item and flagging a safe item have different consequences.',
-      vi: 'Xem lại bộ phân loại checklist an toàn, nơi bỏ sót một mục nguy hiểm và gắn cờ nhầm mục an toàn có hậu quả khác nhau.',
-    },
-    learningObjective: {
-      en: 'Choose and explain a classification metric from the error type that matters.',
-      vi: 'Chọn và giải thích metric phân loại từ loại lỗi thực sự quan trọng.',
-    },
-    taskFingerprint: 'lesson-cml-p07-error-tradeoff-metrics',
-    title: {
-      en: 'Read error types, not only accuracy',
-      vi: 'Đọc loại lỗi, không chỉ accuracy',
-    },
-  },
   'cml-p08-knn': {
     concept: {
       en: 'KNN bases a prediction on nearby labelled examples. Scaling determines what counts as nearby, and the value of k controls local sensitivity.',

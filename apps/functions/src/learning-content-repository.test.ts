@@ -372,6 +372,84 @@ describe('learning content repository', () => {
     });
   });
 
+  it('returns the two source-backed classification lessons and fixed sigmoid demo only after access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const [logisticPost, metricsPost, demo] = await Promise.all([
+      repository.getFullPostContent({
+        postId: 'cml-p06-logistic-regression',
+        uid: 'learner-01',
+      }),
+      repository.getFullPostContent({
+        postId: 'cml-p07-classification-metrics',
+        uid: 'learner-01',
+      }),
+      repository.getDemoContent({
+        demoId: 'demo-logistic-admission',
+        uid: 'learner-01',
+      }),
+    ]);
+
+    expect(logisticPost.data).toMatchObject({
+      id: 'cml-p06-logistic-regression',
+      moduleId: 'cml-m04-logistic-classification',
+      postQuizId: 'quiz-post-cml-p06',
+      title: {
+        en: 'Read a logistic score before its class rule',
+        vi: 'Đọc điểm logistic trước quy tắc lớp',
+      },
+    });
+    expect(logisticPost.data.blocks).toHaveLength(10);
+    expect(logisticPost.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p06-logistic-regression-example',
+        type: 'example',
+      }),
+    );
+
+    expect(metricsPost.data).toMatchObject({
+      id: 'cml-p07-classification-metrics',
+      moduleId: 'cml-m04-logistic-classification',
+      postQuizId: 'quiz-post-cml-p07',
+      title: {
+        en: 'Choose a classification metric from the error trade-off',
+        vi: 'Chọn metric phân loại từ đánh đổi lỗi',
+      },
+    });
+    expect(metricsPost.data.blocks).toHaveLength(10);
+    expect(metricsPost.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p07-classification-metrics-example',
+        type: 'example',
+      }),
+    );
+
+    expect(demo.data).toMatchObject({
+      demoId: 'demo-logistic-admission',
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-logistic-admission-v1',
+        parameterValues: [
+          { id: 'sigmoid-midpoint', value: 2 },
+          { id: 'classification-threshold', value: 0.5 },
+        ],
+        rows: [
+          { input: [1], predictedOutput: 0.27, targetOutput: 0 },
+          { input: [2], predictedOutput: 0.5, targetOutput: 0 },
+          { input: [3], predictedOutput: 0.73, targetOutput: 1 },
+          { input: [4], predictedOutput: 0.88, targetOutput: 1 },
+        ],
+      },
+      requiredStepIds: [
+        'logistic-problem',
+        'logistic-scores',
+        'logistic-probability',
+        'logistic-threshold',
+      ],
+    });
+  });
+
   it('returns the fixed MLP checkerboard and its distinct completion path only after demo access is granted', async () => {
     const repository = createLearningContentRepository({
       accessReader: createAccessReader(() => true),

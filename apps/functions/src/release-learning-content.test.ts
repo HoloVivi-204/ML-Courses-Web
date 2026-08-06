@@ -526,4 +526,132 @@ describe('Release 1 protected learning content', () => {
       ).toBe(true);
     }
   });
+
+  it('pins the Classical ML M04 classification batch to the Microsoft and Google snapshots used for its distinct lessons, fixed probability reading, and quizzes', () => {
+    const logisticPost = getReadablePost(
+      'course-classical-ml',
+      'cml-p06-logistic-regression',
+      true,
+    )!;
+    const metricsPost = getReadablePost(
+      'course-classical-ml',
+      'cml-p07-classification-metrics',
+      true,
+    )!;
+    const demo = getFixedDemo('demo-logistic-admission')!;
+    const logisticQuiz = getQuizManifest('quiz-post-cml-p06');
+    const metricsQuiz = getQuizManifest('quiz-post-cml-p07');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m04');
+    const microsoftSourceSnapshot = {
+      contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
+      contentUrls: [
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/2-Regression/4-Logistic/README.md',
+      ],
+      sourceId: 'microsoft-ml-for-beginners',
+    };
+    const googleSourceSnapshot = {
+      contentSnapshotHash: 'be3f8c79a7ba8e6e03f326de4ab92dc966792ae91cac36c9225348d9c0cdf60b',
+      contentUrls: ['https://developers.google.com/machine-learning/crash-course/classification'],
+      sourceId: 'google-ml-crash-course',
+    };
+
+    for (const provenance of [
+      logisticPost.provenance,
+      demo.draftProvenance,
+      logisticQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['microsoft-ml-for-beginners'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(microsoftSourceSnapshot)],
+        },
+      });
+    }
+
+    for (const provenance of [metricsPost.provenance, metricsQuiz.draftProvenance]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['google-ml-crash-course'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(googleSourceSnapshot)],
+        },
+      });
+    }
+
+    expect(moduleQuiz.draftProvenance).toMatchObject({
+      candidateSourceIds: ['microsoft-ml-for-beginners', 'google-ml-crash-course'],
+      contentReviewStatus: 'pending-operator-review',
+      sourceTrace: {
+        kind: 'snapshot-pinned',
+        sourceSnapshots: [
+          expect.objectContaining(microsoftSourceSnapshot),
+          expect.objectContaining(googleSourceSnapshot),
+        ],
+      },
+    });
+
+    for (const post of [logisticPost, metricsPost]) {
+      expect(post.blocks).toHaveLength(10);
+      expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    }
+    expect(logisticPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p06-logistic-regression-example',
+        sourceIds: ['microsoft-ml-for-beginners'],
+        type: 'example',
+      }),
+    );
+    expect(metricsPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p07-classification-metrics-example',
+        sourceIds: ['google-ml-crash-course'],
+        type: 'example',
+      }),
+    );
+
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-logistic-admission-v1',
+        parameterValues: [
+          { id: 'sigmoid-midpoint', value: 2 },
+          { id: 'classification-threshold', value: 0.5 },
+        ],
+        rows: [
+          { input: [1], predictedOutput: 0.27, targetOutput: 0 },
+          { input: [2], predictedOutput: 0.5, targetOutput: 0 },
+          { input: [3], predictedOutput: 0.73, targetOutput: 1 },
+          { input: [4], predictedOutput: 0.88, targetOutput: 1 },
+        ],
+      },
+      requiredStepIds: [
+        'logistic-problem',
+        'logistic-scores',
+        'logistic-probability',
+        'logistic-threshold',
+      ],
+    });
+
+    expect(
+      logisticQuiz.questions.every((question) =>
+        question.sourceIds?.every((sourceId) => sourceId === 'microsoft-ml-for-beginners'),
+      ),
+    ).toBe(true);
+    expect(
+      metricsQuiz.questions.every((question) =>
+        question.sourceIds?.every((sourceId) => sourceId === 'google-ml-crash-course'),
+      ),
+    ).toBe(true);
+    expect(moduleQuiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+    expect(
+      moduleQuiz.questions.every((question) =>
+        question.sourceIds?.every(
+          (sourceId) =>
+            sourceId === 'microsoft-ml-for-beginners' || sourceId === 'google-ml-crash-course',
+        ),
+      ),
+    ).toBe(true);
+  });
 });
