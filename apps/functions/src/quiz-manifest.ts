@@ -7,17 +7,26 @@ import {
 import {
   dlM01SourceTrace,
   dlM02SourceTrace,
+  dlM03SourceTrace,
   type DraftProvenance,
 } from './content-source-trace.js';
 
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const dlM02DraftProvenance = {
   candidateSourceIds: DL_M02_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: dlM02SourceTrace,
+} as const satisfies DraftProvenance;
+const dlM03DraftProvenance = {
+  candidateSourceIds: DL_M03_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: dlM03SourceTrace,
 } as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
@@ -928,6 +937,454 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-dl-p03': {
+    courseId: 'course-deep-learning-basic',
+    demoId: null,
+    draftProvenance: dlM03DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'dl-m03-training-generalization',
+    passingScorePercent: 100,
+    postId: 'dl-p03-backprop-overfitting',
+    questionCount: 3,
+    quizId: 'quiz-post-dl-p03',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-dl-p03-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'dl-p03-backprop-overfitting', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-forward-dependencies',
+        explanation: {
+          en: 'Forward propagation follows the computational dependencies from inputs through hidden values and outputs to the objective.',
+          vi: 'Truyền xuôi đi theo các phụ thuộc tính toán từ đầu vào qua giá trị hidden và đầu ra đến mục tiêu.',
+        },
+        hints: [
+          {
+            en: 'Start at the input side of the graph, not at the objective.',
+            vi: 'Bắt đầu ở phía đầu vào của đồ thị, không phải tại mục tiêu.',
+          },
+          {
+            en: 'Forward values must exist before the objective can be evaluated.',
+            vi: 'Giá trị truyền xuôi phải tồn tại trước khi có thể tính mục tiêu.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-forward-dependencies',
+            text: {
+              en: 'Inputs → hidden values → outputs → objective',
+              vi: 'Đầu vào → giá trị hidden → đầu ra → mục tiêu',
+            },
+          },
+          {
+            optionId: 'opt-forward-reverse',
+            text: {
+              en: 'Objective → outputs → hidden values → inputs',
+              vi: 'Mục tiêu → đầu ra → giá trị hidden → đầu vào',
+            },
+          },
+          {
+            optionId: 'opt-forward-labels',
+            text: {
+              en: 'Target labels → parameters → unrelated inputs',
+              vi: 'Nhãn target → tham số → đầu vào không liên quan',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which order describes forward propagation in the lesson?',
+          vi: 'Thứ tự nào mô tả truyền xuôi trong bài học?',
+        },
+        questionId: 'q-dl-p03-forward-order',
+        sourceId: 'act-dl-p03-backprop-overfitting-quiz-01',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-start-objective', 'opt-reverse-dependencies'],
+        explanation: {
+          en: 'Backpropagation begins with the objective at the output and moves through the graph in reverse dependency order, using the chain rule to connect derivatives.',
+          vi: 'Lan truyền ngược bắt đầu với mục tiêu ở đầu ra và đi qua đồ thị theo thứ tự phụ thuộc đảo, dùng quy tắc chuỗi để nối các đạo hàm.',
+        },
+        hints: [
+          {
+            en: 'Choose where gradients start and which direction they travel.',
+            vi: 'Chọn nơi gradient bắt đầu và chiều chúng đi.',
+          },
+          {
+            en: 'Backward is the reverse of the dependency order used in forward propagation.',
+            vi: 'Backward là chiều đảo của thứ tự phụ thuộc dùng trong truyền xuôi.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-start-objective',
+            text: {
+              en: 'Start with the objective at the output.',
+              vi: 'Bắt đầu với mục tiêu tại đầu ra.',
+            },
+          },
+          {
+            optionId: 'opt-reverse-dependencies',
+            text: {
+              en: 'Move through dependencies in reverse order.',
+              vi: 'Đi qua các phụ thuộc theo thứ tự đảo.',
+            },
+          },
+          {
+            optionId: 'opt-ignore-values',
+            text: {
+              en: 'Ignore the intermediate values from forward propagation.',
+              vi: 'Bỏ qua các giá trị trung gian của truyền xuôi.',
+            },
+          },
+          {
+            optionId: 'opt-rewrite-targets',
+            text: {
+              en: 'Rewrite target labels before differentiating.',
+              vi: 'Viết lại nhãn target trước khi lấy đạo hàm.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two actions describe the direction of backpropagation?',
+          vi: 'Hai hành động nào mô tả chiều của lan truyền ngược?',
+        },
+        questionId: 'q-dl-p03-backward-direction',
+        sourceId: 'act-dl-p03-backprop-overfitting-quiz-02',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'Training loss alone measures fit to seen examples. A validation or held-out check is needed before claiming a lower training loss generalises.',
+          vi: 'Chỉ loss train đo độ khớp với ví dụ đã thấy. Cần kiểm tra validation hoặc giữ lại trước khi khẳng định loss train thấp hơn có tổng quát.',
+        },
+        hints: [
+          {
+            en: 'Compare the evidence from seen data with evidence from held-out data.',
+            vi: 'So sánh bằng chứng từ dữ liệu đã thấy với dữ liệu giữ lại.',
+          },
+          {
+            en: 'A lower training loss can coexist with a worse validation loss.',
+            vi: 'Loss train thấp hơn có thể đồng thời với loss validation tệ hơn.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a lower training loss alone proves a model will generalise better.',
+          vi: 'Đúng hay sai: chỉ loss train thấp hơn chứng minh mô hình sẽ tổng quát tốt hơn.',
+        },
+        questionId: 'q-dl-p03-train-loss-not-proof',
+        sourceId: 'act-dl-p03-backprop-overfitting-quiz-03',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-dl-m03': {
+    courseId: 'course-deep-learning-basic',
+    demoId: null,
+    draftProvenance: dlM03DraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'dl-m03-training-generalization',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-dl-m03',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-dl-m03-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [],
+    questions: [
+      {
+        correctAnswer: 'opt-gradient-parameters',
+        explanation: {
+          en: 'Backpropagation computes gradients with respect to network parameters so an optimisation step can know how the objective changes around the current values.',
+          vi: 'Lan truyền ngược tính gradient theo tham số mạng để bước tối ưu biết mục tiêu đổi thế nào quanh các giá trị hiện tại.',
+        },
+        hints: [
+          {
+            en: 'Ask what needs a gradient when model values are updated.',
+            vi: 'Hãy hỏi điều gì cần gradient khi cập nhật giá trị mô hình.',
+          },
+          {
+            en: 'The target is not the gradient destination; the model parameters are.',
+            vi: 'Target không phải đích của gradient; các tham số mô hình mới là đích.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-gradient-parameters',
+            text: {
+              en: 'Gradients of the objective with respect to network parameters',
+              vi: 'Gradient của mục tiêu theo tham số mạng',
+            },
+          },
+          {
+            optionId: 'opt-gradient-new-labels',
+            text: {
+              en: 'New target labels for the training data',
+              vi: 'Nhãn target mới cho dữ liệu train',
+            },
+          },
+          {
+            optionId: 'opt-gradient-browser',
+            text: {
+              en: 'A separate browser decision for each point',
+              vi: 'Một quyết định trình duyệt riêng cho từng điểm',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What does backpropagation compute for a neural network?',
+          vi: 'Lan truyền ngược tính gì cho mạng nơ-ron?',
+        },
+        questionId: 'q-dl-m03-gradient-parameters',
+        sourceId: 'quiz-module-dl-m03-q01',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-chain-path',
+        explanation: {
+          en: 'The chain rule combines a downstream derivative with a local derivative along the computational path.',
+          vi: 'Quy tắc chuỗi kết hợp đạo hàm hạ nguồn với đạo hàm cục bộ dọc đường tính toán.',
+        },
+        hints: [
+          {
+            en: 'A composed path has an intermediate value between the earlier and later variables.',
+            vi: 'Đường ghép có một giá trị trung gian giữa biến sớm và biến muộn.',
+          },
+          {
+            en: 'The derivative travels through that intermediate dependency.',
+            vi: 'Đạo hàm đi qua phụ thuộc trung gian đó.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-chain-path',
+            text: {
+              en: 'Combine downstream and local derivatives along the path.',
+              vi: 'Kết hợp đạo hàm hạ nguồn và cục bộ dọc đường đi.',
+            },
+          },
+          {
+            optionId: 'opt-chain-copy',
+            text: {
+              en: 'Copy the objective value to every earlier layer unchanged.',
+              vi: 'Sao chép nguyên giá trị mục tiêu đến mọi lớp trước.',
+            },
+          },
+          {
+            optionId: 'opt-chain-reorder',
+            text: {
+              en: 'Choose derivative order at random for each parameter.',
+              vi: 'Chọn ngẫu nhiên thứ tự đạo hàm cho từng tham số.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does the chain rule connect derivatives in backpropagation?',
+          vi: 'Quy tắc chuỗi nối các đạo hàm trong lan truyền ngược như thế nào?',
+        },
+        questionId: 'q-dl-m03-chain-rule-path',
+        sourceId: 'quiz-module-dl-m03-q02',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'Forward propagation computes and preserves intermediate values that backpropagation needs when it walks through the same graph in reverse.',
+          vi: 'Truyền xuôi tính và giữ các giá trị trung gian mà lan truyền ngược cần khi đi qua cùng đồ thị theo chiều đảo.',
+        },
+        hints: [
+          {
+            en: 'Backward reuses the graph that forward already evaluated.',
+            vi: 'Backward dùng lại đồ thị mà forward đã tính.',
+          },
+          {
+            en: 'The two directions depend on the same intermediate values.',
+            vi: 'Hai chiều phụ thuộc vào cùng các giá trị trung gian.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: backpropagation can use intermediate values computed during forward propagation.',
+          vi: 'Đúng hay sai: lan truyền ngược có thể dùng giá trị trung gian đã tính trong truyền xuôi.',
+        },
+        questionId: 'q-dl-m03-forward-values-reused',
+        sourceId: 'quiz-module-dl-m03-q03',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-underfit-high-train',
+        explanation: {
+          en: 'Underfitting means the model cannot reduce training error enough to capture the relevant pattern.',
+          vi: 'Underfitting nghĩa là mô hình không thể giảm lỗi train đủ để nắm được mẫu liên quan.',
+        },
+        hints: [
+          {
+            en: 'Look at the training error before comparing the two losses.',
+            vi: 'Hãy nhìn lỗi train trước khi so sánh hai loss.',
+          },
+          {
+            en: 'A limited model may remain inaccurate even on the examples it saw.',
+            vi: 'Mô hình hạn chế có thể vẫn không chính xác ngay cả trên ví dụ đã thấy.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-underfit-high-train',
+            text: {
+              en: 'Training error remains high because the model misses the pattern.',
+              vi: 'Lỗi train còn cao vì mô hình bỏ lỡ mẫu.',
+            },
+          },
+          {
+            optionId: 'opt-underfit-gap',
+            text: {
+              en: 'Training loss is much lower than validation loss after fitting noise.',
+              vi: 'Loss train thấp hơn nhiều loss validation sau khi khớp nhiễu.',
+            },
+          },
+          {
+            optionId: 'opt-underfit-perfect',
+            text: {
+              en: 'Both training and validation losses are zero by definition.',
+              vi: 'Cả loss train và validation đều bằng 0 theo định nghĩa.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which observation is most consistent with underfitting?',
+          vi: 'Quan sát nào phù hợp nhất với underfitting?',
+        },
+        questionId: 'q-dl-m03-underfitting',
+        sourceId: 'quiz-module-dl-m03-q04',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-overfit-gap',
+        explanation: {
+          en: 'Overfitting is signalled when training loss becomes much lower than validation loss because a complex model has followed training-specific noise.',
+          vi: 'Overfitting được báo hiệu khi loss train thấp hơn nhiều loss validation vì mô hình phức tạp đã bám theo nhiễu riêng của train.',
+        },
+        hints: [
+          {
+            en: 'Compare the later curve checkpoint in the lesson.',
+            vi: 'So sánh mốc đường cong muộn trong bài học.',
+          },
+          {
+            en: 'The key is a widening gap, not merely a low training value.',
+            vi: 'Điểm chính là khoảng cách mở rộng, không chỉ là giá trị train thấp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-overfit-gap',
+            text: {
+              en: 'Training loss is much lower than validation loss.',
+              vi: 'Loss train thấp hơn nhiều loss validation.',
+            },
+          },
+          {
+            optionId: 'opt-overfit-both-high',
+            text: {
+              en: 'Both losses remain high because the model cannot fit training examples.',
+              vi: 'Cả hai loss còn cao vì mô hình không khớp được ví dụ train.',
+            },
+          },
+          {
+            optionId: 'opt-overfit-same',
+            text: {
+              en: 'Both losses improve together with no meaningful gap.',
+              vi: 'Cả hai loss cùng cải thiện không có khoảng cách đáng kể.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which loss pattern warns that a complex model may be overfitting?',
+          vi: 'Mẫu loss nào cảnh báo mô hình phức tạp có thể đang overfitting?',
+        },
+        questionId: 'q-dl-m03-overfitting-gap',
+        sourceId: 'quiz-module-dl-m03-q05',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-heldout-evidence', 'opt-cautious-validation'],
+        explanation: {
+          en: 'Use held-out validation evidence for model selection and avoid treating a repeatedly tuned validation score as an unrestricted target. Training loss alone is not enough.',
+          vi: 'Dùng bằng chứng validation giữ lại để chọn mô hình và tránh coi điểm validation đã được tinh chỉnh lặp lại là mục tiêu không giới hạn. Chỉ loss train là chưa đủ.',
+        },
+        hints: [
+          {
+            en: 'Pick the checks that keep generalisation evidence meaningful.',
+            vi: 'Chọn các kiểm tra giữ bằng chứng tổng quát có ý nghĩa.',
+          },
+          {
+            en: 'The source warns both to use validation and not to use it too freely.',
+            vi: 'Nguồn vừa khuyên dùng validation vừa cảnh báo không dùng nó quá tự do.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-heldout-evidence',
+            text: {
+              en: 'Compare with held-out validation evidence.',
+              vi: 'So sánh với bằng chứng validation giữ lại.',
+            },
+          },
+          {
+            optionId: 'opt-cautious-validation',
+            text: {
+              en: 'Use the validation set carefully during model selection.',
+              vi: 'Dùng tập validation cẩn trọng khi chọn mô hình.',
+            },
+          },
+          {
+            optionId: 'opt-train-only',
+            text: {
+              en: 'Choose the model from the lowest training loss alone.',
+              vi: 'Chọn mô hình chỉ từ loss train thấp nhất.',
+            },
+          },
+          {
+            optionId: 'opt-repeat-validation',
+            text: {
+              en: 'Retune until the same validation score looks ideal.',
+              vi: 'Tinh chỉnh cho đến khi cùng điểm validation trông lý tưởng.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two practices keep model-selection evidence more trustworthy?',
+          vi: 'Hai thực hành nào giữ bằng chứng chọn mô hình đáng tin hơn?',
+        },
+        questionId: 'q-dl-m03-validation-practice',
+        sourceId: 'quiz-module-dl-m03-q06',
+        sourceIds: DL_M03_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -1215,16 +1672,6 @@ const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>
     trueAssertion: {
       en: 'Keeping fewer principal components can simplify a representation while discarding some reconstructable information.',
       vi: 'Giữ ít component chính hơn có thể đơn giản hóa biểu diễn nhưng loại bỏ một phần thông tin có thể tái dựng.',
-    },
-  },
-  'dl-p03-backprop-overfitting': {
-    coreMove: {
-      en: 'Use validation curves to stop treating lower training loss as automatic improvement.',
-      vi: 'Dùng đường validation để không coi training loss thấp hơn là cải thiện tự động.',
-    },
-    trueAssertion: {
-      en: 'Rising validation loss while training loss falls is a warning that the model may be overfitting.',
-      vi: 'Validation loss tăng trong khi training loss giảm là cảnh báo mô hình có thể đang overfitting.',
     },
   },
 };

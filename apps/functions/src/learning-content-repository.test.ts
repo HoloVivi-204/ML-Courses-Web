@@ -156,6 +156,43 @@ describe('learning content repository', () => {
     });
   });
 
+  it('returns the twelve-block training and generalisation lesson only after post access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const post = await repository.getFullPostContent({
+      postId: 'dl-p03-backprop-overfitting',
+      uid: 'learner-01',
+    });
+
+    expect(post.data).toMatchObject({
+      id: 'dl-p03-backprop-overfitting',
+      moduleId: 'dl-m03-training-generalization',
+      postQuizId: 'quiz-post-dl-p03',
+      title: {
+        en: 'How gradients and validation evidence guide training',
+        vi: 'Gradient và bằng chứng validation định hướng huấn luyện',
+      },
+    });
+    expect(post.data.blocks).toHaveLength(12);
+    expect(post.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-dl-p03-backprop-overfitting-example',
+        type: 'example',
+      }),
+    );
+    expect(post.data.blocks).toContainEqual(
+      expect.objectContaining({
+        resources: expect.arrayContaining([
+          expect.objectContaining({ title: 'Backpropagation' }),
+          expect.objectContaining({ title: 'Underfitting and Overfitting' }),
+        ]),
+        type: 'source-list',
+      }),
+    );
+  });
+
   it('returns the fixed MLP checkerboard and its distinct completion path only after demo access is granted', async () => {
     const repository = createLearningContentRepository({
       accessReader: createAccessReader(() => true),

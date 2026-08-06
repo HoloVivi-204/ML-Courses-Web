@@ -28,7 +28,7 @@ export function SourceListBlockView({ block, displayIndex, locale }: SourceListB
       <p>{content.intro}</p>
       <ul>
         {resources.map(({ resource, safeLicenseUrl, safeResourceUrl }) => (
-          <li key={resource.sourceId}>
+          <li key={resource.url}>
             <a href={safeResourceUrl.href} rel="noopener noreferrer" target="_blank">
               {resource.title}
               <ArrowUpRight aria-hidden="true" size={17} />

@@ -60,4 +60,63 @@ describe('content block collection validation', () => {
       parseContentBlockCollection([createHeading('valid', 1), hostileBlock], POST_ID),
     ).toBeNull();
   });
+
+  it('accepts separate source documents from one pinned publisher when their URLs are distinct', () => {
+    const sourceList = {
+      accessibility: { en: null, vi: null },
+      activityId: null,
+      assetIds: [],
+      id: 'sources',
+      locales: {
+        en: {
+          heading: 'Sources',
+          intro: 'Two documents support this lesson.',
+          navigationTitle: 'Sources',
+        },
+        vi: {
+          heading: 'Nguồn',
+          intro: 'Hai tài liệu hỗ trợ bài học này.',
+          navigationTitle: 'Nguồn',
+        },
+      },
+      order: 1,
+      postId: POST_ID,
+      required: false,
+      resources: [
+        {
+          attribution: { en: 'Adapted summary.', vi: 'Diễn giải ngắn gọn.' },
+          language: 'vi',
+          license: {
+            name: 'Creative Commons Attribution-ShareAlike 4.0',
+            url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+          },
+          relatedTopicIds: [],
+          resourceType: 'documentation',
+          sourceId: 'd2l-vi',
+          sourceName: 'Dive into Deep Learning Vietnamese',
+          title: 'Backpropagation',
+          url: 'https://example.test/backpropagation',
+        },
+        {
+          attribution: { en: 'Adapted summary.', vi: 'Diễn giải ngắn gọn.' },
+          language: 'vi',
+          license: {
+            name: 'Creative Commons Attribution-ShareAlike 4.0',
+            url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+          },
+          relatedTopicIds: [],
+          resourceType: 'documentation',
+          sourceId: 'd2l-vi',
+          sourceName: 'Dive into Deep Learning Vietnamese',
+          title: 'Underfitting and overfitting',
+          url: 'https://example.test/underfit-overfit',
+        },
+      ],
+      schemaVersion: 1,
+      sourceIds: ['d2l-vi'],
+      type: 'source-list',
+    };
+
+    expect(parseContentBlockCollection([sourceList], POST_ID)).not.toBeNull();
+  });
 });

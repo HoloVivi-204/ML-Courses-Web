@@ -148,7 +148,7 @@ function isSourceListBlock(
     value.resources.length > 0 &&
     value.resources.every(isExternalResource) &&
     value.resources.every((resource) => value.sourceIds.includes(resource.sourceId)) &&
-    hasUniqueValues(value.resources.map((resource) => resource.sourceId))
+    hasUniqueValues(value.resources.map((resource) => resource.url))
   );
 }
 

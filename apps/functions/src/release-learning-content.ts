@@ -2,6 +2,7 @@ import { getReleaseLearningCatalog, type LocalizedText } from './release-learnin
 import {
   dlM01SourceTrace,
   dlM02SourceTrace,
+  dlM03SourceTrace,
   type DraftProvenance,
 } from './content-source-trace.js';
 
@@ -40,10 +41,12 @@ export interface TrialPost {
 
 const TRIAL_POST_ID = 'dl-p01-neuron-perceptron';
 const MLP_POST_ID = 'dl-p02-mlp-forward-activation';
+const TRAINING_POST_ID = 'dl-p03-backprop-overfitting';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -63,6 +66,16 @@ const mlpBlockDefaults = {
   required: true,
   schemaVersion: 1,
   sourceIds: DL_M02_SOURCE_IDS,
+} as const;
+
+const trainingBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: TRAINING_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: DL_M03_SOURCE_IDS,
 } as const;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -696,6 +709,272 @@ const mlpFullLessonBlocks = [
   },
 ] satisfies readonly LearningContentBlock[];
 
+const trainingFullLessonBlocks = [
+  {
+    ...trainingBlockDefaults,
+    id: 'training-forward-and-backward',
+    locales: {
+      en: {
+        lede: 'Training has two linked directions: forward propagation computes an objective, then backpropagation carries gradient information back to the parameters.',
+        navigationTitle: 'See the two directions',
+        title: 'Forward computes; backward assigns credit',
+      },
+      vi: {
+        lede: 'Huấn luyện có hai chiều liên kết: truyền xuôi tính mục tiêu, rồi lan truyền ngược đưa thông tin gradient trở lại các tham số.',
+        navigationTitle: 'Quan sát hai chiều',
+        title: 'Truyền xuôi tính; truyền ngược phân bổ trách nhiệm',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-forward-values',
+    locales: {
+      en: {
+        markdown:
+          'Forward propagation follows the dependency order: inputs produce hidden values, hidden values produce outputs, and outputs contribute to an objective $J$. The intermediate values are needed later when gradients are computed.',
+      },
+      vi: {
+        markdown:
+          'Truyền xuôi theo thứ tự phụ thuộc: đầu vào tạo giá trị hidden, hidden tạo đầu ra, và đầu ra góp vào mục tiêu $J$. Các giá trị trung gian cần thiết ở bước sau khi tính gradient.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-backward-credit',
+    locales: {
+      en: {
+        body: 'Backpropagation starts with the objective at the output and walks through the same computational graph in reverse dependency order. The chain rule links each local derivative to the gradient of an earlier parameter.',
+        title: 'The graph is read in reverse for gradients',
+      },
+      vi: {
+        body: 'Lan truyền ngược bắt đầu từ mục tiêu ở đầu ra và đi qua cùng đồ thị tính toán theo thứ tự phụ thuộc đảo ngược. Quy tắc chuỗi nối từng đạo hàm cục bộ với gradient của tham số ở sớm hơn.',
+        title: 'Đồ thị được đọc ngược khi tính gradient',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-chain-rule',
+    locales: {
+      en: {
+        lede: 'A gradient is not a separate answer for every layer; it is propagated along the dependencies that produced the objective.',
+        navigationTitle: 'Follow the chain rule',
+        title: 'Local changes combine along the graph',
+      },
+      vi: {
+        lede: 'Gradient không phải câu trả lời riêng rẽ cho từng layer; nó truyền dọc các phụ thuộc đã tạo ra mục tiêu.',
+        navigationTitle: 'Theo quy tắc chuỗi',
+        title: 'Các thay đổi cục bộ kết hợp dọc đồ thị',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-gradient-equation',
+    locales: {
+      en: {
+        markdown:
+          'For a composed path $X \\rightarrow Y \\rightarrow Z$, the chain rule combines the downstream and local changes: $\\frac{\\partial Z}{\\partial X}$ depends on $\\frac{\\partial Z}{\\partial Y}$ and $\\frac{\\partial Y}{\\partial X}$. The direction is what matters here: begin at the objective, then move toward earlier inputs and weights.',
+      },
+      vi: {
+        markdown:
+          'Với đường ghép $X \\rightarrow Y \\rightarrow Z$, quy tắc chuỗi kết hợp thay đổi hạ nguồn và cục bộ: $\\frac{\\partial Z}{\\partial X}$ phụ thuộc vào $\\frac{\\partial Z}{\\partial Y}$ và $\\frac{\\partial Y}{\\partial X}$. Điều quan trọng ở đây là chiều đi: bắt đầu từ mục tiêu rồi lùi về đầu vào và trọng số sớm hơn.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...trainingBlockDefaults,
+    activityId: 'act-dl-p03-backprop-overfitting-example',
+    id: 'training-curve-reading-example',
+    locales: {
+      en: {
+        description:
+          'Read the fixed curve checkpoints as evidence, not as a live run: when training loss keeps falling while validation loss rises, inspect generalisation before fitting longer.',
+        navigationTitle: 'Read a curve gap',
+      },
+      vi: {
+        description:
+          'Đọc các mốc đường cong cố định như bằng chứng, không phải lượt chạy live: khi loss train tiếp tục giảm còn loss validation tăng, hãy kiểm tra khả năng tổng quát trước khi khớp lâu hơn.',
+        navigationTitle: 'Đọc khoảng cách đường cong',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-generalisation-evidence',
+    locales: {
+      en: {
+        lede: 'The objective on training examples describes fit to what was seen. Generalisation needs a separate check on examples not used to choose the parameters.',
+        navigationTitle: 'Compare two losses',
+        title: 'Training loss is not generalisation evidence by itself',
+      },
+      vi: {
+        lede: 'Mục tiêu trên ví dụ train mô tả độ khớp với điều đã thấy. Khả năng tổng quát cần kiểm tra riêng trên ví dụ không dùng để chọn tham số.',
+        navigationTitle: 'So sánh hai loss',
+        title: 'Chỉ loss train chưa phải bằng chứng tổng quát',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-fixed-curve-table',
+    locales: {
+      en: {
+        markdown:
+          'Use this fixed instructional reading, not a reported experiment:\n\n' +
+          '| checkpoint | train loss | validation loss | reading |\n|---|---:|---:|---|\n| early | 0.82 | 0.86 | both remain high |\n| middle | 0.45 | 0.49 | both improve together |\n| later | 0.21 | 0.68 | the gap needs investigation |\n\n' +
+          'The later row does not prove a diagnosis on its own; it signals that the validation evidence must be read alongside the training fit.',
+      },
+      vi: {
+        markdown:
+          'Dùng cách đọc cố định để học này, không phải một thí nghiệm được báo cáo:\n\n' +
+          '| mốc | loss train | loss validation | cách đọc |\n|---|---:|---:|---|\n| sớm | 0,82 | 0,86 | cả hai còn cao |\n| giữa | 0,45 | 0,49 | cả hai cùng cải thiện |\n| muộn | 0,21 | 0,68 | khoảng cách cần được kiểm tra |\n\n' +
+          'Hàng muộn không tự chứng minh một chẩn đoán; nó báo hiệu phải đọc bằng chứng validation cùng với độ khớp train.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-underfit-overfit',
+    locales: {
+      en: {
+        body: 'Both outcomes require evidence from more than a flattering training score.',
+        items: [
+          {
+            body: 'Training error remains high because the model cannot capture the relevant structure.',
+            label: 'Underfitting',
+            title: 'The model is too limited for the pattern',
+          },
+          {
+            body: 'Training loss becomes much lower than validation loss as a complex model follows training noise.',
+            label: 'Overfitting',
+            title: 'The training fit does not transfer',
+          },
+        ],
+        title: 'Read capacity through both losses',
+      },
+      vi: {
+        body: 'Cả hai kết quả cần bằng chứng nhiều hơn một điểm train đẹp.',
+        items: [
+          {
+            body: 'Lỗi train vẫn cao vì mô hình không nắm được cấu trúc liên quan.',
+            label: 'Underfitting',
+            title: 'Mô hình quá hạn chế với mẫu',
+          },
+          {
+            body: 'Loss train thấp hơn nhiều so với loss validation khi mô hình phức tạp bám theo nhiễu train.',
+            label: 'Overfitting',
+            title: 'Độ khớp train không chuyển sang dữ liệu khác',
+          },
+        ],
+        title: 'Đọc năng lực qua cả hai loss',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'comparison',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-validation-choice',
+    locales: {
+      en: {
+        lede: 'A validation set can guide model selection, but it is evidence to use carefully rather than a score to optimise repeatedly.',
+        navigationTitle: 'Use validation carefully',
+        title: 'Choose the model with a held-out check',
+      },
+      vi: {
+        lede: 'Tập validation có thể hướng dẫn chọn mô hình, nhưng đó là bằng chứng cần dùng cẩn trọng chứ không phải điểm để tối ưu lặp đi lặp lại.',
+        navigationTitle: 'Dùng validation cẩn trọng',
+        title: 'Chọn mô hình bằng kiểm tra giữ lại',
+      },
+    },
+    order: 10,
+    type: 'heading',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-cautious-next-step',
+    locales: {
+      en: {
+        body: 'Cause: a lower training objective may reflect better fit to the training examples or a model that learned their noise. Effect: compare held-out evidence before claiming the later checkpoint is the better model.',
+        title: 'A lower train loss is a question, not a verdict',
+      },
+      vi: {
+        body: 'Nguyên nhân: mục tiêu train thấp hơn có thể là khớp tốt hơn với ví dụ train hoặc mô hình đã học nhiễu của chúng. Kết quả: so sánh bằng chứng giữ lại trước khi khẳng định mốc muộn hơn là mô hình tốt hơn.',
+        title: 'Loss train thấp hơn là câu hỏi, không phải phán quyết',
+      },
+    },
+    order: 11,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...trainingBlockDefaults,
+    id: 'training-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from pinned local snapshots of the two documents below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của hai tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 12,
+    required: false,
+    resources: [
+      {
+        attribution: dlM03SourceTrace.sourceSnapshots[0].attribution,
+        language: 'vi',
+        license: dlM03SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: dlM03SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: dlM03SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Backpropagation',
+        url: 'https://github.com/d2l-ai/d2l-vi/blob/main/chapter_multilayer-perceptrons/backprop.md',
+      },
+      {
+        attribution: dlM03SourceTrace.sourceSnapshots[0].attribution,
+        language: 'vi',
+        license: dlM03SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: dlM03SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: dlM03SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Underfitting and Overfitting',
+        url: 'https://github.com/d2l-ai/d2l-vi/blob/main/chapter_multilayer-perceptrons/underfit-overfit.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -764,6 +1043,34 @@ const fullLessonPosts: readonly TrialPost[] = [
     title: {
       en: 'How a hidden layer reshapes a decision',
       vi: 'Hidden layer định hình lại quyết định thế nào',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: trainingFullLessonBlocks,
+    courseId: 'course-deep-learning-basic',
+    description: {
+      en: 'Connect forward values, reverse gradients, and train-versus-validation evidence before deciding whether more fitting generalises.',
+      vi: 'Nối giá trị truyền xuôi, gradient truyền ngược và bằng chứng train–validation trước khi quyết định khớp thêm có tổng quát hay không.',
+    },
+    durationMinutes: 16,
+    id: TRAINING_POST_ID,
+    learningObjective: {
+      en: 'Explain how backpropagation follows a computational graph in reverse and use train/validation loss evidence to distinguish underfitting from overfitting.',
+      vi: 'Giải thích cách lan truyền ngược đi theo đồ thị tính toán theo chiều đảo và dùng bằng chứng loss train/validation để phân biệt underfitting với overfitting.',
+    },
+    moduleId: 'dl-m03-training-generalization',
+    postQuizId: 'quiz-post-dl-p03',
+    provenance: {
+      ...createDraftProvenance('course-deep-learning-basic'),
+      candidateSourceIds: DL_M03_SOURCE_IDS,
+      sourceTrace: dlM03SourceTrace,
+    },
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-training-gradient-and-generalisation-gap',
+    title: {
+      en: 'How gradients and validation evidence guide training',
+      vi: 'Gradient và bằng chứng validation định hướng huấn luyện',
     },
   },
 ];
@@ -1060,25 +1367,6 @@ const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
     title: {
       en: 'Keep variance while reducing dimensions',
       vi: 'Giữ phương sai khi giảm chiều',
-    },
-  },
-  'dl-p03-backprop-overfitting': {
-    concept: {
-      en: 'Training loss measures fit to seen examples; validation loss estimates behaviour on unseen examples. Diverging curves are a warning that more fitting is not more generalisation.',
-      vi: 'Training loss đo mức khớp với ví dụ đã thấy; validation loss ước lượng hành vi trên ví dụ chưa thấy. Hai đường tách xa cảnh báo rằng khớp thêm không đồng nghĩa tổng quát tốt hơn.',
-    },
-    examplePrompt: {
-      en: 'Read a pair of learning curves where training loss keeps falling while validation loss begins to rise, then name the next cautious action.',
-      vi: 'Đọc một cặp đường học nơi training loss tiếp tục giảm còn validation loss bắt đầu tăng, rồi nêu hành động thận trọng tiếp theo.',
-    },
-    learningObjective: {
-      en: 'Use learning curves to distinguish improving fit from overfitting and choose a cautious response.',
-      vi: 'Dùng đường học để phân biệt khớp tốt hơn với overfitting và chọn phản ứng thận trọng.',
-    },
-    taskFingerprint: 'lesson-dl-p03-learning-curves-generalisation',
-    title: {
-      en: 'Use validation curves to spot overfitting',
-      vi: 'Dùng đường validation để nhận ra overfitting',
     },
   },
 };

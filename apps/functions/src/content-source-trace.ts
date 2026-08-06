@@ -85,3 +85,27 @@ export const dlM02SourceTrace = {
   kind: 'snapshot-pinned',
   sourceSnapshots: [dlM01SourceTrace.sourceSnapshots[1]],
 } as const satisfies SnapshotPinnedSourceTrace;
+
+export const dlM03SourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from Dive into Deep Learning Vietnamese; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Đắm mình vào Học Sâu; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '503f5fe87c26ab3c93d68142343a51feb72a0e743f293f0cc1090b34211bedc1',
+      contentUrls: [
+        'https://raw.githubusercontent.com/d2l-ai/d2l-vi/main/chapter_multilayer-perceptrons/backprop.md',
+        'https://raw.githubusercontent.com/d2l-ai/d2l-vi/main/chapter_multilayer-perceptrons/underfit-overfit.md',
+      ],
+      license: {
+        id: 'CC-BY-SA-4.0',
+        name: 'Creative Commons Attribution-ShareAlike 4.0',
+        url: 'https://raw.githubusercontent.com/d2l-ai/d2l-vi/main/LICENSE',
+      },
+      sourceId: 'd2l-vi',
+      sourceName: 'Dive into Deep Learning Vietnamese',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;

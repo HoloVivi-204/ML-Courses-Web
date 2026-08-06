@@ -241,4 +241,58 @@ describe('Release 1 protected learning content', () => {
       ).toBe(true);
     }
   });
+
+  it('pins the dl-m03 training batch to the D2L backpropagation and generalisation snapshots used for its prose and quizzes', () => {
+    const post = getReadablePost(
+      'course-deep-learning-basic',
+      'dl-p03-backprop-overfitting',
+      true,
+    )!;
+    const postQuiz = getQuizManifest('quiz-post-dl-p03');
+    const moduleQuiz = getQuizManifest('quiz-module-dl-m03');
+    const expectedSourceSnapshot = {
+      contentSnapshotHash: '503f5fe87c26ab3c93d68142343a51feb72a0e743f293f0cc1090b34211bedc1',
+      contentUrls: expect.arrayContaining([
+        'https://raw.githubusercontent.com/d2l-ai/d2l-vi/main/chapter_multilayer-perceptrons/backprop.md',
+        'https://raw.githubusercontent.com/d2l-ai/d2l-vi/main/chapter_multilayer-perceptrons/underfit-overfit.md',
+      ]),
+      sourceId: 'd2l-vi',
+    };
+
+    for (const provenance of [
+      post.provenance,
+      postQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['d2l-vi'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(expectedSourceSnapshot)],
+        },
+      });
+    }
+
+    expect(post.blocks).toHaveLength(12);
+    expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-dl-p03-backprop-overfitting-example',
+        type: 'example',
+      }),
+    );
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({ sourceIds: ['d2l-vi'], type: 'source-list' }),
+    );
+
+    for (const quiz of [postQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'd2l-vi'),
+        ),
+      ).toBe(true);
+    }
+  });
 });
