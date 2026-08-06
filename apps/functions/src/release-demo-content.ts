@@ -7,6 +7,11 @@ import {
   cmlM02SourceTrace,
   cmlM03SourceTrace,
   cmlM04LogisticSourceTrace,
+  cmlM05KnnSourceTrace,
+  cmlM06ModuleSourceTrace,
+  cmlM07SvmSourceTrace,
+  cmlM08ClusteringSourceTrace,
+  cmlM09PcaSourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   type DraftProvenance,
@@ -17,6 +22,19 @@ const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => sourc
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M04_LOGISTIC_SOURCE_IDS = cmlM04LogisticSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M05_KNN_SOURCE_IDS = cmlM05KnnSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M06_MODULE_SOURCE_IDS = ['sklearn-docs'] as const;
+const CML_M07_SVM_SOURCE_IDS = cmlM07SvmSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M08_CLUSTERING_SOURCE_IDS = cmlM08ClusteringSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M09_PCA_SOURCE_IDS = cmlM09PcaSourceTrace.sourceSnapshots.map(
   (source) => source.sourceId,
 );
 
@@ -42,6 +60,46 @@ const cmlM04LogisticDemoDraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM04LogisticSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM05KnnDemoDraftProvenance = {
+  candidateSourceIds: CML_M05_KNN_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM05KnnSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM06TreeForestDemoDraftProvenance = {
+  candidateSourceIds: CML_M06_MODULE_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM06ModuleSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM07SvmDemoDraftProvenance = {
+  candidateSourceIds: CML_M07_SVM_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM07SvmSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM08ClusteringDemoDraftProvenance = {
+  candidateSourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM08ClusteringSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM09PcaDemoDraftProvenance = {
+  candidateSourceIds: CML_M09_PCA_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM09PcaSourceTrace,
 } as const satisfies DraftProvenance;
 
 export interface DemoStep {
@@ -712,6 +770,610 @@ export const logisticAdmissionDemo: FixedDemoManifest = {
   },
 };
 
+export const neighborFlowerDemo: FixedDemoManifest = {
+  algorithmId: 'knn',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-neighbor-flower',
+  draftProvenance: cmlM05KnnDemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'A static coordinate exercise: k is fixed at 3 and the query at (2, 2) receives three class-1 votes from its nearest displayed references.',
+      vi: 'Bài tập tọa độ tĩnh: k cố định bằng 3 và truy vấn tại (2, 2) nhận ba phiếu lớp 1 từ các điểm tham chiếu gần nhất được hiển thị.',
+    },
+    datasetVersionId: 'dataset-demo-neighbor-flower-v1',
+    parameterValues: [{ id: 'k', value: 3 }],
+    rows: [
+      { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+      { input: [1, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [2, 2], predictedOutput: 1, targetOutput: 1 },
+    ],
+  },
+  learningObjective: {
+    en: 'Follow a fixed KNN classification from a chosen k and Euclidean distances to the visible majority vote, without running live training or fetching data.',
+    vi: 'Theo dõi một phân loại KNN cố định từ k đã chọn và khoảng cách Euclid đến phiếu đa số hiển thị, không chạy huấn luyện live hay lấy dữ liệu.',
+  },
+  moduleId: 'cml-m05-knn-naive-bayes',
+  problemId: 'problem-demo-neighbor-flower',
+  requiredStepIds: ['knn-problem', 'knn-reference-points', 'knn-distance', 'knn-vote'],
+  revisionId: 'demo-neighbor-flower-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'knn-problem',
+      narration: {
+        en: 'This is a fixed coordinate classification exercise with anonymous class-0 and class-1 reference points. The stable demo identifier mentions a flower, but it does not identify a real specimen, use a live dataset, or make a real-world recommendation.',
+        vi: 'Đây là bài tập phân loại tọa độ cố định với các điểm tham chiếu lớp 0 và lớp 1 ẩn danh. Demo ID ổn định có chữ flower, nhưng demo không nhận diện mẫu vật thật, không dùng dataset live và không đưa ra khuyến nghị thực tế.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A problem card frames an anonymous two-class coordinate exercise with no external data connection.',
+        vi: 'Thẻ bài toán đặt khung bài tập tọa độ hai lớp ẩn danh, không kết nối dữ liệu bên ngoài.',
+      },
+      title: {
+        en: 'Frame the fixed neighbour task',
+        vi: 'Đặt khung nhiệm vụ láng giềng cố định',
+      },
+    },
+    {
+      id: 'knn-reference-points',
+      narration: {
+        en: 'Read the six displayed reference coordinates. Class 0 occupies the lower-left group; class 1 has references at (2, 1), (1, 2), and (3, 2). They are a static teaching table, not examples added or changed at runtime.',
+        vi: 'Đọc sáu tọa độ tham chiếu hiển thị. Lớp 0 nằm ở nhóm dưới-trái; lớp 1 có các điểm tham chiếu (2, 1), (1, 2) và (3, 2). Đây là bảng dạy học tĩnh, không phải ví dụ được thêm hoặc đổi khi chạy.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A static plot contains three class-0 reference points and three class-1 reference points before the query is evaluated.',
+        vi: 'Biểu đồ tĩnh có ba điểm tham chiếu lớp 0 và ba điểm tham chiếu lớp 1 trước khi truy vấn được đánh giá.',
+      },
+      title: {
+        en: 'Inspect the labelled reference points',
+        vi: 'Quan sát các điểm tham chiếu đã gán nhãn',
+      },
+    },
+    {
+      id: 'knn-distance',
+      narration: {
+        en: 'For the fixed query (2, 2), use the displayed Euclidean representation. Its distances to (2, 1), (1, 2), and (3, 2) are each 1, so these are the three nearest references when k equals 3. The distance rule and k are held constant for this run.',
+        vi: 'Với truy vấn cố định (2, 2), dùng biểu diễn Euclid được hiển thị. Khoảng cách tới (2, 1), (1, 2) và (3, 2) đều bằng 1, nên đây là ba điểm tham chiếu gần nhất khi k bằng 3. Quy tắc khoảng cách và k được giữ cố định cho lần chạy này.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The distance card marks three class-1 references exactly one unit from the query at (2, 2).',
+        vi: 'Thẻ khoảng cách đánh dấu ba điểm tham chiếu lớp 1 cách đúng một đơn vị so với truy vấn tại (2, 2).',
+      },
+      title: {
+        en: 'Compute the local distance evidence',
+        vi: 'Tính bằng chứng khoảng cách cục bộ',
+      },
+    },
+    {
+      id: 'knn-vote',
+      narration: {
+        en: 'Take the simple majority label of the three selected neighbours. All three are class 1, so the fixed query receives class 1. This is a reproducible KNN reading of this table, not a claim about every possible distance metric, k value, or dataset ordering.',
+        vi: 'Lấy nhãn đa số đơn giản của ba láng giềng đã chọn. Cả ba đều là lớp 1 nên truy vấn cố định nhận lớp 1. Đây là cách đọc KNN có thể tái lập cho bảng này, không phải khẳng định về mọi thước đo khoảng cách, giá trị k hay thứ tự dataset.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A vote card counts three class-1 neighbours and labels the fixed query class 1.',
+        vi: 'Thẻ phiếu đếm ba láng giềng lớp 1 và gán truy vấn cố định là lớp 1.',
+      },
+      title: {
+        en: 'Apply the fixed majority vote',
+        vi: 'Áp dụng phiếu đa số cố định',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-knn-fixed-k-three-distance-majority-vote',
+  title: {
+    en: 'KNN demo: fixed local-distance vote',
+    vi: 'Demo KNN: phiếu khoảng cách cục bộ cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 34, y: 188 },
+      { x: 78, y: 158 },
+      { x: 118, y: 134 },
+      { x: 154, y: 108 },
+      { x: 212, y: 62 },
+    ],
+    points: [
+      { classification: 'negative', label: '(0, 0) → 0', positiveFromStep: 0, x: 46, y: 180 },
+      { classification: 'negative', label: '(0, 1) → 0', positiveFromStep: 0, x: 46, y: 138 },
+      { classification: 'negative', label: '(1, 0) → 0', positiveFromStep: 0, x: 86, y: 180 },
+      { classification: 'positive', label: '(2, 1) → 1', positiveFromStep: 1, x: 126, y: 138 },
+      { classification: 'positive', label: '(1, 2) → 1', positiveFromStep: 1, x: 86, y: 96 },
+      { classification: 'positive', label: '(3, 2) → 1', positiveFromStep: 1, x: 166, y: 96 },
+      { classification: 'positive', label: 'query (2, 2) → 1', positiveFromStep: 3, x: 126, y: 96 },
+    ],
+  },
+};
+
+export const treeForestHabitatDemo: FixedDemoManifest = {
+  algorithmId: 'decision-tree',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-tree-forest-habitat',
+  draftProvenance: cmlM06TreeForestDemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'A static two-feature comparison: three displayed trees return class 0, class 1, and class 1 for the query (1, 1), so this classroom fixture’s simple-majority rule reports class 1.',
+      vi: 'So sánh tĩnh hai feature: ba cây hiển thị trả về lớp 0, lớp 1 và lớp 1 cho truy vấn (1, 1), nên quy tắc đa số đơn giản của fixture lớp học này báo lớp 1.',
+    },
+    datasetVersionId: 'dataset-demo-tree-forest-habitat-v1',
+    parameterValues: [{ id: 'treeCount', value: 3 }],
+    rows: [
+      { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+      { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+      { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+    ],
+  },
+  learningObjective: {
+    en: 'Contrast one fixed decision-tree path with a fixed three-tree ensemble, then identify how diversity and an explicit aggregation rule produce the displayed result without live training.',
+    vi: 'Đối chiếu một đường đi cây quyết định cố định với ensemble ba cây cố định, rồi xác định cách đa dạng và quy tắc tổng hợp rõ ràng tạo ra kết quả hiển thị mà không huấn luyện live.',
+  },
+  moduleId: 'cml-m06-trees-forest',
+  problemId: 'problem-demo-tree-forest-habitat',
+  requiredStepIds: ['tree-problem', 'tree-split', 'forest-diversity', 'forest-aggregate'],
+  revisionId: 'demo-tree-forest-habitat-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'tree-problem',
+      narration: {
+        en: 'This is a fixed anonymous two-feature classification exercise. Although the stable demo identifier includes “habitat,” no real habitat records, species, or environmental recommendation are used or produced here.',
+        vi: 'Đây là bài tập phân loại hai feature ẩn danh cố định. Dù demo ID ổn định có chữ “habitat”, không có bản ghi môi trường sống thật, loài hay khuyến nghị môi trường nào được dùng hoặc tạo ra ở đây.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A problem card frames a static binary-feature exercise with no live data or real-world recommendation.',
+        vi: 'Thẻ bài toán đặt khung bài tập feature nhị phân tĩnh, không có dữ liệu live hay khuyến nghị thực tế.',
+      },
+      title: {
+        en: 'Frame the fixed tree comparison',
+        vi: 'Đặt khung so sánh cây cố định',
+      },
+    },
+    {
+      id: 'tree-split',
+      narration: {
+        en: 'Read the first displayed tree for query (1, 1). It checks signal A and takes its shown branch to class 0. The point is not that this is a universal rule: a tree prediction is the result of the visible conditions on this fixed path.',
+        vi: 'Đọc cây hiển thị đầu tiên cho truy vấn (1, 1). Nó kiểm tra tín hiệu A và đi theo nhánh được hiển thị đến lớp 0. Điểm chính không phải đây là quy tắc phổ quát: dự đoán của cây là kết quả của các điều kiện nhìn thấy trên đường đi cố định này.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A tree card shows a query with A equal to one following one labelled branch to class 0.',
+        vi: 'Thẻ cây cho thấy truy vấn có A bằng một đi theo một nhánh đã gán nhãn đến lớp 0.',
+      },
+      title: {
+        en: 'Follow one visible split path',
+        vi: 'Theo một đường split hiển thị',
+      },
+    },
+    {
+      id: 'forest-diversity',
+      narration: {
+        en: 'The other two fixed trees examine different displayed feature evidence and both return class 1. This models the diversity idea: different sampled data or feature choices can make trees make different errors, rather than repeating one path unchanged.',
+        vi: 'Hai cây cố định còn lại xem bằng chứng feature hiển thị khác nhau và đều trả về lớp 1. Điều này mô hình hóa ý tưởng đa dạng: dữ liệu lấy mẫu hoặc lựa chọn feature khác nhau có thể khiến cây mắc lỗi khác nhau thay vì lặp lại một đường đi không đổi.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'Two additional tree cards use different labelled conditions and each return class 1 for the same query.',
+        vi: 'Hai thẻ cây bổ sung dùng điều kiện đã gán nhãn khác nhau và mỗi thẻ trả về lớp 1 cho cùng truy vấn.',
+      },
+      title: {
+        en: 'Compare diverse fixed tree outputs',
+        vi: 'So sánh đầu ra cây cố định đa dạng',
+      },
+    },
+    {
+      id: 'forest-aggregate',
+      narration: {
+        en: 'Apply the explicit simple-majority rule for this instructional fixture: two class-1 outputs outweigh one class-0 output, so the displayed forest result is class 1. A production implementation can use a different stated aggregation such as probability averaging; this demo does not claim to run one.',
+        vi: 'Áp dụng quy tắc đa số đơn giản được nêu rõ cho fixture học này: hai đầu ra lớp 1 nhiều hơn một đầu ra lớp 0 nên kết quả forest hiển thị là lớp 1. Một triển khai production có thể dùng cách tổng hợp khác được nêu rõ như lấy trung bình xác suất; demo này không khẳng định đang chạy một triển khai như vậy.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'An aggregation card counts two class-1 outputs and one class-0 output, then reports class 1 under a simple-majority classroom rule.',
+        vi: 'Thẻ tổng hợp đếm hai đầu ra lớp 1 và một đầu ra lớp 0, rồi báo lớp 1 theo quy tắc lớp học đa số đơn giản.',
+      },
+      title: {
+        en: 'Apply the fixed aggregation rule',
+        vi: 'Áp dụng quy tắc tổng hợp cố định',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-tree-forest-fixed-diversity-majority-comparison',
+  title: {
+    en: 'Tree and forest demo: fixed diversity comparison',
+    vi: 'Demo cây và forest: so sánh đa dạng cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 36, y: 186 },
+      { x: 80, y: 154 },
+      { x: 124, y: 122 },
+      { x: 168, y: 90 },
+      { x: 212, y: 58 },
+    ],
+    points: [
+      { classification: 'negative', label: '(0, 0) → 0', positiveFromStep: 0, x: 50, y: 178 },
+      { classification: 'negative', label: '(0, 1) → 0', positiveFromStep: 0, x: 50, y: 126 },
+      { classification: 'positive', label: '(1, 0) → 1', positiveFromStep: 1, x: 116, y: 178 },
+      {
+        classification: 'positive',
+        label: 'query (1, 1) → 1',
+        positiveFromStep: 3,
+        x: 116,
+        y: 126,
+      },
+    ],
+  },
+};
+
+export const svmMarginDemo: FixedDemoManifest = {
+  algorithmId: 'svm',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-svm-margin',
+  draftProvenance: cmlM07SvmDemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'A static margin diagram: margin is fixed at one unit in the fixture, and the marked support vectors are the nearest displayed points to the separator.',
+      vi: 'Sơ đồ margin tĩnh: margin được cố định bằng một đơn vị trong fixture, và các support vector được đánh dấu là các điểm hiển thị gần mặt phân tách nhất.',
+    },
+    datasetVersionId: 'dataset-demo-svm-margin-v1',
+    parameterValues: [{ id: 'margin', value: 1 }],
+    rows: [
+      { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+      { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+      { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+    ],
+  },
+  learningObjective: {
+    en: 'Inspect a fixed separating line, its margin boundaries, and marked support vectors without training a live SVM or making a decision about a real record.',
+    vi: 'Quan sát đường phân tách cố định, các biên margin và support vector được đánh dấu mà không huấn luyện SVM live hay quyết định về bản ghi thật.',
+  },
+  moduleId: 'cml-m07-svm',
+  problemId: 'problem-demo-svm-margin',
+  requiredStepIds: ['svm-problem', 'svm-reference-points', 'svm-margin', 'svm-support-vectors'],
+  revisionId: 'demo-svm-margin-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'svm-problem',
+      narration: {
+        en: 'This is a fixed two-class coordinate diagram with anonymous points. It does not collect, rank, or classify real people, applications, or records; it only makes an SVM separation geometry inspectable.',
+        vi: 'Đây là sơ đồ tọa độ hai lớp cố định với các điểm ẩn danh. Nó không thu thập, xếp hạng hay phân loại người, đơn đăng ký hoặc bản ghi thật; nó chỉ làm hình học phân tách SVM có thể kiểm tra.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A problem card frames a static two-class coordinate diagram with no external data source.',
+        vi: 'Thẻ bài toán đặt khung sơ đồ tọa độ hai lớp tĩnh, không có nguồn dữ liệu bên ngoài.',
+      },
+      title: {
+        en: 'Frame the fixed separator',
+        vi: 'Đặt khung mặt phân tách cố định',
+      },
+    },
+    {
+      id: 'svm-reference-points',
+      narration: {
+        en: 'Read the four fixed labelled coordinates. Two are class 0 and two are class 1; they are an instructional table used to reveal the geometry, not a training request that changes while the page runs.',
+        vi: 'Đọc bốn tọa độ đã gán nhãn cố định. Hai điểm là lớp 0 và hai điểm là lớp 1; chúng là bảng dạy học dùng để làm rõ hình học, không phải yêu cầu train thay đổi khi trang chạy.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A static plot lists two class-0 points and two class-1 points before the separator is read.',
+        vi: 'Biểu đồ tĩnh liệt kê hai điểm lớp 0 và hai điểm lớp 1 trước khi đọc mặt phân tách.',
+      },
+      title: {
+        en: 'Inspect the labelled reference points',
+        vi: 'Quan sát các điểm tham chiếu đã gán nhãn',
+      },
+    },
+    {
+      id: 'svm-margin',
+      narration: {
+        en: 'The central line is the fixed separating hyperplane in this two-dimensional sketch. Its two displayed margin boundaries are one unit apart in the fixture. The diagram illustrates why a separator is judged by its nearest class points, not by an arbitrary visual gap.',
+        vi: 'Đường trung tâm là siêu phẳng phân tách cố định trong phác thảo hai chiều này. Hai biên margin hiển thị cách nhau một đơn vị trong fixture. Sơ đồ minh họa vì sao mặt phân tách được đánh giá bởi các điểm lớp gần nhất, không phải khoảng trống trực quan tùy ý.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A separator card shows a central line and two parallel margin boundaries separated by one fixed unit.',
+        vi: 'Thẻ mặt phân tách cho thấy đường trung tâm và hai biên margin song song cách nhau một đơn vị cố định.',
+      },
+      title: {
+        en: 'Read the fixed margin geometry',
+        vi: 'Đọc hình học margin cố định',
+      },
+    },
+    {
+      id: 'svm-support-vectors',
+      narration: {
+        en: 'The marked points nearest the margin boundaries are the support vectors for this illustration. They constrain the displayed separator; a point farther from the margins contributes to the diagram but is not marked as equally decisive. This does not claim that the static line is optimal for other data.',
+        vi: 'Các điểm được đánh dấu gần biên margin nhất là support vector của minh họa này. Chúng ràng buộc mặt phân tách hiển thị; điểm xa margin hơn vẫn góp phần vào sơ đồ nhưng không được đánh dấu là quyết định như nhau. Điều này không khẳng định đường tĩnh là tối ưu cho dữ liệu khác.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A support-vector card marks the closest points to the margin boundaries and leaves distant points unmarked.',
+        vi: 'Thẻ support vector đánh dấu các điểm gần biên margin nhất và để các điểm xa không đánh dấu.',
+      },
+      title: {
+        en: 'Identify the marked support vectors',
+        vi: 'Xác định các support vector được đánh dấu',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-svm-fixed-margin-support-vector-geometry',
+  title: {
+    en: 'SVM demo: fixed margin and support vectors',
+    vi: 'Demo SVM: margin và support vector cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 130, y: 34 },
+      { x: 130, y: 208 },
+    ],
+    points: [
+      { classification: 'negative', label: '(0, 0) → 0', positiveFromStep: 0, x: 54, y: 178 },
+      {
+        classification: 'negative',
+        label: '(0, 1) support → 0',
+        positiveFromStep: 3,
+        x: 102,
+        y: 104,
+      },
+      {
+        classification: 'positive',
+        label: '(1, 0) support → 1',
+        positiveFromStep: 3,
+        x: 158,
+        y: 136,
+      },
+      {
+        classification: 'positive',
+        label: '(1, 1) support → 1',
+        positiveFromStep: 3,
+        x: 208,
+        y: 60,
+      },
+    ],
+  },
+};
+
+export const stellarClustersDemo: FixedDemoManifest = {
+  algorithmId: 'kmeans',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-stellar-clusters',
+  draftProvenance: cmlM08ClusteringDemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'A static clustering fixture: K = 2 is chosen only to make one assignment-and-update pass inspectable. The anonymous coordinates are not astronomical observations or externally sourced records.',
+      vi: 'Fixture phân cụm tĩnh: K = 2 chỉ được chọn để quan sát một lượt gán-cập nhật. Các tọa độ ẩn danh không phải quan sát thiên văn hoặc bản ghi lấy từ bên ngoài.',
+    },
+    datasetVersionId: 'dataset-demo-stellar-clusters-v1',
+    parameterValues: [{ id: 'k', value: 2 }],
+    rows: [
+      { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+      { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+      { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+    ],
+  },
+  learningObjective: {
+    en: 'Inspect one fixed clustering pass through initial centroids, nearest-centroid assignments, mean updates, and a cautious reading of the resulting groups.',
+    vi: 'Quan sát một lượt phân cụm cố định qua centroid khởi tạo, gán centroid gần nhất, cập nhật trung bình và cách đọc thận trọng các nhóm kết quả.',
+  },
+  moduleId: 'cml-m08-clustering',
+  problemId: 'problem-demo-stellar-clusters',
+  requiredStepIds: [
+    'cluster-problem',
+    'cluster-initial-centroids',
+    'cluster-assign-update',
+    'cluster-read-result',
+  ],
+  revisionId: 'demo-stellar-clusters-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'cluster-problem',
+      narration: {
+        en: 'This is a fixed set of four anonymous coordinates with no class labels. The task is to inspect a grouping procedure, not to infer a real type of star, person, or event from a cluster number.',
+        vi: 'Đây là tập bốn tọa độ ẩn danh cố định không có nhãn lớp. Nhiệm vụ là quan sát thủ tục gom nhóm, không suy ra loại sao, con người hay sự kiện thật từ số cụm.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A problem card states that four anonymous points will be grouped without ground-truth class labels.',
+        vi: 'Thẻ bài toán nêu bốn điểm ẩn danh sẽ được gom nhóm mà không có nhãn lớp sự thật.',
+      },
+      title: {
+        en: 'Frame an unlabelled grouping task',
+        vi: 'Đặt khung nhiệm vụ gom nhóm không nhãn',
+      },
+    },
+    {
+      id: 'cluster-initial-centroids',
+      narration: {
+        en: 'The fixture declares K = 2 and shows two initial centroids. Initialization matters because K-means can converge to a local minimum, so the starting positions are evidence to record rather than hidden configuration.',
+        vi: 'Fixture nêu K = 2 và hiển thị hai centroid khởi tạo. Khởi tạo quan trọng vì K-means có thể hội tụ ở cực tiểu cục bộ, nên vị trí bắt đầu là bằng chứng cần ghi thay vì cấu hình bị che giấu.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A centroid card names K = 2 and makes two fixed starting centres visible.',
+        vi: 'Thẻ centroid nêu K = 2 và làm rõ hai tâm bắt đầu cố định.',
+      },
+      title: {
+        en: 'Inspect the fixed initial centroids',
+        vi: 'Quan sát các centroid khởi tạo cố định',
+      },
+    },
+    {
+      id: 'cluster-assign-update',
+      narration: {
+        en: 'For each point, compare distances to the two current centroids and assign it to the nearer one. Then replace each centroid with the mean of its assigned points. This fixture displays one deterministic teaching pass; it does not run training or fetch data.',
+        vi: 'Với mỗi điểm, so sánh khoảng cách tới hai centroid hiện tại và gán nó cho tâm gần hơn. Sau đó thay mỗi centroid bằng trung bình của các điểm đã gán. Fixture hiển thị một lượt dạy học xác định; nó không chạy huấn luyện hay lấy dữ liệu.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'An assignment-and-update card maps each fixed point to its nearer centre, then states that the next centres are means of their assigned points.',
+        vi: 'Thẻ gán-cập nhật ghép mỗi điểm cố định với tâm gần hơn, rồi nêu tâm kế tiếp là trung bình của các điểm đã gán.',
+      },
+      title: {
+        en: 'Follow the assignment-and-update pass',
+        vi: 'Theo dõi lượt gán-cập nhật',
+      },
+    },
+    {
+      id: 'cluster-read-result',
+      narration: {
+        en: 'Read the two displayed groups as a compactness illustration only. A lower within-cluster sum of squares can support this fixed arrangement, but it does not prove that K = 2 is uniquely correct or that every real shape fits K-means assumptions.',
+        vi: 'Đọc hai nhóm hiển thị chỉ như minh họa độ gọn. Tổng bình phương trong cụm thấp hơn có thể ủng hộ cách sắp xếp cố định này, nhưng không chứng minh K = 2 là duy nhất đúng hoặc mọi hình dạng thực đều khớp giả định K-means.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A result card reports two fixed groups and cautions that compactness is evidence, not ground truth.',
+        vi: 'Thẻ kết quả báo hai nhóm cố định và lưu ý độ gọn là bằng chứng, không phải sự thật nền.',
+      },
+      title: {
+        en: 'Interpret the fixed grouping cautiously',
+        vi: 'Diễn giải cách gom nhóm cố định một cách thận trọng',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-clustering-fixed-centroid-assignment-update-compactness',
+  title: {
+    en: 'Clustering demo: fixed centroid assignment',
+    vi: 'Demo phân cụm: gán centroid cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 40, y: 176 },
+      { x: 126, y: 112 },
+      { x: 214, y: 48 },
+    ],
+    points: [
+      { label: '(0, 0) → cluster 0', positiveFromStep: 3, x: 58, y: 172 },
+      { label: '(0, 1) → cluster 0', positiveFromStep: 3, x: 58, y: 116 },
+      { label: '(1, 0) → cluster 1', positiveFromStep: 3, x: 172, y: 172 },
+      { label: '(1, 1) → cluster 1', positiveFromStep: 3, x: 172, y: 116 },
+    ],
+  },
+};
+
+export const pcaSensorCompressionDemo: FixedDemoManifest = {
+  algorithmId: 'pca',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-pca-sensor-compression',
+  draftProvenance: cmlM09PcaDemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'A static paired-measurement fixture: one component is retained only to inspect the projection trade-off. The numeric output fields are stable row identifiers for this teaching fixture, not reported PCA scores or measurements from real sensors.',
+      vi: 'Fixture phép đo cặp tĩnh: chỉ giữ một component để quan sát đánh đổi của phép chiếu. Các trường đầu ra số là ID hàng ổn định của fixture dạy học này, không phải điểm PCA được báo cáo hoặc số đo cảm biến thật.',
+    },
+    datasetVersionId: 'dataset-demo-pca-sensor-compression-v1',
+    parameterValues: [{ id: 'components', value: 1 }],
+    rows: [
+      { input: [1, 1], predictedOutput: 0, targetOutput: 0 },
+      { input: [2, 2], predictedOutput: 1, targetOutput: 1 },
+      { input: [3, 3], predictedOutput: 2, targetOutput: 2 },
+      { input: [4, 4], predictedOutput: 3, targetOutput: 3 },
+    ],
+  },
+  learningObjective: {
+    en: 'Inspect a fixed one-component PCA teaching trace through centering, a retained shared-variation direction, and the approximation that follows from dropping another direction.',
+    vi: 'Quan sát dấu vết dạy học PCA một component cố định qua centering, hướng biến thiên chung được giữ và xấp xỉ phát sinh khi bỏ một hướng khác.',
+  },
+  moduleId: 'cml-m09-pca',
+  problemId: 'problem-demo-pca-sensor-compression',
+  requiredStepIds: ['pca-problem', 'pca-center', 'pca-project', 'pca-read-tradeoff'],
+  revisionId: 'demo-pca-sensor-compression-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'pca-problem',
+      narration: {
+        en: 'This fixture contains four synthetic paired measurements, not data from real sensors or people. It asks how a shorter representation can describe shared variation; it does not classify, rank, or diagnose any record.',
+        vi: 'Fixture này chứa bốn phép đo cặp tổng hợp, không phải dữ liệu từ cảm biến thật hoặc con người. Nó hỏi biểu diễn ngắn hơn có thể mô tả biến thiên chung ra sao; nó không phân loại, xếp hạng hoặc chẩn đoán bất kỳ bản ghi nào.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A problem card introduces four synthetic paired measurements and a dimensionality-reduction question.',
+        vi: 'Thẻ bài toán giới thiệu bốn phép đo cặp tổng hợp và câu hỏi giảm chiều.',
+      },
+      title: {
+        en: 'Frame a synthetic shared-variation task',
+        vi: 'Đặt khung bài toán biến thiên chung tổng hợp',
+      },
+    },
+    {
+      id: 'pca-center',
+      narration: {
+        en: 'Center each feature before reading the component direction. The pinned account says PCA centers but does not automatically scale each feature before SVD, so the fixture records those as separate choices rather than treating them as the same operation.',
+        vi: 'Center từng feature trước khi đọc hướng component. Cách mô tả đã pin nêu PCA center nhưng không tự scale từng feature trước SVD, nên fixture ghi chúng là các lựa chọn riêng thay vì coi là cùng một thao tác.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A preprocessing card distinguishes centering each feature from automatic scaling.',
+        vi: 'Thẻ tiền xử lý phân biệt centering từng feature với scaling tự động.',
+      },
+      title: {
+        en: 'Center before projecting',
+        vi: 'Center trước khi chiếu',
+      },
+    },
+    {
+      id: 'pca-project',
+      narration: {
+        en: 'Retain one displayed orthogonal component as the shared-variation direction. The fixed diagonal guide is only a conceptual drawing: it shows that the representation has one dimension after projection, not a live numerical PCA calculation or a score for any row.',
+        vi: 'Giữ một component trực giao hiển thị như hướng biến thiên chung. Đường chéo cố định chỉ là hình vẽ khái niệm: nó cho thấy biểu diễn còn một chiều sau phép chiếu, không phải phép tính PCA số học live hoặc điểm số cho bất kỳ hàng nào.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A projection card shows one retained shared-variation direction for four fixed paired measurements.',
+        vi: 'Thẻ phép chiếu hiển thị một hướng biến thiên chung được giữ cho bốn phép đo cặp cố định.',
+      },
+      title: {
+        en: 'Keep one shared-variation direction',
+        vi: 'Giữ một hướng biến thiên chung',
+      },
+    },
+    {
+      id: 'pca-read-tradeoff',
+      narration: {
+        en: 'Read the result as a reduction trade-off: dropping lower-variance directions can preserve much of the explained variance while omitting information. If a reconstruction is shown, call it approximate unless appropriate evidence establishes otherwise; the source specifically notes a randomized PCA inverse transform is not exact.',
+        vi: 'Đọc kết quả như đánh đổi giảm chiều: bỏ các hướng phương sai thấp có thể giữ phần lớn phương sai đã giải thích trong khi bỏ sót thông tin. Nếu hiển thị tái dựng, hãy gọi nó là xấp xỉ trừ khi có bằng chứng phù hợp; nguồn nêu rõ inverse transform PCA randomized không chính xác.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A result card states that one retained direction is a reduced view with an approximation limit.',
+        vi: 'Thẻ kết quả nêu một hướng được giữ là góc nhìn rút gọn với giới hạn xấp xỉ.',
+      },
+      title: {
+        en: 'Read the reduction trade-off',
+        vi: 'Đọc đánh đổi giảm chiều',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-pca-fixed-centering-projection-approximation',
+  title: {
+    en: 'PCA demo: fixed one-component projection',
+    vi: 'Demo PCA: phép chiếu một component cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 42, y: 180 },
+      { x: 210, y: 44 },
+    ],
+    points: [
+      { label: '(1, 1) synthetic row', positiveFromStep: 2, x: 58, y: 168 },
+      { label: '(2, 2) synthetic row', positiveFromStep: 2, x: 96, y: 138 },
+      { label: '(3, 3) synthetic row', positiveFromStep: 2, x: 136, y: 106 },
+      { label: '(4, 4) synthetic row', positiveFromStep: 2, x: 176, y: 76 },
+    ],
+  },
+};
+
 const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
   'demo-linear-calibration': 'problem-demo-linear-calibration',
   'demo-regularization-noisy-signal': 'problem-demo-regularization-noisy-signal',
@@ -733,108 +1395,7 @@ interface DemoDraftDefinition {
   topic: LocalizedText;
 }
 
-const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {
-  'demo-neighbor-flower': {
-    decision: {
-      en: 'The fixed KNN view assigns the new sample from its nearest labelled neighbours after all displayed features share a scale.',
-      vi: 'Góc nhìn KNN cố định gán mẫu mới từ láng giềng đã gán nhãn gần nhất sau khi các feature hiển thị cùng thang đo.',
-    },
-    evidence: {
-      en: 'The fixed flower measurements are small enough to inspect neighbour distances without changing k or the dataset.',
-      vi: 'Các số đo hoa cố định đủ nhỏ để quan sát khoảng cách láng giềng mà không đổi k hoặc dataset.',
-    },
-    learningObjective: {
-      en: 'Explain a nearest-neighbour classification from fixed, scaled evidence.',
-      vi: 'Giải thích phân loại láng giềng gần nhất từ bằng chứng cố định đã chuẩn hóa.',
-    },
-    result: {
-      en: 'The final class follows the displayed neighbours and highlights that distance depends on representation.',
-      vi: 'Lớp cuối theo các láng giềng hiển thị và nhấn mạnh khoảng cách phụ thuộc vào cách biểu diễn.',
-    },
-    taskFingerprint: 'demo-knn-flower-neighbour-representation',
-    topic: { en: 'nearest-neighbour classification', vi: 'phân loại láng giềng gần nhất' },
-  },
-  'demo-tree-forest-habitat': {
-    decision: {
-      en: 'A fixed tree follows transparent split rules, while the forest combines several fixed tree votes before reporting a class.',
-      vi: 'Cây cố định đi theo quy tắc chia minh bạch, còn forest tổng hợp phiếu từ nhiều cây cố định trước khi báo lớp.',
-    },
-    evidence: {
-      en: 'The habitat cards expose the few feature checks used by each tree and keep the voting set fixed.',
-      vi: 'Các thẻ môi trường cho thấy vài kiểm tra feature của từng cây và giữ tập bỏ phiếu cố định.',
-    },
-    learningObjective: {
-      en: 'Contrast one interpretable split path with a fixed ensemble vote.',
-      vi: 'Đối chiếu một đường chia dễ giải thích với một phiếu ensemble cố định.',
-    },
-    result: {
-      en: 'The result makes the vote visible and leaves the learner to consider when diversity reduces brittleness.',
-      vi: 'Kết quả làm rõ phiếu bầu và để người học cân nhắc khi nào đa dạng giảm tính mong manh.',
-    },
-    taskFingerprint: 'demo-tree-forest-habitat-voting',
-    topic: { en: 'tree rules and forest voting', vi: 'quy tắc cây và phiếu forest' },
-  },
-  'demo-svm-margin': {
-    decision: {
-      en: 'The fixed separator is chosen for margin, so the closest support points constrain the boundary more than distant points.',
-      vi: 'Ranh giới cố định được chọn theo margin, nên các support point gần nhất ràng buộc đường biên mạnh hơn điểm ở xa.',
-    },
-    evidence: {
-      en: 'The fixed sketch shows two labelled clouds and the few points nearest the separating line.',
-      vi: 'Phác thảo cố định cho thấy hai đám mây có nhãn và vài điểm gần đường phân tách nhất.',
-    },
-    learningObjective: {
-      en: 'Read a fixed margin and identify why support vectors matter.',
-      vi: 'Đọc một margin cố định và xác định vì sao support vector quan trọng.',
-    },
-    result: {
-      en: 'The final frame preserves room around the line instead of fitting every distant point tightly.',
-      vi: 'Frame cuối giữ khoảng trống quanh đường biên thay vì khớp chặt mọi điểm ở xa.',
-    },
-    taskFingerprint: 'demo-svm-margin-support-points',
-    topic: { en: 'support-vector margin', vi: 'margin của support vector' },
-  },
-  'demo-stellar-clusters': {
-    decision: {
-      en: 'The fixed clustering view groups nearby observations and then checks whether the selected centres describe compact groups.',
-      vi: 'Góc nhìn phân cụm cố định gom các quan sát gần nhau rồi kiểm tra tâm đã chọn có mô tả nhóm gọn không.',
-    },
-    evidence: {
-      en: 'The fixed points are unlabeled and remain unchanged while the learner reads the centre assignments.',
-      vi: 'Các điểm cố định không có nhãn và giữ nguyên khi người học đọc gán tâm.',
-    },
-    learningObjective: {
-      en: 'Interpret a fixed clustering result without treating cluster labels as ground truth classes.',
-      vi: 'Diễn giải kết quả phân cụm cố định mà không coi nhãn cụm là lớp sự thật.',
-    },
-    result: {
-      en: 'The result reports compactness as a clue, not a proof that the chosen number of groups is uniquely correct.',
-      vi: 'Kết quả báo độ gọn như một gợi ý, không phải bằng chứng số nhóm đã chọn là duy nhất đúng.',
-    },
-    taskFingerprint: 'demo-clustering-stellar-centres-compactness',
-    topic: { en: 'fixed cluster centres', vi: 'tâm cụm cố định' },
-  },
-  'demo-pca-sensor-compression': {
-    decision: {
-      en: 'The fixed PCA projection keeps the directions with most shared variation and reconstructs the original signal approximately.',
-      vi: 'Phép chiếu PCA cố định giữ các hướng có biến thiên chung lớn nhất và tái dựng tín hiệu gốc gần đúng.',
-    },
-    evidence: {
-      en: 'The fixed sensor table contains related measurements so shared variation can be compared with the reconstruction.',
-      vi: 'Bảng cảm biến cố định có các số đo liên quan để so sánh biến thiên chung với tái dựng.',
-    },
-    learningObjective: {
-      en: 'Relate a fixed PCA projection to retained variation and reconstruction loss.',
-      vi: 'Liên hệ phép chiếu PCA cố định với biến thiên giữ lại và lỗi tái dựng.',
-    },
-    result: {
-      en: 'The final summary states what was kept and what approximation cost remains.',
-      vi: 'Tóm tắt cuối nêu điều được giữ và chi phí xấp xỉ còn lại.',
-    },
-    taskFingerprint: 'demo-pca-sensor-reconstruction',
-    topic: { en: 'PCA compression', vi: 'nén PCA' },
-  },
-};
+const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {};
 
 function getDemoDraftDefinition(demoId: string): DemoDraftDefinition {
   const definition = demoDraftDefinitions[demoId];
@@ -1032,6 +1593,11 @@ const handAuthoredDemos = [
   linearCalibrationDemo,
   regularizationNoisySignalDemo,
   logisticAdmissionDemo,
+  neighborFlowerDemo,
+  treeForestHabitatDemo,
+  svmMarginDemo,
+  stellarClustersDemo,
+  pcaSensorCompressionDemo,
 ] as const;
 const handAuthoredDemoIds = new Set(handAuthoredDemos.map((demo) => demo.demoId));
 

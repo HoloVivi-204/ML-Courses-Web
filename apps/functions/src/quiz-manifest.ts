@@ -11,6 +11,15 @@ import {
   cmlM04LogisticSourceTrace,
   cmlM04MetricsSourceTrace,
   cmlM04ModuleSourceTrace,
+  cmlM05KnnSourceTrace,
+  cmlM05ModuleSourceTrace,
+  cmlM05NaiveBayesSourceTrace,
+  cmlM06DecisionTreeSourceTrace,
+  cmlM06ModuleSourceTrace,
+  cmlM06RandomForestSourceTrace,
+  cmlM07SvmSourceTrace,
+  cmlM08ClusteringSourceTrace,
+  cmlM09PcaSourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -30,6 +39,29 @@ const CML_M04_METRICS_SOURCE_IDS = cmlM04MetricsSourceTrace.sourceSnapshots.map(
   (source) => source.sourceId,
 );
 const CML_M04_MODULE_SOURCE_IDS = cmlM04ModuleSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M05_KNN_SOURCE_IDS = cmlM05KnnSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M05_NAIVE_BAYES_SOURCE_IDS = cmlM05NaiveBayesSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M05_MODULE_SOURCE_IDS = ['sklearn-docs'] as const;
+const CML_M06_DECISION_TREE_SOURCE_IDS = cmlM06DecisionTreeSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M06_RANDOM_FOREST_SOURCE_IDS = cmlM06RandomForestSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M06_MODULE_SOURCE_IDS = ['sklearn-docs'] as const;
+const CML_M07_SVM_SOURCE_IDS = cmlM07SvmSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M08_CLUSTERING_SOURCE_IDS = cmlM08ClusteringSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M09_PCA_SOURCE_IDS = cmlM09PcaSourceTrace.sourceSnapshots.map(
   (source) => source.sourceId,
 );
 const dlM02DraftProvenance = {
@@ -87,6 +119,69 @@ const cmlM04ModuleDraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM04ModuleSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM05KnnDraftProvenance = {
+  candidateSourceIds: CML_M05_KNN_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM05KnnSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM05NaiveBayesDraftProvenance = {
+  candidateSourceIds: CML_M05_NAIVE_BAYES_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM05NaiveBayesSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM05ModuleDraftProvenance = {
+  candidateSourceIds: CML_M05_MODULE_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM05ModuleSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM06DecisionTreeDraftProvenance = {
+  candidateSourceIds: CML_M06_DECISION_TREE_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM06DecisionTreeSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM06RandomForestDraftProvenance = {
+  candidateSourceIds: CML_M06_RANDOM_FOREST_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM06RandomForestSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM06ModuleDraftProvenance = {
+  candidateSourceIds: CML_M06_MODULE_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM06ModuleSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM07SvmDraftProvenance = {
+  candidateSourceIds: CML_M07_SVM_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM07SvmSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM08ClusteringDraftProvenance = {
+  candidateSourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM08ClusteringSourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM09PcaDraftProvenance = {
+  candidateSourceIds: CML_M09_PCA_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM09PcaSourceTrace,
 } as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
@@ -3454,6 +3549,2704 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-cml-p08': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM05KnnDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m05-knn-naive-bayes',
+    passingScorePercent: 100,
+    postId: 'cml-p08-knn',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p08',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p08-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p08-knn', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-chosen-nearby-training-labels',
+        explanation: {
+          en: 'The pinned guide describes nearest-neighbour classification as predicting from a predefined number of the closest training samples. The labels of those nearby samples supply the class evidence.',
+          vi: 'Hướng dẫn đã pin mô tả phân loại láng giềng gần nhất là dự đoán từ một số mẫu train gần nhất đã định trước. Nhãn của các mẫu gần đó cung cấp bằng chứng cho lớp.',
+        },
+        hints: [
+          {
+            en: 'Look for labelled training examples selected by distance.',
+            vi: 'Tìm các ví dụ train đã gán nhãn được chọn theo khoảng cách.',
+          },
+          {
+            en: 'KNN does not begin by fitting a global straight line.',
+            vi: 'KNN không bắt đầu bằng việc khớp một đường thẳng toàn cục.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-chosen-nearby-training-labels',
+            text: {
+              en: 'A chosen number of nearby labelled training samples',
+              vi: 'Một số mẫu train gần đã gán nhãn được chọn',
+            },
+          },
+          {
+            optionId: 'opt-one-global-coefficient',
+            text: {
+              en: 'One global coefficient fitted before the query',
+              vi: 'Một hệ số toàn cục được khớp trước truy vấn',
+            },
+          },
+          {
+            optionId: 'opt-unlabelled-centres',
+            text: {
+              en: 'Only unlabelled cluster centres',
+              vi: 'Chỉ các tâm cụm không nhãn',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What evidence does fixed-k nearest-neighbour classification use for a query?',
+          vi: 'Phân loại láng giềng gần nhất với k cố định dùng bằng chứng nào cho một truy vấn?',
+        },
+        questionId: 'q-cml-p08-chosen-nearby-labels',
+        sourceId: 'act-cml-p08-knn-quiz-01',
+        sourceIds: CML_M05_KNN_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-class-one-majority',
+        explanation: {
+          en: 'With k fixed at 3, KNN reads the three selected nearest labels. Two class-1 labels and one class-0 label give class 1 by simple majority.',
+          vi: 'Với k cố định bằng 3, KNN đọc ba nhãn gần nhất đã chọn. Hai nhãn lớp 1 và một nhãn lớp 0 cho lớp 1 theo đa số đơn giản.',
+        },
+        hints: [
+          {
+            en: 'Count labels only after the nearest three have been selected.',
+            vi: 'Chỉ đếm nhãn sau khi ba điểm gần nhất đã được chọn.',
+          },
+          {
+            en: 'Two votes outweigh one vote.',
+            vi: 'Hai phiếu nhiều hơn một phiếu.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-class-one-majority',
+            text: {
+              en: 'Class 1, because it has two of the three votes',
+              vi: 'Lớp 1, vì có hai trong ba phiếu',
+            },
+          },
+          {
+            optionId: 'opt-class-zero-first',
+            text: {
+              en: 'Class 0, because its label appears first',
+              vi: 'Lớp 0, vì nhãn của nó xuất hiện trước',
+            },
+          },
+          {
+            optionId: 'opt-no-class-until-retrain',
+            text: {
+              en: 'No class until the model is retrained',
+              vi: 'Không có lớp nào cho đến khi mô hình được huấn luyện lại',
+            },
+          },
+        ],
+        prompt: {
+          en: 'For k = 3, the selected nearest labels are 1, 1, and 0. What class does a simple KNN majority vote assign?',
+          vi: 'Với k = 3, các nhãn gần nhất được chọn là 1, 1 và 0. Phiếu đa số KNN đơn giản gán lớp nào?',
+        },
+        questionId: 'q-cml-p08-fixed-majority-vote',
+        sourceId: 'act-cml-p08-knn-quiz-02',
+        sourceIds: CML_M05_KNN_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'The pinned guide notes that an exact-distance tie among differently labelled neighbours can make the result depend on the ordering of the training data. A tie deserves explicit inspection rather than a hidden assumption.',
+          vi: 'Hướng dẫn đã pin lưu ý rằng hòa khoảng cách chính xác giữa các láng giềng có nhãn khác nhau có thể khiến kết quả phụ thuộc vào thứ tự dữ liệu train. Một trường hợp hòa cần được kiểm tra rõ thay vì giả định ngầm.',
+        },
+        hints: [
+          {
+            en: 'Consider neighbours with equal distance but different labels.',
+            vi: 'Xét các láng giềng có khoảng cách bằng nhau nhưng nhãn khác nhau.',
+          },
+          {
+            en: 'The guide warns that ordering can become visible in this case.',
+            vi: 'Hướng dẫn cảnh báo thứ tự có thể trở nên quan trọng trong trường hợp này.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: when equally distant neighbours have different labels, a KNN result can depend on training-data ordering.',
+          vi: 'Đúng hay sai: khi các láng giềng cùng khoảng cách có nhãn khác nhau, kết quả KNN có thể phụ thuộc vào thứ tự dữ liệu train.',
+        },
+        questionId: 'q-cml-p08-distance-tie-ordering',
+        sourceId: 'act-cml-p08-knn-quiz-03',
+        sourceIds: CML_M05_KNN_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-post-cml-p09': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM05NaiveBayesDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m05-knn-naive-bayes',
+    passingScorePercent: 100,
+    postId: 'cml-p09-naive-bayes',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p09',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p09-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p09-naive-bayes', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-independent-given-class',
+        explanation: {
+          en: '“Naive” refers to the conditional-independence assumption: once the class is known, the feature terms are treated as independent for the model’s evidence calculation.',
+          vi: '“Naive” nói đến giả định độc lập có điều kiện: khi lớp đã biết, các hạng feature được coi là độc lập trong phép tính bằng chứng của mô hình.',
+        },
+        hints: [
+          {
+            en: 'The condition is the candidate class.',
+            vi: 'Điều kiện ở đây là lớp đang xét.',
+          },
+          {
+            en: 'This is an assumption used by the classifier, not a claim about every real dataset.',
+            vi: 'Đây là giả định mà classifier dùng, không phải khẳng định về mọi dataset thật.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-independent-given-class',
+            text: {
+              en: 'Feature terms are conditionally independent given the class',
+              vi: 'Các hạng feature độc lập có điều kiện khi biết lớp',
+            },
+          },
+          {
+            optionId: 'opt-identical-features',
+            text: {
+              en: 'All features must have identical values',
+              vi: 'Mọi feature phải có giá trị giống hệt nhau',
+            },
+          },
+          {
+            optionId: 'opt-no-training-labels',
+            text: {
+              en: 'Training data must not contain class labels',
+              vi: 'Dữ liệu train không được có nhãn lớp',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What conditional-independence assumption does Naive Bayes make in this lesson?',
+          vi: 'Naive Bayes dùng giả định độc lập có điều kiện nào trong bài này?',
+        },
+        questionId: 'q-cml-p09-conditional-independence',
+        sourceId: 'act-cml-p09-naive-bayes-quiz-01',
+        sourceIds: CML_M05_NAIVE_BAYES_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-relative-training-frequency',
+        explanation: {
+          en: 'The guide states that the class prior P(y) can be estimated from that class’s relative frequency in the training set. It is starting evidence, not the final result after features are observed.',
+          vi: 'Hướng dẫn nêu rằng prior lớp P(y) có thể được ước lượng từ tần suất tương đối của lớp đó trong tập train. Đây là bằng chứng ban đầu, không phải kết quả cuối sau khi đã quan sát feature.',
+        },
+        hints: [
+          {
+            en: 'Read the term before feature likelihoods are applied.',
+            vi: 'Đọc hạng trước khi likelihood của feature được áp dụng.',
+          },
+          {
+            en: 'It comes from class frequency in the training set.',
+            vi: 'Nó đến từ tần suất lớp trong tập train.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-relative-training-frequency',
+            text: {
+              en: 'The class’s relative frequency in training data',
+              vi: 'Tần suất tương đối của lớp trong dữ liệu train',
+            },
+          },
+          {
+            optionId: 'opt-last-prediction',
+            text: {
+              en: 'The label predicted for the previous record',
+              vi: 'Nhãn dự đoán cho bản ghi trước đó',
+            },
+          },
+          {
+            optionId: 'opt-browser-default',
+            text: {
+              en: 'A browser default selected by the interface',
+              vi: 'Giá trị mặc định của trình duyệt do giao diện chọn',
+            },
+          },
+        ],
+        prompt: {
+          en: 'In the pinned guide, what can estimate the Naive Bayes class prior P(y)?',
+          vi: 'Trong hướng dẫn đã pin, điều gì có thể ước lượng prior lớp P(y) của Naive Bayes?',
+        },
+        questionId: 'q-cml-p09-class-prior-frequency',
+        sourceId: 'act-cml-p09-naive-bayes-quiz-02',
+        sourceIds: CML_M05_NAIVE_BAYES_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-distribution-assumption', 'opt-class-conditional-term'],
+        explanation: {
+          en: 'Naive Bayes variants mainly differ in their distributional assumption for P(x_i | y). That term is class-conditional, so the model compares feature evidence within each candidate class.',
+          vi: 'Các biến thể Naive Bayes chủ yếu khác nhau ở giả định phân phối cho P(x_i | y). Hạng đó có điều kiện theo lớp, nên mô hình so sánh bằng chứng feature trong từng lớp ứng viên.',
+        },
+        hints: [
+          {
+            en: 'Choose statements about P(x_i | y), not a user-interface setting.',
+            vi: 'Chọn các phát biểu về P(x_i | y), không phải thiết lập giao diện.',
+          },
+          {
+            en: 'The notation includes both a feature and a class.',
+            vi: 'Ký hiệu bao gồm cả feature và lớp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-distribution-assumption',
+            text: {
+              en: 'Variants differ by a distribution assumption for feature terms',
+              vi: 'Các biến thể khác nhau bởi giả định phân phối cho các hạng feature',
+            },
+          },
+          {
+            optionId: 'opt-class-conditional-term',
+            text: {
+              en: 'P(x_i | y) is a feature term conditioned on a class',
+              vi: 'P(x_i | y) là hạng feature có điều kiện theo một lớp',
+            },
+          },
+          {
+            optionId: 'opt-fixed-certainty',
+            text: {
+              en: 'A posterior comparison proves a class with certainty',
+              vi: 'So sánh posterior chứng minh một lớp một cách chắc chắn',
+            },
+          },
+          {
+            optionId: 'opt-no-assumptions',
+            text: {
+              en: 'Every Naive Bayes variant avoids distribution assumptions',
+              vi: 'Mọi biến thể Naive Bayes đều tránh giả định phân phối',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly describe Naive Bayes feature likelihoods and variants?',
+          vi: 'Hai phát biểu nào mô tả đúng likelihood feature và các biến thể Naive Bayes?',
+        },
+        questionId: 'q-cml-p09-likelihood-variant-assumption',
+        sourceId: 'act-cml-p09-naive-bayes-quiz-03',
+        sourceIds: CML_M05_NAIVE_BAYES_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
+  'quiz-module-cml-m05': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-neighbor-flower',
+    draftProvenance: cmlM05ModuleDraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m05-knn-naive-bayes',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m05',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m05-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [
+      { id: 'knn', type: 'algorithm' },
+      { id: 'naive-bayes', type: 'algorithm' },
+    ],
+    questions: [
+      {
+        correctAnswer: 'opt-nearest-training-samples',
+        explanation: {
+          en: 'KNN is defined here by selecting a predefined number of the closest labelled training samples, then using their labels for the prediction.',
+          vi: 'KNN ở đây được xác định bằng cách chọn một số mẫu train đã gán nhãn gần nhất đã định trước, rồi dùng nhãn của chúng cho dự đoán.',
+        },
+        hints: [
+          {
+            en: 'The selected records are training samples near the query.',
+            vi: 'Các bản ghi được chọn là mẫu train ở gần truy vấn.',
+          },
+          {
+            en: 'The number is set by k.',
+            vi: 'Số lượng được đặt bởi k.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-nearest-training-samples',
+            text: {
+              en: 'A predefined number of closest labelled training samples',
+              vi: 'Một số mẫu train đã gán nhãn gần nhất được định trước',
+            },
+          },
+          {
+            optionId: 'opt-random-labels',
+            text: {
+              en: 'A random sample of labels from the course',
+              vi: 'Một mẫu nhãn ngẫu nhiên từ khóa học',
+            },
+          },
+          {
+            optionId: 'opt-one-unlabelled-centre',
+            text: {
+              en: 'One unlabelled cluster centre',
+              vi: 'Một tâm cụm không nhãn',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What does k select in the KNN classifier described in this module?',
+          vi: 'k chọn điều gì trong classifier KNN được mô tả ở module này?',
+        },
+        questionId: 'q-cml-m05-knn-selected-neighbours',
+        sourceId: 'quiz-module-cml-m05-q01',
+        sourceIds: CML_M05_MODULE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-query-class-one',
+        explanation: {
+          en: 'In the fixed demo, the query at (2, 2) has the three class-1 references (2, 1), (1, 2), and (3, 2) at distance 1. Their majority assigns class 1.',
+          vi: 'Trong demo cố định, truy vấn tại (2, 2) có ba điểm tham chiếu lớp 1 là (2, 1), (1, 2) và (3, 2) ở khoảng cách 1. Đa số của chúng gán lớp 1.',
+        },
+        hints: [
+          {
+            en: 'Use the displayed k = 3 and the three nearest coordinates.',
+            vi: 'Dùng k = 3 và ba tọa độ gần nhất được hiển thị.',
+          },
+          {
+            en: 'Each selected reference is class 1.',
+            vi: 'Mỗi điểm tham chiếu được chọn đều là lớp 1.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-query-class-one',
+            text: { en: 'Class 1', vi: 'Lớp 1' },
+          },
+          {
+            optionId: 'opt-query-class-zero',
+            text: { en: 'Class 0', vi: 'Lớp 0' },
+          },
+          {
+            optionId: 'opt-query-no-label',
+            text: { en: 'No class can be assigned', vi: 'Không thể gán lớp' },
+          },
+        ],
+        prompt: {
+          en: 'What class does the fixed k = 3 demo assign to the query at (2, 2)?',
+          vi: 'Demo cố định với k = 3 gán lớp nào cho truy vấn tại (2, 2)?',
+        },
+        questionId: 'q-cml-m05-fixed-demo-majority',
+        sourceId: 'quiz-module-cml-m05-q02',
+        sourceIds: CML_M05_MODULE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'The nearest-neighbours guide explicitly cautions that exact-distance ties with different labels can lead to ordering-dependent outcomes. A robust exercise should expose that ambiguity.',
+          vi: 'Hướng dẫn láng giềng gần nhất cảnh báo rõ rằng hòa khoảng cách chính xác với nhãn khác nhau có thể cho kết quả phụ thuộc thứ tự. Bài tập vững nên làm lộ sự mơ hồ đó.',
+        },
+        hints: [
+          {
+            en: 'The issue appears when distances tie exactly.',
+            vi: 'Vấn đề xuất hiện khi khoảng cách hòa chính xác.',
+          },
+          {
+            en: 'Different labels make the tie consequential.',
+            vi: 'Nhãn khác nhau làm trường hợp hòa trở nên có ý nghĩa.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a KNN tie with equally distant, differently labelled neighbours can depend on training order.',
+          vi: 'Đúng hay sai: một trường hợp hòa KNN với các láng giềng cùng khoảng cách, nhãn khác nhau có thể phụ thuộc thứ tự train.',
+        },
+        questionId: 'q-cml-m05-knn-tie-ordering',
+        sourceId: 'quiz-module-cml-m05-q03',
+        sourceIds: CML_M05_MODULE_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-supervised-bayes-classifier',
+        explanation: {
+          en: 'The pinned Naive Bayes guide describes the family as supervised learning based on Bayes’ theorem. It compares candidate classes from priors and feature likelihoods.',
+          vi: 'Hướng dẫn Naive Bayes đã pin mô tả họ phương pháp này là học có giám sát dựa trên định lý Bayes. Nó so sánh các lớp ứng viên từ prior và likelihood feature.',
+        },
+        hints: [
+          {
+            en: 'Look for both the learning setting and the theorem.',
+            vi: 'Tìm cả bối cảnh học và định lý.',
+          },
+          {
+            en: 'The training examples have class labels.',
+            vi: 'Các ví dụ train có nhãn lớp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-supervised-bayes-classifier',
+            text: {
+              en: 'A supervised classifier based on Bayes’ theorem',
+              vi: 'Một classifier có giám sát dựa trên định lý Bayes',
+            },
+          },
+          {
+            optionId: 'opt-unsupervised-centre-mover',
+            text: {
+              en: 'An unsupervised centre-moving procedure',
+              vi: 'Một quy trình di chuyển tâm không giám sát',
+            },
+          },
+          {
+            optionId: 'opt-visualization-only',
+            text: {
+              en: 'A visualization format with no class comparison',
+              vi: 'Một định dạng trực quan không có so sánh lớp',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does the module frame Naive Bayes?',
+          vi: 'Module đặt khung Naive Bayes như thế nào?',
+        },
+        questionId: 'q-cml-m05-naive-bayes-framing',
+        sourceId: 'quiz-module-cml-m05-q04',
+        sourceIds: CML_M05_MODULE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-training-relative-frequency',
+        explanation: {
+          en: 'The class prior P(y) may be estimated by relative class frequency in the training set. The observed feature terms are then incorporated for the current record.',
+          vi: 'Prior lớp P(y) có thể được ước lượng bằng tần suất lớp tương đối trong tập train. Các hạng feature quan sát sau đó được đưa vào cho bản ghi hiện tại.',
+        },
+        hints: [
+          {
+            en: 'Prior comes before record-specific feature evidence.',
+            vi: 'Prior có trước bằng chứng feature dành riêng cho bản ghi.',
+          },
+          {
+            en: 'It is an empirical frequency in the training data.',
+            vi: 'Đó là một tần suất thực nghiệm trong dữ liệu train.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-training-relative-frequency',
+            text: {
+              en: 'Relative class frequency in the training set',
+              vi: 'Tần suất lớp tương đối trong tập train',
+            },
+          },
+          {
+            optionId: 'opt-query-distance',
+            text: {
+              en: 'Distance from the query to a neighbour',
+              vi: 'Khoảng cách từ truy vấn tới một láng giềng',
+            },
+          },
+          {
+            optionId: 'opt-future-label',
+            text: {
+              en: 'The future label after prediction',
+              vi: 'Nhãn trong tương lai sau dự đoán',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What training-set quantity can provide the Naive Bayes class prior P(y)?',
+          vi: 'Đại lượng nào của tập train có thể cung cấp prior lớp P(y) cho Naive Bayes?',
+        },
+        questionId: 'q-cml-m05-naive-bayes-prior',
+        sourceId: 'quiz-module-cml-m05-q05',
+        sourceIds: CML_M05_MODULE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: [
+          'opt-report-prior',
+          'opt-report-feature-evidence',
+          'opt-report-independence-assumption',
+        ],
+        explanation: {
+          en: 'An inspectable Naive Bayes comparison keeps three pieces visible: the class prior, the class-conditional feature evidence, and the conditional-independence assumption that factorizes the evidence.',
+          vi: 'Một so sánh Naive Bayes có thể kiểm tra giữ rõ ba phần: prior lớp, bằng chứng feature có điều kiện theo lớp và giả định độc lập có điều kiện dùng để phân tích bằng chứng.',
+        },
+        hints: [
+          {
+            en: 'Choose the elements that explain how the class score was compared.',
+            vi: 'Chọn các phần giải thích điểm lớp được so sánh như thế nào.',
+          },
+          {
+            en: 'The assumption belongs beside the evidence, not hidden behind the result.',
+            vi: 'Giả định phải nằm cạnh bằng chứng, không ẩn sau kết quả.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-report-prior',
+            text: { en: 'The class prior', vi: 'Prior của lớp' },
+          },
+          {
+            optionId: 'opt-report-feature-evidence',
+            text: {
+              en: 'The class-conditional feature evidence',
+              vi: 'Bằng chứng feature có điều kiện theo lớp',
+            },
+          },
+          {
+            optionId: 'opt-report-independence-assumption',
+            text: {
+              en: 'The conditional-independence assumption',
+              vi: 'Giả định độc lập có điều kiện',
+            },
+          },
+          {
+            optionId: 'opt-report-certainty',
+            text: {
+              en: 'A claim that the selected class is certain',
+              vi: 'Khẳng định rằng lớp được chọn là chắc chắn',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which three details should be reported to make a Naive Bayes class comparison inspectable?',
+          vi: 'Ba chi tiết nào nên được báo cáo để so sánh lớp Naive Bayes có thể kiểm tra?',
+        },
+        questionId: 'q-cml-m05-naive-bayes-inspectable-evidence',
+        sourceId: 'quiz-module-cml-m05-q06',
+        sourceIds: CML_M05_MODULE_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
+  'quiz-post-cml-p10': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM06DecisionTreeDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m06-trees-forest',
+    passingScorePercent: 100,
+    postId: 'cml-p10-decision-tree',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p10',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p10-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p10-decision-tree', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-supervised-feature-rules',
+        explanation: {
+          en: 'The pinned guide frames decision trees as non-parametric supervised learning for classification and regression. Their prediction is built from simple rules learned from data features.',
+          vi: 'Hướng dẫn đã pin đặt khung cây quyết định là học có giám sát, phi tham số cho phân loại và hồi quy. Dự đoán của chúng được tạo từ các quy tắc đơn giản học từ feature dữ liệu.',
+        },
+        hints: [
+          {
+            en: 'Choose the learning setting that has a target and rules from features.',
+            vi: 'Chọn bối cảnh học có mục tiêu và quy tắc từ feature.',
+          },
+          {
+            en: 'The guide includes both classification and regression.',
+            vi: 'Hướng dẫn bao gồm cả phân loại và hồi quy.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-supervised-feature-rules',
+            text: {
+              en: 'A supervised method that learns simple rules from features',
+              vi: 'Phương pháp có giám sát học quy tắc đơn giản từ feature',
+            },
+          },
+          {
+            optionId: 'opt-unlabelled-centre-loop',
+            text: {
+              en: 'An unlabelled loop that moves cluster centres',
+              vi: 'Vòng lặp không nhãn di chuyển tâm cụm',
+            },
+          },
+          {
+            optionId: 'opt-one-global-distance',
+            text: {
+              en: 'A single global distance with no rules',
+              vi: 'Một khoảng cách toàn cục duy nhất không có quy tắc',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does the pinned guide frame a decision tree?',
+          vi: 'Hướng dẫn đã pin đặt khung cây quyết định như thế nào?',
+        },
+        questionId: 'q-cml-p10-supervised-rules',
+        sourceId: 'act-cml-p10-decision-tree-quiz-01',
+        sourceIds: CML_M06_DECISION_TREE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'The guide says deeper trees have more complex rules and fit the data more closely, but it also warns overly complex trees may not generalise well. More depth is not automatic evidence of a better model.',
+          vi: 'Hướng dẫn nêu cây sâu hơn có quy tắc phức tạp hơn và khớp dữ liệu sát hơn, nhưng cũng cảnh báo cây quá phức tạp có thể không tổng quát hóa tốt. Độ sâu nhiều hơn không tự động là bằng chứng mô hình tốt hơn.',
+        },
+        hints: [
+          {
+            en: 'Separate fitting the observed data from generalising to new data.',
+            vi: 'Tách việc khớp dữ liệu quan sát khỏi tổng quát hóa cho dữ liệu mới.',
+          },
+          {
+            en: 'The guide explicitly raises overfitting.',
+            vi: 'Hướng dẫn nêu rõ overfitting.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: because a deeper tree fits more detailed rules, it must generalise better than a shallower tree.',
+          vi: 'Đúng hay sai: vì cây sâu hơn khớp quy tắc chi tiết hơn, nó bắt buộc tổng quát hóa tốt hơn cây nông hơn.',
+        },
+        questionId: 'q-cml-p10-depth-not-guarantee',
+        sourceId: 'act-cml-p10-decision-tree-quiz-02',
+        sourceIds: CML_M06_DECISION_TREE_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: ['opt-pruning', 'opt-size-boundary'],
+        explanation: {
+          en: 'The guide lists pruning, a maximum depth, and minimum sample requirements at a split or leaf as ways to control over-complex trees. These are size controls, not a promise that one displayed tree is correct.',
+          vi: 'Hướng dẫn liệt kê pruning, độ sâu tối đa và yêu cầu số mẫu tối thiểu ở split hoặc lá là cách kiểm soát cây quá phức tạp. Đây là kiểm soát kích thước, không phải lời hứa một cây hiển thị là đúng.',
+        },
+        hints: [
+          {
+            en: 'Choose controls that stop unsupported branch growth.',
+            vi: 'Chọn kiểm soát ngăn nhánh phát triển thiếu bằng chứng.',
+          },
+          {
+            en: 'Both a pruning mechanism and a limit can be relevant.',
+            vi: 'Cả cơ chế pruning và một giới hạn đều có thể phù hợp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-pruning',
+            text: { en: 'Pruning the tree', vi: 'Pruning cây' },
+          },
+          {
+            optionId: 'opt-size-boundary',
+            text: {
+              en: 'A maximum depth or minimum-sample boundary',
+              vi: 'Biên độ sâu tối đa hoặc số mẫu tối thiểu',
+            },
+          },
+          {
+            optionId: 'opt-browser-theme',
+            text: { en: 'Changing the browser theme', vi: 'Đổi giao diện trình duyệt' },
+          },
+          {
+            optionId: 'opt-secret-threshold',
+            text: {
+              en: 'Hiding the split threshold from review',
+              vi: 'Ẩn ngưỡng split khỏi review',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two practices can control decision-tree complexity according to the pinned guide?',
+          vi: 'Hai thực hành nào có thể kiểm soát độ phức tạp của cây quyết định theo hướng dẫn đã pin?',
+        },
+        questionId: 'q-cml-p10-complexity-controls',
+        sourceId: 'act-cml-p10-decision-tree-quiz-03',
+        sourceIds: CML_M06_DECISION_TREE_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
+  'quiz-post-cml-p11': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM06RandomForestDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m06-trees-forest',
+    passingScorePercent: 100,
+    postId: 'cml-p11-random-forest',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p11',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p11-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p11-random-forest', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-combine-base-predictions',
+        explanation: {
+          en: 'The ensemble guide says ensemble methods combine predictions from several base estimators to improve generalisability or robustness over a single estimator.',
+          vi: 'Hướng dẫn ensemble nêu rằng phương pháp ensemble kết hợp dự đoán từ nhiều bộ ước lượng cơ sở để cải thiện khả năng tổng quát hóa hoặc độ vững so với một bộ ước lượng.',
+        },
+        hints: [
+          {
+            en: 'The key action happens after several estimators make predictions.',
+            vi: 'Động tác chính diễn ra sau khi nhiều bộ ước lượng dự đoán.',
+          },
+          {
+            en: 'It is not merely showing several models side by side.',
+            vi: 'Không chỉ là hiển thị nhiều mô hình cạnh nhau.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-combine-base-predictions',
+            text: {
+              en: 'Combine predictions from several base estimators',
+              vi: 'Kết hợp dự đoán từ nhiều bộ ước lượng cơ sở',
+            },
+          },
+          {
+            optionId: 'opt-copy-one-tree',
+            text: {
+              en: 'Copy one tree without changing its evidence',
+              vi: 'Sao chép một cây mà không đổi bằng chứng',
+            },
+          },
+          {
+            optionId: 'opt-hide-outputs',
+            text: {
+              en: 'Hide all individual outputs from the review',
+              vi: 'Ẩn mọi đầu ra riêng khỏi review',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What is the central move of an ensemble method in the pinned guide?',
+          vi: 'Động tác trung tâm của phương pháp ensemble trong hướng dẫn đã pin là gì?',
+        },
+        questionId: 'q-cml-p11-combine-predictions',
+        sourceId: 'act-cml-p11-random-forest-quiz-01',
+        sourceIds: CML_M06_RANDOM_FOREST_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-bootstrap-samples', 'opt-random-features'],
+        explanation: {
+          en: 'For random forests, the guide identifies bootstrapping samples and randomly selecting a feature subset at each split as two sources of randomness. They help make tree errors less coupled before aggregation.',
+          vi: 'Với random forest, hướng dẫn xác định bootstrap mẫu và chọn tập con feature ngẫu nhiên ở mỗi split là hai nguồn ngẫu nhiên. Chúng giúp lỗi của cây ít gắn chặt hơn trước khi tổng hợp.',
+        },
+        hints: [
+          {
+            en: 'Choose one source involving rows and one involving feature choices.',
+            vi: 'Chọn một nguồn liên quan đến dòng mẫu và một nguồn liên quan đến lựa chọn feature.',
+          },
+          {
+            en: 'Both sources introduce diversity before predictions are combined.',
+            vi: 'Cả hai nguồn đưa đa dạng vào trước khi dự đoán được kết hợp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-bootstrap-samples',
+            text: { en: 'Bootstrap samples', vi: 'Mẫu bootstrap' },
+          },
+          {
+            optionId: 'opt-random-features',
+            text: {
+              en: 'A random feature subset at each split',
+              vi: 'Tập con feature ngẫu nhiên ở mỗi split',
+            },
+          },
+          {
+            optionId: 'opt-identical-paths',
+            text: {
+              en: 'Forcing every tree to follow identical paths',
+              vi: 'Bắt mọi cây đi theo đường giống hệt nhau',
+            },
+          },
+          {
+            optionId: 'opt-live-user-input',
+            text: {
+              en: 'Collecting live user input during a vote',
+              vi: 'Thu thập đầu vào người dùng live trong lúc bỏ phiếu',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two sources of randomness does the guide name for random forests?',
+          vi: 'Hai nguồn ngẫu nhiên nào được hướng dẫn nêu cho random forest?',
+        },
+        questionId: 'q-cml-p11-randomness-sources',
+        sourceId: 'act-cml-p11-random-forest-quiz-02',
+        sourceIds: CML_M06_RANDOM_FOREST_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'opt-state-aggregation',
+        explanation: {
+          en: 'The lesson keeps the aggregation mechanism visible. The guide notes that a scikit-learn classifier implementation can average predicted probabilities rather than make each tree cast a hard class vote, so an exercise must name its own rule.',
+          vi: 'Bài học giữ cơ chế tổng hợp hiển thị. Hướng dẫn lưu ý triển khai classifier của scikit-learn có thể lấy trung bình xác suất dự đoán thay vì để mỗi cây bỏ một phiếu lớp cứng, nên bài tập phải nêu quy tắc của chính nó.',
+        },
+        hints: [
+          {
+            en: 'Do not assume every forest uses exactly the same final combination.',
+            vi: 'Đừng giả định mọi forest dùng chính xác cùng cách kết hợp cuối.',
+          },
+          {
+            en: 'The key is to name the aggregation used.',
+            vi: 'Điểm chính là nêu tên cách tổng hợp được dùng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-state-aggregation',
+            text: {
+              en: 'State the aggregation rule used by the exercise or model',
+              vi: 'Nêu quy tắc tổng hợp được bài tập hoặc mô hình dùng',
+            },
+          },
+          {
+            optionId: 'opt-universal-hard-vote',
+            text: {
+              en: 'Assume every forest always uses the same hard vote',
+              vi: 'Giả định mọi forest luôn dùng cùng phiếu cứng',
+            },
+          },
+          {
+            optionId: 'opt-no-combination',
+            text: {
+              en: 'Ignore how tree outputs are combined',
+              vi: 'Bỏ qua cách đầu ra cây được kết hợp',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What should be made explicit before interpreting a fixed forest result?',
+          vi: 'Điều gì nên được nêu rõ trước khi diễn giải một kết quả forest cố định?',
+        },
+        questionId: 'q-cml-p11-explicit-aggregation',
+        sourceId: 'act-cml-p11-random-forest-quiz-03',
+        sourceIds: CML_M06_RANDOM_FOREST_SOURCE_IDS,
+        type: 'single-choice',
+      },
+    ],
+  },
+  'quiz-module-cml-m06': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-tree-forest-habitat',
+    draftProvenance: cmlM06ModuleDraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m06-trees-forest',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m06',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m06-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [
+      { id: 'decision-tree', type: 'algorithm' },
+      { id: 'random-forest', type: 'algorithm' },
+    ],
+    questions: [
+      {
+        correctAnswer: 'opt-simple-rule-path',
+        explanation: {
+          en: 'A decision tree predicts from simple decision rules inferred from data features. Reading the path preserves the sequence of conditions that led to the leaf outcome.',
+          vi: 'Cây quyết định dự đoán từ các quy tắc đơn giản suy ra từ feature dữ liệu. Đọc đường đi giữ lại chuỗi điều kiện đã dẫn tới kết quả lá.',
+        },
+        hints: [
+          {
+            en: 'The prediction is a sequence of conditions, not one invisible score.',
+            vi: 'Dự đoán là chuỗi điều kiện, không phải một điểm vô hình.',
+          },
+          {
+            en: 'The guide calls them simple decision rules.',
+            vi: 'Hướng dẫn gọi chúng là các quy tắc quyết định đơn giản.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-simple-rule-path',
+            text: {
+              en: 'A path of simple decision rules inferred from features',
+              vi: 'Đường đi gồm quy tắc quyết định đơn giản suy ra từ feature',
+            },
+          },
+          {
+            optionId: 'opt-single-hidden-score',
+            text: {
+              en: 'One hidden score with no branch conditions',
+              vi: 'Một điểm ẩn không có điều kiện nhánh',
+            },
+          },
+          {
+            optionId: 'opt-unlabelled-cluster-name',
+            text: {
+              en: 'An unlabelled cluster name',
+              vi: 'Tên cụm không nhãn',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What is the most inspectable way to read a fixed decision-tree prediction?',
+          vi: 'Cách có thể kiểm tra nhất để đọc một dự đoán cây quyết định cố định là gì?',
+        },
+        questionId: 'q-cml-m06-tree-rule-path',
+        sourceId: 'quiz-module-cml-m06-q01',
+        sourceIds: CML_M06_MODULE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'In the fixed comparison, the first displayed tree checks signal A for query (1, 1) and follows the labelled path to class 0. The other two trees are deliberately different evidence paths.',
+          vi: 'Trong so sánh cố định, cây hiển thị đầu tiên kiểm tra tín hiệu A cho truy vấn (1, 1) và theo đường đã gán nhãn đến lớp 0. Hai cây còn lại cố ý là các đường bằng chứng khác.',
+        },
+        hints: [
+          {
+            en: 'Read the single-tree step before the ensemble step.',
+            vi: 'Đọc bước một cây trước bước ensemble.',
+          },
+          {
+            en: 'The first tree is the one dissenting from the other two.',
+            vi: 'Cây đầu tiên là cây khác với hai cây còn lại.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: in the fixed demo, the first displayed tree returns class 0 for query (1, 1).',
+          vi: 'Đúng hay sai: trong demo cố định, cây hiển thị đầu tiên trả về lớp 0 cho truy vấn (1, 1).',
+        },
+        questionId: 'q-cml-m06-first-tree-output',
+        sourceId: 'quiz-module-cml-m06-q02',
+        sourceIds: CML_M06_MODULE_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-forest-class-one',
+        explanation: {
+          en: 'The classroom fixture explicitly uses simple majority: class outputs 0, 1, and 1 produce class 1 because two of the three displayed trees support it.',
+          vi: 'Fixture lớp học nêu rõ đa số đơn giản: đầu ra lớp 0, 1 và 1 tạo lớp 1 vì hai trong ba cây hiển thị ủng hộ nó.',
+        },
+        hints: [
+          {
+            en: 'Use the aggregation rule stated by the demo.',
+            vi: 'Dùng quy tắc tổng hợp được demo nêu rõ.',
+          },
+          {
+            en: 'Count the two class-1 outputs against the one class-0 output.',
+            vi: 'Đếm hai đầu ra lớp 1 so với một đầu ra lớp 0.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-forest-class-one',
+            text: { en: 'Class 1', vi: 'Lớp 1' },
+          },
+          {
+            optionId: 'opt-forest-class-zero',
+            text: { en: 'Class 0', vi: 'Lớp 0' },
+          },
+          {
+            optionId: 'opt-forest-tie',
+            text: { en: 'An unresolved tie', vi: 'Một trường hợp hòa chưa giải quyết' },
+          },
+        ],
+        prompt: {
+          en: 'Under the fixed simple-majority rule, what class does the demo forest report for outputs 0, 1, and 1?',
+          vi: 'Theo quy tắc đa số đơn giản cố định, demo forest báo lớp nào cho đầu ra 0, 1 và 1?',
+        },
+        questionId: 'q-cml-m06-fixed-forest-majority',
+        sourceId: 'quiz-module-cml-m06-q03',
+        sourceIds: CML_M06_MODULE_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-prune-or-bound-depth', 'opt-minimum-sample-support'],
+        explanation: {
+          en: 'The decision-tree guide names pruning, maximum depth, and minimum samples at splits or leaves as controls against overly complex trees that may not generalise.',
+          vi: 'Hướng dẫn cây quyết định nêu pruning, độ sâu tối đa và số mẫu tối thiểu ở split hoặc lá là các kiểm soát chống cây quá phức tạp có thể không tổng quát hóa.',
+        },
+        hints: [
+          {
+            en: 'Choose controls about branch growth and evidence support.',
+            vi: 'Chọn kiểm soát về phát triển nhánh và hỗ trợ bằng chứng.',
+          },
+          {
+            en: 'Both depth and sample support appear in the guide.',
+            vi: 'Cả độ sâu và hỗ trợ mẫu đều xuất hiện trong hướng dẫn.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-prune-or-bound-depth',
+            text: {
+              en: 'Prune or bound the maximum depth',
+              vi: 'Prune hoặc giới hạn độ sâu tối đa',
+            },
+          },
+          {
+            optionId: 'opt-minimum-sample-support',
+            text: {
+              en: 'Require minimum sample support at splits or leaves',
+              vi: 'Yêu cầu hỗ trợ số mẫu tối thiểu tại split hoặc lá',
+            },
+          },
+          {
+            optionId: 'opt-add-branches-until-perfect',
+            text: {
+              en: 'Add branches until every training record is isolated',
+              vi: 'Thêm nhánh đến khi mọi bản ghi train bị cô lập',
+            },
+          },
+          {
+            optionId: 'opt-hide-validation',
+            text: {
+              en: 'Hide held-out evidence from the review',
+              vi: 'Ẩn bằng chứng giữ lại khỏi review',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two controls address decision-tree over-complexity?',
+          vi: 'Hai kiểm soát nào xử lý việc cây quyết định quá phức tạp?',
+        },
+        questionId: 'q-cml-m06-tree-generalisation-controls',
+        sourceId: 'quiz-module-cml-m06-q04',
+        sourceIds: CML_M06_MODULE_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: ['opt-bootstrap', 'opt-random-feature-subset'],
+        explanation: {
+          en: 'The forest guide identifies bootstrap sampling and randomly selected features at each split. Together they introduce diversity that can make tree prediction errors less correlated before aggregation.',
+          vi: 'Hướng dẫn forest xác định lấy mẫu bootstrap và feature được chọn ngẫu nhiên tại mỗi split. Chúng cùng đưa đa dạng vào, có thể làm lỗi dự đoán của cây ít tương quan hơn trước khi tổng hợp.',
+        },
+        hints: [
+          {
+            en: 'One choice changes samples; the other changes features.',
+            vi: 'Một lựa chọn thay đổi mẫu; lựa chọn kia thay đổi feature.',
+          },
+          {
+            en: 'They are sources of randomness, not final results.',
+            vi: 'Chúng là nguồn ngẫu nhiên, không phải kết quả cuối.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-bootstrap',
+            text: { en: 'Bootstrap sampling', vi: 'Lấy mẫu bootstrap' },
+          },
+          {
+            optionId: 'opt-random-feature-subset',
+            text: {
+              en: 'A random feature subset at each split',
+              vi: 'Tập con feature ngẫu nhiên ở mỗi split',
+            },
+          },
+          {
+            optionId: 'opt-same-sample-and-features',
+            text: {
+              en: 'The exact same samples and features for all trees',
+              vi: 'Chính xác cùng mẫu và feature cho mọi cây',
+            },
+          },
+          {
+            optionId: 'opt-new-live-labels',
+            text: {
+              en: 'New live labels collected after each vote',
+              vi: 'Nhãn live mới được thu sau mỗi phiếu',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two choices create diversity in the random-forest account used by this module?',
+          vi: 'Hai lựa chọn nào tạo đa dạng trong cách giải thích random forest của module này?',
+        },
+        questionId: 'q-cml-m06-forest-diversity',
+        sourceId: 'quiz-module-cml-m06-q05',
+        sourceIds: CML_M06_MODULE_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: [
+          'opt-report-sampling',
+          'opt-report-feature-randomness',
+          'opt-report-aggregation',
+          'opt-report-heldout-evidence',
+        ],
+        explanation: {
+          en: 'A defensible forest account identifies how trees were sampled, how feature choices were randomised, how outputs were aggregated, and what held-out evidence supports the claimed benefit.',
+          vi: 'Một cách giải thích forest có cơ sở xác định cây được lấy mẫu thế nào, lựa chọn feature được ngẫu nhiên hóa ra sao, đầu ra được tổng hợp thế nào và bằng chứng giữ lại nào hỗ trợ lợi ích được khẳng định.',
+        },
+        hints: [
+          {
+            en: 'Choose the full chain from diversity mechanism to evidence.',
+            vi: 'Chọn toàn bộ chuỗi từ cơ chế đa dạng đến bằng chứng.',
+          },
+          {
+            en: 'A final class alone does not justify a variance claim.',
+            vi: 'Chỉ lớp cuối không biện minh cho khẳng định phương sai.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-report-sampling',
+            text: { en: 'Tree sampling', vi: 'Cách lấy mẫu cây' },
+          },
+          {
+            optionId: 'opt-report-feature-randomness',
+            text: {
+              en: 'Feature-selection randomness',
+              vi: 'Ngẫu nhiên trong lựa chọn feature',
+            },
+          },
+          {
+            optionId: 'opt-report-aggregation',
+            text: { en: 'The aggregation rule', vi: 'Quy tắc tổng hợp' },
+          },
+          {
+            optionId: 'opt-report-heldout-evidence',
+            text: { en: 'Held-out evidence', vi: 'Bằng chứng giữ lại' },
+          },
+          {
+            optionId: 'opt-report-certainty',
+            text: {
+              en: 'A certainty claim with no validation',
+              vi: 'Khẳng định chắc chắn không có validation',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which four details make a random-forest variance claim inspectable?',
+          vi: 'Bốn chi tiết nào làm khẳng định phương sai random forest có thể kiểm tra?',
+        },
+        questionId: 'q-cml-m06-forest-inspectable-evidence',
+        sourceId: 'quiz-module-cml-m06-q06',
+        sourceIds: CML_M06_MODULE_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
+  'quiz-post-cml-p12': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM07SvmDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m07-svm',
+    passingScorePercent: 100,
+    postId: 'cml-p12-svm',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p12',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p12-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p12-svm', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-supervised-hyperplane',
+        explanation: {
+          en: 'The pinned guide describes SVMs as supervised methods for classification, regression, and outlier detection. For classification, they construct hyperplanes that separate classes.',
+          vi: 'Hướng dẫn đã pin mô tả SVM là các phương pháp có giám sát cho phân loại, hồi quy và phát hiện ngoại lệ. Với phân loại, chúng xây dựng siêu phẳng tách các lớp.',
+        },
+        hints: [
+          {
+            en: 'Choose the option that names both the learning setting and separator.',
+            vi: 'Chọn phương án nêu cả bối cảnh học và mặt phân tách.',
+          },
+          {
+            en: 'The guide uses the word hyperplane.',
+            vi: 'Hướng dẫn dùng từ hyperplane.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-supervised-hyperplane',
+            text: {
+              en: 'A supervised method that constructs separating hyperplanes',
+              vi: 'Phương pháp có giám sát xây dựng siêu phẳng phân tách',
+            },
+          },
+          {
+            optionId: 'opt-unlabelled-centres',
+            text: {
+              en: 'An unlabelled procedure that moves centres',
+              vi: 'Quy trình không nhãn di chuyển tâm',
+            },
+          },
+          {
+            optionId: 'opt-fixed-neighbour-vote',
+            text: {
+              en: 'A fixed neighbour vote with no separator',
+              vi: 'Phiếu láng giềng cố định không có mặt phân tách',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does the pinned guide frame an SVM classifier?',
+          vi: 'Hướng dẫn đã pin đặt khung classifier SVM như thế nào?',
+        },
+        questionId: 'q-cml-p12-supervised-hyperplane',
+        sourceId: 'act-cml-p12-svm-quiz-01',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-largest-nearest-distance', 'opt-support-vector-constraint'],
+        explanation: {
+          en: 'The guide says a good separator has the largest distance to the nearest training data of any class. The points on the margin boundaries are support vectors, so they constrain that geometry.',
+          vi: 'Hướng dẫn nêu mặt phân tách tốt có khoảng cách lớn nhất tới dữ liệu train gần nhất của bất kỳ lớp nào. Các điểm trên biên margin là support vector nên chúng ràng buộc hình học đó.',
+        },
+        hints: [
+          {
+            en: 'Choose one statement about nearest-point distance and one about margin-boundary points.',
+            vi: 'Chọn một phát biểu về khoảng cách điểm gần nhất và một về điểm trên biên margin.',
+          },
+          {
+            en: 'Distant points are not equally decisive.',
+            vi: 'Điểm xa không quyết định như nhau.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-largest-nearest-distance',
+            text: {
+              en: 'Seek the largest distance to nearest training points',
+              vi: 'Tìm khoảng cách lớn nhất tới các điểm train gần nhất',
+            },
+          },
+          {
+            optionId: 'opt-support-vector-constraint',
+            text: {
+              en: 'Margin-boundary points constrain the separator',
+              vi: 'Các điểm trên biên margin ràng buộc mặt phân tách',
+            },
+          },
+          {
+            optionId: 'opt-farthest-only',
+            text: {
+              en: 'Use only the farthest training points',
+              vi: 'Chỉ dùng các điểm train xa nhất',
+            },
+          },
+          {
+            optionId: 'opt-hide-margin',
+            text: {
+              en: 'Hide the margin during review',
+              vi: 'Ẩn margin khi review',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly describe the SVM margin account in this lesson?',
+          vi: 'Hai phát biểu nào mô tả đúng cách giải thích margin SVM trong bài này?',
+        },
+        questionId: 'q-cml-p12-margin-support-vectors',
+        sourceId: 'act-cml-p12-svm-quiz-02',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'When perfect separation is unavailable, the guide permits samples to be misclassified or lie inside a margin boundary. In that formulation, C controls penalty strength and acts as an inverse regularisation parameter.',
+          vi: 'Khi không thể phân tách hoàn hảo, hướng dẫn cho phép mẫu bị phân loại sai hoặc nằm trong biên margin. Trong công thức đó, C kiểm soát cường độ penalty và đóng vai trò tham số regularization nghịch.',
+        },
+        hints: [
+          {
+            en: 'Recall the trade-off between a margin and margin errors.',
+            vi: 'Nhớ đánh đổi giữa margin và lỗi margin.',
+          },
+          {
+            en: 'C is described as a penalty control.',
+            vi: 'C được mô tả là điều khiển penalty.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: in the pinned SVM formulation, C controls a penalty for margin errors and acts as an inverse regularisation parameter.',
+          vi: 'Đúng hay sai: trong công thức SVM đã pin, C kiểm soát penalty cho lỗi margin và đóng vai trò tham số regularization nghịch.',
+        },
+        questionId: 'q-cml-p12-c-penalty',
+        sourceId: 'act-cml-p12-svm-quiz-03',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-cml-m07': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-svm-margin',
+    draftProvenance: cmlM07SvmDraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m07-svm',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m07',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m07-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [{ id: 'svm', type: 'algorithm' }],
+    questions: [
+      {
+        correctAnswer: 'opt-largest-margin',
+        explanation: {
+          en: 'The guide’s intuitive account chooses the hyperplane with the largest distance to the nearest training data points of any class. That distance is the functional margin.',
+          vi: 'Cách giải thích trực quan của hướng dẫn chọn siêu phẳng có khoảng cách lớn nhất tới các điểm train gần nhất của bất kỳ lớp nào. Khoảng cách đó là margin hàm.',
+        },
+        hints: [
+          {
+            en: 'The comparison starts at the nearest points, not at a random gap.',
+            vi: 'So sánh bắt đầu ở các điểm gần nhất, không ở khoảng trống ngẫu nhiên.',
+          },
+          {
+            en: 'The adjective is “largest.”',
+            vi: 'Tính từ là “lớn nhất”.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-largest-margin',
+            text: {
+              en: 'The largest margin to nearest points',
+              vi: 'Margin lớn nhất tới các điểm gần nhất',
+            },
+          },
+          {
+            optionId: 'opt-most-branches',
+            text: {
+              en: 'The separator with most branches',
+              vi: 'Mặt phân tách có nhiều nhánh nhất',
+            },
+          },
+          {
+            optionId: 'opt-random-gap',
+            text: { en: 'A random visual gap', vi: 'Khoảng trống trực quan ngẫu nhiên' },
+          },
+        ],
+        prompt: {
+          en: 'What separator does the intuitive SVM account prefer?',
+          vi: 'Cách giải thích SVM trực quan ưu tiên mặt phân tách nào?',
+        },
+        questionId: 'q-cml-m07-largest-margin',
+        sourceId: 'quiz-module-cml-m07-q01',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-nearest-marked-points', 'opt-margin-boundary-points'],
+        explanation: {
+          en: 'The fixed demo marks the points nearest the displayed margin boundaries. In the guide’s separable illustration, points on those boundaries are support vectors, so the two descriptions identify the evidence the diagram asks the learner to inspect.',
+          vi: 'Demo cố định đánh dấu các điểm gần biên margin hiển thị nhất. Trong minh họa phân tách được của hướng dẫn, các điểm trên biên đó là support vector, nên hai mô tả xác định bằng chứng mà sơ đồ yêu cầu người học quan sát.',
+        },
+        hints: [
+          {
+            en: 'Choose descriptions of closeness to the displayed margins.',
+            vi: 'Chọn mô tả về sự gần các margin hiển thị.',
+          },
+          {
+            en: 'Support vectors are not defined by being far away.',
+            vi: 'Support vector không được xác định bởi việc ở xa.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-nearest-marked-points',
+            text: {
+              en: 'The marked points nearest the displayed margins',
+              vi: 'Các điểm được đánh dấu gần margin hiển thị nhất',
+            },
+          },
+          {
+            optionId: 'opt-margin-boundary-points',
+            text: {
+              en: 'The points on the illustrated margin boundaries',
+              vi: 'Các điểm trên biên margin được minh họa',
+            },
+          },
+          {
+            optionId: 'opt-farthest-corners',
+            text: {
+              en: 'The points farthest from the separator',
+              vi: 'Các điểm xa mặt phân tách nhất',
+            },
+          },
+          {
+            optionId: 'opt-all-points-equal',
+            text: {
+              en: 'Every displayed point equally constrains the line',
+              vi: 'Mọi điểm hiển thị đều ràng buộc đường như nhau',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two descriptions identify the support-vector evidence in the fixed margin diagram?',
+          vi: 'Hai mô tả nào xác định bằng chứng support vector trong sơ đồ margin cố định?',
+        },
+        questionId: 'q-cml-m07-fixed-support-evidence',
+        sourceId: 'quiz-module-cml-m07-q02',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'The guide explains that when a problem is not linearly separable, support vectors are samples within the margin boundaries. They do not disappear merely because perfect separation is unavailable.',
+          vi: 'Hướng dẫn giải thích rằng khi bài toán không phân tách tuyến tính, support vector là các mẫu trong các biên margin. Chúng không biến mất chỉ vì không thể phân tách hoàn hảo.',
+        },
+        hints: [
+          {
+            en: 'Read the non-linearly-separable case.',
+            vi: 'Đọc trường hợp không phân tách tuyến tính.',
+          },
+          {
+            en: 'The definition shifts to points within the margins.',
+            vi: 'Định nghĩa chuyển sang các điểm nằm trong margin.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: if data are not linearly separable, an SVM has no support vectors to inspect.',
+          vi: 'Đúng hay sai: nếu dữ liệu không phân tách tuyến tính, SVM không có support vector để quan sát.',
+        },
+        questionId: 'q-cml-m07-nonseparable-support-vectors',
+        sourceId: 'quiz-module-cml-m07-q03',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-c-penalty',
+        explanation: {
+          en: 'In the stated SVM formulation, C controls the penalty strength for points that are misclassified or within a margin boundary. It should be reported as a model choice rather than hidden.',
+          vi: 'Trong công thức SVM đã nêu, C kiểm soát cường độ penalty cho các điểm bị phân loại sai hoặc nằm trong biên margin. Nó cần được báo cáo như lựa chọn mô hình thay vì bị ẩn.',
+        },
+        hints: [
+          {
+            en: 'This parameter is about the error penalty.',
+            vi: 'Tham số này liên quan đến penalty lỗi.',
+          },
+          {
+            en: 'It is not the number of clusters.',
+            vi: 'Nó không phải số cụm.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-c-penalty',
+            text: {
+              en: 'The penalty strength for margin errors',
+              vi: 'Cường độ penalty cho lỗi margin',
+            },
+          },
+          {
+            optionId: 'opt-c-centres',
+            text: { en: 'The number of cluster centres', vi: 'Số tâm cụm' },
+          },
+          {
+            optionId: 'opt-c-browser',
+            text: { en: 'A browser cache duration', vi: 'Thời lượng cache trình duyệt' },
+          },
+        ],
+        prompt: {
+          en: 'What does C control in the SVM account used by this module?',
+          vi: 'C kiểm soát điều gì trong cách giải thích SVM của module này?',
+        },
+        questionId: 'q-cml-m07-c-penalty',
+        sourceId: 'quiz-module-cml-m07-q04',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-implicit-higher-space',
+        explanation: {
+          en: 'The guide describes kernels as implicitly mapping training vectors into a higher, possibly infinite-dimensional space. A kernel choice changes the representation used by the SVM, so it needs to be named.',
+          vi: 'Hướng dẫn mô tả kernel ánh xạ ngầm vector train vào không gian nhiều chiều hơn, có thể vô hạn. Lựa chọn kernel thay đổi biểu diễn SVM dùng nên cần được nêu tên.',
+        },
+        hints: [
+          {
+            en: 'The key word is “implicitly.”',
+            vi: 'Từ khóa là “ngầm”.',
+          },
+          {
+            en: 'It changes representation, not a user-interface colour.',
+            vi: 'Nó thay đổi biểu diễn, không phải màu giao diện.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-implicit-higher-space',
+            text: {
+              en: 'Implicitly map vectors into a higher-dimensional space',
+              vi: 'Ánh xạ ngầm vector vào không gian nhiều chiều hơn',
+            },
+          },
+          {
+            optionId: 'opt-delete-features',
+            text: { en: 'Delete all input features', vi: 'Xóa mọi feature đầu vào' },
+          },
+          {
+            optionId: 'opt-live-fetch',
+            text: { en: 'Fetch live labels from the network', vi: 'Lấy nhãn live từ mạng' },
+          },
+        ],
+        prompt: {
+          en: 'What representation role does the pinned guide assign to an SVM kernel?',
+          vi: 'Hướng dẫn đã pin gán vai trò biểu diễn nào cho kernel SVM?',
+        },
+        questionId: 'q-cml-m07-kernel-role',
+        sourceId: 'quiz-module-cml-m07-q05',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: [
+          'opt-report-margin',
+          'opt-report-support-geometry',
+          'opt-report-kernel',
+          'opt-report-penalty',
+          'opt-report-heldout',
+        ],
+        explanation: {
+          en: 'An inspectable SVM interpretation reports the margin, support-vector geometry, kernel, penalty setting, and held-out evidence. A fixed diagram by itself cannot establish a real-world decision.',
+          vi: 'Diễn giải SVM có thể kiểm tra báo cáo margin, hình học support vector, kernel, cài đặt penalty và bằng chứng giữ lại. Một sơ đồ cố định tự nó không thể thiết lập quyết định thực tế.',
+        },
+        hints: [
+          {
+            en: 'Choose the complete geometric, modelling, and evaluation chain.',
+            vi: 'Chọn chuỗi hoàn chỉnh về hình học, mô hình và đánh giá.',
+          },
+          {
+            en: 'Exclude a certainty claim that omits evidence.',
+            vi: 'Loại khẳng định chắc chắn bỏ qua bằng chứng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-report-margin',
+            text: { en: 'Margin interpretation', vi: 'Diễn giải margin' },
+          },
+          {
+            optionId: 'opt-report-support-geometry',
+            text: { en: 'Support-vector geometry', vi: 'Hình học support vector' },
+          },
+          { optionId: 'opt-report-kernel', text: { en: 'Kernel choice', vi: 'Lựa chọn kernel' } },
+          {
+            optionId: 'opt-report-penalty',
+            text: { en: 'Penalty setting', vi: 'Cài đặt penalty' },
+          },
+          {
+            optionId: 'opt-report-heldout',
+            text: { en: 'Held-out evidence', vi: 'Bằng chứng giữ lại' },
+          },
+          {
+            optionId: 'opt-report-certainty',
+            text: {
+              en: 'A certainty claim without validation',
+              vi: 'Khẳng định chắc chắn không có validation',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which five details make an SVM boundary interpretation reviewable?',
+          vi: 'Năm chi tiết nào làm diễn giải ranh giới SVM có thể review?',
+        },
+        questionId: 'q-cml-m07-reviewable-interpretation',
+        sourceId: 'quiz-module-cml-m07-q06',
+        sourceIds: CML_M07_SVM_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
+  'quiz-post-cml-p13': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM08ClusteringDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m08-clustering',
+    passingScorePercent: 100,
+    postId: 'cml-p13-kmeans',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p13',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p13-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p13-kmeans', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-mean-centroid',
+        explanation: {
+          en: 'The pinned guide describes each K-means cluster through its mean, called a centroid. That centroid need not be one of the original samples.',
+          vi: 'Hướng dẫn đã pin mô tả mỗi cụm K-means qua trung bình của nó, gọi là centroid. Centroid đó không cần là một mẫu gốc.',
+        },
+        hints: [
+          {
+            en: 'Look for the statistic used to describe each disjoint cluster.',
+            vi: 'Tìm thống kê dùng để mô tả mỗi cụm rời nhau.',
+          },
+          {
+            en: 'A centroid is computed from assigned samples.',
+            vi: 'Centroid được tính từ các mẫu đã gán.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-mean-centroid',
+            text: { en: 'The mean of the assigned samples', vi: 'Trung bình của các mẫu đã gán' },
+          },
+          {
+            optionId: 'opt-nearest-original',
+            text: { en: 'Always the nearest original sample', vi: 'Luôn là mẫu gốc gần nhất' },
+          },
+          {
+            optionId: 'opt-known-class',
+            text: { en: 'A known class label', vi: 'Một nhãn lớp đã biết' },
+          },
+          {
+            optionId: 'opt-largest-distance',
+            text: {
+              en: 'The largest distance in the group',
+              vi: 'Khoảng cách lớn nhất trong nhóm',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What does the lesson call the value that describes a K-means cluster?',
+          vi: 'Bài học gọi giá trị mô tả một cụm K-means là gì?',
+        },
+        questionId: 'q-cml-p13-centroid-mean',
+        sourceId: 'act-cml-p13-kmeans-quiz-01',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-assign-nearest', 'opt-update-mean'],
+        explanation: {
+          en: 'One iteration assigns samples to the nearest current centroid, then recalculates each centroid as the mean of its assigned samples. The two operations are repeated after the update.',
+          vi: 'Một vòng lặp gán mẫu cho centroid hiện tại gần nhất, rồi tính lại mỗi centroid bằng trung bình các mẫu đã gán. Hai thao tác lặp lại sau cập nhật.',
+        },
+        hints: [
+          {
+            en: 'The loop has an assignment action and an update action.',
+            vi: 'Vòng lặp có thao tác gán và thao tác cập nhật.',
+          },
+          {
+            en: 'The update uses a mean, not a class label.',
+            vi: 'Cập nhật dùng trung bình, không dùng nhãn lớp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-assign-nearest',
+            text: {
+              en: 'Assign each sample to its nearest current centroid',
+              vi: 'Gán mỗi mẫu cho centroid hiện tại gần nhất',
+            },
+          },
+          {
+            optionId: 'opt-update-mean',
+            text: {
+              en: 'Replace each centroid with the mean of its assigned samples',
+              vi: 'Thay mỗi centroid bằng trung bình các mẫu đã gán',
+            },
+          },
+          {
+            optionId: 'opt-request-labels',
+            text: {
+              en: 'Request a ground-truth class label for every sample',
+              vi: 'Yêu cầu nhãn lớp sự thật cho mọi mẫu',
+            },
+          },
+          {
+            optionId: 'opt-freeze-centres',
+            text: {
+              en: 'Keep the initial centroids unchanged after assignment',
+              vi: 'Giữ centroid khởi tạo không đổi sau khi gán',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two actions form the K-means assignment-and-update loop?',
+          vi: 'Hai thao tác nào tạo thành vòng lặp gán-cập nhật K-means?',
+        },
+        questionId: 'q-cml-p13-assign-update',
+        sourceId: 'act-cml-p13-kmeans-quiz-02',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'Inertia measures within-cluster sum of squares, but the guide notes shape assumptions and lack of normalization. A lower value alone does not prove that a chosen K is uniquely correct.',
+          vi: 'Inertia đo tổng bình phương trong cụm, nhưng hướng dẫn nêu các giả định hình dạng và việc không chuẩn hóa. Chỉ giá trị thấp hơn không chứng minh K đã chọn là duy nhất đúng.',
+        },
+        hints: [
+          {
+            en: 'Separate compactness evidence from an absolute verdict.',
+            vi: 'Tách bằng chứng độ gọn khỏi phán quyết tuyệt đối.',
+          },
+          {
+            en: 'Recall the limitations for irregular or elongated shapes.',
+            vi: 'Nhớ các giới hạn với hình dạng bất quy tắc hoặc kéo dài.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: the lowest inertia by itself proves that the selected K is the uniquely correct clustering.',
+          vi: 'Đúng hay sai: chỉ inertia thấp nhất tự nó chứng minh K đã chọn là cách phân cụm duy nhất đúng.',
+        },
+        questionId: 'q-cml-p13-inertia-not-verdict',
+        sourceId: 'act-cml-p13-kmeans-quiz-03',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-post-cml-p14': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM08ClusteringDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m08-clustering',
+    passingScorePercent: 100,
+    postId: 'cml-p14-hierarchical-clustering',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p14',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p14-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p14-hierarchical-clustering', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-start-singletons',
+        explanation: {
+          en: 'Agglomerative clustering is bottom-up: each observation begins in its own cluster and clusters are successively merged.',
+          vi: 'Phân cụm kết tụ đi từ dưới lên: mỗi quan sát bắt đầu trong cụm riêng và các cụm được gộp liên tiếp.',
+        },
+        hints: [
+          {
+            en: 'Think about the first state before any merge.',
+            vi: 'Hãy nghĩ về trạng thái đầu tiên trước bất kỳ lần gộp nào.',
+          },
+          {
+            en: 'Agglomerative means building larger groups from small ones.',
+            vi: 'Kết tụ nghĩa là xây nhóm lớn hơn từ các nhóm nhỏ.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-start-singletons',
+            text: {
+              en: 'Each observation begins as its own cluster',
+              vi: 'Mỗi quan sát bắt đầu là một cụm riêng',
+            },
+          },
+          {
+            optionId: 'opt-start-one',
+            text: {
+              en: 'All observations begin in one final cluster',
+              vi: 'Mọi quan sát bắt đầu trong một cụm cuối cùng',
+            },
+          },
+          {
+            optionId: 'opt-start-labelled',
+            text: {
+              en: 'Each known class becomes a cluster',
+              vi: 'Mỗi lớp đã biết trở thành một cụm',
+            },
+          },
+          {
+            optionId: 'opt-start-random-answer',
+            text: {
+              en: 'The learner selects a class label first',
+              vi: 'Người học chọn nhãn lớp trước',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does agglomerative hierarchical clustering begin?',
+          vi: 'Phân cụm phân cấp kết tụ bắt đầu như thế nào?',
+        },
+        questionId: 'q-cml-p14-agglomerative-start',
+        sourceId: 'act-cml-p14-hierarchical-clustering-quiz-01',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-ward-within-squares', 'opt-single-closest'],
+        explanation: {
+          en: 'The guide describes Ward linkage through within-cluster squared distances and single linkage through the closest distance between clusters. Linkage determines which merge is justified next.',
+          vi: 'Hướng dẫn mô tả linkage Ward qua khoảng cách bình phương trong cụm và single linkage qua khoảng cách gần nhất giữa các cụm. Linkage quyết định lần gộp nào được biện minh tiếp theo.',
+        },
+        hints: [
+          {
+            en: 'Choose the descriptions tied to named linkage rules.',
+            vi: 'Chọn các mô tả gắn với quy tắc linkage đã nêu tên.',
+          },
+          {
+            en: 'One rule uses squared within-cluster distances; another uses the closest pair.',
+            vi: 'Một quy tắc dùng khoảng cách bình phương trong cụm; quy tắc khác dùng cặp gần nhất.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-ward-within-squares',
+            text: {
+              en: 'Ward linkage minimizes within-cluster squared distances',
+              vi: 'Linkage Ward giảm khoảng cách bình phương trong cụm',
+            },
+          },
+          {
+            optionId: 'opt-single-closest',
+            text: {
+              en: 'Single linkage uses the closest distance between clusters',
+              vi: 'Single linkage dùng khoảng cách gần nhất giữa các cụm',
+            },
+          },
+          {
+            optionId: 'opt-complete-average',
+            text: {
+              en: 'Complete linkage uses only the average distance',
+              vi: 'Complete linkage chỉ dùng khoảng cách trung bình',
+            },
+          },
+          {
+            optionId: 'opt-linkage-label',
+            text: {
+              en: 'Linkage assigns a ground-truth class label',
+              vi: 'Linkage gán nhãn lớp sự thật',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly describe linkage rules in this lesson?',
+          vi: 'Hai phát biểu nào mô tả đúng các quy tắc linkage trong bài này?',
+        },
+        questionId: 'q-cml-p14-linkage-rules',
+        sourceId: 'act-cml-p14-hierarchical-clustering-quiz-02',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'A dendrogram represents the nested hierarchy: its root contains all samples and its leaves are individual samples. A cut should still be explained with its linkage and merge evidence.',
+          vi: 'Dendrogram biểu diễn hệ phân cấp lồng nhau: gốc chứa tất cả mẫu và lá là từng mẫu riêng. Mức cắt vẫn cần được giải thích bằng linkage và bằng chứng gộp.',
+        },
+        hints: [
+          {
+            en: 'Recall the two ends of the hierarchy picture.',
+            vi: 'Nhớ hai đầu của bức tranh hệ phân cấp.',
+          },
+          {
+            en: 'The root is the broadest cluster, not an individual observation.',
+            vi: 'Gốc là cụm rộng nhất, không phải một quan sát riêng lẻ.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: in the lesson dendrogram, the root contains all samples and the leaves are individual samples.',
+          vi: 'Đúng hay sai: trong dendrogram của bài học, gốc chứa mọi mẫu và các lá là từng mẫu riêng.',
+        },
+        questionId: 'q-cml-p14-dendrogram-root-leaves',
+        sourceId: 'act-cml-p14-hierarchical-clustering-quiz-03',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-cml-m08': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-stellar-clusters',
+    draftProvenance: cmlM08ClusteringDraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m08-clustering',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m08',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m08-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [
+      { id: 'kmeans', type: 'algorithm' },
+      { id: 'hierarchical-clustering', type: 'algorithm' },
+    ],
+    questions: [
+      {
+        correctAnswer: 'opt-k-disjoint-groups',
+        explanation: {
+          en: 'K-means partitions N samples into K disjoint clusters. Choosing K states the grouping question; it does not reveal a pre-existing class label.',
+          vi: 'K-means phân hoạch N mẫu thành K cụm rời nhau. Chọn K nêu câu hỏi gom nhóm; nó không tiết lộ nhãn lớp có sẵn.',
+        },
+        hints: [
+          {
+            en: 'K is chosen before the assignment-and-update loop.',
+            vi: 'K được chọn trước vòng lặp gán-cập nhật.',
+          },
+          {
+            en: 'Think of a requested number of groups, not a label value.',
+            vi: 'Hãy nghĩ về số nhóm được yêu cầu, không phải giá trị nhãn.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-k-disjoint-groups',
+            text: {
+              en: 'How many disjoint clusters K-means should describe',
+              vi: 'K-means nên mô tả bao nhiêu cụm rời nhau',
+            },
+          },
+          {
+            optionId: 'opt-k-known-labels',
+            text: {
+              en: 'Which ground-truth class labels to copy',
+              vi: 'Nhãn lớp sự thật nào cần sao chép',
+            },
+          },
+          {
+            optionId: 'opt-k-network-request',
+            text: { en: 'How many network requests to make', vi: 'Cần tạo bao nhiêu yêu cầu mạng' },
+          },
+          {
+            optionId: 'opt-k-tree-depth',
+            text: { en: 'The depth of a decision tree', vi: 'Độ sâu của cây quyết định' },
+          },
+        ],
+        prompt: {
+          en: 'What decision does K make explicit in the K-means part of this module?',
+          vi: 'K làm rõ quyết định nào trong phần K-means của module?',
+        },
+        questionId: 'q-cml-m08-k-group-count',
+        sourceId: 'quiz-module-cml-m08-q01',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-nearest-assignment', 'opt-mean-update'],
+        explanation: {
+          en: 'The fixed demo makes one K-means pass inspectable: points are assigned to a nearer current centroid, then centres are updated from means of assigned points.',
+          vi: 'Demo cố định làm một lượt K-means có thể quan sát: điểm được gán cho centroid hiện tại gần hơn, rồi tâm được cập nhật từ trung bình các điểm đã gán.',
+        },
+        hints: [
+          {
+            en: 'Select the two steps that transform the current centroids.',
+            vi: 'Chọn hai bước biến đổi các centroid hiện tại.',
+          },
+          {
+            en: 'The procedure has no ground-truth class lookup.',
+            vi: 'Thủ tục không tra cứu nhãn lớp sự thật.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-nearest-assignment',
+            text: {
+              en: 'Assign a point to a nearer current centroid',
+              vi: 'Gán điểm cho centroid hiện tại gần hơn',
+            },
+          },
+          {
+            optionId: 'opt-mean-update',
+            text: {
+              en: 'Update a centroid from the mean of its assigned points',
+              vi: 'Cập nhật centroid từ trung bình các điểm đã gán',
+            },
+          },
+          {
+            optionId: 'opt-hidden-label-fetch',
+            text: { en: 'Fetch a hidden ground-truth label', vi: 'Lấy nhãn sự thật bị ẩn' },
+          },
+          {
+            optionId: 'opt-stay-static',
+            text: {
+              en: 'Prohibit centroid movement after every pass',
+              vi: 'Cấm centroid dịch chuyển sau mỗi lượt',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two actions make the static demo a K-means assignment-and-update pass?',
+          vi: 'Hai thao tác nào làm demo tĩnh trở thành một lượt gán-cập nhật K-means?',
+        },
+        questionId: 'q-cml-m08-kmeans-pass',
+        sourceId: 'quiz-module-cml-m08-q02',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'K-means convergence can depend on initialization and can reach a local minimum. A fixed initialization must therefore be visible in a reviewable interpretation.',
+          vi: 'Sự hội tụ K-means có thể phụ thuộc khởi tạo và có thể đạt cực tiểu cục bộ. Vì vậy một khởi tạo cố định phải nhìn thấy được trong diễn giải có thể review.',
+        },
+        hints: [
+          {
+            en: 'Recall the source warning about initialization.',
+            vi: 'Nhớ cảnh báo của nguồn về khởi tạo.',
+          },
+          {
+            en: 'Convergence does not automatically mean a unique global outcome.',
+            vi: 'Hội tụ không tự động có nghĩa là kết quả toàn cục duy nhất.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: any K-means initialization must converge to the same uniquely global result.',
+          vi: 'Đúng hay sai: mọi khởi tạo K-means phải hội tụ đến cùng một kết quả toàn cục duy nhất.',
+        },
+        questionId: 'q-cml-m08-kmeans-local-minimum',
+        sourceId: 'quiz-module-cml-m08-q03',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-hierarchy-dendrogram',
+        explanation: {
+          en: 'Hierarchical clustering builds nested clusters through successive merging or splitting, and a dendrogram represents that hierarchy for inspection.',
+          vi: 'Phân cụm phân cấp xây cụm lồng nhau qua gộp hoặc tách liên tiếp, và dendrogram biểu diễn hệ phân cấp đó để quan sát.',
+        },
+        hints: [
+          {
+            en: 'Look for the representation that records nested merges.',
+            vi: 'Tìm biểu diễn ghi lại các lần gộp lồng nhau.',
+          },
+          {
+            en: 'The diagram has a root and individual leaves.',
+            vi: 'Sơ đồ có gốc và các lá riêng lẻ.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-hierarchy-dendrogram',
+            text: {
+              en: 'A dendrogram of nested merges or splits',
+              vi: 'Dendrogram của các lần gộp hoặc tách lồng nhau',
+            },
+          },
+          {
+            optionId: 'opt-fixed-known-label',
+            text: { en: 'A table of known class labels', vi: 'Bảng nhãn lớp đã biết' },
+          },
+          {
+            optionId: 'opt-live-score',
+            text: { en: 'A live individual risk score', vi: 'Điểm rủi ro live của cá nhân' },
+          },
+          {
+            optionId: 'opt-secret-answer',
+            text: {
+              en: 'An answer key hidden in the browser',
+              vi: 'Đáp án bị ẩn trong trình duyệt',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What representation makes a hierarchical clustering sequence inspectable?',
+          vi: 'Biểu diễn nào làm chuỗi phân cụm phân cấp có thể quan sát?',
+        },
+        questionId: 'q-cml-m08-dendrogram-representation',
+        sourceId: 'quiz-module-cml-m08-q04',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-complete-largest', 'opt-average-mean-distance'],
+        explanation: {
+          en: 'Complete linkage is defined through the largest distance between clusters, while average linkage uses an average distance. Naming either rule makes the merge basis reviewable.',
+          vi: 'Complete linkage được xác định qua khoảng cách lớn nhất giữa các cụm, còn average linkage dùng khoảng cách trung bình. Nêu tên quy tắc làm cơ sở gộp có thể review.',
+        },
+        hints: [
+          {
+            en: 'Select the two descriptions that match named linkage rules.',
+            vi: 'Chọn hai mô tả khớp với quy tắc linkage đã nêu tên.',
+          },
+          {
+            en: 'One takes the maximum distance; the other takes an average.',
+            vi: 'Một quy tắc lấy khoảng cách lớn nhất; quy tắc kia lấy trung bình.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-complete-largest',
+            text: {
+              en: 'Complete linkage uses the largest distance between clusters',
+              vi: 'Complete linkage dùng khoảng cách lớn nhất giữa các cụm',
+            },
+          },
+          {
+            optionId: 'opt-average-mean-distance',
+            text: {
+              en: 'Average linkage uses an average distance',
+              vi: 'Average linkage dùng khoảng cách trung bình',
+            },
+          },
+          {
+            optionId: 'opt-ward-known-label',
+            text: {
+              en: 'Ward linkage copies known class labels',
+              vi: 'Linkage Ward sao chép nhãn lớp đã biết',
+            },
+          },
+          {
+            optionId: 'opt-single-farthest',
+            text: {
+              en: 'Single linkage uses the farthest distance',
+              vi: 'Single linkage dùng khoảng cách xa nhất',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly describe linkage choices in the fixed hierarchy lesson?',
+          vi: 'Hai phát biểu nào mô tả đúng các lựa chọn linkage trong bài hệ phân cấp cố định?',
+        },
+        questionId: 'q-cml-m08-linkage-comparison',
+        sourceId: 'quiz-module-cml-m08-q05',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'Cluster identifiers describe a grouping procedure, not ground-truth classes. A defensible dendrogram cut names the linkage, distance basis, and merge level instead of treating the cluster number as a real-world category.',
+          vi: 'ID cụm mô tả thủ tục gom nhóm, không phải lớp sự thật. Mức cắt dendrogram có cơ sở nêu linkage, cơ sở khoảng cách và mức gộp thay vì coi số cụm là loại ngoài đời.',
+        },
+        hints: [
+          {
+            en: 'Separate an algorithmic group ID from a verified class.',
+            vi: 'Tách ID nhóm thuật toán khỏi một lớp đã được xác minh.',
+          },
+          {
+            en: 'Recall what must accompany a dendrogram cut.',
+            vi: 'Nhớ điều gì phải đi kèm mức cắt dendrogram.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a cluster ID in the fixed hierarchy is automatically a ground-truth class label.',
+          vi: 'Đúng hay sai: ID cụm trong hệ phân cấp cố định tự động là nhãn lớp sự thật.',
+        },
+        questionId: 'q-cml-m08-cluster-id-not-truth',
+        sourceId: 'quiz-module-cml-m08-q06',
+        sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-post-cml-p15': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM09PcaDraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m09-pca',
+    passingScorePercent: 100,
+    postId: 'cml-p15-pca',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p15',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p15-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p15-pca', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-orthogonal-variance',
+        explanation: {
+          en: 'The pinned guide describes PCA as successive orthogonal components that explain a maximum amount of variance in a multivariate dataset.',
+          vi: 'Hướng dẫn đã pin mô tả PCA là các component trực giao liên tiếp giải thích lượng phương sai tối đa trong dữ liệu đa biến.',
+        },
+        hints: [
+          {
+            en: 'Look for both the geometry of the components and their variance role.',
+            vi: 'Tìm cả hình học của component và vai trò phương sai của chúng.',
+          },
+          {
+            en: 'PCA does not begin with known class labels.',
+            vi: 'PCA không bắt đầu bằng nhãn lớp đã biết.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-orthogonal-variance',
+            text: {
+              en: 'Successive orthogonal components explaining maximum variance',
+              vi: 'Các component trực giao liên tiếp giải thích phương sai tối đa',
+            },
+          },
+          {
+            optionId: 'opt-label-copy',
+            text: {
+              en: 'Copies a known class label into one column',
+              vi: 'Sao chép nhãn lớp đã biết vào một cột',
+            },
+          },
+          {
+            optionId: 'opt-nearest-centroid',
+            text: {
+              en: 'Assigns a point to a nearest centroid',
+              vi: 'Gán điểm cho centroid gần nhất',
+            },
+          },
+          {
+            optionId: 'opt-live-risk',
+            text: {
+              en: 'Produces a live individual risk decision',
+              vi: 'Đưa ra quyết định rủi ro live cho cá nhân',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does the pinned guide characterize PCA components?',
+          vi: 'Hướng dẫn đã pin mô tả các component PCA như thế nào?',
+        },
+        questionId: 'q-cml-p15-orthogonal-variance',
+        sourceId: 'act-cml-p15-pca-quiz-01',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-centers-features', 'opt-not-auto-scale'],
+        explanation: {
+          en: 'Before SVD, PCA centers every feature but does not scale each feature automatically. Centering and scaling should be recorded as distinct preprocessing choices.',
+          vi: 'Trước SVD, PCA center mọi feature nhưng không tự scale từng feature. Centering và scaling cần được ghi là các lựa chọn tiền xử lý riêng biệt.',
+        },
+        hints: [
+          {
+            en: 'Select the two statements about default preprocessing.',
+            vi: 'Chọn hai phát biểu về tiền xử lý mặc định.',
+          },
+          {
+            en: 'Centering is stated; automatic scaling is not.',
+            vi: 'Centering được nêu; scaling tự động thì không.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-centers-features',
+            text: {
+              en: 'It centers each feature before SVD',
+              vi: 'Nó center từng feature trước SVD',
+            },
+          },
+          {
+            optionId: 'opt-not-auto-scale',
+            text: {
+              en: 'It does not automatically scale each feature',
+              vi: 'Nó không tự động scale từng feature',
+            },
+          },
+          {
+            optionId: 'opt-never-centers',
+            text: {
+              en: 'It never centers the input data',
+              vi: 'Nó không bao giờ center dữ liệu đầu vào',
+            },
+          },
+          {
+            optionId: 'opt-label-normalizes',
+            text: { en: 'It normalizes known class labels', vi: 'Nó chuẩn hóa nhãn lớp đã biết' },
+          },
+        ],
+        prompt: {
+          en: 'Which two preprocessing statements match the PCA account used in this lesson?',
+          vi: 'Hai phát biểu tiền xử lý nào khớp với cách mô tả PCA dùng trong bài này?',
+        },
+        questionId: 'q-cml-p15-centering-scaling',
+        sourceId: 'act-cml-p15-pca-quiz-02',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'The source notes that randomized PCA inverse_transform is not the exact inverse of transform even with the default whiten=False setting. A compressed reconstruction must therefore be described as an approximation unless evidence says otherwise.',
+          vi: 'Nguồn nêu inverse_transform PCA randomized không phải nghịch đảo chính xác của transform ngay cả với cài đặt mặc định whiten=False. Vì vậy tái dựng nén phải được mô tả là xấp xỉ trừ khi có bằng chứng khác.',
+        },
+        hints: [
+          {
+            en: 'Recall the randomized PCA inverse-transform caveat.',
+            vi: 'Nhớ lưu ý về inverse transform PCA randomized.',
+          },
+          {
+            en: 'An inverse-looking operation can still be approximate.',
+            vi: 'Một thao tác trông như nghịch đảo vẫn có thể xấp xỉ.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: randomized PCA inverse_transform is always the exact inverse of transform.',
+          vi: 'Đúng hay sai: inverse_transform PCA randomized luôn là nghịch đảo chính xác của transform.',
+        },
+        questionId: 'q-cml-p15-randomized-inverse-approximation',
+        sourceId: 'act-cml-p15-pca-quiz-03',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-cml-m09': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-pca-sensor-compression',
+    draftProvenance: cmlM09PcaDraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m09-pca',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m09',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m09-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [{ id: 'pca', type: 'algorithm' }],
+    questions: [
+      {
+        correctAnswer: 'opt-max-explained-variance',
+        explanation: {
+          en: 'PCA uses successive orthogonal components that explain a maximum amount of variance. The retained components give a reduced representation of that variation.',
+          vi: 'PCA dùng các component trực giao liên tiếp giải thích lượng phương sai tối đa. Các component giữ lại tạo biểu diễn rút gọn của biến thiên đó.',
+        },
+        hints: [
+          {
+            en: 'Focus on the criterion for the leading components.',
+            vi: 'Tập trung vào tiêu chí của các component đầu.',
+          },
+          {
+            en: 'The criterion concerns variance, not a class label.',
+            vi: 'Tiêu chí liên quan đến phương sai, không phải nhãn lớp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-max-explained-variance',
+            text: {
+              en: 'Explain as much variance as possible in successive components',
+              vi: 'Giải thích nhiều phương sai nhất có thể trong các component liên tiếp',
+            },
+          },
+          {
+            optionId: 'opt-max-known-labels',
+            text: {
+              en: 'Copy as many known class labels as possible',
+              vi: 'Sao chép nhiều nhãn lớp đã biết nhất có thể',
+            },
+          },
+          {
+            optionId: 'opt-max-network-data',
+            text: {
+              en: 'Fetch as much live data as possible',
+              vi: 'Lấy nhiều dữ liệu live nhất có thể',
+            },
+          },
+          {
+            optionId: 'opt-max-tree-depth',
+            text: { en: 'Maximize a decision-tree depth', vi: 'Tối đa hóa độ sâu cây quyết định' },
+          },
+        ],
+        prompt: {
+          en: 'What does PCA seek from its successive leading components?',
+          vi: 'PCA tìm điều gì từ các component đầu liên tiếp của nó?',
+        },
+        questionId: 'q-cml-m09-variance-goal',
+        sourceId: 'quiz-module-cml-m09-q01',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-center-before-svd', 'opt-report-scaling-choice'],
+        explanation: {
+          en: 'The lesson requires centering before SVD and distinguishes that from scaling. Reporting the scaling choice makes a projection interpretation reproducible.',
+          vi: 'Bài học yêu cầu centering trước SVD và phân biệt điều đó với scaling. Báo lựa chọn scaling làm diễn giải phép chiếu có thể tái lập.',
+        },
+        hints: [
+          {
+            en: 'Choose the two actions that make preprocessing visible.',
+            vi: 'Chọn hai thao tác làm tiền xử lý trở nên nhìn thấy được.',
+          },
+          {
+            en: 'Do not replace preprocessing with a class-label step.',
+            vi: 'Đừng thay tiền xử lý bằng bước nhãn lớp.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-center-before-svd',
+            text: { en: 'Center features before SVD', vi: 'Center feature trước SVD' },
+          },
+          {
+            optionId: 'opt-report-scaling-choice',
+            text: {
+              en: 'State whether and how scaling or whitening was chosen',
+              vi: 'Nêu có chọn scaling hoặc whitening thế nào',
+            },
+          },
+          {
+            optionId: 'opt-copy-cluster-label',
+            text: {
+              en: 'Copy a cluster ID as a class label',
+              vi: 'Sao chép ID cụm thành nhãn lớp',
+            },
+          },
+          {
+            optionId: 'opt-hide-preprocessing',
+            text: {
+              en: 'Hide preprocessing because the plot is shorter',
+              vi: 'Che giấu tiền xử lý vì biểu đồ ngắn hơn',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two details make the preprocessing of a fixed PCA projection reviewable?',
+          vi: 'Hai chi tiết nào làm tiền xử lý của phép chiếu PCA cố định có thể review?',
+        },
+        questionId: 'q-cml-m09-preprocessing-review',
+        sourceId: 'quiz-module-cml-m09-q02',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'The optional whiten=True setting scales each component to unit variance after projecting into singular space. That setting should be named when it matters to a downstream assumption.',
+          vi: 'Tùy chọn whiten=True scale từng component về phương sai đơn vị sau khi chiếu vào không gian singular. Cài đặt này cần được nêu khi quan trọng với giả định phía sau.',
+        },
+        hints: [
+          {
+            en: 'Look for the effect of the optional whitening setting.',
+            vi: 'Tìm tác động của cài đặt whitening tùy chọn.',
+          },
+          {
+            en: 'It changes component variance, not class labels.',
+            vi: 'Nó thay đổi phương sai component, không phải nhãn lớp.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: with whiten=True, the PCA account scales each projected component to unit variance.',
+          vi: 'Đúng hay sai: với whiten=True, cách mô tả PCA scale mỗi component đã chiếu về phương sai đơn vị.',
+        },
+        questionId: 'q-cml-m09-whiten-unit-variance',
+        sourceId: 'quiz-module-cml-m09-q03',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-drop-lower-singular',
+        explanation: {
+          en: 'A lower-dimensional projection can preserve most variance by dropping components associated with lower singular values. The dropped directions are the cost of the reduced representation.',
+          vi: 'Phép chiếu ít chiều có thể giữ phần lớn phương sai bằng cách bỏ component gắn với singular value thấp hơn. Các hướng bị bỏ là chi phí của biểu diễn rút gọn.',
+        },
+        hints: [
+          {
+            en: 'Think about which components are discarded during reduction.',
+            vi: 'Hãy nghĩ về component nào bị bỏ khi giảm chiều.',
+          },
+          {
+            en: 'The source connects the choice to singular values.',
+            vi: 'Nguồn liên hệ lựa chọn này với singular value.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-drop-lower-singular',
+            text: {
+              en: 'Drop components associated with lower singular values',
+              vi: 'Bỏ component gắn với singular value thấp hơn',
+            },
+          },
+          {
+            optionId: 'opt-drop-leading',
+            text: { en: 'Drop the leading components first', vi: 'Bỏ các component đầu tiên' },
+          },
+          {
+            optionId: 'opt-drop-centering',
+            text: { en: 'Drop feature centering before SVD', vi: 'Bỏ centering feature trước SVD' },
+          },
+          {
+            optionId: 'opt-drop-evidence',
+            text: {
+              en: 'Drop the stated explained-variance evidence',
+              vi: 'Bỏ bằng chứng phương sai đã giải thích',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which components does the source connect with a lower-dimensional PCA reduction?',
+          vi: 'Nguồn liên hệ component nào với phép giảm chiều PCA?',
+        },
+        questionId: 'q-cml-m09-lower-singular-components',
+        sourceId: 'quiz-module-cml-m09-q04',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-retained-count', 'opt-explained-variance', 'opt-approximation-limit'],
+        explanation: {
+          en: 'A reviewable reduced view records retained component count, explained variance, and whether reconstruction is approximate. Those facts state the trade-off instead of treating a plot as an exact copy.',
+          vi: 'Góc nhìn rút gọn có thể review ghi số component giữ lại, phương sai đã giải thích và tái dựng có xấp xỉ hay không. Các dữ kiện này nêu đánh đổi thay vì coi biểu đồ là bản sao chính xác.',
+        },
+        hints: [
+          {
+            en: 'Select evidence about what was kept and what the reduction can no longer guarantee.',
+            vi: 'Chọn bằng chứng về điều được giữ và điều giảm chiều không còn bảo đảm.',
+          },
+          {
+            en: 'A real-world category claim is not a PCA audit field.',
+            vi: 'Khẳng định loại ngoài đời không phải trường audit PCA.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-retained-count',
+            text: { en: 'Retained component count', vi: 'Số component giữ lại' },
+          },
+          {
+            optionId: 'opt-explained-variance',
+            text: { en: 'Explained variance retained', vi: 'Phương sai đã giải thích được giữ' },
+          },
+          {
+            optionId: 'opt-approximation-limit',
+            text: {
+              en: 'Whether reconstruction is approximate',
+              vi: 'Việc tái dựng có phải xấp xỉ hay không',
+            },
+          },
+          {
+            optionId: 'opt-ground-truth-category',
+            text: {
+              en: 'A ground-truth category inferred from a component',
+              vi: 'Loại sự thật suy ra từ một component',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which three details keep a fixed PCA reduction open to review?',
+          vi: 'Ba chi tiết nào giữ phép giảm PCA cố định mở để review?',
+        },
+        questionId: 'q-cml-m09-reviewable-reduction',
+        sourceId: 'quiz-module-cml-m09-q05',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'A principal component is a direction in a transformed representation, not a verified real-world category. The fixed fixture is explicitly synthetic and has no individual or sensor decision claim.',
+          vi: 'Component chính là hướng trong biểu diễn đã biến đổi, không phải loại ngoài đời đã xác minh. Fixture cố định được nêu rõ là tổng hợp và không đưa ra khẳng định quyết định về cá nhân hoặc cảm biến.',
+        },
+        hints: [
+          {
+            en: 'Separate a mathematical direction from a real-world label.',
+            vi: 'Tách một hướng toán học khỏi nhãn ngoài đời.',
+          },
+          {
+            en: 'Recall the scope of the fixed synthetic fixture.',
+            vi: 'Nhớ phạm vi của fixture tổng hợp cố định.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a principal component in this fixed fixture is automatically a verified sensor or real-world category.',
+          vi: 'Đúng hay sai: một component chính trong fixture cố định tự động là loại cảm biến hoặc loại ngoài đời đã xác minh.',
+        },
+        questionId: 'q-cml-m09-component-not-category',
+        sourceId: 'quiz-module-cml-m09-q06',
+        sourceIds: CML_M09_PCA_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -3592,88 +6385,7 @@ interface PostQuizDraftDefinition {
   trueAssertion: LocalizedText;
 }
 
-const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {
-  'cml-p08-knn': {
-    coreMove: {
-      en: 'Make distance meaningful by scaling features before trusting nearby examples.',
-      vi: 'Làm khoảng cách có ý nghĩa bằng cách chuẩn hóa feature trước khi tin ví dụ lân cận.',
-    },
-    trueAssertion: {
-      en: 'A feature with a much larger numeric range can dominate a KNN distance unless the representation is scaled.',
-      vi: 'Feature có thang số lớn hơn nhiều có thể chi phối khoảng cách KNN nếu biểu diễn chưa được chuẩn hóa.',
-    },
-  },
-  'cml-p09-naive-bayes': {
-    coreMove: {
-      en: 'Combine prior belief with observed feature evidence while keeping the independence assumption visible.',
-      vi: 'Kết hợp niềm tin ban đầu với bằng chứng feature quan sát được và giữ rõ giả định độc lập.',
-    },
-    trueAssertion: {
-      en: 'Naive Bayes can update a class belief from several features without claiming that the features are truly independent.',
-      vi: 'Naive Bayes có thể cập nhật niềm tin về lớp từ nhiều feature mà không khẳng định các feature thực sự độc lập.',
-    },
-  },
-  'cml-p10-decision-tree': {
-    coreMove: {
-      en: 'Read each tree split as an explicit rule that reduces label mixing.',
-      vi: 'Đọc mỗi split của cây như quy tắc rõ ràng làm giảm sự lẫn lộn của nhãn.',
-    },
-    trueAssertion: {
-      en: 'A useful split makes the labels in its child groups more consistent than before the split.',
-      vi: 'Split hữu ích làm nhãn trong các nhóm con nhất quán hơn so với trước khi chia.',
-    },
-  },
-  'cml-p11-random-forest': {
-    coreMove: {
-      en: 'Combine diverse trees so one brittle split has less influence on the final vote.',
-      vi: 'Kết hợp các cây đa dạng để một split mong manh có ít ảnh hưởng hơn lên phiếu cuối.',
-    },
-    trueAssertion: {
-      en: 'Bootstrap samples and feature subsets help forest trees avoid making the same error for the same reason.',
-      vi: 'Mẫu bootstrap và tập con feature giúp các cây trong forest tránh cùng mắc một lỗi vì cùng lý do.',
-    },
-  },
-  'cml-p12-svm': {
-    coreMove: {
-      en: 'Prefer a separating boundary with margin and identify the nearest support points.',
-      vi: 'Ưu tiên ranh giới phân tách có margin và xác định các support point gần nhất.',
-    },
-    trueAssertion: {
-      en: 'Support vectors matter because moving them changes the margin-constrained boundary.',
-      vi: 'Support vector quan trọng vì di chuyển chúng làm thay đổi ranh giới bị ràng buộc bởi margin.',
-    },
-  },
-  'cml-p13-kmeans': {
-    coreMove: {
-      en: 'Explain the K-Means loop as assignment to centres followed by centre updates.',
-      vi: 'Giải thích vòng lặp K-Means là gán vào tâm rồi cập nhật tâm.',
-    },
-    trueAssertion: {
-      en: 'Changing k changes the grouping question being asked, not just the label names shown at the end.',
-      vi: 'Thay đổi k làm thay đổi câu hỏi gom nhóm, không chỉ đổi tên nhãn hiển thị ở cuối.',
-    },
-  },
-  'cml-p14-hierarchical-clustering': {
-    coreMove: {
-      en: 'Read merge heights before choosing the dendrogram cut that defines groups.',
-      vi: 'Đọc độ cao gộp trước khi chọn mức cắt dendrogram xác định các nhóm.',
-    },
-    trueAssertion: {
-      en: 'A large late merge can be evidence that two groups stayed distinct until a high cut level.',
-      vi: 'Lần gộp muộn lớn có thể là bằng chứng hai nhóm vẫn khác biệt cho tới mức cắt cao.',
-    },
-  },
-  'cml-p15-pca': {
-    coreMove: {
-      en: 'Track retained variation and reconstruction loss when reducing correlated features.',
-      vi: 'Theo dõi phương sai giữ lại và lỗi tái dựng khi giảm các feature tương quan.',
-    },
-    trueAssertion: {
-      en: 'Keeping fewer principal components can simplify a representation while discarding some reconstructable information.',
-      vi: 'Giữ ít component chính hơn có thể đơn giản hóa biểu diễn nhưng loại bỏ một phần thông tin có thể tái dựng.',
-    },
-  },
-};
+const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {};
 
 function getPostQuizDraftDefinition(postId: string): PostQuizDraftDefinition {
   const definition = postQuizDraftDefinitions[postId];

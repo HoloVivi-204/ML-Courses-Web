@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getLockedContentScope } from './content-scope-validator.js';
 import { createCourseTransformManifest } from './content-transform.js';
@@ -126,5 +126,43 @@ describe('content snapshot transform', () => {
       sourceCount: course.sourceIds.length,
       unitCount: result.manifest.units.length,
     });
+  });
+
+  it('transforms pinned local snapshots when network access is unavailable', async () => {
+    const outputRoot = createTemporaryDirectory();
+    const scope = getLockedContentScope();
+    const course = scope.courses.find((item) => item.courseId === 'course-classical-ml')!;
+    let fetchCalls = 0;
+
+    for (const sourceId of course.sourceIds) {
+      writePinnedSnapshot({
+        outputRoot,
+        sourceId,
+        text: '<article><h1>' + sourceId + '</h1><p>Offline source evidence.</p></article>',
+      });
+    }
+
+    vi.stubGlobal('fetch', async () => {
+      fetchCalls += 1;
+      throw new Error('Network access is unavailable.');
+    });
+
+    try {
+      await expect(
+        createCourseTransformManifest({
+          courseId: course.courseId,
+          outputRoot,
+          scope,
+        }),
+      ).resolves.toMatchObject({
+        manifest: {
+          courseId: course.courseId,
+          reviewStatus: 'pending-operator-review',
+        },
+      });
+      expect(fetchCalls).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

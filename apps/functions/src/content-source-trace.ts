@@ -230,3 +230,166 @@ export const cmlM04ModuleSourceTrace = {
     ...cmlM04MetricsSourceTrace.sourceSnapshots,
   ],
 } as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM05KnnSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/neighbors.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM05NaiveBayesSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/naive_bayes.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM05ModuleSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    ...cmlM05KnnSourceTrace.sourceSnapshots,
+    ...cmlM05NaiveBayesSourceTrace.sourceSnapshots,
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM06DecisionTreeSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/tree.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM06RandomForestSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/ensemble.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM06ModuleSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    ...cmlM06DecisionTreeSourceTrace.sourceSnapshots,
+    ...cmlM06RandomForestSourceTrace.sourceSnapshots,
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM07SvmSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/svm.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM08ClusteringSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/clustering.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM09PcaSourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/decomposition.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;

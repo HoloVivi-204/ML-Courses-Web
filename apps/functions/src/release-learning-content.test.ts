@@ -654,4 +654,385 @@ describe('Release 1 protected learning content', () => {
       ),
     ).toBe(true);
   });
+
+  it('pins the Classical ML M05 KNN and Naive Bayes batch to the distinct scikit-learn documents used for its lessons, fixed neighbour vote, and quizzes', () => {
+    const knnPost = getReadablePost('course-classical-ml', 'cml-p08-knn', true)!;
+    const naiveBayesPost = getReadablePost('course-classical-ml', 'cml-p09-naive-bayes', true)!;
+    const demo = getFixedDemo('demo-neighbor-flower')!;
+    const knnQuiz = getQuizManifest('quiz-post-cml-p08');
+    const naiveBayesQuiz = getQuizManifest('quiz-post-cml-p09');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m05');
+    const knnSourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/neighbors.html'],
+      sourceId: 'sklearn-docs',
+    };
+    const naiveBayesSourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/naive_bayes.html'],
+      sourceId: 'sklearn-docs',
+    };
+
+    for (const provenance of [knnPost.provenance, demo.draftProvenance, knnQuiz.draftProvenance]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(knnSourceSnapshot)],
+        },
+      });
+    }
+    for (const provenance of [naiveBayesPost.provenance, naiveBayesQuiz.draftProvenance]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(naiveBayesSourceSnapshot)],
+        },
+      });
+    }
+    expect(moduleQuiz.draftProvenance).toMatchObject({
+      candidateSourceIds: ['sklearn-docs'],
+      sourceTrace: {
+        kind: 'snapshot-pinned',
+        sourceSnapshots: [
+          expect.objectContaining(knnSourceSnapshot),
+          expect.objectContaining(naiveBayesSourceSnapshot),
+        ],
+      },
+    });
+
+    for (const post of [knnPost, naiveBayesPost]) {
+      expect(post.blocks).toHaveLength(10);
+      expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    }
+    expect(knnPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p08-knn-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+    expect(naiveBayesPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p09-naive-bayes-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-neighbor-flower-v1',
+        parameterValues: [{ id: 'k', value: 3 }],
+        rows: [
+          { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+          { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+          { input: [1, 0], predictedOutput: 0, targetOutput: 0 },
+          { input: [2, 2], predictedOutput: 1, targetOutput: 1 },
+        ],
+      },
+      requiredStepIds: ['knn-problem', 'knn-reference-points', 'knn-distance', 'knn-vote'],
+    });
+
+    for (const quiz of [knnQuiz, naiveBayesQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'sklearn-docs'),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('pins the Classical ML M06 decision-tree and random-forest batch to the distinct scikit-learn documents used for its lessons, fixed forest comparison, and quizzes', () => {
+    const treePost = getReadablePost('course-classical-ml', 'cml-p10-decision-tree', true)!;
+    const forestPost = getReadablePost('course-classical-ml', 'cml-p11-random-forest', true)!;
+    const demo = getFixedDemo('demo-tree-forest-habitat')!;
+    const treeQuiz = getQuizManifest('quiz-post-cml-p10');
+    const forestQuiz = getQuizManifest('quiz-post-cml-p11');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m06');
+    const treeSourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/tree.html'],
+      sourceId: 'sklearn-docs',
+    };
+    const forestSourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/ensemble.html'],
+      sourceId: 'sklearn-docs',
+    };
+
+    for (const provenance of [treePost.provenance, treeQuiz.draftProvenance]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(treeSourceSnapshot)],
+        },
+      });
+    }
+    for (const provenance of [forestPost.provenance, forestQuiz.draftProvenance]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(forestSourceSnapshot)],
+        },
+      });
+    }
+    for (const provenance of [demo.draftProvenance, moduleQuiz.draftProvenance]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [
+            expect.objectContaining(treeSourceSnapshot),
+            expect.objectContaining(forestSourceSnapshot),
+          ],
+        },
+      });
+    }
+
+    for (const post of [treePost, forestPost]) {
+      expect(post.blocks).toHaveLength(10);
+      expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    }
+    expect(treePost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p10-decision-tree-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+    expect(forestPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p11-random-forest-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-tree-forest-habitat-v1',
+        parameterValues: [{ id: 'treeCount', value: 3 }],
+        rows: [
+          { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+          { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+          { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+          { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+        ],
+      },
+      requiredStepIds: ['tree-problem', 'tree-split', 'forest-diversity', 'forest-aggregate'],
+    });
+
+    for (const quiz of [treeQuiz, forestQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'sklearn-docs'),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('pins the Classical ML M07 SVM batch to the scikit-learn snapshot used for its lesson, fixed margin diagram, and quizzes', () => {
+    const post = getReadablePost('course-classical-ml', 'cml-p12-svm', true)!;
+    const demo = getFixedDemo('demo-svm-margin')!;
+    const postQuiz = getQuizManifest('quiz-post-cml-p12');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m07');
+    const sourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/svm.html'],
+      sourceId: 'sklearn-docs',
+    };
+
+    for (const provenance of [
+      post.provenance,
+      demo.draftProvenance,
+      postQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(sourceSnapshot)],
+        },
+      });
+    }
+
+    expect(post.blocks).toHaveLength(10);
+    expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p12-svm-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-svm-margin-v1',
+        parameterValues: [{ id: 'margin', value: 1 }],
+        rows: [
+          { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+          { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+          { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+          { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+        ],
+      },
+      requiredStepIds: ['svm-problem', 'svm-reference-points', 'svm-margin', 'svm-support-vectors'],
+    });
+
+    for (const quiz of [postQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'sklearn-docs'),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('pins the Classical ML M08 clustering batch to the scikit-learn snapshot used for its two lessons, fixed cluster diagram, and quizzes', () => {
+    const kmeansPost = getReadablePost('course-classical-ml', 'cml-p13-kmeans', true)!;
+    const hierarchicalPost = getReadablePost(
+      'course-classical-ml',
+      'cml-p14-hierarchical-clustering',
+      true,
+    )!;
+    const demo = getFixedDemo('demo-stellar-clusters')!;
+    const kmeansQuiz = getQuizManifest('quiz-post-cml-p13');
+    const hierarchicalQuiz = getQuizManifest('quiz-post-cml-p14');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m08');
+    const sourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/clustering.html'],
+      sourceId: 'sklearn-docs',
+    };
+
+    for (const provenance of [
+      kmeansPost.provenance,
+      hierarchicalPost.provenance,
+      demo.draftProvenance,
+      kmeansQuiz.draftProvenance,
+      hierarchicalQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(sourceSnapshot)],
+        },
+      });
+    }
+
+    for (const post of [kmeansPost, hierarchicalPost]) {
+      expect(post.blocks).toHaveLength(10);
+      expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    }
+    expect(kmeansPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p13-kmeans-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+    expect(hierarchicalPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p14-hierarchical-clustering-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-stellar-clusters-v1',
+        parameterValues: [{ id: 'k', value: 2 }],
+        rows: [
+          { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+          { input: [0, 1], predictedOutput: 0, targetOutput: 0 },
+          { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+          { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
+        ],
+      },
+      requiredStepIds: [
+        'cluster-problem',
+        'cluster-initial-centroids',
+        'cluster-assign-update',
+        'cluster-read-result',
+      ],
+    });
+
+    for (const quiz of [kmeansQuiz, hierarchicalQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'sklearn-docs'),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('pins the Classical ML M09 PCA batch to the scikit-learn snapshot used for its lesson, fixed projection diagram, and quizzes', () => {
+    const post = getReadablePost('course-classical-ml', 'cml-p15-pca', true)!;
+    const demo = getFixedDemo('demo-pca-sensor-compression')!;
+    const postQuiz = getQuizManifest('quiz-post-cml-p15');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m09');
+    const sourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/decomposition.html'],
+      sourceId: 'sklearn-docs',
+    };
+
+    for (const provenance of [
+      post.provenance,
+      demo.draftProvenance,
+      postQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(sourceSnapshot)],
+        },
+      });
+    }
+
+    expect(post.blocks).toHaveLength(10);
+    expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p15-pca-example',
+        sourceIds: ['sklearn-docs'],
+        type: 'example',
+      }),
+    );
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-pca-sensor-compression-v1',
+        parameterValues: [{ id: 'components', value: 1 }],
+        rows: [
+          { input: [1, 1], predictedOutput: 0, targetOutput: 0 },
+          { input: [2, 2], predictedOutput: 1, targetOutput: 1 },
+          { input: [3, 3], predictedOutput: 2, targetOutput: 2 },
+          { input: [4, 4], predictedOutput: 3, targetOutput: 3 },
+        ],
+      },
+      requiredStepIds: ['pca-problem', 'pca-center', 'pca-project', 'pca-read-tradeoff'],
+    });
+
+    for (const quiz of [postQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'sklearn-docs'),
+        ),
+      ).toBe(true);
+    }
+  });
 });

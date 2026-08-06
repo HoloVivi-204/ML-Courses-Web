@@ -5,6 +5,13 @@ import {
   cmlM03SourceTrace,
   cmlM04LogisticSourceTrace,
   cmlM04MetricsSourceTrace,
+  cmlM05KnnSourceTrace,
+  cmlM05NaiveBayesSourceTrace,
+  cmlM06DecisionTreeSourceTrace,
+  cmlM06RandomForestSourceTrace,
+  cmlM07SvmSourceTrace,
+  cmlM08ClusteringSourceTrace,
+  cmlM09PcaSourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -54,6 +61,14 @@ const CML_M02_POLYNOMIAL_POST_ID = 'cml-p04-polynomial-regression';
 const CML_M03_REGULARIZATION_POST_ID = 'cml-p05-regularization-ridge-lasso';
 const CML_M04_LOGISTIC_POST_ID = 'cml-p06-logistic-regression';
 const CML_M04_METRICS_POST_ID = 'cml-p07-classification-metrics';
+const CML_M05_KNN_POST_ID = 'cml-p08-knn';
+const CML_M05_NAIVE_BAYES_POST_ID = 'cml-p09-naive-bayes';
+const CML_M06_DECISION_TREE_POST_ID = 'cml-p10-decision-tree';
+const CML_M06_RANDOM_FOREST_POST_ID = 'cml-p11-random-forest';
+const CML_M07_SVM_POST_ID = 'cml-p12-svm';
+const CML_M08_KMEANS_POST_ID = 'cml-p13-kmeans';
+const CML_M08_HIERARCHICAL_POST_ID = 'cml-p14-hierarchical-clustering';
+const CML_M09_PCA_POST_ID = 'cml-p15-pca';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
@@ -66,6 +81,27 @@ const CML_M04_LOGISTIC_SOURCE_IDS = cmlM04LogisticSourceTrace.sourceSnapshots.ma
   (source) => source.sourceId,
 );
 const CML_M04_METRICS_SOURCE_IDS = cmlM04MetricsSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M05_KNN_SOURCE_IDS = cmlM05KnnSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M05_NAIVE_BAYES_SOURCE_IDS = cmlM05NaiveBayesSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M06_DECISION_TREE_SOURCE_IDS = cmlM06DecisionTreeSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M06_RANDOM_FOREST_SOURCE_IDS = cmlM06RandomForestSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M07_SVM_SOURCE_IDS = cmlM07SvmSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M08_CLUSTERING_SOURCE_IDS = cmlM08ClusteringSourceTrace.sourceSnapshots.map(
+  (source) => source.sourceId,
+);
+const CML_M09_PCA_SOURCE_IDS = cmlM09PcaSourceTrace.sourceSnapshots.map(
   (source) => source.sourceId,
 );
 
@@ -169,6 +205,86 @@ const cmlM04MetricsBlockDefaults = {
   sourceIds: CML_M04_METRICS_SOURCE_IDS,
 } as const;
 
+const cmlM05KnnBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M05_KNN_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M05_KNN_SOURCE_IDS,
+} as const;
+
+const cmlM05NaiveBayesBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M05_NAIVE_BAYES_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M05_NAIVE_BAYES_SOURCE_IDS,
+} as const;
+
+const cmlM06DecisionTreeBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M06_DECISION_TREE_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M06_DECISION_TREE_SOURCE_IDS,
+} as const;
+
+const cmlM06RandomForestBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M06_RANDOM_FOREST_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M06_RANDOM_FOREST_SOURCE_IDS,
+} as const;
+
+const cmlM07SvmBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M07_SVM_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M07_SVM_SOURCE_IDS,
+} as const;
+
+const cmlM08KmeansBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M08_KMEANS_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+} as const;
+
+const cmlM08HierarchicalBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  assetIds: [],
+  activityId: null,
+  postId: CML_M08_HIERARCHICAL_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+} as const;
+
+const cmlM09PcaBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M09_PCA_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M09_PCA_SOURCE_IDS,
+} as const;
+
 const cmlM01DraftProvenance = {
   candidateSourceIds: CML_M01_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -207,6 +323,62 @@ const cmlM04MetricsDraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM04MetricsSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM05KnnDraftProvenance = {
+  candidateSourceIds: CML_M05_KNN_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM05KnnSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM05NaiveBayesDraftProvenance = {
+  candidateSourceIds: CML_M05_NAIVE_BAYES_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM05NaiveBayesSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM06DecisionTreeDraftProvenance = {
+  candidateSourceIds: CML_M06_DECISION_TREE_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM06DecisionTreeSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM06RandomForestDraftProvenance = {
+  candidateSourceIds: CML_M06_RANDOM_FOREST_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM06RandomForestSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM07SvmDraftProvenance = {
+  candidateSourceIds: CML_M07_SVM_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM07SvmSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM08ClusteringDraftProvenance = {
+  candidateSourceIds: CML_M08_CLUSTERING_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM08ClusteringSourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM09PcaDraftProvenance = {
+  candidateSourceIds: CML_M09_PCA_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM09PcaSourceTrace,
 } as const satisfies DraftProvenance;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -2532,6 +2704,1542 @@ const cmlM04MetricsFullLessonBlocks = [
   },
 ] satisfies readonly LearningContentBlock[];
 
+const cmlM05KnnFullLessonBlocks = [
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-neighbour-question',
+    locales: {
+      en: {
+        lede: 'K-nearest neighbours begins with a concrete comparison: which labelled training samples are closest to this new point under the chosen distance measure?',
+        navigationTitle: 'Ask who is nearest',
+        title: 'Classify a new point from nearby labelled evidence',
+      },
+      vi: {
+        lede: 'K láng giềng gần nhất bắt đầu bằng so sánh cụ thể: mẫu train đã gán nhãn nào gần điểm mới này nhất theo khoảng cách đã chọn?',
+        navigationTitle: 'Hỏi ai gần nhất',
+        title: 'Phân loại điểm mới từ bằng chứng đã gán nhãn lân cận',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-distance-principle',
+    locales: {
+      en: {
+        markdown:
+          'The pinned scikit-learn guide describes the nearest-neighbour principle as finding a predefined number of training samples closest in distance to the new point, then predicting its label from those samples. The number can be the user-specified constant k.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn scikit-learn đã pin mô tả nguyên tắc láng giềng gần nhất là tìm số lượng mẫu train định trước gần điểm mới nhất theo khoảng cách, rồi dự đoán nhãn từ các mẫu đó. Số lượng có thể là hằng k do người dùng chỉ định.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-representation-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: KNN makes its decision from a distance calculation. Effect: the selected metric and the representation of each feature determine which evidence is called “near,” so both must be visible in a review.',
+        title: 'Distance is a modelling choice',
+      },
+      vi: {
+        body: 'Nguyên nhân: KNN đưa ra quyết định từ phép tính khoảng cách. Kết quả: metric đã chọn và biểu diễn của mỗi feature quyết định bằng chứng nào được gọi là “gần”, nên cả hai phải hiển thị khi review.',
+        title: 'Khoảng cách là lựa chọn mô hình hóa',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-vote-question',
+    locales: {
+      en: {
+        lede: 'After the neighbours are fixed, KNN classification uses their labels rather than fitting a separate global boundary for this lesson.',
+        navigationTitle: 'Read the local vote',
+        title: 'Let the nearest labelled set cast the class vote',
+      },
+      vi: {
+        lede: 'Sau khi cố định các láng giềng, phân loại KNN dùng nhãn của chúng thay vì fit một ranh giới toàn cục riêng cho bài này.',
+        navigationTitle: 'Đọc phiếu cục bộ',
+        title: 'Để tập đã gán nhãn gần nhất bỏ phiếu cho lớp',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-majority-reading',
+    locales: {
+      en: {
+        markdown:
+          'For nearest-neighbour classification, the guide states that a query point receives the class with the most representatives among its nearest neighbours. Uniform weighting is the basic form; the guide also notes that nearer neighbours can be weighted more strongly in some circumstances.',
+      },
+      vi: {
+        markdown:
+          'Với phân loại láng giềng gần nhất, hướng dẫn nêu điểm truy vấn nhận lớp có nhiều đại diện nhất trong các láng giềng gần nhất. Trọng số đồng đều là dạng cơ bản; hướng dẫn cũng nêu trong một số trường hợp láng giềng gần hơn có thể được gán trọng số mạnh hơn.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    activityId: 'act-cml-p08-knn-example',
+    id: 'knn-fixed-neighbour-example',
+    locales: {
+      en: {
+        description:
+          'Inspect a fixed three-neighbour vote for an anonymous flower-like point. The displayed neighbour labels are class 1, class 1, and class 0, so the fixed majority result is class 1. State the cause and effect: the three closest labelled records supply the vote; a different k or distance representation could change which records appear in that set. This is a static teaching comparison, not a live classifier.',
+        navigationTitle: 'Inspect a fixed neighbour vote',
+      },
+      vi: {
+        description:
+          'Quan sát phiếu ba láng giềng cố định cho một điểm giống hoa ẩn danh. Nhãn láng giềng hiển thị là lớp 1, lớp 1, lớp 0 nên kết quả đa số cố định là lớp 1. Nêu nguyên nhân và kết quả: ba bản ghi đã gán nhãn gần nhất cung cấp phiếu; k hoặc biểu diễn khoảng cách khác có thể đổi bản ghi xuất hiện trong tập đó. Đây là so sánh tĩnh để học, không phải classifier live.',
+        navigationTitle: 'Quan sát phiếu láng giềng cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-metric-question',
+    locales: {
+      en: {
+        lede: 'Euclidean distance is the most common metric in the pinned guide, but the guide permits other metric measures. The metric is evidence context, not an invisible implementation detail.',
+        navigationTitle: 'Name the distance metric',
+        title: 'Make the meaning of “closest” explicit',
+      },
+      vi: {
+        lede: 'Khoảng cách Euclid là metric phổ biến nhất trong hướng dẫn đã pin, nhưng hướng dẫn cho phép các metric khác. Metric là bối cảnh bằng chứng, không phải chi tiết triển khai vô hình.',
+        navigationTitle: 'Nêu metric khoảng cách',
+        title: 'Làm rõ “gần nhất” có nghĩa gì',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-tie-boundary',
+    locales: {
+      en: {
+        markdown:
+          'The nearest-neighbours guide warns that when the k-th and k+1-th neighbours have identical distances but different labels, the result depends on training-data ordering. Treat an exact-distance tie as an ambiguity to disclose, not as hidden certainty.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn láng giềng gần nhất cảnh báo khi láng giềng thứ k và k+1 có khoảng cách giống hệt nhưng nhãn khác nhau, kết quả phụ thuộc vào thứ tự dữ liệu train. Hãy xem tie khoảng cách chính xác là điểm mơ hồ cần nêu, không phải sự chắc chắn ẩn.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-review-summary',
+    locales: {
+      en: {
+        body: 'Before accepting a neighbour result, report k, the distance metric, the displayed neighbour labels, and whether a tie exists. This preserves the local evidence chain that produced the category.',
+        title: 'Report the local evidence chain',
+      },
+      vi: {
+        body: 'Trước khi chấp nhận kết quả láng giềng, hãy báo cáo k, metric khoảng cách, nhãn láng giềng hiển thị và có tie hay không. Việc này giữ chuỗi bằng chứng cục bộ tạo ra category.',
+        title: 'Báo cáo chuỗi bằng chứng cục bộ',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM05KnnBlockDefaults,
+    id: 'knn-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM05KnnSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM05KnnSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM05KnnSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM05KnnSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Nearest Neighbors — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/neighbors.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM05NaiveBayesFullLessonBlocks = [
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-question',
+    locales: {
+      en: {
+        lede: 'Naive Bayes is a supervised classification family that turns a class prior and feature evidence into a comparison among candidate classes.',
+        navigationTitle: 'Frame evidence by class',
+        title: 'Update a class comparison with observed features',
+      },
+      vi: {
+        lede: 'Naive Bayes là họ phân loại có giám sát biến prior của lớp và bằng chứng feature thành so sánh giữa các lớp ứng viên.',
+        navigationTitle: 'Đặt khung bằng chứng theo lớp',
+        title: 'Cập nhật so sánh lớp bằng feature quan sát',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-bayes-rule',
+    locales: {
+      en: {
+        markdown:
+          'The pinned guide describes Naive Bayes as supervised learning based on Bayes’ theorem. For each candidate class, it combines a class prior with class-conditional feature likelihoods, then selects the class with the largest resulting comparison score.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn đã pin mô tả Naive Bayes là học có giám sát dựa trên định lý Bayes. Với mỗi lớp ứng viên, nó kết hợp prior của lớp với likelihood feature có điều kiện theo lớp, rồi chọn lớp có điểm so sánh kết quả lớn nhất.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-independence-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: the “naive” assumption treats every pair of features as conditionally independent once the class is known. Effect: the joint evidence can be simplified into one class prior times individual feature terms.',
+        title: 'An explicit assumption makes the calculation tractable',
+      },
+      vi: {
+        body: 'Nguyên nhân: giả định “naive” xem mọi cặp feature độc lập có điều kiện khi đã biết lớp. Kết quả: bằng chứng chung có thể được đơn giản hóa thành prior lớp nhân với các hạng feature riêng lẻ.',
+        title: 'Giả định rõ ràng làm phép tính khả thi',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-prior-question',
+    locales: {
+      en: {
+        lede: 'A prior is not a final category. It is the class frequency signal present before the current feature values are applied.',
+        navigationTitle: 'Read the class prior',
+        title: 'Separate prior frequency from current evidence',
+      },
+      vi: {
+        lede: 'Prior không phải category cuối. Nó là tín hiệu tần suất lớp có trước khi áp dụng giá trị feature hiện tại.',
+        navigationTitle: 'Đọc prior của lớp',
+        title: 'Tách tần suất prior khỏi bằng chứng hiện tại',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-prior-reading',
+    locales: {
+      en: {
+        markdown:
+          'The guide notes that the class prior P(y) can be estimated as the relative frequency of that class in the training set. Feature likelihoods then change the comparison for the specific record; do not read a high prior as proof before those features are considered.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn nêu prior lớp P(y) có thể được ước lượng là tần suất tương đối của lớp đó trong tập train. Likelihood feature sau đó thay đổi so sánh cho bản ghi cụ thể; đừng đọc prior cao như bằng chứng trước khi xét các feature đó.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    activityId: 'act-cml-p09-naive-bayes-example',
+    id: 'naive-bayes-fixed-evidence-example',
+    locales: {
+      en: {
+        description:
+          'Inspect a fixed two-class message exercise. Before feature evidence, class A appears in 6 of 10 training messages and class B in 4 of 10. A displayed word cue is more likely under B than A, so explain why the cue can shift the comparison toward B without proving certainty or causation. The table is instructional, not a live message classifier.',
+        navigationTitle: 'Compare a fixed prior and cue',
+      },
+      vi: {
+        description:
+          'Quan sát bài tập thông điệp hai lớp cố định. Trước bằng chứng feature, lớp A xuất hiện trong 6/10 thông điệp train và lớp B trong 4/10. Một từ gợi ý hiển thị có likelihood cao hơn dưới B so với A, nên hãy giải thích vì sao từ đó có thể dịch so sánh về B mà không chứng minh chắc chắn hoặc nhân quả. Bảng là để học, không phải classifier thông điệp live.',
+        navigationTitle: 'So sánh prior và từ gợi ý cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-distribution-question',
+    locales: {
+      en: {
+        lede: 'Naive Bayes variants differ mainly in the distribution assumed for each class-conditional feature term. Select a variant from the data representation, not from a favourite name.',
+        navigationTitle: 'Match assumptions to data',
+        title: 'The feature distribution assumption matters',
+      },
+      vi: {
+        lede: 'Các biến thể Naive Bayes khác nhau chủ yếu ở phân phối giả định cho từng hạng feature có điều kiện theo lớp. Hãy chọn biến thể từ biểu diễn dữ liệu, không phải từ tên ưa thích.',
+        navigationTitle: 'Khớp giả định với dữ liệu',
+        title: 'Giả định phân phối feature có ý nghĩa',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-variant-reading',
+    locales: {
+      en: {
+        markdown:
+          'The pinned guide says the different Naive Bayes classifiers mainly differ by their assumptions about the distribution of P(x_i | y). Preserve that assumption in the evaluation note; a fast model can still be a poor fit for a mismatched feature representation.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn đã pin nói các classifier Naive Bayes khác nhau chủ yếu ở giả định về phân phối P(x_i | y). Hãy giữ giả định đó trong ghi chú đánh giá; mô hình nhanh vẫn có thể không phù hợp với biểu diễn feature không khớp.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-review-summary',
+    locales: {
+      en: {
+        body: 'Report the class prior, the observed feature evidence, and the conditional-independence assumption together. This makes a posterior comparison inspectable without mistaking it for a causal explanation.',
+        title: 'Keep the evidence accounting visible',
+      },
+      vi: {
+        body: 'Hãy báo cáo prior lớp, bằng chứng feature quan sát và giả định độc lập có điều kiện cùng nhau. Việc này làm so sánh posterior có thể kiểm tra mà không nhầm nó với lời giải thích nhân quả.',
+        title: 'Giữ hạch toán bằng chứng hiển thị',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM05NaiveBayesBlockDefaults,
+    id: 'naive-bayes-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM05NaiveBayesSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM05NaiveBayesSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM05NaiveBayesSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM05NaiveBayesSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Naive Bayes — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/naive_bayes.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM06DecisionTreeFullLessonBlocks = [
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-decision-rule-question',
+    locales: {
+      en: {
+        lede: 'A decision tree turns feature evidence into a path of simple questions. At each branch, the current record follows the rule whose condition it satisfies.',
+        navigationTitle: 'Frame a rule path',
+        title: 'Predict by following simple rules inferred from features',
+      },
+      vi: {
+        lede: 'Cây quyết định biến bằng chứng feature thành một đường đi gồm các câu hỏi đơn giản. Ở mỗi nhánh, bản ghi hiện tại đi theo quy tắc có điều kiện mà nó thỏa mãn.',
+        navigationTitle: 'Đặt khung đường đi theo quy tắc',
+        title: 'Dự đoán bằng cách theo các quy tắc đơn giản suy ra từ feature',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-supervised-rule-principle',
+    locales: {
+      en: {
+        markdown:
+          'The pinned scikit-learn guide describes decision trees as a non-parametric supervised method for classification and regression. They predict a target from simple decision rules learned from data features; a tree can be read as a piecewise-constant approximation.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn scikit-learn đã pin mô tả cây quyết định là phương pháp có giám sát, phi tham số cho phân loại và hồi quy. Cây dự đoán mục tiêu từ các quy tắc quyết định đơn giản học từ feature dữ liệu; có thể đọc cây như một xấp xỉ hằng từng đoạn.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-depth-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: adding depth adds more conditional rules. Effect: the tree can fit a more detailed pattern, but a more complex tree can also stop generalising beyond the examples that shaped those branches.',
+        title: 'More branches increase both detail and risk',
+      },
+      vi: {
+        body: 'Nguyên nhân: thêm độ sâu sẽ thêm các quy tắc có điều kiện. Kết quả: cây có thể khớp một mẫu chi tiết hơn, nhưng cây phức tạp hơn cũng có thể không còn tổng quát hóa ngoài các ví dụ đã tạo nên các nhánh đó.',
+        title: 'Nhiều nhánh hơn tăng cả chi tiết lẫn rủi ro',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-split-question',
+    locales: {
+      en: {
+        lede: 'Do not read a split as a mysterious score. Read it as a visible if–then question that sends a record to one of two subsequent rule paths.',
+        navigationTitle: 'Read a split',
+        title: 'Treat each split as an inspectable decision',
+      },
+      vi: {
+        lede: 'Đừng đọc một split như một điểm số bí ẩn. Hãy đọc nó như câu hỏi if–then hiển thị, đưa bản ghi vào một trong hai đường đi quy tắc tiếp theo.',
+        navigationTitle: 'Đọc một split',
+        title: 'Xem mỗi split là một quyết định có thể kiểm tra',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-rule-path-reading',
+    locales: {
+      en: {
+        markdown:
+          'A fixed tree path is reproducible: write the tested feature, the branch taken, and the leaf result in order. This makes the prediction explainable as a sequence of rules, while keeping clear that the displayed tree is only an instructional fixture.',
+      },
+      vi: {
+        markdown:
+          'Một đường đi cây cố định có thể tái lập: ghi feature được kiểm tra, nhánh được chọn và kết quả lá theo thứ tự. Việc này làm dự đoán có thể giải thích như chuỗi quy tắc, đồng thời giữ rõ rằng cây hiển thị chỉ là fixture để học.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    activityId: 'act-cml-p10-decision-tree-example',
+    id: 'tree-fixed-rule-example',
+    locales: {
+      en: {
+        description:
+          'Inspect a fixed anonymous condition card with two binary features. The displayed tree first asks whether signal A is present; for A = 1 it asks whether signal B is present, then reaches a class-1 leaf for B = 1. Explain the cause and effect: the visible answers determine the branch sequence, so a changed feature value can route the same card to a different leaf. This is not a real habitat classifier despite the later stable demo identifier.',
+        navigationTitle: 'Trace a fixed rule path',
+      },
+      vi: {
+        description:
+          'Quan sát một thẻ điều kiện ẩn danh cố định với hai feature nhị phân. Cây hiển thị trước hết hỏi tín hiệu A có mặt không; với A = 1, nó hỏi tín hiệu B có mặt không, rồi đến lá lớp 1 khi B = 1. Giải thích nguyên nhân và kết quả: các câu trả lời hiển thị quyết định chuỗi nhánh, nên thay đổi một feature có thể đưa cùng thẻ đến lá khác. Đây không phải classifier môi trường sống thật dù demo ổn định về sau có tên habitat.',
+        navigationTitle: 'Lần theo đường đi quy tắc cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-generalisation-question',
+    locales: {
+      en: {
+        lede: 'A tree that keeps splitting can become over-complex. The question is not whether a deeper tree has more rules, but whether those rules still generalise to data not used to make them.',
+        navigationTitle: 'Check generalisation',
+        title: 'Make size controls part of the evidence',
+      },
+      vi: {
+        lede: 'Một cây tiếp tục chia có thể trở nên quá phức tạp. Câu hỏi không phải cây sâu hơn có nhiều quy tắc hơn không, mà là các quy tắc đó còn tổng quát hóa cho dữ liệu không dùng để tạo chúng hay không.',
+        navigationTitle: 'Kiểm tra tổng quát hóa',
+        title: 'Đưa các kiểm soát kích thước vào bằng chứng',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-overfit-controls',
+    locales: {
+      en: {
+        markdown:
+          'The guide cautions that tree learners can create overly complex trees that do not generalise well. It lists pruning, a maximum depth, and minimum sample requirements at splits or leaves as ways to control tree size. State the chosen control alongside held-out evidence rather than treating the deepest tree as automatically best.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn cảnh báo bộ học cây có thể tạo cây quá phức tạp, không tổng quát hóa tốt. Hướng dẫn nêu pruning, độ sâu tối đa và yêu cầu số mẫu tối thiểu tại split hoặc lá là các cách kiểm soát kích thước cây. Hãy nêu kiểm soát đã chọn cạnh bằng chứng giữ lại thay vì coi cây sâu nhất tự động là tốt nhất.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-review-summary',
+    locales: {
+      en: {
+        body: 'Review a tree by recording its visible split rules, depth or pruning boundary, and the minimum evidence required to reach each leaf. This connects the readable path to the generalisation risk it may introduce.',
+        title: 'Keep rule path and complexity evidence together',
+      },
+      vi: {
+        body: 'Review một cây bằng cách ghi các quy tắc split hiển thị, biên độ sâu hoặc pruning, và bằng chứng tối thiểu cần để đi tới mỗi lá. Việc này nối đường đi dễ đọc với rủi ro tổng quát hóa mà nó có thể tạo ra.',
+        title: 'Giữ đường đi quy tắc và bằng chứng độ phức tạp cùng nhau',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM06DecisionTreeBlockDefaults,
+    id: 'tree-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM06DecisionTreeSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM06DecisionTreeSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM06DecisionTreeSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM06DecisionTreeSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Decision Trees — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/tree.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM06RandomForestFullLessonBlocks = [
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-ensemble-question',
+    locales: {
+      en: {
+        lede: 'A random forest does not replace its trees with one opaque rule. It combines several tree predictions so the final result reflects an ensemble rather than a single branch path.',
+        navigationTitle: 'Frame an ensemble',
+        title: 'Combine several trees before reporting a result',
+      },
+      vi: {
+        lede: 'Random forest không thay các cây bằng một quy tắc mờ đục. Nó kết hợp nhiều dự đoán của cây để kết quả cuối phản ánh một ensemble thay vì một đường nhánh duy nhất.',
+        navigationTitle: 'Đặt khung một ensemble',
+        title: 'Kết hợp nhiều cây trước khi báo cáo kết quả',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-ensemble-principle',
+    locales: {
+      en: {
+        markdown:
+          'The pinned ensemble guide explains that ensemble methods combine predictions from several base estimators to improve generalisability or robustness over one estimator. Random forests are a tree-based example of that broader idea.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn ensemble đã pin giải thích rằng phương pháp ensemble kết hợp dự đoán từ nhiều bộ ước lượng cơ sở để cải thiện khả năng tổng quát hóa hoặc độ vững so với một bộ ước lượng. Random forest là ví dụ dựa trên cây của ý tưởng rộng hơn đó.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-diversity-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: forests inject randomness through bootstrap samples and a random subset of features at each split. Effect: individual tree errors become less coupled, so combining their predictions can reduce variance instead of repeating the same brittle error.',
+        title: 'Diversity changes how errors combine',
+      },
+      vi: {
+        body: 'Nguyên nhân: forest đưa ngẫu nhiên vào qua mẫu bootstrap và tập con feature ngẫu nhiên ở mỗi split. Kết quả: lỗi của từng cây trở nên ít gắn chặt hơn, nên kết hợp dự đoán của chúng có thể giảm phương sai thay vì lặp lại cùng một lỗi mong manh.',
+        title: 'Đa dạng thay đổi cách các lỗi kết hợp',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-aggregation-question',
+    locales: {
+      en: {
+        lede: 'Aggregation is the final evidence step. Read what each fixed tree contributes before summarising their outputs into one class or score.',
+        navigationTitle: 'Read aggregation',
+        title: 'Make the ensemble combination visible',
+      },
+      vi: {
+        lede: 'Tổng hợp là bước bằng chứng cuối. Hãy đọc mỗi cây cố định đóng góp gì trước khi tóm tắt đầu ra của chúng thành một lớp hoặc điểm.',
+        navigationTitle: 'Đọc tổng hợp',
+        title: 'Làm rõ cách kết hợp ensemble',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-aggregation-reading',
+    locales: {
+      en: {
+        markdown:
+          'The guide explains that averaging predictions from diverse trees can cancel some errors and reduce variance. It also notes a scikit-learn classifier implementation may average predicted probabilities rather than make every tree cast one hard class vote. Therefore report the aggregation rule used by the particular exercise or model.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn giải thích rằng lấy trung bình dự đoán từ các cây đa dạng có thể triệt tiêu một số lỗi và giảm phương sai. Hướng dẫn cũng lưu ý một triển khai classifier của scikit-learn có thể lấy trung bình xác suất dự đoán thay vì để mọi cây bỏ một phiếu lớp cứng. Vì vậy hãy báo cáo quy tắc tổng hợp mà bài tập hoặc mô hình cụ thể sử dụng.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    activityId: 'act-cml-p11-random-forest-example',
+    id: 'forest-fixed-comparison-example',
+    locales: {
+      en: {
+        description:
+          'Compare one fixed tree with a fixed three-tree classroom ensemble on an anonymous two-feature card. The single tree reaches class 0 after one path; the other displayed trees return class 1 and class 1. Under this exercise’s explicit simple-majority rule, the ensemble reports class 1. Cause and effect: differing sampled evidence and feature choices can yield diverse tree outputs, and the named aggregation rule determines the final display. This is a static illustration, not a live habitat system.',
+        navigationTitle: 'Compare fixed tree outputs',
+      },
+      vi: {
+        description:
+          'So sánh một cây cố định với ensemble ba cây cố định trong lớp cho một thẻ hai feature ẩn danh. Cây đơn đi tới lớp 0 sau một đường đi; các cây hiển thị khác trả về lớp 1 và lớp 1. Theo quy tắc đa số đơn giản được nêu rõ của bài tập này, ensemble báo lớp 1. Nguyên nhân và kết quả: bằng chứng được lấy mẫu và lựa chọn feature khác nhau có thể tạo đầu ra cây đa dạng, còn quy tắc tổng hợp được nêu tên quyết định hiển thị cuối. Đây là minh họa tĩnh, không phải hệ thống môi trường sống live.',
+        navigationTitle: 'So sánh đầu ra cây cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-variance-question',
+    locales: {
+      en: {
+        lede: 'A larger forest is not an automatic guarantee. The variance benefit depends on diversity and on combining the tree predictions under a stated aggregation rule.',
+        navigationTitle: 'Check the variance claim',
+        title: 'Link randomisation to the claimed benefit',
+      },
+      vi: {
+        lede: 'Forest lớn hơn không tự động là bảo đảm. Lợi ích phương sai phụ thuộc vào sự đa dạng và việc kết hợp dự đoán của cây theo một quy tắc tổng hợp được nêu rõ.',
+        navigationTitle: 'Kiểm tra khẳng định phương sai',
+        title: 'Nối ngẫu nhiên hóa với lợi ích được khẳng định',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-bootstrap-feature-reading',
+    locales: {
+      en: {
+        markdown:
+          'The guide names bootstrapping samples and randomly selecting features at each split as two sources of forest randomness. It explains that deep individual trees often have high variance and tend to overfit; less-correlated errors can partly cancel when their predictions are combined. Validate this on held-out evidence rather than claiming the benefit from the word “forest” alone.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn nêu bootstrap mẫu và chọn feature ngẫu nhiên ở mỗi split là hai nguồn ngẫu nhiên của forest. Hướng dẫn giải thích cây sâu riêng lẻ thường có phương sai cao và dễ overfit; các lỗi ít tương quan hơn có thể triệt tiêu một phần khi dự đoán được kết hợp. Hãy kiểm chứng điều này bằng bằng chứng giữ lại thay vì khẳng định lợi ích chỉ từ chữ “forest”.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-review-summary',
+    locales: {
+      en: {
+        body: 'Review a forest by naming the tree sampling, feature-selection randomness, aggregation rule, and held-out result together. These details explain why several trees may be more robust than one without promising that every ensemble wins.',
+        title: 'Report diversity, aggregation, and evidence together',
+      },
+      vi: {
+        body: 'Review một forest bằng cách nêu cùng nhau việc lấy mẫu cây, ngẫu nhiên chọn feature, quy tắc tổng hợp và kết quả giữ lại. Các chi tiết này giải thích vì sao nhiều cây có thể vững hơn một cây mà không hứa mọi ensemble đều thắng.',
+        title: 'Báo cáo đa dạng, tổng hợp và bằng chứng cùng nhau',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM06RandomForestBlockDefaults,
+    id: 'forest-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM06RandomForestSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM06RandomForestSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM06RandomForestSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM06RandomForestSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Ensembles and Random Forests — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/ensemble.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM07SvmFullLessonBlocks = [
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-separation-question',
+    locales: {
+      en: {
+        lede: 'A support vector machine compares labelled examples through a separating surface. The key geometric question is how much room the chosen separator leaves before it reaches the nearest training points.',
+        navigationTitle: 'Frame the separator',
+        title: 'Separate classes while preserving visible room',
+      },
+      vi: {
+        lede: 'Máy vector hỗ trợ so sánh các ví dụ đã gán nhãn qua một mặt phân tách. Câu hỏi hình học chính là mặt phân tách đã chọn chừa bao nhiêu khoảng trống trước khi chạm các điểm train gần nhất.',
+        navigationTitle: 'Đặt khung mặt phân tách',
+        title: 'Tách lớp đồng thời giữ khoảng trống hiển thị',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-supervised-principle',
+    locales: {
+      en: {
+        markdown:
+          'The pinned scikit-learn guide describes SVMs as supervised methods used for classification, regression, and outlier detection. In the classification picture, an SVM constructs one or more hyperplanes that separate candidate classes.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn scikit-learn đã pin mô tả SVM là các phương pháp có giám sát dùng cho phân loại, hồi quy và phát hiện ngoại lệ. Trong bức tranh phân loại, SVM xây dựng một hoặc nhiều siêu phẳng để tách các lớp ứng viên.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-margin-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: the separator is judged by its distance to the nearest training points of each class, called the functional margin. Effect: the guide says a larger margin generally corresponds to lower classifier generalisation error, so the closest points deserve special attention.',
+        title: 'The nearest points define the margin evidence',
+      },
+      vi: {
+        body: 'Nguyên nhân: mặt phân tách được đánh giá bằng khoảng cách tới các điểm train gần nhất của mỗi lớp, gọi là margin hàm. Kết quả: hướng dẫn nêu margin lớn hơn nhìn chung tương ứng với lỗi tổng quát hóa classifier thấp hơn, nên các điểm gần nhất cần được chú ý đặc biệt.',
+        title: 'Các điểm gần nhất xác định bằng chứng margin',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-support-vector-question',
+    locales: {
+      en: {
+        lede: 'Not every training point constrains the same separating boundary. The points on the margin boundaries are the support vectors in the linearly separable illustration.',
+        navigationTitle: 'Identify support vectors',
+        title: 'Find the points that constrain the separator',
+      },
+      vi: {
+        lede: 'Không phải mọi điểm train đều ràng buộc mặt phân tách như nhau. Các điểm trên biên margin là support vector trong minh họa phân tách tuyến tính.',
+        navigationTitle: 'Xác định support vector',
+        title: 'Tìm các điểm ràng buộc mặt phân tách',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-support-vector-reading',
+    locales: {
+      en: {
+        markdown:
+          'For a linearly separable problem, the guide calls the training samples on the margin boundaries support vectors. When the problem is not linearly separable, support vectors lie within the margin boundaries. Record that geometry instead of saying every point is equally decisive.',
+      },
+      vi: {
+        markdown:
+          'Với bài toán phân tách tuyến tính, hướng dẫn gọi các mẫu train nằm trên biên margin là support vector. Khi bài toán không phân tách tuyến tính, support vector nằm trong các biên margin. Hãy ghi hình học đó thay vì nói mọi điểm đều quyết định như nhau.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    activityId: 'act-cml-p12-svm-example',
+    id: 'svm-fixed-margin-example',
+    locales: {
+      en: {
+        description:
+          'Inspect a fixed two-class coordinate sketch. The displayed separator has one class-0 point and two class-1 points nearest its margin boundaries; mark those three as support vectors, then explain why moving a distant point need not change this illustrative separator. This is a static geometry exercise, not a live scoring or classification service.',
+        navigationTitle: 'Inspect fixed margin points',
+      },
+      vi: {
+        description:
+          'Quan sát phác thảo tọa độ hai lớp cố định. Mặt phân tách hiển thị có một điểm lớp 0 và hai điểm lớp 1 gần nhất với biên margin; đánh dấu ba điểm đó là support vector, rồi giải thích vì sao di chuyển một điểm xa không nhất thiết thay đổi mặt phân tách minh họa này. Đây là bài tập hình học tĩnh, không phải dịch vụ chấm điểm hoặc phân loại live.',
+        navigationTitle: 'Quan sát các điểm margin cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-penalty-question',
+    locales: {
+      en: {
+        lede: 'Real classes are not always perfectly separable. The SVM objective therefore makes the trade-off between a wide margin and margin errors explicit rather than pretending a perfect line always exists.',
+        navigationTitle: 'Read the trade-off',
+        title: 'Separate margin width from margin errors',
+      },
+      vi: {
+        lede: 'Các lớp thật không phải lúc nào cũng phân tách hoàn hảo. Vì vậy mục tiêu SVM làm rõ đánh đổi giữa margin rộng và lỗi margin thay vì giả vờ luôn có đường hoàn hảo.',
+        navigationTitle: 'Đọc đánh đổi',
+        title: 'Tách độ rộng margin khỏi lỗi margin',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-penalty-kernel-reading',
+    locales: {
+      en: {
+        markdown:
+          'The guide explains that samples can be misclassified or lie within a margin boundary when perfect separation is unavailable; parameter C controls the penalty strength and acts as an inverse regularisation parameter in that formulation. It also describes kernels as implicitly mapping vectors into a higher-dimensional space. Name the chosen kernel and penalty setting rather than treating either as invisible.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn giải thích các mẫu có thể bị phân loại sai hoặc nằm trong biên margin khi không thể phân tách hoàn hảo; tham số C kiểm soát cường độ penalty và đóng vai trò tham số regularization nghịch trong công thức đó. Hướng dẫn cũng mô tả kernel ánh xạ ngầm vector vào không gian nhiều chiều hơn. Hãy nêu kernel và cài đặt penalty đã chọn thay vì coi chúng là vô hình.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-review-summary',
+    locales: {
+      en: {
+        body: 'Review an SVM by recording the support-vector geometry, margin interpretation, kernel, penalty setting, and held-out evidence. This explains the chosen boundary without claiming that a fixed diagram decides a real person or event.',
+        title: 'Keep geometry and model choices reviewable',
+      },
+      vi: {
+        body: 'Review một SVM bằng cách ghi hình học support vector, cách diễn giải margin, kernel, cài đặt penalty và bằng chứng giữ lại. Việc này giải thích ranh giới đã chọn mà không khẳng định sơ đồ cố định quyết định một người hay sự kiện thật.',
+        title: 'Giữ hình học và lựa chọn mô hình có thể review',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM07SvmBlockDefaults,
+    id: 'svm-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM07SvmSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM07SvmSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM07SvmSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM07SvmSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Support Vector Machines — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/svm.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM08KmeansFullLessonBlocks = [
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-unlabelled-groups-question',
+    locales: {
+      en: {
+        lede: 'Start with observations that have coordinates but no class labels. The question is not which known class each point belongs to; it is whether nearby observations can be described as a small number of groups.',
+        navigationTitle: 'Frame an unlabelled grouping question',
+        title: 'Group observations without class labels',
+      },
+      vi: {
+        lede: 'Bắt đầu với các quan sát có tọa độ nhưng không có nhãn lớp. Câu hỏi không phải mỗi điểm thuộc lớp đã biết nào; đó là liệu các quan sát gần nhau có thể được mô tả bằng một số nhóm nhỏ hay không.',
+        navigationTitle: 'Đặt câu hỏi gom nhóm không nhãn',
+        title: 'Gom các quan sát không có nhãn lớp',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-centroid-and-k',
+    locales: {
+      en: {
+        markdown:
+          'The pinned guide describes K-means as partitioning N samples into K disjoint clusters, each described by a mean called a centroid. K must be chosen for the question being asked, and a centroid is not required to be one of the original samples.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn đã pin mô tả K-means là phân hoạch N mẫu thành K cụm rời nhau, mỗi cụm được mô tả bằng một trung bình gọi là centroid. Phải chọn K cho câu hỏi đang đặt ra, và centroid không bắt buộc là một mẫu gốc.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-inertia-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: K-means seeks low within-cluster sum of squares, commonly called inertia. Effect: a lower inertia says the displayed points are closer to their assigned centroids in this fixture; it does not by itself prove that this K is uniquely correct.',
+        title: 'Read inertia as compactness evidence, not a verdict',
+      },
+      vi: {
+        body: 'Nguyên nhân: K-means tìm tổng bình phương trong cụm thấp, thường gọi là inertia. Hệ quả: inertia thấp hơn cho biết các điểm hiển thị gần centroid được gán hơn trong fixture này; tự nó không chứng minh K đã chọn là duy nhất đúng.',
+        title: 'Đọc inertia như bằng chứng độ gọn, không phải phán quyết',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-assignment-question',
+    locales: {
+      en: {
+        lede: 'One K-means iteration has a visible cause-and-effect loop: assign each point to its nearest current centroid, then replace each centroid with the mean of the points assigned to it.',
+        navigationTitle: 'Follow assignment and update',
+        title: 'Assign first, then update the centroids',
+      },
+      vi: {
+        lede: 'Một vòng lặp K-means có chuỗi nguyên nhân-kết quả nhìn thấy được: gán mỗi điểm cho centroid hiện tại gần nhất, rồi thay mỗi centroid bằng trung bình của các điểm đã gán vào nó.',
+        navigationTitle: 'Theo dõi gán và cập nhật',
+        title: 'Gán trước, rồi cập nhật các centroid',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-repeat-until-stable',
+    locales: {
+      en: {
+        markdown:
+          'After updated means are calculated, the assignment-and-update steps repeat until centroid movement falls below a threshold. The guide warns that this convergence can be a local minimum and depends on the initial centroids, so record the initialization rather than hiding it.',
+      },
+      vi: {
+        markdown:
+          'Sau khi tính các trung bình đã cập nhật, hai bước gán-cập nhật lặp lại đến khi dịch chuyển centroid thấp hơn ngưỡng. Hướng dẫn lưu ý sự hội tụ này có thể là cực tiểu cục bộ và phụ thuộc centroid khởi tạo, nên hãy ghi cách khởi tạo thay vì che giấu nó.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    activityId: 'act-cml-p13-kmeans-example',
+    id: 'kmeans-fixed-coordinate-example',
+    locales: {
+      en: {
+        description:
+          'Inspect the fixed anonymous points (0, 0), (0, 1), (1, 0), and (1, 1) with K = 2. First state which displayed centroid is nearest to each point, then state how the mean of each assigned group would become the next centroid. The fixture is a static teaching table, not a live clustering service or an astronomy claim.',
+        navigationTitle: 'Inspect a fixed K-means pass',
+      },
+      vi: {
+        description:
+          'Quan sát các điểm ẩn danh cố định (0, 0), (0, 1), (1, 0), và (1, 1) với K = 2. Trước hết nêu centroid hiển thị nào gần từng điểm nhất, rồi nêu trung bình của mỗi nhóm đã gán sẽ trở thành centroid kế tiếp ra sao. Fixture là bảng dạy học tĩnh, không phải dịch vụ phân cụm live hay khẳng định thiên văn.',
+        navigationTitle: 'Quan sát một lượt K-means cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-shape-limitation-question',
+    locales: {
+      en: {
+        lede: 'Before comparing cluster counts, ask whether the displayed shape matches the geometry K-means assumes. A compact score can mislead when the groups are long, curved, or otherwise irregular.',
+        navigationTitle: 'Check the geometry assumption',
+        title: 'Do not let one compactness score hide shape',
+      },
+      vi: {
+        lede: 'Trước khi so sánh số cụm, hãy hỏi liệu hình dạng hiển thị có khớp với hình học K-means giả định không. Một điểm độ gọn có thể gây hiểu lầm khi nhóm dài, cong hoặc bất quy tắc.',
+        navigationTitle: 'Kiểm tra giả định hình học',
+        title: 'Đừng để một điểm độ gọn che khuất hình dạng',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-inertia-limitation',
+    locales: {
+      en: {
+        markdown:
+          'The guide notes that inertia assumes convex, isotropic clusters and can perform poorly for elongated or irregular clusters. It is also not normalized, so it can rise with dimensionality. Compare it with the plotted geometry and the stated K instead of treating a smaller number as a universal quality certificate.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn nêu inertia giả định các cụm lồi, đẳng hướng và có thể hoạt động kém với cụm kéo dài hoặc bất quy tắc. Nó cũng không được chuẩn hóa nên có thể tăng theo số chiều. Hãy so sánh nó với hình học đã vẽ và K đã nêu thay vì coi số nhỏ hơn là chứng chỉ chất lượng phổ quát.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-review-summary',
+    locales: {
+      en: {
+        body: 'A reviewable K-means result names K, the initialization, the assignment-and-update sequence, inertia, and a shape limitation. That chain lets another learner check why a fixed grouping was shown without claiming it discovers a real-world truth.',
+        title: 'Make a fixed grouping reproducible',
+      },
+      vi: {
+        body: 'Một kết quả K-means có thể review nêu K, cách khởi tạo, chuỗi gán-cập nhật, inertia và một giới hạn hình dạng. Chuỗi đó cho người học khác kiểm tra vì sao một cách gom nhóm cố định được hiển thị mà không khẳng định nó khám phá sự thật ngoài đời.',
+        title: 'Làm cho cách gom nhóm cố định có thể tái lập',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM08KmeansBlockDefaults,
+    id: 'kmeans-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM08ClusteringSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM08ClusteringSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM08ClusteringSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM08ClusteringSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Clustering — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/clustering.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM08HierarchicalFullLessonBlocks = [
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-nested-groups-question',
+    locales: {
+      en: {
+        lede: 'Hierarchical clustering does not begin by declaring one final number of groups. It builds a nested sequence so the learner can inspect which observations join early and which only join later.',
+        navigationTitle: 'Frame nested grouping',
+        title: 'Build groups as a visible hierarchy',
+      },
+      vi: {
+        lede: 'Phân cụm phân cấp không bắt đầu bằng cách tuyên bố một số nhóm cuối cùng. Nó tạo chuỗi lồng nhau để người học quan sát quan sát nào nhập sớm và quan sát nào chỉ nhập muộn.',
+        navigationTitle: 'Đặt khung gom nhóm lồng nhau',
+        title: 'Xây nhóm thành một hệ phân cấp hiển thị',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-dendrogram-reading',
+    locales: {
+      en: {
+        markdown:
+          'The pinned guide describes hierarchical clustering as a family of methods that build nested clusters by successive merging or splitting. A dendrogram represents that hierarchy: its root contains every sample and its leaves are individual samples.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn đã pin mô tả phân cụm phân cấp là họ phương pháp xây cụm lồng nhau bằng cách gộp hoặc tách liên tiếp. Dendrogram biểu diễn hệ phân cấp đó: gốc chứa mọi mẫu và các lá là từng mẫu riêng lẻ.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-agglomerative-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: in agglomerative clustering, each observation starts as its own cluster and clusters are successively merged. Effect: the merge order becomes inspectable evidence, so a later cut can be explained from the joins rather than chosen as an unexplained label.',
+        title: 'Let bottom-up merges leave an audit trail',
+      },
+      vi: {
+        body: 'Nguyên nhân: trong phân cụm kết tụ, mỗi quan sát bắt đầu là một cụm riêng và các cụm được gộp liên tiếp. Hệ quả: thứ tự gộp trở thành bằng chứng có thể quan sát, nên mức cắt sau đó có thể được giải thích từ các lần nhập thay vì là một nhãn không rõ nguyên nhân.',
+        title: 'Để các lần gộp từ dưới lên tạo dấu vết',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-linkage-question',
+    locales: {
+      en: {
+        lede: 'The next merge depends on linkage: a rule for measuring distance between candidate clusters. Naming linkage is essential because different linkage rules can tell different merge stories for the same points.',
+        navigationTitle: 'Name the linkage rule',
+        title: 'Choose how two candidate clusters are compared',
+      },
+      vi: {
+        lede: 'Lần gộp kế tiếp phụ thuộc vào linkage: quy tắc đo khoảng cách giữa các cụm ứng viên. Phải nêu linkage vì các quy tắc linkage khác nhau có thể kể câu chuyện gộp khác nhau cho cùng các điểm.',
+        navigationTitle: 'Nêu quy tắc linkage',
+        title: 'Chọn cách so sánh hai cụm ứng viên',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-linkage-types',
+    locales: {
+      en: {
+        markdown:
+          'The guide distinguishes Ward linkage, which minimizes the sum of squared distances within clusters, complete linkage, which uses the largest between-cluster distance, average linkage, which uses an average distance, and single linkage, which uses the closest distance. The rule changes which merge is justified next.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn phân biệt linkage Ward, giảm tổng bình phương khoảng cách trong cụm; complete linkage, dùng khoảng cách lớn nhất giữa cụm; average linkage, dùng khoảng cách trung bình; và single linkage, dùng khoảng cách gần nhất. Quy tắc thay đổi lần gộp nào được biện minh tiếp theo.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    activityId: 'act-cml-p14-hierarchical-clustering-example',
+    id: 'hierarchical-fixed-merge-example',
+    locales: {
+      en: {
+        description:
+          'Read the same four fixed anonymous coordinates as a bottom-up merge sketch. First keep each point separate, then state one nearby pair that could merge under a named linkage, and finally explain why a dendrogram cut should cite the merge level rather than turn cluster IDs into ground-truth classes. This is a static instructional trace, not a live segmenter.',
+        navigationTitle: 'Inspect a fixed merge sequence',
+      },
+      vi: {
+        description:
+          'Đọc cùng bốn tọa độ ẩn danh cố định như phác thảo gộp từ dưới lên. Trước hết giữ từng điểm riêng, rồi nêu một cặp gần nhau có thể nhập theo linkage đã nêu, và cuối cùng giải thích vì sao mức cắt dendrogram phải viện dẫn mức gộp thay vì biến ID cụm thành lớp sự thật. Đây là dấu vết dạy học tĩnh, không phải bộ phân khúc live.',
+        navigationTitle: 'Quan sát chuỗi gộp cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-dendrogram-cut-question',
+    locales: {
+      en: {
+        lede: 'A dendrogram makes a cut decision visible. The learner should identify the displayed merge level, linkage, and distance basis before saying how many clusters are retained.',
+        navigationTitle: 'Read a cut from the hierarchy',
+        title: 'Choose a cut after reading the merges',
+      },
+      vi: {
+        lede: 'Dendrogram làm quyết định cắt trở nên nhìn thấy được. Người học nên xác định mức gộp hiển thị, linkage và cơ sở khoảng cách trước khi nói giữ lại bao nhiêu cụm.',
+        navigationTitle: 'Đọc mức cắt từ hệ phân cấp',
+        title: 'Chọn mức cắt sau khi đọc các lần gộp',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-dendrogram-limitation',
+    locales: {
+      en: {
+        markdown:
+          'The guide notes that visual inspection of a dendrogram can be useful, especially with small sample sizes. Treat that picture as an aid to a stated linkage and distance choice; it is not a license to infer a real category from an arbitrary cluster label.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn nêu quan sát trực quan dendrogram có thể hữu ích, đặc biệt với cỡ mẫu nhỏ. Hãy coi bức hình đó là trợ giúp cho lựa chọn linkage và khoảng cách đã nêu; nó không cho phép suy ra một loại thực tế từ nhãn cụm tùy ý.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-review-summary',
+    locales: {
+      en: {
+        body: 'A reviewable hierarchical result records the bottom-up merge sequence, linkage, distance basis, and cut level. Those details explain why the fixed tree is read one way and make a competing reading possible to discuss.',
+        title: 'Keep the hierarchy open to review',
+      },
+      vi: {
+        body: 'Một kết quả phân cấp có thể review ghi chuỗi gộp từ dưới lên, linkage, cơ sở khoảng cách và mức cắt. Các chi tiết đó giải thích vì sao cây cố định được đọc theo một cách và cho phép thảo luận một cách đọc cạnh tranh.',
+        title: 'Giữ hệ phân cấp mở để review',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM08HierarchicalBlockDefaults,
+    id: 'hierarchical-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM08ClusteringSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM08ClusteringSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM08ClusteringSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM08ClusteringSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Clustering — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/clustering.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM09PcaFullLessonBlocks = [
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-correlated-signal-question',
+    locales: {
+      en: {
+        lede: 'When several numeric features move together, a learner may want a shorter view of their shared variation. PCA changes the coordinate system for that view; it does not turn the rows into known classes or make a real-world decision.',
+        navigationTitle: 'Frame shared variation',
+        title: 'Reduce a correlated signal without inventing labels',
+      },
+      vi: {
+        lede: 'Khi nhiều feature số thay đổi cùng nhau, người học có thể muốn một góc nhìn ngắn hơn về biến thiên chung của chúng. PCA đổi hệ tọa độ cho góc nhìn đó; nó không biến các hàng thành lớp đã biết hoặc đưa ra quyết định ngoài đời.',
+        navigationTitle: 'Đặt khung biến thiên chung',
+        title: 'Giảm một tín hiệu tương quan mà không bịa ra nhãn',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-orthogonal-components',
+    locales: {
+      en: {
+        markdown:
+          'The pinned guide describes PCA as decomposing a multivariate dataset into successive orthogonal components that explain a maximum amount of variance. A fitted PCA transformer learns n components and can project new data onto them.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn đã pin mô tả PCA là phân rã một tập dữ liệu đa biến thành các component trực giao liên tiếp giải thích lượng phương sai tối đa. Một transformer PCA đã fit học n component và có thể chiếu dữ liệu mới lên chúng.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-projection-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: keep only the first components that explain more variance and drop components tied to lower singular values. Effect: the representation has fewer dimensions while retaining much of the explained variance, but it is a reduced view rather than a guarantee that no information was discarded.',
+        title: 'Trade dimensions for a stated amount of variation',
+      },
+      vi: {
+        body: 'Nguyên nhân: giữ các component đầu giải thích nhiều phương sai hơn và bỏ component gắn với singular value thấp hơn. Hệ quả: biểu diễn có ít chiều hơn trong khi giữ phần lớn phương sai đã giải thích, nhưng đó là góc nhìn rút gọn chứ không đảm bảo không mất thông tin.',
+        title: 'Đánh đổi số chiều để giữ lượng biến thiên đã nêu',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-centering-question',
+    locales: {
+      en: {
+        lede: 'Before reading a projection, identify what happened to each feature. Centering and scaling are different operations, so a component plot is incomplete when it hides the preprocessing choice.',
+        navigationTitle: 'Check preprocessing before projection',
+        title: 'Separate centering from scaling',
+      },
+      vi: {
+        lede: 'Trước khi đọc phép chiếu, hãy xác định điều gì xảy ra với từng feature. Centering và scaling là hai thao tác khác nhau, nên biểu đồ component chưa đầy đủ khi che giấu lựa chọn tiền xử lý.',
+        navigationTitle: 'Kiểm tra tiền xử lý trước phép chiếu',
+        title: 'Tách centering khỏi scaling',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-centering-scaling-reading',
+    locales: {
+      en: {
+        markdown:
+          'In the pinned scikit-learn account, PCA centers each feature before SVD but does not scale it automatically. The optional whiten setting projects into the singular space while scaling each component to unit variance; name that choice when a downstream method assumes isotropic signals.',
+      },
+      vi: {
+        markdown:
+          'Trong cách mô tả scikit-learn đã pin, PCA center từng feature trước SVD nhưng không tự scale nó. Tùy chọn whiten chiếu vào không gian singular đồng thời scale từng component về phương sai đơn vị; hãy nêu lựa chọn này khi phương pháp phía sau giả định tín hiệu đẳng hướng.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    activityId: 'act-cml-p15-pca-example',
+    id: 'pca-fixed-sensor-fixture',
+    locales: {
+      en: {
+        description:
+          'Inspect four synthetic paired measurements: (1, 1), (2, 2), (3, 3), and (4, 4). State that the fixture uses one retained component only to make a one-dimensional projection discussion visible; first name centering, then name the retained direction, and finally state that reducing to one component omits another direction of variation. The row IDs in the fixture are not claimed numerical PCA scores and the data are not readings from real sensors.',
+        navigationTitle: 'Inspect a fixed one-component projection',
+      },
+      vi: {
+        description:
+          'Quan sát bốn phép đo cặp tổng hợp: (1, 1), (2, 2), (3, 3), và (4, 4). Nêu rằng fixture chỉ giữ một component để làm rõ thảo luận về phép chiếu một chiều; trước hết nêu centering, rồi nêu hướng được giữ, và cuối cùng nói giảm còn một component sẽ bỏ một hướng biến thiên khác. ID hàng trong fixture không được khẳng định là điểm PCA số học và dữ liệu không phải số đo cảm biến thật.',
+        navigationTitle: 'Quan sát phép chiếu một component cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-retained-components-question',
+    locales: {
+      en: {
+        lede: 'Choosing n_components is a model decision. It makes explicit how many directions will be kept, so a shorter display must also state what amount of explained variance it preserves.',
+        navigationTitle: 'Name the retained dimension',
+        title: 'Keep a stated number of components',
+      },
+      vi: {
+        lede: 'Chọn n_components là quyết định mô hình. Nó làm rõ bao nhiêu hướng sẽ được giữ, nên một hiển thị ngắn hơn cũng phải nêu lượng phương sai đã giải thích mà nó giữ lại.',
+        navigationTitle: 'Nêu số chiều được giữ',
+        title: 'Giữ một số component đã nêu',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-approximation-limitation',
+    locales: {
+      en: {
+        markdown:
+          'Lower-dimensional PCA is useful because it can retain most explained variance while dropping lower-singular-value components. It is still an approximation: the pinned guide notes that randomized PCA inverse_transform is not an exact inverse of transform even with the default non-whitened setting. Do not call a compressed reconstruction exact without the appropriate evidence.',
+      },
+      vi: {
+        markdown:
+          'PCA ít chiều hữu ích vì có thể giữ phần lớn phương sai đã giải thích trong khi bỏ component có singular value thấp. Nó vẫn là xấp xỉ: hướng dẫn đã pin nêu inverse_transform của PCA randomized không phải nghịch đảo chính xác của transform ngay cả với cài đặt mặc định không whiten. Đừng gọi tái dựng nén là chính xác nếu không có bằng chứng phù hợp.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-review-summary',
+    locales: {
+      en: {
+        body: 'Make a PCA projection reviewable by recording feature centering and scaling choices, retained component count, explained variance, and whether a reconstruction is approximate. Those details explain the shorter view without pretending the projection is a ground-truth category or an exact copy of the original rows.',
+        title: 'Keep a reduced view accountable',
+      },
+      vi: {
+        body: 'Làm phép chiếu PCA có thể review bằng cách ghi lựa chọn center và scale feature, số component giữ lại, phương sai đã giải thích và việc tái dựng có phải xấp xỉ hay không. Các chi tiết đó giải thích góc nhìn ngắn hơn mà không giả vờ phép chiếu là loại sự thật hoặc bản sao chính xác của các hàng gốc.',
+        title: 'Giữ góc nhìn rút gọn có thể đối chiếu',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM09PcaBlockDefaults,
+    id: 'pca-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM09PcaSourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM09PcaSourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM09PcaSourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM09PcaSourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Decomposing signals in components — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/decomposition.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -2822,6 +4530,198 @@ const fullLessonPosts: readonly TrialPost[] = [
       vi: 'Chọn metric phân loại từ đánh đổi lỗi',
     },
   },
+  {
+    accessLevel: 'full',
+    blocks: cmlM05KnnFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Trace a fixed nearest-neighbour vote from a query point, through visible distances, to a reproducible local class decision.',
+      vi: 'Lần theo một phiếu láng giềng gần nhất cố định từ điểm truy vấn, qua các khoảng cách hiển thị, đến quyết định lớp cục bộ có thể tái lập.',
+    },
+    durationMinutes: 16,
+    id: CML_M05_KNN_POST_ID,
+    learningObjective: {
+      en: 'Explain how KNN uses a chosen number of nearby labelled training examples, a distance measure, and a majority vote to classify a fixed query.',
+      vi: 'Giải thích cách KNN dùng số ví dụ train đã gán nhãn ở gần được chọn, một thước đo khoảng cách và phiếu đa số để phân loại truy vấn cố định.',
+    },
+    moduleId: 'cml-m05-knn-naive-bayes',
+    postQuizId: 'quiz-post-cml-p08',
+    provenance: cmlM05KnnDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-knn-fixed-neighbour-distance-majority-vote',
+    title: {
+      en: 'Trace a KNN vote through local distance evidence',
+      vi: 'Lần theo phiếu KNN qua bằng chứng khoảng cách cục bộ',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM05NaiveBayesFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Compare fixed class evidence by separating the prior frequency, observed feature terms, and the conditional-independence assumption.',
+      vi: 'So sánh bằng chứng lớp cố định bằng cách tách tần suất ban đầu, các hạng bằng chứng feature quan sát và giả định độc lập có điều kiện.',
+    },
+    durationMinutes: 16,
+    id: CML_M05_NAIVE_BAYES_POST_ID,
+    learningObjective: {
+      en: 'Explain how Naive Bayes compares class priors and class-conditional feature evidence under its conditional-independence assumption.',
+      vi: 'Giải thích cách Naive Bayes so sánh prior của lớp và bằng chứng feature có điều kiện theo lớp dưới giả định độc lập có điều kiện.',
+    },
+    moduleId: 'cml-m05-knn-naive-bayes',
+    postQuizId: 'quiz-post-cml-p09',
+    provenance: cmlM05NaiveBayesDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-naive-bayes-prior-evidence-independence-assumption',
+    title: {
+      en: 'Compare class evidence with Naive Bayes',
+      vi: 'So sánh bằng chứng lớp với Naive Bayes',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM06DecisionTreeFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Follow visible feature conditions through a fixed decision tree, then connect tree depth and pruning controls to the risk of overfitting.',
+      vi: 'Theo các điều kiện feature hiển thị qua một cây quyết định cố định, rồi nối độ sâu và kiểm soát pruning của cây với rủi ro overfitting.',
+    },
+    durationMinutes: 16,
+    id: CML_M06_DECISION_TREE_POST_ID,
+    learningObjective: {
+      en: 'Explain a decision-tree prediction as a path of simple rules and identify why depth, pruning, and minimum-sample controls matter for generalisation.',
+      vi: 'Giải thích dự đoán của cây quyết định như một đường đi gồm quy tắc đơn giản và xác định vì sao độ sâu, pruning và kiểm soát số mẫu tối thiểu quan trọng với tổng quát hóa.',
+    },
+    moduleId: 'cml-m06-trees-forest',
+    postQuizId: 'quiz-post-cml-p10',
+    provenance: cmlM06DecisionTreeDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-decision-tree-rule-path-complexity-generalisation',
+    title: {
+      en: 'Trace a decision tree through visible rules',
+      vi: 'Lần theo cây quyết định qua các quy tắc hiển thị',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM06RandomForestFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Compare one fixed tree with a diverse tree ensemble, then make the sampling, feature randomness, and aggregation rule visible before claiming lower variance.',
+      vi: 'So sánh một cây cố định với ensemble cây đa dạng, rồi làm rõ việc lấy mẫu, ngẫu nhiên feature và quy tắc tổng hợp trước khi khẳng định phương sai thấp hơn.',
+    },
+    durationMinutes: 16,
+    id: CML_M06_RANDOM_FOREST_POST_ID,
+    learningObjective: {
+      en: 'Explain how bootstrap samples, random feature choices, and an explicit aggregation rule can make a random-forest prediction less coupled to one tree’s error.',
+      vi: 'Giải thích cách mẫu bootstrap, lựa chọn feature ngẫu nhiên và quy tắc tổng hợp rõ ràng có thể làm dự đoán random forest ít gắn với lỗi của một cây hơn.',
+    },
+    moduleId: 'cml-m06-trees-forest',
+    postQuizId: 'quiz-post-cml-p11',
+    provenance: cmlM06RandomForestDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-random-forest-diversity-aggregation-variance-evidence',
+    title: {
+      en: 'Combine diverse trees with an explicit rule',
+      vi: 'Kết hợp các cây đa dạng bằng quy tắc rõ ràng',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM07SvmFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Read a fixed SVM separator through its margin and support vectors, then distinguish the geometry from an unsupported real-world classification claim.',
+      vi: 'Đọc mặt phân tách SVM cố định qua margin và support vector, rồi phân biệt hình học này với một khẳng định phân loại thực tế thiếu bằng chứng.',
+    },
+    durationMinutes: 16,
+    id: CML_M07_SVM_POST_ID,
+    learningObjective: {
+      en: 'Explain why support vectors constrain a maximum-margin separator and name the penalty and kernel choices that must accompany an SVM interpretation.',
+      vi: 'Giải thích vì sao support vector ràng buộc mặt phân tách margin tối đa và nêu các lựa chọn penalty, kernel phải đi kèm khi diễn giải SVM.',
+    },
+    moduleId: 'cml-m07-svm',
+    postQuizId: 'quiz-post-cml-p12',
+    provenance: cmlM07SvmDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-svm-margin-support-vector-kernel-penalty-evidence',
+    title: {
+      en: 'Read an SVM boundary through its margin',
+      vi: 'Đọc ranh giới SVM qua margin của nó',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM08KmeansFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Trace a fixed K-means pass from chosen centroids, through nearest-centroid assignments and mean updates, to a compactness reading with stated limits.',
+      vi: 'Lần theo một lượt K-means cố định từ centroid đã chọn, qua gán centroid gần nhất và cập nhật trung bình, đến cách đọc độ gọn có nêu giới hạn.',
+    },
+    durationMinutes: 16,
+    id: CML_M08_KMEANS_POST_ID,
+    learningObjective: {
+      en: 'Explain K-means as an assignment-and-update loop, name the role of K and initialization, and state why inertia alone cannot validate every cluster shape.',
+      vi: 'Giải thích K-means như vòng lặp gán-cập nhật, nêu vai trò của K và khởi tạo, và nói vì sao chỉ inertia không thể xác thực mọi hình dạng cụm.',
+    },
+    moduleId: 'cml-m08-clustering',
+    postQuizId: 'quiz-post-cml-p13',
+    provenance: cmlM08ClusteringDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-kmeans-centroid-assignment-update-inertia-shape-limit',
+    title: {
+      en: 'Trace K-means from centroids to a cautious grouping',
+      vi: 'Lần theo K-means từ centroid đến cách gom nhóm thận trọng',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM08HierarchicalFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Read a fixed bottom-up cluster hierarchy through its merge sequence, named linkage rule, and a dendrogram cut that remains open to review.',
+      vi: 'Đọc một hệ phân cấp cụm từ dưới lên cố định qua chuỗi gộp, quy tắc linkage đã nêu và mức cắt dendrogram vẫn mở để review.',
+    },
+    durationMinutes: 16,
+    id: CML_M08_HIERARCHICAL_POST_ID,
+    learningObjective: {
+      en: 'Explain how an agglomerative hierarchy records successive merges, distinguish linkage rules, and justify a dendrogram cut with its stated merge evidence.',
+      vi: 'Giải thích cách hệ phân cấp kết tụ ghi các lần gộp liên tiếp, phân biệt các quy tắc linkage và biện minh mức cắt dendrogram bằng bằng chứng gộp đã nêu.',
+    },
+    moduleId: 'cml-m08-clustering',
+    postQuizId: 'quiz-post-cml-p14',
+    provenance: cmlM08ClusteringDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-hierarchical-merge-linkage-dendrogram-cut-evidence',
+    title: {
+      en: 'Read hierarchical merges before choosing a cut',
+      vi: 'Đọc các lần gộp phân cấp trước khi chọn mức cắt',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM09PcaFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Trace a fixed one-component projection from centering choices and retained variance to an explicit statement of what a reduced view can no longer guarantee.',
+      vi: 'Lần theo một phép chiếu một component cố định từ lựa chọn centering và phương sai giữ lại đến phát biểu rõ điều góc nhìn rút gọn không còn bảo đảm.',
+    },
+    durationMinutes: 16,
+    id: CML_M09_PCA_POST_ID,
+    learningObjective: {
+      en: 'Explain PCA as successive orthogonal components, distinguish centering from scaling, and report retained components and approximation limits when reducing dimensions.',
+      vi: 'Giải thích PCA như các component trực giao liên tiếp, phân biệt centering với scaling, và báo số component giữ lại cùng giới hạn xấp xỉ khi giảm chiều.',
+    },
+    moduleId: 'cml-m09-pca',
+    postQuizId: 'quiz-post-cml-p15',
+    provenance: cmlM09PcaDraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-pca-orthogonal-variance-centering-projection-approximation',
+    title: {
+      en: 'Project shared variation with PCA',
+      vi: 'Chiếu biến thiên chung bằng PCA',
+    },
+  },
 ];
 
 interface PostDraftDefinition {
@@ -2832,160 +4732,7 @@ interface PostDraftDefinition {
   title: LocalizedText;
 }
 
-const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
-  'cml-p08-knn': {
-    concept: {
-      en: 'KNN bases a prediction on nearby labelled examples. Scaling determines what counts as nearby, and the value of k controls local sensitivity.',
-      vi: 'KNN dựa dự đoán vào các ví dụ đã gán nhãn ở gần. Chuẩn hóa quyết định thế nào là gần, còn giá trị k kiểm soát độ nhạy cục bộ.',
-    },
-    examplePrompt: {
-      en: 'Classify a new study habit using nearby profiles, then ask how the result changes when one feature has a much larger numeric range.',
-      vi: 'Phân loại một thói quen học mới bằng các hồ sơ gần nhất, rồi hỏi kết quả đổi thế nào khi một feature có thang số lớn hơn nhiều.',
-    },
-    learningObjective: {
-      en: 'Explain the roles of distance, feature scaling, and k in a nearest-neighbour decision.',
-      vi: 'Giải thích vai trò của khoảng cách, chuẩn hóa feature và k trong quyết định láng giềng gần nhất.',
-    },
-    taskFingerprint: 'lesson-cml-p08-neighbour-distance-scaling',
-    title: {
-      en: 'Classify by nearby examples',
-      vi: 'Phân loại bằng ví dụ lân cận',
-    },
-  },
-  'cml-p09-naive-bayes': {
-    concept: {
-      en: 'Naive Bayes updates a class belief from observed features. Its conditional-independence assumption is simple, but the resulting evidence accounting is useful.',
-      vi: 'Naive Bayes cập nhật niềm tin về lớp từ feature quan sát được. Giả định độc lập có điều kiện đơn giản, nhưng cách hạch toán bằng chứng vẫn hữu ích.',
-    },
-    examplePrompt: {
-      en: 'Compare two message categories from short word counts and explain why a strong token can change a class belief without proving certainty.',
-      vi: 'So sánh hai loại thông điệp từ số lần xuất hiện từ ngắn và giải thích vì sao một token mạnh có thể đổi niềm tin về lớp mà không chứng minh chắc chắn.',
-    },
-    learningObjective: {
-      en: 'Describe how prior belief and feature evidence combine in Naive Bayes.',
-      vi: 'Mô tả cách niềm tin ban đầu và bằng chứng feature kết hợp trong Naive Bayes.',
-    },
-    taskFingerprint: 'lesson-cml-p09-bayesian-evidence-update',
-    title: {
-      en: 'Update a class belief from evidence',
-      vi: 'Cập nhật niềm tin về lớp từ bằng chứng',
-    },
-  },
-  'cml-p10-decision-tree': {
-    concept: {
-      en: 'A decision tree asks one interpretable question at a time. Split quality measures how much that question makes the remaining labels less mixed.',
-      vi: 'Cây quyết định hỏi từng câu hỏi dễ giải thích. Chất lượng split đo mức câu hỏi đó làm nhãn còn lại bớt lẫn lộn.',
-    },
-    examplePrompt: {
-      en: 'Organise a study-support triage with yes/no questions and identify which first question separates the cases most clearly.',
-      vi: 'Tổ chức phân loại hỗ trợ học tập bằng câu hỏi có/không và xác định câu hỏi đầu tiên tách các trường hợp rõ nhất.',
-    },
-    learningObjective: {
-      en: 'Read a tree split as a transparent rule and relate it to label purity.',
-      vi: 'Đọc một split của cây như quy tắc minh bạch và liên hệ nó với độ thuần nhãn.',
-    },
-    taskFingerprint: 'lesson-cml-p10-tree-split-purity',
-    title: {
-      en: 'Explain a split rule',
-      vi: 'Giải thích quy tắc chia',
-    },
-  },
-  'cml-p11-random-forest': {
-    concept: {
-      en: 'A random forest combines diverse trees. Sampling rows and feature subsets reduces the chance that every tree repeats the same brittle rule.',
-      vi: 'Random Forest kết hợp các cây đa dạng. Lấy mẫu dòng và tập con feature giảm khả năng mọi cây lặp cùng một quy tắc mong manh.',
-    },
-    examplePrompt: {
-      en: 'Ask several small decision panels to vote on a support case, then compare identical panels with panels that each see a different sample.',
-      vi: 'Yêu cầu nhiều nhóm quyết định nhỏ bỏ phiếu cho một trường hợp hỗ trợ, rồi so sánh các nhóm giống hệt với nhóm mỗi nhóm thấy một mẫu khác.',
-    },
-    learningObjective: {
-      en: 'Explain why diversity and aggregation can make tree predictions less brittle.',
-      vi: 'Giải thích vì sao đa dạng và tổng hợp có thể làm dự đoán của cây bớt mong manh.',
-    },
-    taskFingerprint: 'lesson-cml-p11-forest-diversity-voting',
-    title: {
-      en: 'Use diversity before voting',
-      vi: 'Dùng đa dạng trước khi bỏ phiếu',
-    },
-  },
-  'cml-p12-svm': {
-    concept: {
-      en: 'An SVM seeks a separating boundary with room around it. Points nearest the boundary are support vectors because they constrain that margin.',
-      vi: 'SVM tìm ranh giới phân tách có khoảng trống xung quanh. Các điểm gần ranh giới nhất là support vector vì chúng ràng buộc margin.',
-    },
-    examplePrompt: {
-      en: 'Separate two workshop preference groups on a sketch and compare a narrow gap with a wider gap that leaves more room for small measurement changes.',
-      vi: 'Tách hai nhóm sở thích workshop trên một phác thảo và so sánh khe hẹp với khe rộng hơn, có thêm chỗ cho thay đổi đo lường nhỏ.',
-    },
-    learningObjective: {
-      en: 'Explain margin and support vectors without treating every training point as equally decisive.',
-      vi: 'Giải thích margin và support vector mà không coi mọi điểm train đều quyết định như nhau.',
-    },
-    taskFingerprint: 'lesson-cml-p12-svm-margin-support-vectors',
-    title: {
-      en: 'Separate classes with margin',
-      vi: 'Tách lớp bằng margin',
-    },
-  },
-  'cml-p13-kmeans': {
-    concept: {
-      en: 'K-Means alternates between assigning examples to centres and moving centres to the mean of their assigned examples. The result depends on the chosen k and starting centres.',
-      vi: 'K-Means luân phiên gán ví dụ vào tâm và dời tâm về trung bình của ví dụ đã gán. Kết quả phụ thuộc vào k và tâm khởi tạo.',
-    },
-    examplePrompt: {
-      en: 'Group anonymous study schedules by two time features and inspect what changes after the centres move once.',
-      vi: 'Gom lịch học ẩn danh theo hai feature thời gian và quan sát điều gì đổi sau khi tâm di chuyển một lần.',
-    },
-    learningObjective: {
-      en: 'Describe the assign-and-update loop and the effect of choosing k.',
-      vi: 'Mô tả vòng lặp gán-cập nhật và tác động của việc chọn k.',
-    },
-    taskFingerprint: 'lesson-cml-p13-kmeans-assign-update',
-    title: {
-      en: 'Iterate toward cluster centres',
-      vi: 'Lặp để tiến tới tâm cụm',
-    },
-  },
-  'cml-p14-hierarchical-clustering': {
-    concept: {
-      en: 'Hierarchical clustering records a sequence of merges. A dendrogram lets you choose a cut after seeing which groups joined early and which only joined late.',
-      vi: 'Phân cụm phân cấp ghi lại chuỗi lần gộp. Dendrogram cho phép chọn mức cắt sau khi thấy nhóm nào nhập sớm và nhóm nào chỉ nhập muộn.',
-    },
-    examplePrompt: {
-      en: 'Merge similar reading patterns step by step and explain why a large final merge can be a useful place to stop.',
-      vi: 'Gộp các mẫu đọc tương tự từng bước và giải thích vì sao lần gộp cuối lớn có thể là chỗ phù hợp để dừng.',
-    },
-    learningObjective: {
-      en: 'Read merge height and select a defensible dendrogram cut.',
-      vi: 'Đọc độ cao gộp và chọn mức cắt dendrogram có cơ sở.',
-    },
-    taskFingerprint: 'lesson-cml-p14-dendrogram-cut-height',
-    title: {
-      en: 'Read merges before choosing a cut',
-      vi: 'Đọc lần gộp trước khi chọn mức cắt',
-    },
-  },
-  'cml-p15-pca': {
-    concept: {
-      en: 'PCA rotates correlated features into ordered components. Keeping the first components can simplify a view, but reconstruction loss tells you what was discarded.',
-      vi: 'PCA xoay các feature tương quan thành component có thứ tự. Giữ component đầu có thể đơn giản hóa góc nhìn, nhưng lỗi tái dựng cho biết điều gì đã bị bỏ đi.',
-    },
-    examplePrompt: {
-      en: 'Compress several related wellbeing survey measures into two components and explain what a reconstruction check protects against.',
-      vi: 'Nén nhiều chỉ số khảo sát sức khỏe liên quan thành hai component và giải thích kiểm tra tái dựng bảo vệ chống lại điều gì.',
-    },
-    learningObjective: {
-      en: 'Relate principal components to variance retained and information lost.',
-      vi: 'Liên hệ component chính với phương sai giữ lại và thông tin bị mất.',
-    },
-    taskFingerprint: 'lesson-cml-p15-pca-variance-reconstruction',
-    title: {
-      en: 'Keep variance while reducing dimensions',
-      vi: 'Giữ phương sai khi giảm chiều',
-    },
-  },
-};
+const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {};
 
 function getPostDraftDefinition(postId: string): PostDraftDefinition {
   const definition = postDraftDefinitions[postId];

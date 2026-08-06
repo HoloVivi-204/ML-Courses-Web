@@ -1625,7 +1625,7 @@ describe('public learning journey', () => {
     ).toBeVisible();
   });
 
-  it('opens a generic classical draft lesson on authenticated deep links with backend access', async () => {
+  it('opens a source-pinned classical linear lesson on authenticated deep links with backend access', async () => {
     window.history.pushState({}, '', '/learn/course-classical-ml/posts/cml-p03-linear-regression');
     const learningApiClient = createLearningApiClient({
       getProgress: vi.fn().mockResolvedValue(createLinearModuleUnlockedProgressSnapshot()),
@@ -1638,11 +1638,11 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole(
         'heading',
-        { level: 1, name: 'Dùng baseline tuyến tính' },
+        { level: 1, name: 'Đọc baseline tuyến tính qua bằng chứng phần dư' },
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
-    expect(screen.getByText('Trạng thái provenance của draft')).toBeVisible();
+    expect(screen.getByText('Nguồn dùng cho bài học này')).toBeVisible();
     expect(screen.getByText('cml-p03-linear-regression')).toBeVisible();
     expect(learningApiClient.getFullPostContent).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -3228,7 +3228,7 @@ describe('public learning journey', () => {
     });
   });
 
-  it('opens and completes a generic classical fixed demo with backend access', async () => {
+  it('opens and completes a source-pinned classical fixed demo with backend access', async () => {
     window.history.pushState({}, '', '/learn/course-classical-ml/demos/demo-linear-calibration');
     const user = userEvent.setup();
     const completeDemo = vi.fn().mockResolvedValue({
@@ -3238,9 +3238,9 @@ describe('public learning journey', () => {
       },
       event: {
         demoId: 'demo-linear-calibration',
-        requiredStepIds: ['problem', 'data', 'decision', 'result'],
+        requiredStepIds: ['linear-problem', 'linear-data', 'linear-line', 'linear-residual'],
         type: 'demo_completed',
-        viewedStepIds: ['problem', 'data', 'decision', 'result'],
+        viewedStepIds: ['linear-problem', 'linear-data', 'linear-line', 'linear-residual'],
       },
     });
     const learningApiClient = createLearningApiClient({
@@ -3255,13 +3255,13 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole(
         'heading',
-        { name: 'linear-regression: problem-demo-linear-calibration' },
+        { name: 'Demo hồi quy tuyến tính: đường hiệu chuẩn cố định' },
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
     expect(
       screen.getByRole('img', {
-        name: /Một thẻ bài toán cố định giới thiệu hiệu chuẩn tuyến tính/i,
+        name: /Thẻ bài toán nêu một quan hệ đầu vào và đầu ra số cố định để hiệu chuẩn/i,
       }),
     ).toBeVisible();
     expect(screen.getByRole('status', { name: 'Tiến độ demo' })).toHaveTextContent(
@@ -3277,7 +3277,7 @@ describe('public learning journey', () => {
       demoId: 'demo-linear-calibration',
       idToken: 'local-id-token',
       idempotencyKey: expect.any(String),
-      viewedStepIds: ['problem', 'data', 'decision', 'result'],
+      viewedStepIds: ['linear-problem', 'linear-data', 'linear-line', 'linear-residual'],
     });
   });
 
