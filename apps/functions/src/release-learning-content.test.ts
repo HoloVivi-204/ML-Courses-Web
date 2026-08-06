@@ -168,4 +168,77 @@ describe('Release 1 protected learning content', () => {
       ).toBe(true);
     }
   });
+
+  it('pins the dl-m02 MLP batch to the D2L snapshot used for its prose, checkerboard demo, and quizzes', () => {
+    const post = getReadablePost(
+      'course-deep-learning-basic',
+      'dl-p02-mlp-forward-activation',
+      true,
+    )!;
+    const demo = getFixedDemo('demo-mlp-checkerboard')!;
+    const postQuiz = getQuizManifest('quiz-post-dl-p02');
+    const moduleQuiz = getQuizManifest('quiz-module-dl-m02');
+    const expectedSourceSnapshot = {
+      contentSnapshotHash: '503f5fe87c26ab3c93d68142343a51feb72a0e743f293f0cc1090b34211bedc1',
+      sourceId: 'd2l-vi',
+    };
+
+    for (const provenance of [
+      post.provenance,
+      demo.draftProvenance,
+      postQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['d2l-vi'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(expectedSourceSnapshot)],
+        },
+      });
+    }
+
+    expect(post.blocks).toHaveLength(12);
+    expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-dl-p02-mlp-forward-activation-example',
+        type: 'example',
+      }),
+    );
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({
+        sourceIds: ['d2l-vi'],
+        type: 'source-list',
+      }),
+    );
+
+    expect(demo.fixedRun).toMatchObject({
+      datasetVersionId: 'dataset-demo-mlp-checkerboard-v1',
+      rows: [
+        { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+        { input: [0, 1], predictedOutput: 1, targetOutput: 1 },
+        { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+        { input: [1, 1], predictedOutput: 0, targetOutput: 0 },
+      ],
+    });
+    expect(demo.visualization.points).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ classification: 'negative', label: '0,0' }),
+        expect.objectContaining({ classification: 'positive', label: '0,1' }),
+        expect.objectContaining({ classification: 'positive', label: '1,0' }),
+        expect.objectContaining({ classification: 'negative', label: '1,1' }),
+      ]),
+    );
+
+    for (const quiz of [postQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'd2l-vi'),
+        ),
+      ).toBe(true);
+    }
+  });
 });

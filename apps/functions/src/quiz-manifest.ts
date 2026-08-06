@@ -4,9 +4,21 @@ import {
   type ReleaseLearningModule,
   type ReleaseLearningPost,
 } from './release-learning-catalog.js';
-import { dlM01SourceTrace, type DraftProvenance } from './content-source-trace.js';
+import {
+  dlM01SourceTrace,
+  dlM02SourceTrace,
+  type DraftProvenance,
+} from './content-source-trace.js';
 
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const dlM02DraftProvenance = {
+  candidateSourceIds: DL_M02_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: dlM02SourceTrace,
+} as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
 
@@ -474,6 +486,448 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-dl-p02': {
+    courseId: 'course-deep-learning-basic',
+    demoId: null,
+    draftProvenance: dlM02DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'dl-m02-mlp',
+    passingScorePercent: 100,
+    postId: 'dl-p02-mlp-forward-activation',
+    questionCount: 3,
+    quizId: 'quiz-post-dl-p02',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-dl-p02-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'dl-p02-mlp-forward-activation', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-affine-collapse',
+        explanation: {
+          en: 'Composing affine maps still gives an affine map. A hidden layer needs an activation to become a nonlinear modelling step.',
+          vi: 'Hợp thành các ánh xạ affine vẫn cho một ánh xạ affine. Hidden layer cần kích hoạt để trở thành bước mô hình hóa phi tuyến.',
+        },
+        hints: [
+          {
+            en: 'Ask what happens when no activation sits between the two layers.',
+            vi: 'Hãy xét điều gì xảy ra khi không có kích hoạt giữa hai lớp.',
+          },
+          {
+            en: 'The lesson contrasts a stack of affine maps with an activated hidden layer.',
+            vi: 'Bài học đối chiếu một chồng ánh xạ affine với hidden layer có kích hoạt.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-affine-collapse',
+            text: {
+              en: 'They can still be represented as one affine transformation.',
+              vi: 'Chúng vẫn có thể được biểu diễn thành một phép biến đổi affine.',
+            },
+          },
+          {
+            optionId: 'opt-affine-memory',
+            text: {
+              en: 'They automatically store one separate rule for each input row.',
+              vi: 'Chúng tự động lưu một quy tắc riêng cho từng hàng đầu vào.',
+            },
+          },
+          {
+            optionId: 'opt-affine-relu',
+            text: {
+              en: 'They automatically apply ReLU without an activation layer.',
+              vi: 'Chúng tự động áp dụng ReLU dù không có lớp kích hoạt.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What is true of two affine transformations with no activation between them?',
+          vi: 'Điều gì đúng với hai phép biến đổi affine không có kích hoạt ở giữa?',
+        },
+        questionId: 'q-dl-p02-affine-composition',
+        sourceId: 'act-dl-p02-mlp-forward-activation-quiz-01',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-hidden-affine', 'opt-nonlinear-activation'],
+        explanation: {
+          en: 'The hidden computation first forms an affine score and then applies a nonlinear activation. Together they form the hidden representation used by the output layer.',
+          vi: 'Phép tính hidden trước hết tạo điểm affine rồi áp dụng kích hoạt phi tuyến. Cả hai tạo thành biểu diễn hidden mà lớp đầu ra sử dụng.',
+        },
+        hints: [
+          {
+            en: 'Keep the score-forming operation and the operation that changes it nonlinearly.',
+            vi: 'Giữ phép tạo điểm và phép làm điểm đó trở nên phi tuyến.',
+          },
+          {
+            en: 'The notation H = sigma(XW + b) shows both pieces.',
+            vi: 'Ký hiệu H = sigma(XW + b) thể hiện cả hai phần.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-hidden-affine',
+            text: { en: 'An affine hidden score', vi: 'Một điểm hidden affine' },
+          },
+          {
+            optionId: 'opt-nonlinear-activation',
+            text: { en: 'A nonlinear activation', vi: 'Một kích hoạt phi tuyến' },
+          },
+          {
+            optionId: 'opt-raw-output-copy',
+            text: {
+              en: 'Copying the raw inputs unchanged to the output',
+              vi: 'Sao chép nguyên đầu vào thô sang đầu ra',
+            },
+          },
+          {
+            optionId: 'opt-label-rewrite',
+            text: {
+              en: 'Rewriting target labels before the model reads them',
+              vi: 'Viết lại nhãn target trước khi mô hình đọc chúng',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two operations form the hidden representation in the lesson?',
+          vi: 'Hai phép toán nào tạo biểu diễn hidden trong bài học?',
+        },
+        questionId: 'q-dl-p02-hidden-activation',
+        sourceId: 'act-dl-p02-mlp-forward-activation-quiz-02',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'ReLU is defined as max(z, 0), so a negative hidden score maps to 0 while a positive score passes through.',
+          vi: 'ReLU được định nghĩa là max(z, 0), nên điểm hidden âm thành 0 còn điểm dương được giữ lại.',
+        },
+        hints: [
+          {
+            en: 'Compare a negative score with zero in the ReLU definition.',
+            vi: 'So sánh điểm âm với 0 trong định nghĩa ReLU.',
+          },
+          {
+            en: 'ReLU keeps the maximum of its input and zero.',
+            vi: 'ReLU giữ giá trị lớn hơn giữa đầu vào và 0.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: ReLU maps a negative hidden score to 0.',
+          vi: 'Đúng hay sai: ReLU biến điểm hidden âm thành 0.',
+        },
+        questionId: 'q-dl-p02-relu-negative-score',
+        sourceId: 'act-dl-p02-mlp-forward-activation-quiz-03',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-dl-m02': {
+    courseId: 'course-deep-learning-basic',
+    demoId: 'demo-mlp-checkerboard',
+    draftProvenance: dlM02DraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module and unlock the MLP playground.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module và mở Playground MLP.',
+    },
+    moduleId: 'dl-m02-mlp',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-dl-m02',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-dl-m02-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [{ id: 'mlp', type: 'algorithm' }],
+    questions: [
+      {
+        correctAnswer: 'opt-hidden-representation',
+        explanation: {
+          en: 'Earlier MLP layers create a representation; the later output layer predicts from that representation.',
+          vi: 'Các lớp MLP trước tạo biểu diễn; lớp đầu ra sau đó dự đoán từ biểu diễn ấy.',
+        },
+        hints: [
+          {
+            en: 'The output layer receives H, not only the original input.',
+            vi: 'Lớp đầu ra nhận H, không chỉ đầu vào ban đầu.',
+          },
+          {
+            en: 'Look for the role that happens before the final prediction.',
+            vi: 'Tìm vai trò xảy ra trước dự đoán cuối cùng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-hidden-representation',
+            text: {
+              en: 'Build a representation for the output layer to read.',
+              vi: 'Tạo biểu diễn để lớp đầu ra đọc.',
+            },
+          },
+          {
+            optionId: 'opt-hidden-label-store',
+            text: {
+              en: 'Store a separate target label for every input.',
+              vi: 'Lưu một nhãn target riêng cho mọi đầu vào.',
+            },
+          },
+          {
+            optionId: 'opt-hidden-linear-skip',
+            text: {
+              en: 'Skip the transformation and send raw inputs unchanged.',
+              vi: 'Bỏ qua biến đổi và gửi nguyên đầu vào thô.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What is the role of an earlier hidden layer in an MLP?',
+          vi: 'Vai trò của hidden layer trước trong MLP là gì?',
+        },
+        questionId: 'q-dl-m02-hidden-representation',
+        sourceId: 'quiz-module-dl-m02-q01',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-one-affine-map',
+        explanation: {
+          en: 'Affine composition is still affine, so stacking affine layers without activation does not create the needed nonlinear representation.',
+          vi: 'Hợp thành affine vẫn là affine, nên xếp các lớp affine không kích hoạt không tạo được biểu diễn phi tuyến cần thiết.',
+        },
+        hints: [
+          {
+            en: 'The lesson names the missing operation between the affine layers.',
+            vi: 'Bài học gọi tên phép toán còn thiếu giữa các lớp affine.',
+          },
+          {
+            en: 'Without that operation, the stack can be compressed.',
+            vi: 'Không có phép toán đó, chồng lớp có thể bị rút gọn.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-one-affine-map',
+            text: {
+              en: 'The stack can be reduced to one affine map.',
+              vi: 'Chồng lớp có thể rút gọn thành một ánh xạ affine.',
+            },
+          },
+          {
+            optionId: 'opt-each-label',
+            text: {
+              en: 'Each layer must create one new target label.',
+              vi: 'Mỗi lớp phải tạo một nhãn target mới.',
+            },
+          },
+          {
+            optionId: 'opt-always-nonlinear',
+            text: {
+              en: 'The stack is automatically nonlinear because it has two layers.',
+              vi: 'Chồng lớp tự động phi tuyến vì có hai lớp.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What remains true when an MLP stacks affine layers but omits activations?',
+          vi: 'Điều gì vẫn đúng khi MLP xếp các lớp affine nhưng bỏ kích hoạt?',
+        },
+        questionId: 'q-dl-m02-affine-limit',
+        sourceId: 'quiz-module-dl-m02-q02',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-positive-pass-negative-zero',
+        explanation: {
+          en: 'ReLU returns max(z, 0): it retains positive values and sets negative values to zero.',
+          vi: 'ReLU trả về max(z, 0): nó giữ giá trị dương và đặt giá trị âm thành 0.',
+        },
+        hints: [
+          {
+            en: 'Use the two cases in max(z, 0).',
+            vi: 'Dùng hai trường hợp trong max(z, 0).',
+          },
+          {
+            en: 'One sign passes through and the other is clipped at zero.',
+            vi: 'Một dấu được giữ lại và dấu còn lại bị chặn ở 0.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-positive-pass-negative-zero',
+            text: {
+              en: 'Positive values pass through and negative values become zero.',
+              vi: 'Giá trị dương được giữ lại, giá trị âm thành 0.',
+            },
+          },
+          {
+            optionId: 'opt-positive-zero-negative-pass',
+            text: {
+              en: 'Positive values become zero and negative values pass through.',
+              vi: 'Giá trị dương thành 0 còn giá trị âm được giữ lại.',
+            },
+          },
+          {
+            optionId: 'opt-all-one',
+            text: {
+              en: 'Every hidden value becomes one.',
+              vi: 'Mọi giá trị hidden đều trở thành một.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'How does ReLU treat positive and negative hidden values?',
+          vi: 'ReLU xử lý giá trị hidden dương và âm như thế nào?',
+        },
+        questionId: 'q-dl-m02-relu-behaviour',
+        sourceId: 'quiz-module-dl-m02-q03',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'opt-nonlinear-hidden-step',
+        explanation: {
+          en: 'The checkerboard is used to inspect why the output needs a hidden representation that includes a nonlinear activation, rather than another collapsed affine rule.',
+          vi: 'Bàn cờ được dùng để quan sát vì sao đầu ra cần biểu diễn hidden có kích hoạt phi tuyến, thay vì thêm một quy tắc affine đã bị gộp.',
+        },
+        hints: [
+          {
+            en: 'The key is what changes the representation before the output reads it.',
+            vi: 'Điểm chính là điều gì đổi biểu diễn trước khi đầu ra đọc nó.',
+          },
+          {
+            en: 'The demo does not claim a fitted browser model or a new dataset.',
+            vi: 'Demo không khẳng định có mô hình fit trong trình duyệt hay dataset mới.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-nonlinear-hidden-step',
+            text: {
+              en: 'A nonlinear hidden activation changes the representation before output prediction.',
+              vi: 'Kích hoạt hidden phi tuyến đổi biểu diễn trước dự đoán đầu ra.',
+            },
+          },
+          {
+            optionId: 'opt-duplicate-row',
+            text: {
+              en: 'Duplicating the four input rows changes the representation.',
+              vi: 'Nhân đôi bốn hàng đầu vào làm đổi biểu diễn.',
+            },
+          },
+          {
+            optionId: 'opt-output-first',
+            text: {
+              en: 'The output layer creates the hidden representation after predicting.',
+              vi: 'Lớp đầu ra tạo biểu diễn hidden sau khi dự đoán.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What modelling step makes the fixed checkerboard useful in this MLP lesson?',
+          vi: 'Bước mô hình hóa nào làm bàn cờ cố định hữu ích trong bài MLP này?',
+        },
+        questionId: 'q-dl-m02-checkerboard-nonlinearity',
+        sourceId: 'quiz-module-dl-m02-q04',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-hidden-h', 'opt-output-o'],
+        explanation: {
+          en: 'The forward chain forms H with an activated hidden layer, then forms O from H. The final layer predicts from the representation created earlier.',
+          vi: 'Chuỗi truyền xuôi tạo H bằng hidden layer có kích hoạt, rồi tạo O từ H. Lớp cuối dự đoán từ biểu diễn được tạo trước đó.',
+        },
+        hints: [
+          {
+            en: 'Choose the two symbols and roles in the forward equations.',
+            vi: 'Chọn hai ký hiệu và vai trò trong các phương trình truyền xuôi.',
+          },
+          {
+            en: 'H comes before O.',
+            vi: 'H đứng trước O.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-hidden-h',
+            text: {
+              en: 'H is the activated hidden representation.',
+              vi: 'H là biểu diễn hidden đã kích hoạt.',
+            },
+          },
+          {
+            optionId: 'opt-output-o',
+            text: {
+              en: 'O is the output computed from the hidden representation.',
+              vi: 'O là đầu ra tính từ biểu diễn hidden.',
+            },
+          },
+          {
+            optionId: 'opt-h-labels',
+            text: {
+              en: 'H is a table of rewritten target labels.',
+              vi: 'H là bảng các nhãn target được viết lại.',
+            },
+          },
+          {
+            optionId: 'opt-o-raw-only',
+            text: {
+              en: 'O ignores the hidden representation and must use only raw inputs.',
+              vi: 'O bỏ qua biểu diễn hidden và bắt buộc chỉ dùng đầu vào thô.',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements correctly describe the forward chain H then O?',
+          vi: 'Hai nhận định nào mô tả đúng chuỗi truyền xuôi H rồi O?',
+        },
+        questionId: 'q-dl-m02-forward-chain',
+        sourceId: 'quiz-module-dl-m02-q05',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'In the lesson notation, the output is computed from H, the representation produced by the earlier activated hidden layer.',
+          vi: 'Trong ký hiệu của bài, đầu ra được tính từ H, biểu diễn do hidden layer có kích hoạt tạo ra trước đó.',
+        },
+        hints: [
+          {
+            en: 'Read the second equation in the forward chain.',
+            vi: 'Đọc phương trình thứ hai trong chuỗi truyền xuôi.',
+          },
+          {
+            en: 'The output layer follows the representation layer.',
+            vi: 'Lớp đầu ra theo sau lớp biểu diễn.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: the output layer predicts from the hidden representation.',
+          vi: 'Đúng hay sai: lớp đầu ra dự đoán từ biểu diễn hidden.',
+        },
+        questionId: 'q-dl-m02-output-from-hidden',
+        sourceId: 'quiz-module-dl-m02-q06',
+        sourceIds: DL_M02_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -761,16 +1215,6 @@ const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>
     trueAssertion: {
       en: 'Keeping fewer principal components can simplify a representation while discarding some reconstructable information.',
       vi: 'Giữ ít component chính hơn có thể đơn giản hóa biểu diễn nhưng loại bỏ một phần thông tin có thể tái dựng.',
-    },
-  },
-  'dl-p02-mlp-forward-activation': {
-    coreMove: {
-      en: 'Use hidden layers and activation functions to reshape evidence before the output decision.',
-      vi: 'Dùng hidden layer và hàm kích hoạt để định hình lại bằng chứng trước quyết định đầu ra.',
-    },
-    trueAssertion: {
-      en: 'Without an activation between layers, stacking linear transformations still behaves like one linear transformation.',
-      vi: 'Không có hàm kích hoạt giữa các layer, xếp chồng biến đổi tuyến tính vẫn hoạt động như một biến đổi tuyến tính.',
     },
   },
   'dl-p03-backprop-overfitting': {

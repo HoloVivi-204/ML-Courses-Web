@@ -417,7 +417,11 @@ function FixedDemoFrame({
       {demo.fixedRun ? (
         <table className="and-truth-table">
           <caption>
-            {locale === 'vi' ? 'Dữ liệu và kết quả AND cố định' : 'Fixed AND data and results'}
+            {demo.fixedRun.caption
+              ? localize(demo.fixedRun.caption, locale)
+              : locale === 'vi'
+                ? 'Dữ liệu và kết quả AND cố định'
+                : 'Fixed AND data and results'}
           </caption>
           <thead>
             <tr>

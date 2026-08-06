@@ -126,6 +126,10 @@ export interface LearningDemoVisualization {
 }
 
 export interface LearningDemoFixedRun {
+  caption?: {
+    en: string;
+    vi: string;
+  };
   datasetVersionId: string;
   parameterValues: readonly {
     id: string;

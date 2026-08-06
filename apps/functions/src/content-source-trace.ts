@@ -80,3 +80,8 @@ export const dlM01SourceTrace = {
     },
   ],
 } as const satisfies SnapshotPinnedSourceTrace;
+
+export const dlM02SourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [dlM01SourceTrace.sourceSnapshots[1]],
+} as const satisfies SnapshotPinnedSourceTrace;

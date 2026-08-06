@@ -152,6 +152,50 @@ describe('content block renderer', () => {
     expect(screen.queryByRole('heading', { name: 'Tạo một quyết định' })).not.toBeInTheDocument();
   });
 
+  it('renders an authored MLP example description instead of the generic draft guidance', () => {
+    const blocks: ContentBlock[] = [
+      {
+        accessibility: { en: null, vi: null },
+        activityId: 'act-dl-p02-mlp-forward-activation-example',
+        assetIds: [],
+        id: 'mlp-example',
+        locales: {
+          en: {
+            description:
+              'Trace the checkerboard through a hidden score, activation, and fixed output.',
+            navigationTitle: 'Trace the checkerboard',
+          },
+          vi: {
+            description: 'Lần theo bàn cờ qua điểm hidden, kích hoạt và đầu ra cố định.',
+            navigationTitle: 'Lần theo bàn cờ',
+          },
+        },
+        order: 1,
+        postId: 'dl-p02-mlp-forward-activation',
+        required: true,
+        schemaVersion: 1,
+        sourceIds: ['d2l-vi'],
+        type: 'example',
+      },
+    ];
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <ContentBlockRenderer blocks={blocks} locale="vi" postId="dl-p02-mlp-forward-activation" />
+      </I18nextProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Lần theo bàn cờ' })).toBeVisible();
+    expect(
+      screen.getByText('Lần theo bàn cờ qua điểm hidden, kích hoạt và đầu ra cố định.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'Đọc ví dụ này theo chuỗi: tín hiệu đầu vào thay đổi, mô hình phản ứng, rồi metric kiểm tra lỗi.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it('opens only safe HTTPS resources in an isolated tab', () => {
     const blocks: ContentBlock[] = [
       {

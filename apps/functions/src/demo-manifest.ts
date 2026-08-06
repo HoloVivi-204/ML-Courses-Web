@@ -13,6 +13,16 @@ const handAuthoredDemoCompletionSeeds: Readonly<Record<string, DemoCompletionSee
     moduleId: 'dl-m01-neuron-perceptron',
     requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
   },
+  'demo-mlp-checkerboard': {
+    demoId: 'demo-mlp-checkerboard',
+    moduleId: 'dl-m02-mlp',
+    requiredStepIds: [
+      'checkerboard-problem',
+      'checkerboard-data',
+      'checkerboard-hidden-activation',
+      'checkerboard-output',
+    ],
+  },
 };
 
 function createDemoCompletionSeeds() {

@@ -155,4 +155,39 @@ describe('learning content repository', () => {
       ],
     });
   });
+
+  it('returns the fixed MLP checkerboard and its distinct completion path only after demo access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const demo = await repository.getDemoContent({
+      demoId: 'demo-mlp-checkerboard',
+      uid: 'learner-01',
+    });
+
+    expect(demo.data).toMatchObject({
+      demoId: 'demo-mlp-checkerboard',
+      fixedRun: {
+        caption: {
+          en: 'Fixed checkerboard inputs and outputs',
+          vi: 'Đầu vào và đầu ra bàn cờ cố định',
+        },
+        datasetVersionId: 'dataset-demo-mlp-checkerboard-v1',
+        parameterValues: [],
+        rows: [
+          { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+          { input: [0, 1], predictedOutput: 1, targetOutput: 1 },
+          { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+          { input: [1, 1], predictedOutput: 0, targetOutput: 0 },
+        ],
+      },
+      requiredStepIds: [
+        'checkerboard-problem',
+        'checkerboard-data',
+        'checkerboard-hidden-activation',
+        'checkerboard-output',
+      ],
+    });
+  });
 });

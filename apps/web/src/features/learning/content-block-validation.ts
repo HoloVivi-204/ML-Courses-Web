@@ -197,7 +197,11 @@ function isComparisonItem(value: unknown) {
 }
 
 function isExampleLocale(value: unknown): value is ExampleLocale {
-  return isRecord(value) && isNonEmptyString(value.navigationTitle);
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.navigationTitle) &&
+    (value.description === undefined || isNonEmptyString(value.description))
+  );
 }
 
 function isFormulaLocale(value: unknown): value is FormulaLocale {

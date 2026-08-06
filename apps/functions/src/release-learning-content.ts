@@ -1,5 +1,9 @@
 import { getReleaseLearningCatalog, type LocalizedText } from './release-learning-catalog.js';
-import { dlM01SourceTrace, type DraftProvenance } from './content-source-trace.js';
+import {
+  dlM01SourceTrace,
+  dlM02SourceTrace,
+  type DraftProvenance,
+} from './content-source-trace.js';
 
 export type { DraftProvenance } from './content-source-trace.js';
 
@@ -35,9 +39,11 @@ export interface TrialPost {
 }
 
 const TRIAL_POST_ID = 'dl-p01-neuron-perceptron';
+const MLP_POST_ID = 'dl-p02-mlp-forward-activation';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -47,6 +53,16 @@ const blockDefaults = {
   required: true,
   schemaVersion: 1,
   sourceIds: DL_M01_PRIMARY_SOURCE_IDS,
+} as const;
+
+const mlpBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: MLP_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: DL_M02_SOURCE_IDS,
 } as const;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -421,6 +437,265 @@ const fullLessonBlocks = [
   { ...fullLessonSourceListBlock, order: 12 },
 ] satisfies readonly LearningContentBlock[];
 
+const mlpFullLessonBlocks = [
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-hidden-representation',
+    locales: {
+      en: {
+        lede: 'An MLP passes input features through a hidden representation before the final layer makes its prediction.',
+        navigationTitle: 'Add a hidden representation',
+        title: 'A hidden layer changes what the output can read',
+      },
+      vi: {
+        lede: 'MLP đưa feature đầu vào qua một biểu diễn ẩn trước khi lớp cuối cùng đưa ra dự đoán.',
+        navigationTitle: 'Thêm biểu diễn ẩn',
+        title: 'Hidden layer thay đổi điều đầu ra có thể đọc',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-forward-chain',
+    locales: {
+      en: {
+        markdown:
+          'The forward chain has two jobs: first form a hidden representation, then predict from it. ' +
+          'In compact notation, $H = \\sigma(XW^{(1)} + b^{(1)})$ and $O = HW^{(2)} + b^{(2)}$.',
+      },
+      vi: {
+        markdown:
+          'Chuỗi truyền xuôi có hai việc: trước hết tạo biểu diễn ẩn, sau đó dự đoán từ biểu diễn ấy. ' +
+          'Ký hiệu ngắn gọn là $H = \\sigma(XW^{(1)} + b^{(1)})$ và $O = HW^{(2)} + b^{(2)}$.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-affine-collapse',
+    locales: {
+      en: {
+        body: 'Without an activation between them, two affine transformations still collapse to one affine transformation. The hidden layer only becomes a new modelling step when it adds nonlinearity.',
+        title: 'Two linear-looking layers are not enough on their own',
+      },
+      vi: {
+        body: 'Nếu không có kích hoạt ở giữa, hai phép biến đổi affine vẫn có thể gộp thành một phép affine. Hidden layer chỉ trở thành bước mô hình hóa mới khi nó thêm tính phi tuyến.',
+        title: 'Hai lớp trông tuyến tính chưa đủ nếu đứng một mình',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-checkerboard-target',
+    locales: {
+      en: {
+        lede: 'The fixed checkerboard puts the positive targets in opposite corners, so it is a useful small pattern for inspecting a nonlinear representation.',
+        navigationTitle: 'Inspect the checkerboard',
+        title: 'Opposite corners need a different representation',
+      },
+      vi: {
+        lede: 'Bàn cờ cố định đặt các target dương ở hai góc đối diện, nên đây là mẫu nhỏ hữu ích để quan sát biểu diễn phi tuyến.',
+        navigationTitle: 'Quan sát bàn cờ',
+        title: 'Các góc đối diện cần một biểu diễn khác',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-checkerboard-table',
+    locales: {
+      en: {
+        markdown:
+          'Use the same four fixed inputs throughout the lesson and demo:\n\n' +
+          '| x1 | x2 | target |\n|---:|---:|---:|\n| 0 | 0 | 0 |\n| 0 | 1 | 1 |\n| 1 | 0 | 1 |\n| 1 | 1 | 0 |\n\n' +
+          'The table is an instructional checkerboard, not a claim that this page trained a model.',
+      },
+      vi: {
+        markdown:
+          'Dùng cùng bốn đầu vào cố định xuyên suốt bài và demo:\n\n' +
+          '| x1 | x2 | target |\n|---:|---:|---:|\n| 0 | 0 | 0 |\n| 0 | 1 | 1 |\n| 1 | 0 | 1 |\n| 1 | 1 | 0 |\n\n' +
+          'Bảng này là bàn cờ để học, không phải khẳng định trang đã huấn luyện một mô hình.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-activation-role',
+    locales: {
+      en: {
+        lede: 'Activation is the operation that prevents the hidden transformation from collapsing back into one linear rule.',
+        navigationTitle: 'Add nonlinearity',
+        title: 'Activation makes the hidden layer matter',
+      },
+      vi: {
+        lede: 'Kích hoạt là phép toán ngăn biến đổi ẩn gộp trở lại thành một quy tắc tuyến tính duy nhất.',
+        navigationTitle: 'Thêm phi tuyến',
+        title: 'Kích hoạt khiến hidden layer có ý nghĩa',
+      },
+    },
+    order: 6,
+    type: 'heading',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-relu-operation',
+    locales: {
+      en: {
+        markdown:
+          'A common hidden-layer activation is $\\operatorname{ReLU}(z) = \\max(z, 0)$. ' +
+          'Positive hidden scores pass through; negative scores become $0$.',
+      },
+      vi: {
+        markdown:
+          'Một kích hoạt thường dùng ở hidden layer là $\\operatorname{ReLU}(z) = \\max(z, 0)$. ' +
+          'Điểm hidden dương được giữ lại; điểm âm trở thành $0$.',
+      },
+    },
+    order: 7,
+    type: 'markdown',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-activation-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: the activation changes each hidden score locally. Effect: the output layer receives a representation that cannot be reduced to the earlier single affine rule.',
+        title: 'Change the representation before asking for the output',
+      },
+      vi: {
+        body: 'Nguyên nhân: kích hoạt thay đổi từng điểm hidden cục bộ. Kết quả: lớp đầu ra nhận một biểu diễn không thể rút gọn về quy tắc affine đơn ban đầu.',
+        title: 'Đổi biểu diễn trước khi yêu cầu đầu ra',
+      },
+    },
+    order: 8,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...mlpBlockDefaults,
+    activityId: 'act-dl-p02-mlp-forward-activation-example',
+    id: 'mlp-checkerboard-example',
+    locales: {
+      en: {
+        description:
+          'Read the four checkerboard corners in order: form a hidden score, apply an activation, then let the fixed output label show the changed representation.',
+        navigationTitle: 'Trace one checkerboard pass',
+      },
+      vi: {
+        description:
+          'Đọc bốn góc bàn cờ theo thứ tự: tạo điểm hidden, áp dụng kích hoạt, rồi dùng nhãn đầu ra cố định để thấy biểu diễn đã đổi.',
+        navigationTitle: 'Lần theo một lượt bàn cờ',
+      },
+    },
+    order: 9,
+    type: 'example',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-output-predictor',
+    locales: {
+      en: {
+        lede: 'The final layer is a predictor over the representation built by the earlier layer; it does not need to repeat the raw input rule.',
+        navigationTitle: 'Read the final layer',
+        title: 'The output predicts from hidden features',
+      },
+      vi: {
+        lede: 'Lớp cuối là bộ dự đoán trên biểu diễn do lớp trước tạo ra; nó không cần lặp lại quy tắc trực tiếp trên đầu vào thô.',
+        navigationTitle: 'Đọc lớp cuối',
+        title: 'Đầu ra dự đoán từ feature ẩn',
+      },
+    },
+    order: 10,
+    type: 'heading',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-before-after-activation',
+    locales: {
+      en: {
+        body: 'Use this comparison to explain the mechanism, not to infer a trained parameter set from four labels.',
+        items: [
+          {
+            body: 'Stacked affine maps can still be expressed as one affine map.',
+            label: 'Before activation',
+            title: 'No new nonlinear representation',
+          },
+          {
+            body: 'The hidden activation changes the representation before the output prediction.',
+            label: 'After activation',
+            title: 'A nonlinear modelling step',
+          },
+        ],
+        title: 'What the activation changes',
+      },
+      vi: {
+        body: 'Dùng so sánh này để giải thích cơ chế, không suy ra một bộ tham số đã huấn luyện từ bốn nhãn.',
+        items: [
+          {
+            body: 'Các ánh xạ affine xếp chồng vẫn có thể biểu diễn thành một ánh xạ affine.',
+            label: 'Trước kích hoạt',
+            title: 'Chưa có biểu diễn phi tuyến mới',
+          },
+          {
+            body: 'Kích hoạt hidden đổi biểu diễn trước dự đoán đầu ra.',
+            label: 'Sau kích hoạt',
+            title: 'Một bước mô hình hóa phi tuyến',
+          },
+        ],
+        title: 'Kích hoạt thay đổi điều gì',
+      },
+    },
+    order: 11,
+    type: 'callout',
+    variant: 'comparison',
+  },
+  {
+    ...mlpBlockDefaults,
+    id: 'mlp-sources',
+    locales: {
+      en: {
+        heading: 'Source used for this lesson',
+        intro:
+          'This concise original lesson is adapted from the pinned local snapshot below; source review is still pending.',
+        navigationTitle: 'Lesson source',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 12,
+    required: false,
+    resources: [
+      {
+        attribution: dlM02SourceTrace.sourceSnapshots[0].attribution,
+        language: 'vi',
+        license: dlM02SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: dlM02SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: dlM02SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Multilayer Perceptrons',
+        url: 'https://github.com/d2l-ai/d2l-vi/blob/main/chapter_multilayer-perceptrons/mlp.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -462,6 +737,34 @@ const fullLessonPosts: readonly TrialPost[] = [
       vi: 'Đi từ một quyết định Perceptron nhị phân đến giới hạn tuyến tính gợi ý hidden layer.',
     },
     durationMinutes: 16,
+  },
+  {
+    accessLevel: 'full',
+    blocks: mlpFullLessonBlocks,
+    courseId: 'course-deep-learning-basic',
+    description: {
+      en: 'Use a fixed checkerboard to connect hidden affine transformations, nonlinear activation, and the final MLP prediction.',
+      vi: 'Dùng bàn cờ cố định để nối biến đổi affine ẩn, kích hoạt phi tuyến và dự đoán MLP cuối cùng.',
+    },
+    durationMinutes: 16,
+    id: MLP_POST_ID,
+    learningObjective: {
+      en: 'Explain why an MLP needs a nonlinear hidden activation to represent the fixed checkerboard before its output layer predicts.',
+      vi: 'Giải thích vì sao MLP cần kích hoạt phi tuyến ở hidden layer để biểu diễn bàn cờ cố định trước khi lớp đầu ra dự đoán.',
+    },
+    moduleId: 'dl-m02-mlp',
+    postQuizId: 'quiz-post-dl-p02',
+    provenance: {
+      ...createDraftProvenance('course-deep-learning-basic'),
+      candidateSourceIds: DL_M02_SOURCE_IDS,
+      sourceTrace: dlM02SourceTrace,
+    },
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-mlp-checkerboard-hidden-activation',
+    title: {
+      en: 'How a hidden layer reshapes a decision',
+      vi: 'Hidden layer định hình lại quyết định thế nào',
+    },
   },
 ];
 
@@ -757,25 +1060,6 @@ const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
     title: {
       en: 'Keep variance while reducing dimensions',
       vi: 'Giữ phương sai khi giảm chiều',
-    },
-  },
-  'dl-p02-mlp-forward-activation': {
-    concept: {
-      en: 'An MLP stacks weighted transformations with activations. Hidden layers can reshape evidence before the final output makes a decision.',
-      vi: 'MLP xếp chồng các biến đổi có trọng số với hàm kích hoạt. Hidden layer có thể định hình lại bằng chứng trước khi đầu ra cuối ra quyết định.',
-    },
-    examplePrompt: {
-      en: 'Trace two simple signals through a hidden layer and explain why an activation is needed between two linear transformations.',
-      vi: 'Theo dõi hai tín hiệu đơn giản qua hidden layer và giải thích vì sao cần hàm kích hoạt giữa hai biến đổi tuyến tính.',
-    },
-    learningObjective: {
-      en: 'Explain how layers and activations let an MLP represent nonlinear patterns.',
-      vi: 'Giải thích cách layer và hàm kích hoạt giúp MLP biểu diễn mẫu phi tuyến.',
-    },
-    taskFingerprint: 'lesson-dl-p02-mlp-activation-composition',
-    title: {
-      en: 'Compose layers and activations',
-      vi: 'Kết hợp layer và hàm kích hoạt',
     },
   },
   'dl-p03-backprop-overfitting': {

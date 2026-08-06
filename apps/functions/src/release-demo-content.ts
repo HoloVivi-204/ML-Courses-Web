@@ -3,9 +3,14 @@ import {
   type LocalizedText,
   type ReleaseLearningModule,
 } from './release-learning-catalog.js';
-import { dlM01SourceTrace, type DraftProvenance } from './content-source-trace.js';
+import {
+  dlM01SourceTrace,
+  dlM02SourceTrace,
+  type DraftProvenance,
+} from './content-source-trace.js';
 
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 export interface DemoStep {
   id: string;
@@ -30,6 +35,7 @@ export interface FixedDemoVisualization {
 }
 
 export interface FixedDemoRun {
+  caption?: LocalizedText;
   datasetVersionId: string;
   parameterValues: readonly {
     id: string;
@@ -177,6 +183,134 @@ export const andGateDemo: FixedDemoManifest = {
       },
     },
   ],
+};
+
+export const mlpCheckerboardDemo: FixedDemoManifest = {
+  algorithmId: 'mlp',
+  courseId: 'course-deep-learning-basic',
+  demoId: 'demo-mlp-checkerboard',
+  draftProvenance: {
+    candidateSourceIds: DL_M02_SOURCE_IDS,
+    contentReviewStatus: 'pending-operator-review',
+    externalEvidenceStatus: 'not-collected',
+    importStatus: 'draft-only',
+    sourceTrace: dlM02SourceTrace,
+  },
+  fixedRun: {
+    caption: {
+      en: 'Fixed checkerboard inputs and outputs',
+      vi: 'Đầu vào và đầu ra bàn cờ cố định',
+    },
+    datasetVersionId: 'dataset-demo-mlp-checkerboard-v1',
+    parameterValues: [],
+    rows: [
+      { input: [0, 0], predictedOutput: 0, targetOutput: 0 },
+      { input: [0, 1], predictedOutput: 1, targetOutput: 1 },
+      { input: [1, 0], predictedOutput: 1, targetOutput: 1 },
+      { input: [1, 1], predictedOutput: 0, targetOutput: 0 },
+    ],
+  },
+  learningObjective: {
+    en: 'Trace how a hidden nonlinear activation lets an MLP use a different representation for the fixed checkerboard before its output prediction.',
+    vi: 'Lần theo cách kích hoạt phi tuyến ở hidden layer cho phép MLP dùng biểu diễn khác cho bàn cờ cố định trước dự đoán đầu ra.',
+  },
+  moduleId: 'dl-m02-mlp',
+  problemId: 'problem-demo-mlp-checkerboard',
+  requiredStepIds: [
+    'checkerboard-problem',
+    'checkerboard-data',
+    'checkerboard-hidden-activation',
+    'checkerboard-output',
+  ],
+  revisionId: 'demo-mlp-checkerboard-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'checkerboard-problem',
+      narration: {
+        en: 'The fixed target labels 0,1 and 1,0 as positive while 0,0 and 1,1 are negative. Opposite corners now share a label.',
+        vi: 'Target cố định gán 0,1 và 1,0 là dương, còn 0,0 và 1,1 là âm. Các góc đối diện giờ cùng một nhãn.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A square contains four binary-input corners. The upper-left and lower-right corners are positive; the other diagonal is negative.',
+        vi: 'Một hình vuông có bốn góc đầu vào nhị phân. Góc trên trái và dưới phải là dương; đường chéo còn lại là âm.',
+      },
+      title: {
+        en: 'Define the checkerboard target',
+        vi: 'Xác định target bàn cờ',
+      },
+    },
+    {
+      id: 'checkerboard-data',
+      narration: {
+        en: 'The four rows are fixed. They make the input arrangement inspectable without live sampling, training controls, or a hidden dataset.',
+        vi: 'Bốn hàng được cố định. Chúng khiến cách sắp xếp đầu vào có thể quan sát mà không có lấy mẫu live, điều khiển huấn luyện hay dataset ẩn.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The fixed table lists inputs 0,0; 0,1; 1,0; and 1,1 with targets 0, 1, 1, and 0.',
+        vi: 'Bảng cố định liệt kê đầu vào 0,0; 0,1; 1,0; 1,1 với target tương ứng 0, 1, 1, 0.',
+      },
+      title: {
+        en: 'Inspect the fixed four rows',
+        vi: 'Quan sát bốn hàng cố định',
+      },
+    },
+    {
+      id: 'checkerboard-hidden-activation',
+      narration: {
+        en: 'A hidden layer first forms affine scores, then applies an activation such as ReLU. That activation is the step that stops stacked affine maps from collapsing to one linear rule.',
+        vi: 'Hidden layer trước hết tạo các điểm affine, rồi áp dụng kích hoạt như ReLU. Kích hoạt là bước ngăn các ánh xạ affine xếp chồng gộp lại thành một quy tắc tuyến tính.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A schematic nonlinear contour accompanies the four fixed checkerboard points. It illustrates a changed representation, not a fitted boundary or a learned parameter set.',
+        vi: 'Một đường bao phi tuyến minh họa đi cùng bốn điểm bàn cờ cố định. Nó mô tả biểu diễn đã đổi, không phải ranh giới đã fit hay bộ tham số đã học.',
+      },
+      title: {
+        en: 'Apply the hidden activation',
+        vi: 'Áp dụng kích hoạt hidden',
+      },
+    },
+    {
+      id: 'checkerboard-output',
+      narration: {
+        en: 'The output layer reads the transformed hidden representation. The fixed rows show the intended outputs, but this demo does not claim to run or train an MLP in the browser.',
+        vi: 'Lớp đầu ra đọc biểu diễn hidden đã biến đổi. Các hàng cố định cho đầu ra dự kiến, nhưng demo không khẳng định chạy hoặc huấn luyện MLP trong trình duyệt.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The result table reports outputs 0, 1, 1, 0 against the same four fixed targets.',
+        vi: 'Bảng kết quả báo đầu ra 0, 1, 1, 0 so với cùng bốn target cố định.',
+      },
+      title: {
+        en: 'Read the fixed output',
+        vi: 'Đọc đầu ra cố định',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-mlp-fixed-checkerboard-hidden-activation',
+  title: {
+    en: 'MLP demo: checkerboard representation',
+    vi: 'Demo MLP: biểu diễn bàn cờ',
+  },
+  visualization: {
+    boundary: [
+      { x: 36, y: 115 },
+      { x: 114, y: 115 },
+      { x: 114, y: 34 },
+      { x: 132, y: 34 },
+      { x: 132, y: 115 },
+      { x: 210, y: 115 },
+    ],
+    points: [
+      { classification: 'negative', label: '0,0', positiveFromStep: 1, x: 62, y: 172 },
+      { classification: 'positive', label: '0,1', positiveFromStep: 1, x: 62, y: 58 },
+      { classification: 'positive', label: '1,0', positiveFromStep: 1, x: 190, y: 172 },
+      { classification: 'negative', label: '1,1', positiveFromStep: 1, x: 190, y: 58 },
+    ],
+  },
 };
 
 const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
@@ -360,26 +494,6 @@ const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {
     },
     taskFingerprint: 'demo-pca-sensor-reconstruction',
     topic: { en: 'PCA compression', vi: 'nén PCA' },
-  },
-  'demo-mlp-checkerboard': {
-    decision: {
-      en: 'The fixed MLP uses a hidden transformation and activation so a nonlinear pattern can be separated before the output decision.',
-      vi: 'MLP cố định dùng biến đổi hidden và hàm kích hoạt để tách mẫu phi tuyến trước quyết định đầu ra.',
-    },
-    evidence: {
-      en: 'The fixed checkerboard points remain unchanged while the demo shows the representation change across layers.',
-      vi: 'Các điểm bàn cờ cố định giữ nguyên khi demo cho thấy biểu diễn đổi qua các layer.',
-    },
-    learningObjective: {
-      en: 'Explain why a fixed hidden layer and activation can separate a nonlinear pattern.',
-      vi: 'Giải thích vì sao hidden layer và hàm kích hoạt cố định có thể tách một mẫu phi tuyến.',
-    },
-    result: {
-      en: 'The final output is fixed and highlights the representational step rather than exposing training controls.',
-      vi: 'Đầu ra cuối cố định và nhấn mạnh bước biểu diễn thay vì mở điều khiển huấn luyện.',
-    },
-    taskFingerprint: 'demo-mlp-checkerboard-hidden-representation',
-    topic: { en: 'hidden-layer representation', vi: 'biểu diễn hidden layer' },
   },
 };
 
@@ -573,9 +687,12 @@ function createExpandedDemo(input: {
   };
 }
 
+const handAuthoredDemos = [andGateDemo, mlpCheckerboardDemo] as const;
+const handAuthoredDemoIds = new Set(handAuthoredDemos.map((demo) => demo.demoId));
+
 const generatedDemos = getReleaseLearningCatalog().courses.flatMap((course) =>
   course.modules
-    .filter((module) => module.demoId !== null && module.demoId !== andGateDemo.demoId)
+    .filter((module) => module.demoId !== null && !handAuthoredDemoIds.has(module.demoId))
     .map((module) =>
       createExpandedDemo({
         courseId: course.courseId,
@@ -584,7 +701,7 @@ const generatedDemos = getReleaseLearningCatalog().courses.flatMap((course) =>
       }),
     ),
 );
-const fixedDemos = [andGateDemo, ...generatedDemos] as const;
+const fixedDemos = [...handAuthoredDemos, ...generatedDemos] as const;
 
 export function getFixedDemo(demoId: string | undefined) {
   return fixedDemos.find((demo) => demo.demoId === demoId);

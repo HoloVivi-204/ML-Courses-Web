@@ -34,6 +34,7 @@ export interface ComparisonCalloutLocale {
 }
 
 export interface ExampleLocale {
+  description?: string;
   navigationTitle: string;
 }
 
