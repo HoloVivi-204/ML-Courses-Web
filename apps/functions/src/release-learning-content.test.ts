@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getFixedDemo } from './release-demo-content.js';
 import { getReadablePost } from './release-learning-content.js';
@@ -6,6 +6,45 @@ import { getReleaseLearningCatalog } from './release-learning-catalog.js';
 import { getQuizManifest } from './quiz-manifest.js';
 
 describe('Release 1 protected learning content', () => {
+  it('serves every learning unit from local data when source network access is unavailable', () => {
+    let fetchCalls = 0;
+    vi.stubGlobal('fetch', () => {
+      fetchCalls += 1;
+      throw new Error('Source network access is unavailable.');
+    });
+
+    try {
+      const catalog = getReleaseLearningCatalog();
+      const servedPosts = catalog.courses.flatMap((course) =>
+        course.modules.flatMap((module) =>
+          module.posts.map((post) => {
+            expect(getReadablePost(course.courseId, post.postId, true)).toBeDefined();
+            expect(getQuizManifest(post.postQuizId)).toBeDefined();
+            return post.postId;
+          }),
+        ),
+      );
+      const servedDemos = catalog.courses.flatMap((course) =>
+        course.modules.flatMap((module) => {
+          expect(getQuizManifest(module.moduleQuizId)).toBeDefined();
+
+          if (!module.demoId) {
+            return [];
+          }
+
+          expect(getFixedDemo(module.demoId)).toBeDefined();
+          return [module.demoId];
+        }),
+      );
+
+      expect(servedPosts).toHaveLength(18);
+      expect(servedDemos).toHaveLength(10);
+      expect(fetchCalls).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('provides draft vi/en full post content for every locked catalog post', () => {
     const catalog = getReleaseLearningCatalog();
     const posts = catalog.courses.flatMap((course) =>
