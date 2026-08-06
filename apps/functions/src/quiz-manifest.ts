@@ -5,6 +5,7 @@ import {
   type ReleaseLearningPost,
 } from './release-learning-catalog.js';
 import {
+  cmlM01SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -14,6 +15,7 @@ import {
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const dlM02DraftProvenance = {
   candidateSourceIds: DL_M02_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -27,6 +29,13 @@ const dlM03DraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: dlM03SourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM01DraftProvenance = {
+  candidateSourceIds: CML_M01_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM01SourceTrace,
 } as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
@@ -1385,6 +1394,580 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-cml-p01': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM01DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m01-foundations',
+    passingScorePercent: 100,
+    postId: 'cml-p01-problem-data-types',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p01',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p01-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p01-problem-data-types', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-queue-label',
+        explanation: {
+          en: 'The historical queue length is the known outcome being estimated. Hour and reservation count are evidence available to estimate it.',
+          vi: 'Độ dài hàng đợi lịch sử là kết quả đã biết đang được ước lượng. Giờ và số lượt đặt chỗ là bằng chứng có sẵn để ước lượng nó.',
+        },
+        hints: [
+          {
+            en: 'Ask which value is the past answer to the forecast.',
+            vi: 'Hãy hỏi giá trị nào là đáp án quá khứ của dự báo.',
+          },
+          {
+            en: 'Features are inputs; the label is the outcome to estimate.',
+            vi: 'Feature là đầu vào; nhãn là kết quả cần ước lượng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-queue-label',
+            text: { en: 'The recorded queue length', vi: 'Độ dài hàng đợi đã ghi nhận' },
+          },
+          {
+            optionId: 'opt-hour-feature',
+            text: { en: 'The hour of the day', vi: 'Giờ trong ngày' },
+          },
+          {
+            optionId: 'opt-reservation-feature',
+            text: { en: 'The active reservation count', vi: 'Số lượt đặt chỗ đang hoạt động' },
+          },
+        ],
+        prompt: {
+          en: 'For historical rows used to forecast a library queue, which field is the label?',
+          vi: 'Trong các dòng lịch sử dùng để dự báo hàng đợi thư viện, trường nào là nhãn?',
+        },
+        questionId: 'q-cml-p01-label-from-history',
+        sourceId: 'act-cml-p01-problem-data-types-quiz-01',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-delivery-delay', 'opt-ticket-routing'],
+        explanation: {
+          en: 'Both tasks have historical inputs paired with known outcomes. Grouping anonymous records has no supplied outcome, so it is an unlabeled grouping task instead.',
+          vi: 'Cả hai nhiệm vụ đều có đầu vào lịch sử ghép với kết quả đã biết. Gom các bản ghi ẩn danh không có kết quả được cung cấp nên đó là nhiệm vụ gom nhóm không nhãn.',
+        },
+        hints: [
+          {
+            en: 'Choose the tasks where an intended answer exists in past rows.',
+            vi: 'Chọn các nhiệm vụ có đáp án mong muốn tồn tại trong các dòng quá khứ.',
+          },
+          {
+            en: 'A known number or named class can be a supervised target.',
+            vi: 'Một con số hoặc lớp có tên đã biết có thể là mục tiêu có giám sát.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-delivery-delay',
+            text: {
+              en: 'Estimate a delivery delay from completed deliveries',
+              vi: 'Ước lượng trễ giao hàng từ các lượt giao đã hoàn tất',
+            },
+          },
+          {
+            optionId: 'opt-ticket-routing',
+            text: {
+              en: 'Route a ticket using its previously assigned team',
+              vi: 'Chuyển phiếu bằng đội đã được gán trước đó',
+            },
+          },
+          {
+            optionId: 'opt-anonymous-groups',
+            text: {
+              en: 'Group anonymous usage records with no supplied outcome',
+              vi: 'Gom bản ghi sử dụng ẩn danh không có kết quả được cung cấp',
+            },
+          },
+          {
+            optionId: 'opt-dashboard-layout',
+            text: {
+              en: 'Arrange dashboard panels by visual preference',
+              vi: 'Sắp xếp bảng điều khiển theo sở thích trực quan',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two tasks are supervised learning tasks?',
+          vi: 'Hai nhiệm vụ nào là nhiệm vụ học có giám sát?',
+        },
+        questionId: 'q-cml-p01-supervised-pairs',
+        sourceId: 'act-cml-p01-problem-data-types-quiz-02',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'Clustering starts from unlabeled inputs and searches for useful patterns or groups rather than matching each row to a predefined output.',
+          vi: 'Clustering bắt đầu từ đầu vào không nhãn và tìm mẫu hoặc nhóm hữu ích thay vì ghép mỗi dòng với đầu ra được xác định sẵn.',
+        },
+        hints: [
+          {
+            en: 'Look for whether a target is supplied before grouping begins.',
+            vi: 'Hãy xem có mục tiêu được cung cấp trước khi bắt đầu gom nhóm hay không.',
+          },
+          {
+            en: 'No paired outcome means the task can be exploratory grouping.',
+            vi: 'Không có kết quả ghép cặp nghĩa là nhiệm vụ có thể là gom nhóm khám phá.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: clustering can be appropriate when records have no predefined output label.',
+          vi: 'Đúng hay sai: clustering có thể phù hợp khi các bản ghi không có nhãn đầu ra được xác định trước.',
+        },
+        questionId: 'q-cml-p01-clustering-without-labels',
+        sourceId: 'act-cml-p01-problem-data-types-quiz-03',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-post-cml-p02': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM01DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m01-foundations',
+    passingScorePercent: 100,
+    postId: 'cml-p02-train-test-metrics',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p02',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p02-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p02-train-test-metrics', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-heldout-evidence',
+        explanation: {
+          en: 'The model did not use held-out labels during fitting, so those rows provide evidence about behavior on new examples.',
+          vi: 'Mô hình không dùng nhãn giữ lại khi khớp, nên các dòng đó cung cấp bằng chứng về hành vi trên ví dụ mới.',
+        },
+        hints: [
+          {
+            en: 'Separate the rows used to learn from the rows used to support a claim.',
+            vi: 'Tách các dòng dùng để học khỏi các dòng dùng để hỗ trợ một khẳng định.',
+          },
+          {
+            en: 'A test row must remain untouched until evaluation.',
+            vi: 'Dòng test phải được giữ nguyên cho tới khi đánh giá.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-heldout-evidence',
+            text: {
+              en: 'To test behavior on examples not used for fitting',
+              vi: 'Để kiểm tra hành vi trên ví dụ không dùng để khớp',
+            },
+          },
+          {
+            optionId: 'opt-repeat-training',
+            text: {
+              en: 'To give the model another copy of training labels',
+              vi: 'Để cho mô hình thêm một bản sao nhãn train',
+            },
+          },
+          {
+            optionId: 'opt-name-features',
+            text: {
+              en: 'To rename feature columns after fitting',
+              vi: 'Để đổi tên cột feature sau khi khớp',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Why should a test split remain held out while a model is fitted?',
+          vi: 'Vì sao một phần test phải được giữ lại khi mô hình được khớp?',
+        },
+        questionId: 'q-cml-p02-heldout-purpose',
+        sourceId: 'act-cml-p02-train-test-metrics-quiz-01',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-error-consequence', 'opt-error-types'],
+        explanation: {
+          en: 'A decision-aware evaluation states which error has the larger consequence and keeps false positives and false negatives visible instead of hiding them in one score.',
+          vi: 'Đánh giá theo quyết định nêu rõ lỗi nào có hậu quả lớn hơn và giữ dương tính giả cùng âm tính giả hiển thị thay vì che chúng trong một điểm số.',
+        },
+        hints: [
+          {
+            en: 'Choose checks about consequences, not a score alone.',
+            vi: 'Chọn các kiểm tra về hậu quả, không chỉ một điểm số.',
+          },
+          {
+            en: 'The same accuracy can conceal different error patterns.',
+            vi: 'Cùng accuracy có thể che các mẫu lỗi khác nhau.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-error-consequence',
+            text: {
+              en: 'State which missed or unnecessary action is more costly',
+              vi: 'Nêu hành động bỏ sót hoặc không cần thiết nào tốn kém hơn',
+            },
+          },
+          {
+            optionId: 'opt-error-types',
+            text: {
+              en: 'Inspect false positives and false negatives separately',
+              vi: 'Xem riêng dương tính giả và âm tính giả',
+            },
+          },
+          {
+            optionId: 'opt-high-train-only',
+            text: {
+              en: 'Prefer the model with the highest training score alone',
+              vi: 'Chỉ ưu tiên mô hình có điểm train cao nhất',
+            },
+          },
+          {
+            optionId: 'opt-hide-counts',
+            text: {
+              en: 'Hide the outcome counts once accuracy is computed',
+              vi: 'Ẩn các số đếm kết quả sau khi tính accuracy',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two practices make a classification metric discussion match the decision?',
+          vi: 'Hai thực hành nào làm thảo luận metric phân loại khớp với quyết định?',
+        },
+        questionId: 'q-cml-p02-metric-consequences',
+        sourceId: 'act-cml-p02-train-test-metrics-quiz-02',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'A high training score only reports fit to rows the model already saw. Held-out evidence is needed before claiming behavior on new examples.',
+          vi: 'Điểm train cao chỉ báo cáo độ khớp với các dòng mô hình đã thấy. Cần bằng chứng giữ lại trước khi khẳng định hành vi trên ví dụ mới.',
+        },
+        hints: [
+          {
+            en: 'Ask whether the model had access to the rows being scored.',
+            vi: 'Hãy hỏi mô hình có được truy cập các dòng đang được chấm hay không.',
+          },
+          {
+            en: 'Training fit and held-out evidence answer different questions.',
+            vi: 'Độ khớp train và bằng chứng giữ lại trả lời các câu hỏi khác nhau.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a high training score alone proves that a model will work well on new rows.',
+          vi: 'Đúng hay sai: chỉ điểm train cao chứng minh mô hình sẽ hoạt động tốt trên dòng mới.',
+        },
+        questionId: 'q-cml-p02-training-score-not-proof',
+        sourceId: 'act-cml-p02-train-test-metrics-quiz-03',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-cml-m01': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM01DraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m01-foundations',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m01',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m01-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [],
+    questions: [
+      {
+        correctAnswer: 'opt-known-outcome',
+        explanation: {
+          en: 'A label is the known outcome attached to a historical supervised example. Features are the observations used to estimate that outcome.',
+          vi: 'Nhãn là kết quả đã biết gắn với ví dụ lịch sử có giám sát. Feature là quan sát dùng để ước lượng kết quả đó.',
+        },
+        hints: [
+          {
+            en: 'Look for the answer the model is expected to estimate.',
+            vi: 'Hãy tìm đáp án mà mô hình được kỳ vọng ước lượng.',
+          },
+          {
+            en: 'A label is not simply any column in the table.',
+            vi: 'Nhãn không chỉ là một cột bất kỳ trong bảng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-known-outcome',
+            text: { en: 'The known historical outcome', vi: 'Kết quả lịch sử đã biết' },
+          },
+          {
+            optionId: 'opt-all-columns',
+            text: {
+              en: 'Every observed column including the outcome',
+              vi: 'Mọi cột quan sát gồm cả kết quả',
+            },
+          },
+          {
+            optionId: 'opt-future-event',
+            text: {
+              en: 'A value available only after the decision',
+              vi: 'Giá trị chỉ có sau quyết định',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What is a label in a supervised dataset?',
+          vi: 'Nhãn trong dữ liệu có giám sát là gì?',
+        },
+        questionId: 'q-cml-m01-known-outcome',
+        sourceId: 'quiz-module-cml-m01-q01',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-paired-answers', 'opt-check-against-label'],
+        explanation: {
+          en: 'Supervised learning uses input rows paired with known outcomes and can compare a prediction with the corresponding label.',
+          vi: 'Học có giám sát dùng các dòng đầu vào ghép với kết quả đã biết và có thể so sánh dự đoán với nhãn tương ứng.',
+        },
+        hints: [
+          {
+            en: 'Choose the properties that require a supplied answer.',
+            vi: 'Chọn các đặc tính đòi hỏi một đáp án được cung cấp.',
+          },
+          {
+            en: 'Grouping without labels is a different task.',
+            vi: 'Gom nhóm không nhãn là một nhiệm vụ khác.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-paired-answers',
+            text: {
+              en: 'Input rows are paired with known outcomes',
+              vi: 'Các dòng đầu vào được ghép với kết quả đã biết',
+            },
+          },
+          {
+            optionId: 'opt-check-against-label',
+            text: {
+              en: 'A prediction can be checked against its label',
+              vi: 'Dự đoán có thể được kiểm tra với nhãn của nó',
+            },
+          },
+          {
+            optionId: 'opt-only-unlabeled',
+            text: {
+              en: 'Every row must have no supplied outcome',
+              vi: 'Mọi dòng phải không có kết quả được cung cấp',
+            },
+          },
+          {
+            optionId: 'opt-no-output',
+            text: {
+              en: 'The task has no output to estimate',
+              vi: 'Nhiệm vụ không có đầu ra để ước lượng',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements describe supervised learning data?',
+          vi: 'Hai phát biểu nào mô tả dữ liệu học có giám sát?',
+        },
+        questionId: 'q-cml-m01-supervised-data',
+        sourceId: 'quiz-module-cml-m01-q02',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'Clustering can explore unlabeled records by grouping them according to patterns in the observed inputs.',
+          vi: 'Clustering có thể khám phá các bản ghi không nhãn bằng cách gom chúng theo mẫu trong đầu vào quan sát được.',
+        },
+        hints: [
+          {
+            en: 'No predefined output is supplied in the grouping case.',
+            vi: 'Không có đầu ra xác định trước được cung cấp trong trường hợp gom nhóm.',
+          },
+          {
+            en: 'The goal is to discover a grouping, not to predict an attached answer.',
+            vi: 'Mục tiêu là khám phá một cách gom nhóm, không dự đoán đáp án đã gắn.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: clustering can start with unlabeled input records.',
+          vi: 'Đúng hay sai: clustering có thể bắt đầu với các bản ghi đầu vào không nhãn.',
+        },
+        questionId: 'q-cml-m01-unlabeled-clustering',
+        sourceId: 'quiz-module-cml-m01-q03',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-generalisation-evidence',
+        explanation: {
+          en: 'Because test labels were not used to fit the model, comparing predictions on those rows supports a claim about new examples.',
+          vi: 'Vì nhãn test không được dùng để khớp mô hình, so sánh dự đoán trên các dòng đó hỗ trợ một khẳng định về ví dụ mới.',
+        },
+        hints: [
+          {
+            en: 'Think about which rows the model did not use while learning.',
+            vi: 'Hãy nghĩ đến các dòng mô hình không dùng khi học.',
+          },
+          {
+            en: 'Held-out evidence checks a different question from training fit.',
+            vi: 'Bằng chứng giữ lại kiểm tra một câu hỏi khác với độ khớp train.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-generalisation-evidence',
+            text: {
+              en: 'It provides evidence about behavior on new examples',
+              vi: 'Nó cung cấp bằng chứng về hành vi trên ví dụ mới',
+            },
+          },
+          {
+            optionId: 'opt-more-fitting',
+            text: {
+              en: 'It lets the model fit the same labels one more time',
+              vi: 'Nó cho mô hình khớp cùng nhãn thêm một lần',
+            },
+          },
+          {
+            optionId: 'opt-hide-errors',
+            text: {
+              en: 'It removes the need to inspect error types',
+              vi: 'Nó loại bỏ nhu cầu xem loại lỗi',
+            },
+          },
+        ],
+        prompt: {
+          en: 'What is the main purpose of a held-out test set?',
+          vi: 'Mục đích chính của tập test giữ lại là gì?',
+        },
+        questionId: 'q-cml-m01-test-purpose',
+        sourceId: 'quiz-module-cml-m01-q04',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-false-positive-cost', 'opt-false-negative-cost'],
+        explanation: {
+          en: 'Metric choice should expose the costly error. The team must discuss both unnecessary actions and missed actions before selecting what to emphasize.',
+          vi: 'Chọn metric phải phơi bày lỗi tốn kém. Nhóm phải thảo luận cả hành động không cần thiết và hành động bị bỏ sót trước khi chọn điều cần nhấn mạnh.',
+        },
+        hints: [
+          {
+            en: 'Choose the consequences that a single accuracy score can hide.',
+            vi: 'Chọn các hậu quả mà một điểm accuracy có thể che giấu.',
+          },
+          {
+            en: 'Both kinds of wrong action belong in the decision discussion.',
+            vi: 'Cả hai loại hành động sai đều thuộc phần thảo luận quyết định.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-false-positive-cost',
+            text: {
+              en: 'The cost of an unnecessary positive action',
+              vi: 'Chi phí của một hành động dương tính không cần thiết',
+            },
+          },
+          {
+            optionId: 'opt-false-negative-cost',
+            text: {
+              en: 'The cost of missing a needed positive action',
+              vi: 'Chi phí của việc bỏ sót hành động dương tính cần thiết',
+            },
+          },
+          {
+            optionId: 'opt-column-order',
+            text: {
+              en: 'The alphabetical order of feature columns',
+              vi: 'Thứ tự chữ cái của cột feature',
+            },
+          },
+          {
+            optionId: 'opt-model-name',
+            text: { en: 'The name of the algorithm alone', vi: 'Chỉ tên của thuật toán' },
+          },
+        ],
+        prompt: {
+          en: 'Which two consequences should guide a classification metric discussion?',
+          vi: 'Hai hậu quả nào nên định hướng thảo luận metric phân loại?',
+        },
+        questionId: 'q-cml-m01-error-consequences',
+        sourceId: 'quiz-module-cml-m01-q05',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'opt-eighty-five-percent',
+        explanation: {
+          en: 'The fixed table has 8 true positives and 9 true negatives, so 17 of 20 decisions are correct: 85%.',
+          vi: 'Bảng cố định có 8 dương tính đúng và 9 âm tính đúng, nên 17 trong 20 quyết định là đúng: 85%.',
+        },
+        hints: [
+          {
+            en: 'Add the two correct outcome counts before dividing by all rows.',
+            vi: 'Cộng hai số đếm kết quả đúng trước khi chia cho mọi dòng.',
+          },
+          {
+            en: 'True positives and true negatives are the correct cases.',
+            vi: 'Dương tính đúng và âm tính đúng là các ca đúng.',
+          },
+        ],
+        options: [
+          { optionId: 'opt-eighty-five-percent', text: { en: '85%', vi: '85%' } },
+          { optionId: 'opt-forty-percent', text: { en: '40%', vi: '40%' } },
+          { optionId: 'opt-ninety-percent', text: { en: '90%', vi: '90%' } },
+        ],
+        prompt: {
+          en: 'A fixed table has 8 true positives, 2 false positives, 1 false negative, and 9 true negatives. What is its accuracy?',
+          vi: 'Một bảng cố định có 8 dương tính đúng, 2 dương tính giả, 1 âm tính giả và 9 âm tính đúng. Accuracy là bao nhiêu?',
+        },
+        questionId: 'q-cml-m01-fixed-accuracy',
+        sourceId: 'quiz-module-cml-m01-q06',
+        sourceIds: CML_M01_SOURCE_IDS,
+        type: 'single-choice',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -1524,26 +2107,6 @@ interface PostQuizDraftDefinition {
 }
 
 const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {
-  'cml-p01-problem-data-types': {
-    coreMove: {
-      en: 'Define the prediction target before listing the features.',
-      vi: 'Xác định mục tiêu dự đoán trước khi liệt kê feature.',
-    },
-    trueAssertion: {
-      en: 'A label is an outcome known in supervised examples, while a feature is evidence used to estimate it.',
-      vi: 'Nhãn là kết quả đã biết trong ví dụ có giám sát, còn feature là bằng chứng dùng để ước lượng kết quả đó.',
-    },
-  },
-  'cml-p02-train-test-metrics': {
-    coreMove: {
-      en: 'Judge a model on held-out examples with a metric that reflects the costly error.',
-      vi: 'Đánh giá mô hình trên ví dụ giữ lại bằng metric phản ánh lỗi tốn kém.',
-    },
-    trueAssertion: {
-      en: 'A high training score alone cannot show how a model will behave on unseen examples.',
-      vi: 'Điểm train cao một mình không thể cho biết mô hình sẽ hoạt động thế nào trên ví dụ chưa thấy.',
-    },
-  },
   'cml-p03-linear-regression': {
     coreMove: {
       en: 'Start with an interpretable line and inspect residual patterns before adding complexity.',

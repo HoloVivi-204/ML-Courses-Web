@@ -295,4 +295,72 @@ describe('Release 1 protected learning content', () => {
       ).toBe(true);
     }
   });
+
+  it('pins the classical M01 foundations batch to the Microsoft snapshot used for problem framing, evaluation, and quizzes', () => {
+    const problemPost = getReadablePost('course-classical-ml', 'cml-p01-problem-data-types', true)!;
+    const evaluationPost = getReadablePost(
+      'course-classical-ml',
+      'cml-p02-train-test-metrics',
+      true,
+    )!;
+    const problemQuiz = getQuizManifest('quiz-post-cml-p01');
+    const evaluationQuiz = getQuizManifest('quiz-post-cml-p02');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m01');
+    const expectedSourceSnapshot = {
+      contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
+      contentUrls: expect.arrayContaining([
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/4-Classification/1-Introduction/README.md',
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/4-Classification/2-Classifiers-1/README.md',
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/5-Clustering/1-Visualize/README.md',
+      ]),
+      sourceId: 'microsoft-ml-for-beginners',
+    };
+
+    for (const provenance of [
+      problemPost.provenance,
+      evaluationPost.provenance,
+      problemQuiz.draftProvenance,
+      evaluationQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['microsoft-ml-for-beginners'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(expectedSourceSnapshot)],
+        },
+      });
+    }
+
+    for (const post of [problemPost, evaluationPost]) {
+      expect(post.blocks).toHaveLength(10);
+      expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+      expect(post.blocks).toContainEqual(
+        expect.objectContaining({ sourceIds: ['microsoft-ml-for-beginners'], type: 'source-list' }),
+      );
+    }
+
+    expect(problemPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p01-problem-data-types-example',
+        type: 'example',
+      }),
+    );
+    expect(evaluationPost.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p02-train-test-metrics-example',
+        type: 'example',
+      }),
+    );
+
+    for (const quiz of [problemQuiz, evaluationQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'microsoft-ml-for-beginners'),
+        ),
+      ).toBe(true);
+    }
+  });
 });

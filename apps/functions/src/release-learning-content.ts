@@ -1,5 +1,6 @@
 import { getReleaseLearningCatalog, type LocalizedText } from './release-learning-catalog.js';
 import {
+  cmlM01SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -42,11 +43,14 @@ export interface TrialPost {
 const TRIAL_POST_ID = 'dl-p01-neuron-perceptron';
 const MLP_POST_ID = 'dl-p02-mlp-forward-activation';
 const TRAINING_POST_ID = 'dl-p03-backprop-overfitting';
+const CML_M01_PROBLEM_POST_ID = 'cml-p01-problem-data-types';
+const CML_M01_EVALUATION_POST_ID = 'cml-p02-train-test-metrics';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -77,6 +81,34 @@ const trainingBlockDefaults = {
   schemaVersion: 1,
   sourceIds: DL_M03_SOURCE_IDS,
 } as const;
+
+const cmlM01ProblemBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M01_PROBLEM_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M01_SOURCE_IDS,
+} as const;
+
+const cmlM01EvaluationBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M01_EVALUATION_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M01_SOURCE_IDS,
+} as const;
+
+const cmlM01DraftProvenance = {
+  candidateSourceIds: CML_M01_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM01SourceTrace,
+} as const satisfies DraftProvenance;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
   'course-classical-ml': [
@@ -975,6 +1007,472 @@ const trainingFullLessonBlocks = [
   },
 ] satisfies readonly LearningContentBlock[];
 
+const cmlM01ProblemFullLessonBlocks = [
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-decision-first',
+    locales: {
+      en: {
+        lede: 'A useful learning problem begins with a decision someone must make, then names the unknown outcome that would make that decision less uncertain.',
+        navigationTitle: 'Start from the decision',
+        title: 'Name the decision before naming the model',
+      },
+      vi: {
+        lede: 'Một bài toán học hữu ích bắt đầu bằng quyết định cần đưa ra, rồi gọi tên kết quả chưa biết sẽ làm quyết định đó bớt bất định.',
+        navigationTitle: 'Bắt đầu từ quyết định',
+        title: 'Gọi tên quyết định trước khi gọi tên mô hình',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-target-and-evidence',
+    locales: {
+      en: {
+        markdown:
+          'For a prediction task, separate the **target** from the **evidence**. If a library wants to estimate tomorrow’s queue length, the historical queue length is the target in past rows; weekday, hour, and active reservations are features. A model maps the feature values to an estimated target.',
+      },
+      vi: {
+        markdown:
+          'Với bài toán dự đoán, hãy tách **mục tiêu** khỏi **bằng chứng**. Nếu thư viện muốn ước lượng độ dài hàng đợi ngày mai, độ dài hàng đợi lịch sử là mục tiêu ở các dòng quá khứ; thứ, giờ và số lượt đặt chỗ đang hoạt động là feature. Mô hình ánh xạ giá trị feature thành mục tiêu ước lượng.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-feature-label-distinction',
+    locales: {
+      en: {
+        body: 'Cause: the historical outcome is available when the row is created. Effect: it can become a label for supervised learning, while the other observed columns remain inputs used to estimate that label.',
+        title: 'A label is the known past answer; a feature is evidence',
+      },
+      vi: {
+        body: 'Nguyên nhân: kết quả lịch sử đã có khi dòng dữ liệu được tạo. Kết quả: nó có thể thành nhãn cho học có giám sát, còn các cột quan sát khác là đầu vào để ước lượng nhãn đó.',
+        title: 'Nhãn là đáp án quá khứ đã biết; feature là bằng chứng',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-output-shape',
+    locales: {
+      en: {
+        body: 'An output measured on a numeric scale suggests a regression question, such as an estimated wait time. An output selected from named classes suggests classification, such as routing a request to billing, access, or technical support.',
+        items: [
+          {
+            body: 'The output can vary continuously, so preserve its measurement meaning.',
+            label: 'Number',
+            title: 'Estimate a quantity',
+          },
+          {
+            body: 'The output is one of a defined set of groups, so preserve its class meaning.',
+            label: 'Category',
+            title: 'Choose a class',
+          },
+        ],
+        title: 'The output type changes the learning question',
+      },
+      vi: {
+        body: 'Đầu ra đo trên thang số gợi ý câu hỏi hồi quy, như thời gian chờ ước lượng. Đầu ra chọn từ các lớp có tên gợi ý phân loại, như chuyển yêu cầu đến thanh toán, truy cập hoặc hỗ trợ kỹ thuật.',
+        items: [
+          {
+            body: 'Đầu ra biến thiên liên tục nên phải giữ ý nghĩa đo lường của nó.',
+            label: 'Số',
+            title: 'Ước lượng đại lượng',
+          },
+          {
+            body: 'Đầu ra là một trong tập nhóm đã xác định nên phải giữ ý nghĩa lớp của nó.',
+            label: 'Danh mục',
+            title: 'Chọn một lớp',
+          },
+        ],
+        title: 'Kiểu đầu ra làm thay đổi câu hỏi học',
+      },
+    },
+    order: 4,
+    type: 'callout',
+    variant: 'comparison',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    activityId: 'act-cml-p01-problem-data-types-example',
+    id: 'problem-framing-example',
+    locales: {
+      en: {
+        description:
+          'Sort three fixed prompts before choosing an algorithm: estimate a delivery delay in minutes; assign a support ticket to one of three teams; group anonymous usage records that have no supplied outcome. State the target or grouping goal and why it changes the task type.',
+        navigationTitle: 'Frame three tasks',
+      },
+      vi: {
+        description:
+          'Phân loại ba đề bài cố định trước khi chọn thuật toán: ước lượng trễ giao hàng theo phút; gán phiếu hỗ trợ cho một trong ba đội; gom các bản ghi sử dụng ẩn danh không có kết quả được cung cấp. Nêu mục tiêu hoặc mục tiêu gom nhóm và vì sao nó đổi kiểu bài toán.',
+        navigationTitle: 'Đặt khung ba nhiệm vụ',
+      },
+    },
+    order: 5,
+    type: 'example',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-supervision-evidence',
+    locales: {
+      en: {
+        lede: 'The key distinction is not the algorithm name. It is whether each training row is paired with an intended answer before the grouping or prediction is made.',
+        navigationTitle: 'Check whether answers exist',
+        title: 'Known outcomes create supervision',
+      },
+      vi: {
+        lede: 'Khác biệt then chốt không phải tên thuật toán. Đó là việc mỗi dòng train có được ghép với đáp án mong muốn trước khi dự đoán hoặc gom nhóm hay không.',
+        navigationTitle: 'Kiểm tra đáp án có tồn tại',
+        title: 'Kết quả đã biết tạo ra giám sát',
+      },
+    },
+    order: 6,
+    type: 'heading',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-supervised-unsupervised',
+    locales: {
+      en: {
+        body: 'Classification examples pair inputs with a known class. Clustering instead begins with unlabeled inputs and looks for useful groupings in their observed patterns.',
+        items: [
+          {
+            body: 'A cuisine class attached to an ingredient row lets the learner check a predicted class against an intended answer.',
+            label: 'Supervised',
+            title: 'Predict a supplied outcome',
+          },
+          {
+            body: 'A set of listener behaviours without assigned groups can be explored by placing similar records together.',
+            label: 'Unsupervised',
+            title: 'Discover a grouping',
+          },
+        ],
+        title: 'Labels support prediction; unlabeled patterns support grouping',
+      },
+      vi: {
+        body: 'Ví dụ phân loại ghép đầu vào với lớp đã biết. Clustering thay vào đó bắt đầu bằng đầu vào không nhãn và tìm các nhóm hữu ích trong mẫu quan sát được.',
+        items: [
+          {
+            body: 'Một lớp ẩm thực gắn với dòng nguyên liệu cho phép kiểm tra lớp dự đoán với đáp án mong muốn.',
+            label: 'Có giám sát',
+            title: 'Dự đoán kết quả được cung cấp',
+          },
+          {
+            body: 'Một tập hành vi nghe không được gán nhóm có thể được khám phá bằng cách đặt các bản ghi giống nhau gần nhau.',
+            label: 'Không giám sát',
+            title: 'Khám phá một cách gom nhóm',
+          },
+        ],
+        title: 'Nhãn hỗ trợ dự đoán; mẫu không nhãn hỗ trợ gom nhóm',
+      },
+    },
+    order: 7,
+    type: 'callout',
+    variant: 'comparison',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-data-contract',
+    locales: {
+      en: {
+        markdown:
+          'Write a small data contract before modeling:\n\n| question | check |\n|---|---|\n| What decision changes? | Name the action, not only a score. |\n| What is the target? | Identify the historical outcome or state that no target is supplied. |\n| What are the features? | Keep only information available when the decision is made. |\n| What does the output mean? | Preserve a quantity for regression or a class for classification. |\n\nThis makes a later performance claim traceable to the original decision.',
+      },
+      vi: {
+        markdown:
+          'Hãy viết hợp đồng dữ liệu nhỏ trước khi lập mô hình:\n\n| câu hỏi | kiểm tra |\n|---|---|\n| Quyết định nào thay đổi? | Gọi tên hành động, không chỉ điểm số. |\n| Mục tiêu là gì? | Xác định kết quả lịch sử hoặc nói rõ không có mục tiêu được cung cấp. |\n| Feature là gì? | Chỉ giữ thông tin có sẵn tại thời điểm quyết định. |\n| Đầu ra có nghĩa gì? | Giữ đại lượng cho hồi quy hoặc lớp cho phân loại. |\n\nViệc này giúp kết luận hiệu năng sau này truy về quyết định ban đầu.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-leakage-boundary',
+    locales: {
+      en: {
+        body: 'If a feature is learned only after the decision, it cannot honestly support that decision. Record the time boundary now, otherwise an apparently strong model may merely be reading the answer indirectly.',
+        title: 'Use only evidence available at decision time',
+      },
+      vi: {
+        body: 'Nếu một feature chỉ được biết sau quyết định, nó không thể hỗ trợ quyết định đó một cách trung thực. Hãy ghi ranh giới thời gian ngay bây giờ; nếu không mô hình có vẻ mạnh có thể chỉ đang đọc đáp án gián tiếp.',
+        title: 'Chỉ dùng bằng chứng có sẵn lúc ra quyết định',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM01ProblemBlockDefaults,
+    id: 'problem-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from pinned local snapshots of the documents below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của các tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM01SourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM01SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM01SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM01SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Introduction to classification',
+        url: 'https://github.com/microsoft/ML-For-Beginners/blob/main/4-Classification/1-Introduction/README.md',
+      },
+      {
+        attribution: cmlM01SourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM01SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM01SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM01SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Introduction to clustering',
+        url: 'https://github.com/microsoft/ML-For-Beginners/blob/main/5-Clustering/1-Visualize/README.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
+const cmlM01EvaluationFullLessonBlocks = [
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-claim-first',
+    locales: {
+      en: {
+        lede: 'A model score is a claim about future decisions. The claim needs examples that were not used to set the model’s parameters.',
+        navigationTitle: 'Treat a score as a claim',
+        title: 'Separate fitting from evidence',
+      },
+      vi: {
+        lede: 'Điểm mô hình là một khẳng định về quyết định tương lai. Khẳng định đó cần các ví dụ không được dùng để đặt tham số mô hình.',
+        navigationTitle: 'Xem điểm là một khẳng định',
+        title: 'Tách việc khớp khỏi bằng chứng',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-split-before-fit',
+    locales: {
+      en: {
+        markdown:
+          'After choosing the feature table and label column, divide the rows before fitting. Training rows let the model learn a relationship. Held-out test rows remain untouched until evaluation, so their results answer a different question: how did the fitted model behave on new examples?',
+      },
+      vi: {
+        markdown:
+          'Sau khi chọn bảng feature và cột nhãn, hãy chia các dòng trước khi khớp. Các dòng train cho mô hình học quan hệ. Các dòng test giữ lại không bị đụng đến cho tới lúc đánh giá, nên kết quả của chúng trả lời câu hỏi khác: mô hình đã khớp hành xử thế nào với ví dụ mới?',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-held-out-purpose',
+    locales: {
+      en: {
+        body: 'Cause: the model never used the held-out labels while fitting. Effect: comparing predictions with those labels tests the generalisation claim instead of only repeating the training fit.',
+        title: 'A held-out row is evidence, not extra practice',
+      },
+      vi: {
+        body: 'Nguyên nhân: mô hình chưa dùng nhãn giữ lại khi khớp. Kết quả: so sánh dự đoán với các nhãn đó kiểm tra khẳng định tổng quát hóa thay vì chỉ lặp lại độ khớp train.',
+        title: 'Dòng giữ lại là bằng chứng, không phải bài luyện thêm',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-metric-question',
+    locales: {
+      en: {
+        lede: 'The metric is part of the decision design. It tells the team which kinds of correct and incorrect outcomes will be made visible.',
+        navigationTitle: 'Choose the question for the metric',
+        title: 'A metric measures the error that matters',
+      },
+      vi: {
+        lede: 'Metric là một phần của thiết kế quyết định. Nó cho nhóm biết loại kết quả đúng và sai nào sẽ được nhìn thấy.',
+        navigationTitle: 'Chọn câu hỏi cho metric',
+        title: 'Metric đo loại lỗi quan trọng',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-fixed-counts',
+    locales: {
+      en: {
+        markdown:
+          'Read this fixed instructional count, not a reported experiment:\n\n| outcome | count |\n|---|---:|\n| true positive | 8 |\n| false positive | 2 |\n| false negative | 1 |\n| true negative | 9 |\n\nThe accuracy is $17/20 = 85$%. If missing a positive case is costly, also inspect recall: $8/(8+1)$. Accuracy describes total correct decisions; it does not say which error was tolerated.',
+      },
+      vi: {
+        markdown:
+          'Đọc bảng đếm cố định để học này, không phải thí nghiệm được báo cáo:\n\n| kết quả | số lượng |\n|---|---:|\n| dương tính đúng | 8 |\n| dương tính giả | 2 |\n| âm tính giả | 1 |\n| âm tính đúng | 9 |\n\nAccuracy là $17/20 = 85$%. Nếu bỏ sót ca dương tính gây tốn kém, hãy xem thêm recall: $8/(8+1)$. Accuracy mô tả tổng số quyết định đúng; nó không nói loại lỗi nào đã được dung thứ.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    activityId: 'act-cml-p02-train-test-metrics-example',
+    id: 'evaluation-metric-choice-example',
+    locales: {
+      en: {
+        description:
+          'For the fixed count table, choose what the team must inspect first in two settings: a low-cost newsletter filter and a safety alert where a missed positive case is costly. Explain how the consequence changes the metric discussion without changing the raw counts.',
+        navigationTitle: 'Choose a metric consequence',
+      },
+      vi: {
+        description:
+          'Với bảng đếm cố định, hãy chọn điều nhóm phải xem trước trong hai bối cảnh: bộ lọc bản tin chi phí thấp và cảnh báo an toàn nơi bỏ sót ca dương tính gây tốn kém. Giải thích hậu quả làm thay đổi cuộc thảo luận metric thế nào mà không đổi số đếm thô.',
+        navigationTitle: 'Chọn hậu quả cho metric',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-error-cost-comparison',
+    locales: {
+      en: {
+        body: 'The same accuracy can hide different operational risks. Make the false-positive and false-negative consequences explicit before declaring one model preferable.',
+        items: [
+          {
+            body: 'An unnecessary review may cost staff time but preserve safety.',
+            label: 'False positive',
+            title: 'The system acts when it should not',
+          },
+          {
+            body: 'A missed case may leave a needed action undone.',
+            label: 'False negative',
+            title: 'The system stays silent when it should act',
+          },
+        ],
+        title: 'Count error types separately',
+      },
+      vi: {
+        body: 'Cùng một accuracy có thể che các rủi ro vận hành khác nhau. Hãy làm rõ hậu quả dương tính giả và âm tính giả trước khi tuyên bố một mô hình tốt hơn.',
+        items: [
+          {
+            body: 'Một lượt xem xét không cần thiết có thể tốn thời gian nhân sự nhưng giữ được an toàn.',
+            label: 'Dương tính giả',
+            title: 'Hệ thống hành động khi không nên',
+          },
+          {
+            body: 'Một ca bị bỏ sót có thể khiến hành động cần thiết không diễn ra.',
+            label: 'Âm tính giả',
+            title: 'Hệ thống im lặng khi cần hành động',
+          },
+        ],
+        title: 'Đếm riêng từng loại lỗi',
+      },
+    },
+    order: 7,
+    type: 'callout',
+    variant: 'comparison',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-training-score-boundary',
+    locales: {
+      en: {
+        markdown:
+          'A high training score can mean the model captured a useful relationship, memorised incidental detail, or both. It cannot by itself answer the held-out question because the model already saw those rows while being fitted.',
+      },
+      vi: {
+        markdown:
+          'Điểm train cao có thể nghĩa là mô hình nắm được quan hệ hữu ích, ghi nhớ chi tiết tình cờ, hoặc cả hai. Bản thân nó không thể trả lời câu hỏi giữ lại vì mô hình đã thấy các dòng đó khi được khớp.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-claim-checklist',
+    locales: {
+      en: {
+        body: 'Before reporting a result, record the split, which data remained untouched, the metric, and the error consequence the metric is meant to expose. Each item connects the number back to a real decision.',
+        title: 'Make the result reproducible enough to challenge',
+      },
+      vi: {
+        body: 'Trước khi báo cáo kết quả, hãy ghi phần chia, dữ liệu nào được giữ nguyên, metric và hậu quả lỗi mà metric phải phơi bày. Mỗi mục nối con số trở lại một quyết định thật.',
+        title: 'Làm kết quả đủ tái lập để bị chất vấn',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM01EvaluationBlockDefaults,
+    id: 'evaluation-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM01SourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM01SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM01SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM01SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Cuisine classifiers 1',
+        url: 'https://github.com/microsoft/ML-For-Beginners/blob/main/4-Classification/2-Classifiers-1/README.md',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -1002,6 +1500,30 @@ const trialPosts = [
     title: {
       en: 'How does a neuron make a decision?',
       vi: 'Một neuron đưa ra quyết định như thế nào?',
+    },
+  },
+  {
+    accessLevel: 'trial',
+    blocks: cmlM01ProblemFullLessonBlocks.slice(0, 6),
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Preview a source-backed way to turn a decision into a target, evidence, and learning task before choosing an algorithm.',
+      vi: 'Xem trước cách có nguồn dẫn để biến quyết định thành mục tiêu, bằng chứng và nhiệm vụ học trước khi chọn thuật toán.',
+    },
+    durationMinutes: 8,
+    id: CML_M01_PROBLEM_POST_ID,
+    learningObjective: {
+      en: 'Identify a decision, its target, and available features, then distinguish a supervised prediction from an unlabeled grouping task.',
+      vi: 'Xác định quyết định, mục tiêu và feature sẵn có, rồi phân biệt dự đoán có giám sát với nhiệm vụ gom nhóm không nhãn.',
+    },
+    moduleId: 'cml-m01-foundations',
+    postQuizId: 'quiz-post-cml-p01',
+    provenance: cmlM01DraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'trial-problem-framing-before-algorithm-choice',
+    title: {
+      en: 'Start from a decision, not an algorithm',
+      vi: 'Bắt đầu từ quyết định, không phải thuật toán',
     },
   },
 ] satisfies readonly TrialPost[];
@@ -1073,6 +1595,54 @@ const fullLessonPosts: readonly TrialPost[] = [
       vi: 'Gradient và bằng chứng validation định hướng huấn luyện',
     },
   },
+  {
+    accessLevel: 'full',
+    blocks: cmlM01ProblemFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Turn a decision into a defensible learning task by separating its target, available evidence, output type, and label status.',
+      vi: 'Biến một quyết định thành nhiệm vụ học có cơ sở bằng cách tách mục tiêu, bằng chứng sẵn có, kiểu đầu ra và trạng thái nhãn.',
+    },
+    durationMinutes: 15,
+    id: CML_M01_PROBLEM_POST_ID,
+    learningObjective: {
+      en: 'Frame a learning task from the decision, distinguish a target from features, and choose supervised prediction or unlabeled grouping from the available evidence.',
+      vi: 'Đặt khung nhiệm vụ học từ quyết định, phân biệt mục tiêu với feature và chọn dự đoán có giám sát hoặc gom nhóm không nhãn từ bằng chứng sẵn có.',
+    },
+    moduleId: 'cml-m01-foundations',
+    postQuizId: 'quiz-post-cml-p01',
+    provenance: cmlM01DraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-problem-framing-target-feature-supervision',
+    title: {
+      en: 'Frame a learning problem before choosing an algorithm',
+      vi: 'Đặt khung bài toán học trước khi chọn thuật toán',
+    },
+  },
+  {
+    accessLevel: 'full',
+    blocks: cmlM01EvaluationFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Use a held-out split and decision-aware metric to turn a model score into evidence rather than an unsupported claim.',
+      vi: 'Dùng phần giữ lại và metric theo quyết định để biến điểm mô hình thành bằng chứng thay vì một khẳng định thiếu cơ sở.',
+    },
+    durationMinutes: 15,
+    id: CML_M01_EVALUATION_POST_ID,
+    learningObjective: {
+      en: 'Explain why a held-out test set differs from training data and select evaluation evidence by the consequence of each error type.',
+      vi: 'Giải thích vì sao tập test giữ lại khác dữ liệu train và chọn bằng chứng đánh giá theo hậu quả của từng loại lỗi.',
+    },
+    moduleId: 'cml-m01-foundations',
+    postQuizId: 'quiz-post-cml-p02',
+    provenance: cmlM01DraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-held-out-evidence-and-error-consequences',
+    title: {
+      en: 'Test a claim with held-out evidence',
+      vi: 'Kiểm tra khẳng định bằng bằng chứng giữ lại',
+    },
+  },
 ];
 
 interface PostDraftDefinition {
@@ -1084,44 +1654,6 @@ interface PostDraftDefinition {
 }
 
 const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
-  'cml-p01-problem-data-types': {
-    concept: {
-      en: 'A learning problem starts with a decision, a target, and evidence. Labels are known outcomes; features are the signals used to estimate them.',
-      vi: 'Một bài toán học máy bắt đầu từ quyết định, mục tiêu và bằng chứng. Nhãn là kết quả đã biết; feature là tín hiệu dùng để ước lượng kết quả đó.',
-    },
-    examplePrompt: {
-      en: 'For a library reminder, decide whether the target is a category, a number, or a group before naming the available signals.',
-      vi: 'Với lời nhắc của thư viện, hãy quyết định mục tiêu là một loại, một con số hay một nhóm trước khi gọi tên các tín hiệu sẵn có.',
-    },
-    learningObjective: {
-      en: 'Distinguish a prediction target from the features and identify supervised or unsupervised framing.',
-      vi: 'Phân biệt mục tiêu dự đoán với feature và xác định cách đặt bài toán có hay không có giám sát.',
-    },
-    taskFingerprint: 'lesson-cml-p01-problem-framing',
-    title: {
-      en: 'Frame the prediction problem',
-      vi: 'Đặt khung cho bài toán dự đoán',
-    },
-  },
-  'cml-p02-train-test-metrics': {
-    concept: {
-      en: 'A model must be judged on examples it did not train on. The metric should reflect the cost of the mistakes that matter in the decision.',
-      vi: 'Mô hình phải được đánh giá trên ví dụ chưa dùng để huấn luyện. Metric cần phản ánh chi phí của loại sai lầm quan trọng cho quyết định.',
-    },
-    examplePrompt: {
-      en: 'Compare two reminder models on a held-out week and explain why a missed urgent reminder can matter more than one extra alert.',
-      vi: 'So sánh hai mô hình nhắc việc trên một tuần giữ lại và giải thích vì sao bỏ sót lời nhắc khẩn có thể quan trọng hơn một cảnh báo dư.',
-    },
-    learningObjective: {
-      en: 'Explain why train/test separation and a decision-aligned metric protect against misleading performance claims.',
-      vi: 'Giải thích vì sao tách train/test và chọn metric theo quyết định giúp tránh kết luận hiệu năng sai lệch.',
-    },
-    taskFingerprint: 'lesson-cml-p02-train-test-metric-choice',
-    title: {
-      en: 'Test data and useful metrics',
-      vi: 'Dữ liệu kiểm tra và metric hữu ích',
-    },
-  },
   'cml-p03-linear-regression': {
     concept: {
       en: 'Linear regression uses a straight relationship as an interpretable baseline. Residuals show where that simple relationship consistently misses.',

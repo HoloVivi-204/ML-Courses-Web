@@ -109,3 +109,28 @@ export const dlM03SourceTrace = {
     },
   ],
 } as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM01SourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from Microsoft ML for Beginners; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft ML for Beginners; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
+      contentUrls: [
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/4-Classification/1-Introduction/README.md',
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/4-Classification/2-Classifiers-1/README.md',
+        'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/5-Clustering/1-Visualize/README.md',
+      ],
+      license: {
+        id: 'MIT',
+        name: 'MIT License',
+        url: 'https://raw.githubusercontent.com/microsoft/ML-For-Beginners/main/LICENSE',
+      },
+      sourceId: 'microsoft-ml-for-beginners',
+      sourceName: 'Microsoft ML for Beginners',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;

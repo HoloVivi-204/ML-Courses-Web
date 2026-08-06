@@ -193,6 +193,57 @@ describe('learning content repository', () => {
     );
   });
 
+  it('returns the two source-backed Classical ML foundations lessons only after post access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const [problemPost, evaluationPost] = await Promise.all([
+      repository.getFullPostContent({
+        postId: 'cml-p01-problem-data-types',
+        uid: 'learner-01',
+      }),
+      repository.getFullPostContent({
+        postId: 'cml-p02-train-test-metrics',
+        uid: 'learner-01',
+      }),
+    ]);
+
+    expect(problemPost.data).toMatchObject({
+      id: 'cml-p01-problem-data-types',
+      moduleId: 'cml-m01-foundations',
+      postQuizId: 'quiz-post-cml-p01',
+      title: {
+        en: 'Frame a learning problem before choosing an algorithm',
+        vi: 'Đặt khung bài toán học trước khi chọn thuật toán',
+      },
+    });
+    expect(problemPost.data.blocks).toHaveLength(10);
+    expect(problemPost.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p01-problem-data-types-example',
+        type: 'example',
+      }),
+    );
+
+    expect(evaluationPost.data).toMatchObject({
+      id: 'cml-p02-train-test-metrics',
+      moduleId: 'cml-m01-foundations',
+      postQuizId: 'quiz-post-cml-p02',
+      title: {
+        en: 'Test a claim with held-out evidence',
+        vi: 'Kiểm tra khẳng định bằng bằng chứng giữ lại',
+      },
+    });
+    expect(evaluationPost.data.blocks).toHaveLength(10);
+    expect(evaluationPost.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p02-train-test-metrics-example',
+        type: 'example',
+      }),
+    );
+  });
+
   it('returns the fixed MLP checkerboard and its distinct completion path only after demo access is granted', async () => {
     const repository = createLearningContentRepository({
       accessReader: createAccessReader(() => true),
