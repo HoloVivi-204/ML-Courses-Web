@@ -5,6 +5,7 @@ import {
 } from './release-learning-catalog.js';
 import {
   cmlM02SourceTrace,
+  cmlM03SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   type DraftProvenance,
@@ -13,6 +14,7 @@ import {
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const cmlM02DemoDraftProvenance = {
   candidateSourceIds: CML_M02_SOURCE_IDS,
@@ -20,6 +22,14 @@ const cmlM02DemoDraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM02SourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM03DemoDraftProvenance = {
+  candidateSourceIds: CML_M03_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM03SourceTrace,
 } as const satisfies DraftProvenance;
 
 export interface DemoStep {
@@ -439,6 +449,133 @@ export const linearCalibrationDemo: FixedDemoManifest = {
   },
 };
 
+export const regularizationNoisySignalDemo: FixedDemoManifest = {
+  algorithmId: 'ridge-regression',
+  courseId: 'course-classical-ml',
+  demoId: 'demo-regularization-noisy-signal',
+  draftProvenance: cmlM03DemoDraftProvenance,
+  fixedRun: {
+    caption: {
+      en: 'Fixed Ridge and Lasso coefficient comparison',
+      vi: 'So sánh hệ số Ridge và Lasso cố định',
+    },
+    datasetVersionId: 'dataset-demo-regularization-noisy-signal-v1',
+    parameterValues: [
+      { id: 'ridge-alpha', value: 1 },
+      { id: 'ridge-feature-a', value: 0.45 },
+      { id: 'ridge-feature-b', value: 0.45 },
+      { id: 'lasso-alpha', value: 1 },
+      { id: 'lasso-feature-a', value: 0.9 },
+      { id: 'lasso-feature-b', value: 0 },
+    ],
+    rows: [
+      { input: [1, 1], predictedOutput: 0.9, targetOutput: 1 },
+      { input: [2, 2], predictedOutput: 1.8, targetOutput: 2 },
+      { input: [3, 3], predictedOutput: 2.7, targetOutput: 4 },
+      { input: [4, 4], predictedOutput: 3.6, targetOutput: 4 },
+    ],
+  },
+  learningObjective: {
+    en: 'Contrast fixed Ridge shrinkage with Lasso sparsity, then state why alpha must be selected with validation evidence rather than this illustrative table alone.',
+    vi: 'Đối chiếu shrinkage Ridge cố định với tính thưa Lasso, rồi nêu vì sao phải chọn alpha bằng bằng chứng validation thay vì chỉ bảng minh họa này.',
+  },
+  moduleId: 'cml-m03-ridge-lasso',
+  problemId: 'problem-demo-regularization-noisy-signal',
+  requiredStepIds: [
+    'regularization-problem',
+    'regularization-data',
+    'ridge-shrinkage',
+    'lasso-sparsity',
+  ],
+  revisionId: 'demo-regularization-noisy-signal-rev-r1',
+  seed: 42,
+  steps: [
+    {
+      id: 'regularization-problem',
+      narration: {
+        en: 'The fixed question is how to read two related input signals without pretending the browser is fitting a model. The goal is to compare shrinkage and sparsity as explicit modelling choices.',
+        vi: 'Câu hỏi cố định là đọc hai tín hiệu đầu vào liên quan mà không giả vờ trình duyệt đang fit mô hình. Mục tiêu là so sánh shrinkage và tính thưa như các lựa chọn mô hình rõ ràng.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The problem card introduces a fixed comparison of two related features under regularisation.',
+        vi: 'Thẻ bài toán giới thiệu so sánh cố định hai feature liên quan dưới regularization.',
+      },
+      title: {
+        en: 'Frame the coefficient question',
+        vi: 'Đặt khung câu hỏi hệ số',
+      },
+    },
+    {
+      id: 'regularization-data',
+      narration: {
+        en: 'Inspect the four static rows: feature A and B move together, while the third target includes a noisy upward deviation. This table is a teaching signal, not a reported fitted dataset.',
+        vi: 'Quan sát bốn dòng tĩnh: feature A và B cùng thay đổi, còn mục tiêu thứ ba có độ lệch nhiễu đi lên. Bảng này là tín hiệu để học, không phải dataset đã fit được báo cáo.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'A static table lists two matching input columns and targets 1, 2, 4, and 4.',
+        vi: 'Bảng tĩnh liệt kê hai cột đầu vào bằng nhau và các mục tiêu 1, 2, 4, 4.',
+      },
+      title: {
+        en: 'Inspect related fixed signals',
+        vi: 'Quan sát các tín hiệu cố định liên quan',
+      },
+    },
+    {
+      id: 'ridge-shrinkage',
+      narration: {
+        en: 'The displayed Ridge comparison fixes alpha at one and shows 0.45 for each related coefficient. The point is the direction of the L2 penalty: increasing alpha increases shrinkage and can make coefficients more robust to collinearity, not that these numbers were trained here.',
+        vi: 'So sánh Ridge hiển thị cố định alpha bằng một và cho 0,45 cho mỗi hệ số liên quan. Điểm chính là hướng của penalty L2: tăng alpha tăng shrinkage và có thể làm hệ số vững hơn với collinearity, không phải các số này được train ở đây.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The Ridge card displays alpha one and two equal shrunken coefficients of 0.45.',
+        vi: 'Thẻ Ridge hiển thị alpha một và hai hệ số thu nhỏ bằng nhau là 0,45.',
+      },
+      title: {
+        en: 'Read Ridge shrinkage',
+        vi: 'Đọc shrinkage Ridge',
+      },
+    },
+    {
+      id: 'lasso-sparsity',
+      narration: {
+        en: 'The Lasso comparison also fixes alpha at one but displays 0.90 for A and zero for B. Lasso can estimate sparse coefficients, including an exact zero; validation evidence is still needed before treating one sparse result as the preferred explanation.',
+        vi: 'So sánh Lasso cũng cố định alpha bằng một nhưng hiển thị 0,90 cho A và 0 cho B. Lasso có thể ước lượng hệ số thưa, gồm cả số 0 chính xác; vẫn cần bằng chứng validation trước khi xem một kết quả thưa là lời giải thích ưu tiên.',
+      },
+      required: true,
+      textAlternative: {
+        en: 'The Lasso card displays alpha one, one non-zero coefficient, and one coefficient fixed at zero.',
+        vi: 'Thẻ Lasso hiển thị alpha một, một hệ số khác không và một hệ số cố định bằng không.',
+      },
+      title: {
+        en: 'Read Lasso sparsity',
+        vi: 'Đọc tính thưa Lasso',
+      },
+    },
+  ],
+  taskFingerprint: 'demo-ridge-lasso-fixed-shrinkage-sparsity',
+  title: {
+    en: 'Regularisation demo: fixed Ridge and Lasso comparison',
+    vi: 'Demo regularization: so sánh Ridge và Lasso cố định',
+  },
+  visualization: {
+    boundary: [
+      { x: 42, y: 182 },
+      { x: 104, y: 142 },
+      { x: 164, y: 102 },
+      { x: 210, y: 72 },
+    ],
+    points: [
+      { label: 'A=B=1, y=1', positiveFromStep: 1, x: 54, y: 176 },
+      { label: 'A=B=2, y=2', positiveFromStep: 1, x: 105, y: 142 },
+      { label: 'A=B=3, y=4', positiveFromStep: 2, x: 160, y: 66 },
+      { label: 'A=B=4, y=4', positiveFromStep: 2, x: 207, y: 88 },
+    ],
+  },
+};
+
 const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
   'demo-linear-calibration': 'problem-demo-linear-calibration',
   'demo-regularization-noisy-signal': 'problem-demo-regularization-noisy-signal',
@@ -461,26 +598,6 @@ interface DemoDraftDefinition {
 }
 
 const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {
-  'demo-regularization-noisy-signal': {
-    decision: {
-      en: 'Ridge keeps related signal weights smaller, while Lasso can suppress a weak redundant signal in the fixed comparison.',
-      vi: 'Ridge giữ trọng số tín hiệu liên quan nhỏ hơn, còn Lasso có thể triệt một tín hiệu dư yếu trong so sánh cố định.',
-    },
-    evidence: {
-      en: 'The fixed signal table contains overlapping measurements and one noisy measurement so coefficient instability is visible.',
-      vi: 'Bảng tín hiệu cố định có các số đo chồng chéo và một số đo nhiễu để thấy hệ số không ổn định.',
-    },
-    learningObjective: {
-      en: 'Compare a noisy regression fit with a regularised fixed alternative.',
-      vi: 'So sánh khớp hồi quy nhiễu với một phương án regularization cố định.',
-    },
-    result: {
-      en: 'The stable result trades a little fit for coefficients that are easier to trust on new observations.',
-      vi: 'Kết quả ổn định đánh đổi một phần độ khớp để hệ số đáng tin hơn trên quan sát mới.',
-    },
-    taskFingerprint: 'demo-regularisation-noisy-coefficients',
-    topic: { en: 'regularisation under noisy signals', vi: 'regularization với tín hiệu nhiễu' },
-  },
   'demo-logistic-admission': {
     decision: {
       en: 'The fixed logistic score becomes a probability, then a policy threshold turns it into a review decision.',
@@ -793,7 +910,12 @@ function createExpandedDemo(input: {
   };
 }
 
-const handAuthoredDemos = [andGateDemo, mlpCheckerboardDemo, linearCalibrationDemo] as const;
+const handAuthoredDemos = [
+  andGateDemo,
+  mlpCheckerboardDemo,
+  linearCalibrationDemo,
+  regularizationNoisySignalDemo,
+] as const;
 const handAuthoredDemoIds = new Set(handAuthoredDemos.map((demo) => demo.demoId));
 
 const generatedDemos = getReleaseLearningCatalog().courses.flatMap((course) =>

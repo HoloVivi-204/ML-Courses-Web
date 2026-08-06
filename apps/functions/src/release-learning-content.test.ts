@@ -447,4 +447,83 @@ describe('Release 1 protected learning content', () => {
       ).toBe(true);
     }
   });
+
+  it('pins the Classical ML M03 regularization batch to the scikit-learn snapshot used for prose, fixed comparison, and quizzes', () => {
+    const post = getReadablePost(
+      'course-classical-ml',
+      'cml-p05-regularization-ridge-lasso',
+      true,
+    )!;
+    const demo = getFixedDemo('demo-regularization-noisy-signal')!;
+    const postQuiz = getQuizManifest('quiz-post-cml-p05');
+    const moduleQuiz = getQuizManifest('quiz-module-cml-m03');
+    const expectedSourceSnapshot = {
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/linear_model.html'],
+      sourceId: 'sklearn-docs',
+    };
+
+    for (const provenance of [
+      post.provenance,
+      demo.draftProvenance,
+      postQuiz.draftProvenance,
+      moduleQuiz.draftProvenance,
+    ]) {
+      expect(provenance).toMatchObject({
+        candidateSourceIds: ['sklearn-docs'],
+        contentReviewStatus: 'pending-operator-review',
+        sourceTrace: {
+          kind: 'snapshot-pinned',
+          sourceSnapshots: [expect.objectContaining(expectedSourceSnapshot)],
+        },
+      });
+    }
+
+    expect(post.blocks).toHaveLength(10);
+    expect(post.blocks.every((block) => block.sourceIds.length > 0)).toBe(true);
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({ sourceIds: ['sklearn-docs'], type: 'source-list' }),
+    );
+    expect(post.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p05-regularization-ridge-lasso-example',
+        type: 'example',
+      }),
+    );
+
+    expect(demo).toMatchObject({
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-regularization-noisy-signal-v1',
+        parameterValues: [
+          { id: 'ridge-alpha', value: 1 },
+          { id: 'ridge-feature-a', value: 0.45 },
+          { id: 'ridge-feature-b', value: 0.45 },
+          { id: 'lasso-alpha', value: 1 },
+          { id: 'lasso-feature-a', value: 0.9 },
+          { id: 'lasso-feature-b', value: 0 },
+        ],
+        rows: [
+          { input: [1, 1], predictedOutput: 0.9, targetOutput: 1 },
+          { input: [2, 2], predictedOutput: 1.8, targetOutput: 2 },
+          { input: [3, 3], predictedOutput: 2.7, targetOutput: 4 },
+          { input: [4, 4], predictedOutput: 3.6, targetOutput: 4 },
+        ],
+      },
+      requiredStepIds: [
+        'regularization-problem',
+        'regularization-data',
+        'ridge-shrinkage',
+        'lasso-sparsity',
+      ],
+    });
+
+    for (const quiz of [postQuiz, moduleQuiz]) {
+      expect(quiz.questions.every((question) => question.sourceIds?.length)).toBe(true);
+      expect(
+        quiz.questions.every((question) =>
+          question.sourceIds?.every((sourceId) => sourceId === 'sklearn-docs'),
+        ),
+      ).toBe(true);
+    }
+  });
 });

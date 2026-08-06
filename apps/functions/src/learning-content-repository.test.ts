@@ -317,6 +317,61 @@ describe('learning content repository', () => {
     });
   });
 
+  it('returns the source-backed regularization lesson and fixed coefficient comparison only after access is granted', async () => {
+    const repository = createLearningContentRepository({
+      accessReader: createAccessReader(() => true),
+    });
+
+    const [post, demo] = await Promise.all([
+      repository.getFullPostContent({
+        postId: 'cml-p05-regularization-ridge-lasso',
+        uid: 'learner-01',
+      }),
+      repository.getDemoContent({
+        demoId: 'demo-regularization-noisy-signal',
+        uid: 'learner-01',
+      }),
+    ]);
+
+    expect(post.data).toMatchObject({
+      id: 'cml-p05-regularization-ridge-lasso',
+      moduleId: 'cml-m03-ridge-lasso',
+      postQuizId: 'quiz-post-cml-p05',
+      title: {
+        en: 'Choose shrinkage and sparsity from evidence',
+        vi: 'Chọn shrinkage và tính thưa từ bằng chứng',
+      },
+    });
+    expect(post.data.blocks).toHaveLength(10);
+    expect(post.data.blocks).toContainEqual(
+      expect.objectContaining({
+        activityId: 'act-cml-p05-regularization-ridge-lasso-example',
+        type: 'example',
+      }),
+    );
+
+    expect(demo.data).toMatchObject({
+      demoId: 'demo-regularization-noisy-signal',
+      fixedRun: {
+        datasetVersionId: 'dataset-demo-regularization-noisy-signal-v1',
+        parameterValues: [
+          { id: 'ridge-alpha', value: 1 },
+          { id: 'ridge-feature-a', value: 0.45 },
+          { id: 'ridge-feature-b', value: 0.45 },
+          { id: 'lasso-alpha', value: 1 },
+          { id: 'lasso-feature-a', value: 0.9 },
+          { id: 'lasso-feature-b', value: 0 },
+        ],
+      },
+      requiredStepIds: [
+        'regularization-problem',
+        'regularization-data',
+        'ridge-shrinkage',
+        'lasso-sparsity',
+      ],
+    });
+  });
+
   it('returns the fixed MLP checkerboard and its distinct completion path only after demo access is granted', async () => {
     const repository = createLearningContentRepository({
       accessReader: createAccessReader(() => true),

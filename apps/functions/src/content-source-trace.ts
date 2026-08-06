@@ -157,3 +157,24 @@ export const cmlM02SourceTrace = {
     },
   ],
 } as const satisfies SnapshotPinnedSourceTrace;
+
+export const cmlM03SourceTrace = {
+  kind: 'snapshot-pinned',
+  sourceSnapshots: [
+    {
+      attribution: {
+        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
+        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+      },
+      contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
+      contentUrls: ['https://scikit-learn.org/stable/modules/linear_model.html'],
+      license: {
+        id: 'BSD-3-Clause',
+        name: 'BSD 3-Clause License',
+        url: 'https://github.com/scikit-learn/scikit-learn/blob/main/COPYING',
+      },
+      sourceId: 'sklearn-docs',
+      sourceName: 'scikit-learn User Guide',
+    },
+  ],
+} as const satisfies SnapshotPinnedSourceTrace;

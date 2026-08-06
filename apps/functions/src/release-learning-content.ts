@@ -2,6 +2,7 @@ import { getReleaseLearningCatalog, type LocalizedText } from './release-learnin
 import {
   cmlM01SourceTrace,
   cmlM02SourceTrace,
+  cmlM03SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -48,6 +49,7 @@ const CML_M01_PROBLEM_POST_ID = 'cml-p01-problem-data-types';
 const CML_M01_EVALUATION_POST_ID = 'cml-p02-train-test-metrics';
 const CML_M02_LINEAR_POST_ID = 'cml-p03-linear-regression';
 const CML_M02_POLYNOMIAL_POST_ID = 'cml-p04-polynomial-regression';
+const CML_M03_REGULARIZATION_POST_ID = 'cml-p05-regularization-ridge-lasso';
 const DL_M01_PRIMARY_SOURCE_IDS = ['microsoft-ai-for-beginners'] as const;
 const DL_M01_MLP_SOURCE_IDS = ['d2l-vi'] as const;
 const DL_M01_SOURCE_IDS = dlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
@@ -55,6 +57,7 @@ const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => sourc
 const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 
 const blockDefaults = {
   accessibility: { en: null, vi: null },
@@ -126,6 +129,16 @@ const cmlM02PolynomialBlockDefaults = {
   sourceIds: CML_M02_SOURCE_IDS,
 } as const;
 
+const cmlM03RegularizationBlockDefaults = {
+  accessibility: { en: null, vi: null },
+  activityId: null,
+  assetIds: [],
+  postId: CML_M03_REGULARIZATION_POST_ID,
+  required: true,
+  schemaVersion: 1,
+  sourceIds: CML_M03_SOURCE_IDS,
+} as const;
+
 const cmlM01DraftProvenance = {
   candidateSourceIds: CML_M01_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -140,6 +153,14 @@ const cmlM02DraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM02SourceTrace,
+} as const satisfies DraftProvenance;
+
+const cmlM03DraftProvenance = {
+  candidateSourceIds: CML_M03_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM03SourceTrace,
 } as const satisfies DraftProvenance;
 
 const candidateSourceIdsByCourseId: Readonly<Record<string, readonly string[]>> = {
@@ -1889,6 +1910,198 @@ const cmlM02PolynomialFullLessonBlocks = [
   },
 ] satisfies readonly LearningContentBlock[];
 
+const cmlM03RegularizationFullLessonBlocks = [
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'regularization-question',
+    locales: {
+      en: {
+        lede: 'A low training error is not enough when related features can trade credit with one another. Regularisation makes that trade-off explicit before coefficients are trusted on new rows.',
+        navigationTitle: 'Ask why coefficients move',
+        title: 'Stabilise a linear explanation before relying on it',
+      },
+      vi: {
+        lede: 'Lỗi train thấp chưa đủ khi các feature liên quan có thể đổi phần đóng góp cho nhau. Regularization làm rõ đánh đổi đó trước khi tin hệ số trên các dòng mới.',
+        navigationTitle: 'Hỏi vì sao hệ số thay đổi',
+        title: 'Ổn định lời giải thích tuyến tính trước khi dựa vào nó',
+      },
+    },
+    order: 1,
+    type: 'heading',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'regularization-penalty-purpose',
+    locales: {
+      en: {
+        markdown:
+          'Regularised linear models minimise prediction error together with a penalty on coefficient size. The penalty does not prove that a particular coefficient is true; it asks the fit to avoid unnecessarily large or fragile weights when several explanations fit the training rows.',
+      },
+      vi: {
+        markdown:
+          'Mô hình tuyến tính có regularization tối thiểu hóa lỗi dự đoán cùng một penalty trên độ lớn hệ số. Penalty không chứng minh hệ số nào là đúng; nó yêu cầu phép khớp tránh trọng số lớn hoặc mong manh không cần thiết khi nhiều lời giải thích cùng khớp các dòng train.',
+      },
+    },
+    order: 2,
+    type: 'markdown',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'regularization-alpha-cause-effect',
+    locales: {
+      en: {
+        body: 'Cause: alpha controls the strength of the penalty. Effect: increasing alpha applies more shrinkage, so the comparison must also ask whether the held-out prediction still serves the decision.',
+        title: 'Shrinkage changes both flexibility and evidence',
+      },
+      vi: {
+        body: 'Nguyên nhân: alpha điều khiển độ mạnh của penalty. Kết quả: tăng alpha áp dụng shrinkage nhiều hơn, nên so sánh cũng phải hỏi dự đoán giữ lại còn phục vụ quyết định hay không.',
+        title: 'Shrinkage thay đổi cả tính linh hoạt lẫn bằng chứng',
+      },
+    },
+    order: 3,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'ridge-l2-question',
+    locales: {
+      en: {
+        lede: 'Ridge adds an L2 penalty to the squared-error objective. It is useful to read it as a preference for smaller coefficients when collinearity makes one unpenalised explanation unstable.',
+        navigationTitle: 'Read Ridge shrinkage',
+        title: 'Ridge shrinks related coefficients without declaring one irrelevant',
+      },
+      vi: {
+        lede: 'Ridge thêm penalty L2 vào mục tiêu sai số bình phương. Hãy đọc nó như ưu tiên hệ số nhỏ hơn khi collinearity làm một lời giải thích không penalty trở nên không ổn định.',
+        navigationTitle: 'Đọc shrinkage của Ridge',
+        title: 'Ridge thu nhỏ hệ số liên quan mà không tuyên bố một feature vô nghĩa',
+      },
+    },
+    order: 4,
+    type: 'heading',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'ridge-l2-reading',
+    locales: {
+      en: {
+        markdown:
+          'The Ridge objective adds an L2 coefficient penalty to least squares. In the pinned scikit-learn guide, larger non-negative alpha means greater shrinkage and coefficients that are more robust to collinearity. That is a model choice to evaluate, not a license to select the largest alpha.',
+      },
+      vi: {
+        markdown:
+          'Mục tiêu Ridge thêm penalty L2 trên hệ số vào least squares. Trong hướng dẫn scikit-learn đã pin, alpha không âm lớn hơn nghĩa là shrinkage lớn hơn và hệ số vững hơn với collinearity. Đây là lựa chọn mô hình cần đánh giá, không phải lý do để chọn alpha lớn nhất.',
+      },
+    },
+    order: 5,
+    type: 'markdown',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    activityId: 'act-cml-p05-regularization-ridge-lasso-example',
+    id: 'regularization-fixed-coefficient-example',
+    locales: {
+      en: {
+        description:
+          'Inspect this fixed teaching comparison, not a live fit. Two overlapping signals A and B have Ridge coefficients 0.45 and 0.45 at the displayed alpha. A Lasso comparison keeps A at 0.90 and sets B to 0. Explain the different preference: Ridge shrinks the pair, while Lasso can produce a sparse coefficient vector. Then name the missing evidence: held-out error across candidate alpha values.',
+        navigationTitle: 'Compare fixed coefficients',
+      },
+      vi: {
+        description:
+          'Quan sát so sánh cố định để học này, không phải lượt fit live. Hai tín hiệu chồng chéo A và B có hệ số Ridge 0,45 và 0,45 tại alpha hiển thị. So sánh Lasso giữ A ở 0,90 và đưa B về 0. Giải thích ưu tiên khác nhau: Ridge thu nhỏ cặp hệ số, còn Lasso có thể tạo vector hệ số thưa. Sau đó nêu bằng chứng còn thiếu: lỗi giữ lại trên các alpha ứng viên.',
+        navigationTitle: 'So sánh hệ số cố định',
+      },
+    },
+    order: 6,
+    type: 'example',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'lasso-sparsity-question',
+    locales: {
+      en: {
+        lede: 'Lasso uses an L1 penalty. Its sparse solution can set some coefficients exactly to zero, changing which features the fitted explanation depends on.',
+        navigationTitle: 'Read Lasso sparsity',
+        title: 'Lasso can remove a coefficient rather than only shrink it',
+      },
+      vi: {
+        lede: 'Lasso dùng penalty L1. Lời giải thưa của nó có thể đưa một số hệ số về đúng 0, làm thay đổi các feature mà lời giải thích đã khớp phụ thuộc vào.',
+        navigationTitle: 'Đọc tính thưa của Lasso',
+        title: 'Lasso có thể loại một hệ số thay vì chỉ thu nhỏ nó',
+      },
+    },
+    order: 7,
+    type: 'heading',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'lasso-l1-reading',
+    locales: {
+      en: {
+        markdown:
+          'The scikit-learn guide describes Lasso as a linear model that estimates sparse coefficients and can set coefficients exactly to zero. Its alpha controls the degree of sparsity. A zero in this fixed lesson is a model outcome under its representation and alpha, not a universal claim that the underlying feature never matters.',
+      },
+      vi: {
+        markdown:
+          'Hướng dẫn scikit-learn mô tả Lasso là mô hình tuyến tính ước lượng hệ số thưa và có thể đặt hệ số đúng bằng 0. Alpha điều khiển mức độ thưa. Số 0 trong bài học cố định này là kết quả mô hình dưới biểu diễn và alpha của nó, không phải khẳng định feature gốc không bao giờ quan trọng.',
+      },
+    },
+    order: 8,
+    type: 'markdown',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'regularization-selection-evidence',
+    locales: {
+      en: {
+        body: 'Choose alpha with validation evidence. The pinned guide exposes cross-validation helpers for Ridge and Lasso; pedagogically, compare candidate alphas on held-out folds, then report the trade-off among error, coefficient stability, and sparsity.',
+        title: 'Tune alpha as a testable decision',
+      },
+      vi: {
+        body: 'Chọn alpha bằng bằng chứng validation. Hướng dẫn đã pin có helper cross-validation cho Ridge và Lasso; về mặt học tập, hãy so sánh alpha ứng viên trên các fold giữ lại, rồi báo cáo đánh đổi giữa lỗi, độ ổn định hệ số và tính thưa.',
+        title: 'Tinh chỉnh alpha như một quyết định có thể kiểm tra',
+      },
+    },
+    order: 9,
+    type: 'callout',
+    variant: 'insight',
+  },
+  {
+    ...cmlM03RegularizationBlockDefaults,
+    id: 'regularization-sources',
+    locales: {
+      en: {
+        heading: 'Sources used for this lesson',
+        intro:
+          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        navigationTitle: 'Lesson sources',
+      },
+      vi: {
+        heading: 'Nguồn dùng cho bài học này',
+        intro:
+          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        navigationTitle: 'Nguồn bài học',
+      },
+    },
+    order: 10,
+    required: false,
+    resources: [
+      {
+        attribution: cmlM03SourceTrace.sourceSnapshots[0].attribution,
+        language: 'en',
+        license: cmlM03SourceTrace.sourceSnapshots[0].license,
+        relatedTopicIds: [],
+        resourceType: 'documentation',
+        sourceId: cmlM03SourceTrace.sourceSnapshots[0].sourceId,
+        sourceName: cmlM03SourceTrace.sourceSnapshots[0].sourceName,
+        title: 'Linear Models — scikit-learn User Guide',
+        url: 'https://scikit-learn.org/stable/modules/linear_model.html',
+      },
+    ],
+    type: 'source-list',
+  },
+] satisfies readonly LearningContentBlock[];
+
 const trialPosts = [
   {
     accessLevel: 'trial',
@@ -2107,6 +2320,30 @@ const fullLessonPosts: readonly TrialPost[] = [
       vi: 'Kiểm tra độ cong đa thức có xứng đáng độ phức tạp',
     },
   },
+  {
+    accessLevel: 'full',
+    blocks: cmlM03RegularizationFullLessonBlocks,
+    courseId: 'course-classical-ml',
+    description: {
+      en: 'Use fixed Ridge and Lasso evidence to distinguish coefficient shrinkage from sparse selection, then choose alpha through held-out validation rather than a training-only preference.',
+      vi: 'Dùng bằng chứng Ridge và Lasso cố định để phân biệt shrinkage hệ số với lựa chọn thưa, rồi chọn alpha qua validation giữ lại thay vì ưu tiên chỉ từ train.',
+    },
+    durationMinutes: 16,
+    id: CML_M03_REGULARIZATION_POST_ID,
+    learningObjective: {
+      en: 'Explain how Ridge and Lasso alter coefficients, and select a regularization strength from held-out evidence instead of one apparent training fit.',
+      vi: 'Giải thích Ridge và Lasso thay đổi hệ số thế nào, rồi chọn độ regularization từ bằng chứng giữ lại thay vì một độ khớp train có vẻ tốt.',
+    },
+    moduleId: 'cml-m03-ridge-lasso',
+    postQuizId: 'quiz-post-cml-p05',
+    provenance: cmlM03DraftProvenance,
+    sourceReviewStatus: 'pending-operator-review',
+    taskFingerprint: 'lesson-ridge-lasso-alpha-heldout-evidence',
+    title: {
+      en: 'Choose shrinkage and sparsity from evidence',
+      vi: 'Chọn shrinkage và tính thưa từ bằng chứng',
+    },
+  },
 ];
 
 interface PostDraftDefinition {
@@ -2118,25 +2355,6 @@ interface PostDraftDefinition {
 }
 
 const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {
-  'cml-p05-regularization-ridge-lasso': {
-    concept: {
-      en: 'Regularisation trades a small amount of training fit for more stable coefficients. Ridge spreads weight; Lasso can remove weak signals.',
-      vi: 'Regularization đánh đổi một phần khớp trên train để hệ số ổn định hơn. Ridge phân tán trọng số; Lasso có thể loại bỏ tín hiệu yếu.',
-    },
-    examplePrompt: {
-      en: 'Predict revision time from several overlapping study habits and compare a large unstable coefficient with a smaller stable one.',
-      vi: 'Dự đoán thời gian ôn tập từ nhiều thói quen học chồng chéo và so sánh hệ số lớn không ổn định với hệ số nhỏ ổn định.',
-    },
-    learningObjective: {
-      en: 'Explain how Ridge and Lasso control unstable coefficients in correlated or noisy features.',
-      vi: 'Giải thích cách Ridge và Lasso kiểm soát hệ số không ổn định khi feature tương quan hoặc nhiễu.',
-    },
-    taskFingerprint: 'lesson-cml-p05-regularisation-stability',
-    title: {
-      en: 'Regularise before trusting coefficients',
-      vi: 'Regularize trước khi tin vào hệ số',
-    },
-  },
   'cml-p06-logistic-regression': {
     concept: {
       en: 'Logistic regression maps evidence to a probability. A threshold turns that probability into an action, so the threshold belongs to the decision context.',

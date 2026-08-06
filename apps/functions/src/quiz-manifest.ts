@@ -7,6 +7,7 @@ import {
 import {
   cmlM01SourceTrace,
   cmlM02SourceTrace,
+  cmlM03SourceTrace,
   dlM01SourceTrace,
   dlM02SourceTrace,
   dlM03SourceTrace,
@@ -18,6 +19,7 @@ const DL_M02_SOURCE_IDS = dlM02SourceTrace.sourceSnapshots.map((source) => sourc
 const DL_M03_SOURCE_IDS = dlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M01_SOURCE_IDS = cmlM01SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const CML_M02_SOURCE_IDS = cmlM02SourceTrace.sourceSnapshots.map((source) => source.sourceId);
+const CML_M03_SOURCE_IDS = cmlM03SourceTrace.sourceSnapshots.map((source) => source.sourceId);
 const dlM02DraftProvenance = {
   candidateSourceIds: DL_M02_SOURCE_IDS,
   contentReviewStatus: 'pending-operator-review',
@@ -45,6 +47,13 @@ const cmlM02DraftProvenance = {
   externalEvidenceStatus: 'not-collected',
   importStatus: 'draft-only',
   sourceTrace: cmlM02SourceTrace,
+} as const satisfies DraftProvenance;
+const cmlM03DraftProvenance = {
+  candidateSourceIds: CML_M03_SOURCE_IDS,
+  contentReviewStatus: 'pending-operator-review',
+  externalEvidenceStatus: 'not-collected',
+  importStatus: 'draft-only',
+  sourceTrace: cmlM03SourceTrace,
 } as const satisfies DraftProvenance;
 
 export type BaselineQuestionType = 'multiple-choice' | 'single-choice' | 'true-false';
@@ -2536,6 +2545,391 @@ const handAuthoredQuizManifests: Readonly<Record<string, QuizManifest>> = {
       },
     ],
   },
+  'quiz-post-cml-p05': {
+    courseId: 'course-classical-ml',
+    demoId: null,
+    draftProvenance: cmlM03DraftProvenance,
+    mastery: {
+      en: 'Answer all 3 questions correctly to complete this lesson.',
+      vi: 'Cần trả lời đúng cả 3 câu để hoàn thành bài.',
+    },
+    moduleId: 'cml-m03-ridge-lasso',
+    passingScorePercent: 100,
+    postId: 'cml-p05-regularization-ridge-lasso',
+    questionCount: 3,
+    quizId: 'quiz-post-cml-p05',
+    quizKind: 'post',
+    quizRevisionId: 'quiz-post-cml-p05-rev-r1',
+    requiredCorrectCount: 3,
+    unlocksOnPass: [{ id: 'cml-p05-regularization-ridge-lasso', type: 'post' }],
+    questions: [
+      {
+        correctAnswer: 'opt-more-shrinkage',
+        explanation: {
+          en: 'For Ridge, alpha controls shrinkage. The pinned guide states that a larger non-negative alpha produces greater shrinkage and makes coefficients more robust to collinearity.',
+          vi: 'Với Ridge, alpha điều khiển shrinkage. Hướng dẫn đã pin nêu alpha không âm lớn hơn tạo shrinkage lớn hơn và làm hệ số vững hơn với collinearity.',
+        },
+        hints: [
+          { en: 'Read alpha as penalty strength.', vi: 'Đọc alpha như độ mạnh penalty.' },
+          {
+            en: 'More penalty changes coefficient size.',
+            vi: 'Penalty nhiều hơn thay đổi độ lớn hệ số.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-more-shrinkage',
+            text: {
+              en: 'It applies greater coefficient shrinkage',
+              vi: 'Nó áp dụng shrinkage hệ số lớn hơn',
+            },
+          },
+          {
+            optionId: 'opt-no-penalty',
+            text: { en: 'It removes the penalty from Ridge', vi: 'Nó loại penalty khỏi Ridge' },
+          },
+          {
+            optionId: 'opt-change-target',
+            text: { en: 'It replaces the target values', vi: 'Nó thay thế các giá trị mục tiêu' },
+          },
+        ],
+        prompt: {
+          en: 'What is the direct effect of increasing Ridge alpha in the pinned guide?',
+          vi: 'Tác động trực tiếp của việc tăng alpha Ridge trong hướng dẫn đã pin là gì?',
+        },
+        questionId: 'q-cml-p05-ridge-alpha-shrinkage',
+        sourceId: 'act-cml-p05-regularization-ridge-lasso-quiz-01',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-sparse-coefficients', 'opt-exact-zero'],
+        explanation: {
+          en: 'Lasso estimates sparse coefficients and can set coefficients exactly to zero. Those properties distinguish its L1 penalty from merely inspecting a line fit.',
+          vi: 'Lasso ước lượng hệ số thưa và có thể đưa hệ số đúng bằng 0. Các tính chất đó phân biệt penalty L1 của nó với việc chỉ quan sát độ khớp đường thẳng.',
+        },
+        hints: [
+          {
+            en: 'Look for the two sparse-model properties.',
+            vi: 'Tìm hai tính chất của mô hình thưa.',
+          },
+          {
+            en: 'One property concerns an exact value.',
+            vi: 'Một tính chất nói về giá trị chính xác.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-sparse-coefficients',
+            text: { en: 'It estimates sparse coefficients', vi: 'Nó ước lượng hệ số thưa' },
+          },
+          {
+            optionId: 'opt-exact-zero',
+            text: {
+              en: 'It can set a coefficient exactly to zero',
+              vi: 'Nó có thể đưa một hệ số đúng bằng 0',
+            },
+          },
+          {
+            optionId: 'opt-only-positive',
+            text: { en: 'It forces every coefficient positive', vi: 'Nó buộc mọi hệ số dương' },
+          },
+          {
+            optionId: 'opt-removes-validation',
+            text: { en: 'It removes the need for validation', vi: 'Nó loại bỏ nhu cầu validation' },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements describe Lasso in the pinned guide?',
+          vi: 'Hai phát biểu nào mô tả Lasso trong hướng dẫn đã pin?',
+        },
+        questionId: 'q-cml-p05-lasso-sparse-zero',
+        sourceId: 'act-cml-p05-regularization-ridge-lasso-quiz-02',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'A fixed training comparison is not enough to choose alpha. The lesson uses held-out cross-validation evidence to compare candidate strengths and their trade-offs.',
+          vi: 'Một so sánh train cố định không đủ để chọn alpha. Bài học dùng bằng chứng cross-validation giữ lại để so sánh các độ mạnh ứng viên và đánh đổi của chúng.',
+        },
+        hints: [
+          {
+            en: 'Separate fitting evidence from selection evidence.',
+            vi: 'Tách bằng chứng khớp khỏi bằng chứng chọn.',
+          },
+          { en: 'Alpha is a model-selection decision.', vi: 'Alpha là quyết định chọn mô hình.' },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: one apparent training fit is sufficient evidence for selecting alpha.',
+          vi: 'Đúng hay sai: một độ khớp train có vẻ tốt là bằng chứng đủ để chọn alpha.',
+        },
+        questionId: 'q-cml-p05-alpha-validation-needed',
+        sourceId: 'act-cml-p05-regularization-ridge-lasso-quiz-03',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'true-false',
+      },
+    ],
+  },
+  'quiz-module-cml-m03': {
+    courseId: 'course-classical-ml',
+    demoId: 'demo-regularization-noisy-signal',
+    draftProvenance: cmlM03DraftProvenance,
+    mastery: {
+      en: 'Score at least 70% to complete the module.',
+      vi: 'Đạt ít nhất 70% để hoàn thành module.',
+    },
+    moduleId: 'cml-m03-ridge-lasso',
+    passingScorePercent: 70,
+    postId: null,
+    questionCount: 6,
+    quizId: 'quiz-module-cml-m03',
+    quizKind: 'module',
+    quizRevisionId: 'quiz-module-cml-m03-rev-r1',
+    requiredCorrectCount: null,
+    unlocksOnPass: [
+      { id: 'ridge-regression', type: 'algorithm' },
+      { id: 'lasso-regression', type: 'algorithm' },
+    ],
+    questions: [
+      {
+        correctAnswer: 'opt-coefficient-penalty',
+        explanation: {
+          en: 'Regularisation combines prediction error with a penalty on coefficient size. It changes the fitting objective; it does not relabel the data or replace evaluation.',
+          vi: 'Regularization kết hợp lỗi dự đoán với penalty trên độ lớn hệ số. Nó đổi mục tiêu khớp; nó không gán nhãn lại dữ liệu hay thay thế đánh giá.',
+        },
+        hints: [
+          {
+            en: 'Think about what is added to the objective.',
+            vi: 'Hãy nghĩ về điều được thêm vào mục tiêu.',
+          },
+          { en: 'The added term concerns weights.', vi: 'Hạng thêm liên quan đến trọng số.' },
+        ],
+        options: [
+          {
+            optionId: 'opt-coefficient-penalty',
+            text: { en: 'A penalty on coefficient size', vi: 'Một penalty trên độ lớn hệ số' },
+          },
+          {
+            optionId: 'opt-new-labels',
+            text: { en: 'A new set of target labels', vi: 'Một tập nhãn mục tiêu mới' },
+          },
+          {
+            optionId: 'opt-live-threshold',
+            text: { en: 'A live decision threshold', vi: 'Một ngưỡng quyết định live' },
+          },
+        ],
+        prompt: {
+          en: 'What is added to the fitting objective by regularisation?',
+          vi: 'Regularization thêm gì vào mục tiêu khớp?',
+        },
+        questionId: 'q-cml-m03-regularization-penalty',
+        sourceId: 'quiz-module-cml-m03-q01',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: 'true',
+        explanation: {
+          en: 'For Ridge, the pinned guide says larger non-negative alpha means greater shrinkage and coefficients more robust to collinearity.',
+          vi: 'Với Ridge, hướng dẫn đã pin nói alpha không âm lớn hơn nghĩa là shrinkage lớn hơn và hệ số vững hơn với collinearity.',
+        },
+        hints: [
+          { en: 'Recall the direction of the alpha effect.', vi: 'Nhớ hướng tác động của alpha.' },
+          {
+            en: 'The statement names both shrinkage and collinearity.',
+            vi: 'Phát biểu nêu cả shrinkage và collinearity.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: increasing a non-negative Ridge alpha increases shrinkage and can improve robustness to collinearity.',
+          vi: 'Đúng hay sai: tăng alpha Ridge không âm làm tăng shrinkage và có thể cải thiện độ vững với collinearity.',
+        },
+        questionId: 'q-cml-m03-ridge-collinearity',
+        sourceId: 'quiz-module-cml-m03-q02',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: 'opt-sparsity-degree',
+        explanation: {
+          en: 'The Lasso alpha controls the degree of sparsity of the estimated coefficients. It is not an instruction to use the highest value without evaluation.',
+          vi: 'Alpha Lasso điều khiển mức độ thưa của các hệ số ước lượng. Nó không phải chỉ dẫn dùng giá trị cao nhất mà không đánh giá.',
+        },
+        hints: [
+          {
+            en: 'The source links alpha to a structural property.',
+            vi: 'Nguồn liên kết alpha với một tính chất cấu trúc.',
+          },
+          {
+            en: 'Read the Lasso section, not the row target.',
+            vi: 'Đọc phần Lasso, không phải mục tiêu dòng.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-sparsity-degree',
+            text: { en: 'The degree of coefficient sparsity', vi: 'Mức độ thưa của hệ số' },
+          },
+          {
+            optionId: 'opt-label-count',
+            text: { en: 'The number of target labels', vi: 'Số lượng nhãn mục tiêu' },
+          },
+          {
+            optionId: 'opt-browser-speed',
+            text: { en: 'The browser rendering speed', vi: 'Tốc độ render trình duyệt' },
+          },
+        ],
+        prompt: {
+          en: 'What does alpha control for Lasso in the pinned guide?',
+          vi: 'Alpha điều khiển điều gì cho Lasso trong hướng dẫn đã pin?',
+        },
+        questionId: 'q-cml-m03-lasso-alpha-sparsity',
+        sourceId: 'quiz-module-cml-m03-q03',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'single-choice',
+      },
+      {
+        correctAnswer: ['opt-ridge-pair-shrunk', 'opt-lasso-zero-b'],
+        explanation: {
+          en: 'The fixed teaching comparison displays Ridge values 0.45 and 0.45 for the related pair, and Lasso values 0.90 for A and zero for B. It is an illustration of shrinkage and sparsity, not a live fit.',
+          vi: 'So sánh cố định để học hiển thị Ridge 0,45 và 0,45 cho cặp liên quan, cùng Lasso 0,90 cho A và 0 cho B. Đây là minh họa shrinkage và tính thưa, không phải lượt fit live.',
+        },
+        hints: [
+          { en: 'Read the displayed coefficient cards.', vi: 'Đọc các thẻ hệ số hiển thị.' },
+          {
+            en: 'Choose the two facts, not a claim about training.',
+            vi: 'Chọn hai sự kiện, không phải khẳng định về train.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-ridge-pair-shrunk',
+            text: {
+              en: 'Ridge displays 0.45 for both related coefficients',
+              vi: 'Ridge hiển thị 0,45 cho cả hai hệ số liên quan',
+            },
+          },
+          {
+            optionId: 'opt-lasso-zero-b',
+            text: {
+              en: 'Lasso displays zero for coefficient B',
+              vi: 'Lasso hiển thị 0 cho hệ số B',
+            },
+          },
+          {
+            optionId: 'opt-live-fit',
+            text: {
+              en: 'The browser trained these coefficients live',
+              vi: 'Trình duyệt đã train các hệ số này live',
+            },
+          },
+          {
+            optionId: 'opt-alpha-final',
+            text: {
+              en: 'Alpha one is final for every dataset',
+              vi: 'Alpha một là cuối cùng cho mọi dataset',
+            },
+          },
+        ],
+        prompt: {
+          en: 'Which two statements accurately read the fixed regularization demo?',
+          vi: 'Hai phát biểu nào đọc đúng demo regularization cố định?',
+        },
+        questionId: 'q-cml-m03-fixed-comparison-reading',
+        sourceId: 'quiz-module-cml-m03-q04',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+      {
+        correctAnswer: 'false',
+        explanation: {
+          en: 'An exact Lasso zero is a result of the model, representation, data, and alpha. It does not prove that the original feature can never matter in another setting.',
+          vi: 'Số 0 chính xác của Lasso là kết quả của mô hình, biểu diễn, dữ liệu và alpha. Nó không chứng minh feature gốc không bao giờ quan trọng trong bối cảnh khác.',
+        },
+        hints: [
+          {
+            en: 'Do not turn a fitted coefficient into a universal causal claim.',
+            vi: 'Đừng biến hệ số đã khớp thành khẳng định nhân quả phổ quát.',
+          },
+          {
+            en: 'The lesson labels this as a model outcome.',
+            vi: 'Bài học gọi đây là kết quả mô hình.',
+          },
+        ],
+        options: [
+          { optionId: 'true', text: { en: 'True', vi: 'Đúng' } },
+          { optionId: 'false', text: { en: 'False', vi: 'Sai' } },
+        ],
+        prompt: {
+          en: 'True or false: a Lasso coefficient of zero proves the original feature is never important.',
+          vi: 'Đúng hay sai: hệ số Lasso bằng 0 chứng minh feature gốc không bao giờ quan trọng.',
+        },
+        questionId: 'q-cml-m03-zero-not-universal',
+        sourceId: 'quiz-module-cml-m03-q05',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'true-false',
+      },
+      {
+        correctAnswer: ['opt-heldout-folds', 'opt-tradeoff-report'],
+        explanation: {
+          en: 'Choose alpha by comparing candidate values with held-out validation evidence, then report the relevant trade-off among error, stability, and sparsity. A training-only preference or a universally largest alpha does not supply that evidence.',
+          vi: 'Chọn alpha bằng cách so sánh giá trị ứng viên với bằng chứng validation giữ lại, rồi báo cáo đánh đổi liên quan giữa lỗi, độ ổn định và tính thưa. Ưu tiên chỉ từ train hoặc alpha lớn nhất phổ quát không cung cấp bằng chứng đó.',
+        },
+        hints: [
+          {
+            en: 'Choose evaluation practices, not a fixed answer.',
+            vi: 'Chọn thực hành đánh giá, không phải đáp án cố định.',
+          },
+          {
+            en: 'Model selection needs a comparison and a reported consequence.',
+            vi: 'Chọn mô hình cần so sánh và hậu quả được báo cáo.',
+          },
+        ],
+        options: [
+          {
+            optionId: 'opt-heldout-folds',
+            text: {
+              en: 'Compare candidate alpha values on held-out folds',
+              vi: 'So sánh alpha ứng viên trên các fold giữ lại',
+            },
+          },
+          {
+            optionId: 'opt-tradeoff-report',
+            text: {
+              en: 'Report the error, stability, and sparsity trade-off',
+              vi: 'Báo cáo đánh đổi lỗi, độ ổn định và tính thưa',
+            },
+          },
+          {
+            optionId: 'opt-largest-alpha',
+            text: { en: 'Always choose the largest alpha', vi: 'Luôn chọn alpha lớn nhất' },
+          },
+          {
+            optionId: 'opt-train-only',
+            text: { en: 'Choose from one training fit only', vi: 'Chọn chỉ từ một độ khớp train' },
+          },
+        ],
+        prompt: {
+          en: 'Which two practices give evidence for selecting a regularization strength?',
+          vi: 'Hai thực hành nào cung cấp bằng chứng để chọn độ regularization?',
+        },
+        questionId: 'q-cml-m03-alpha-selection-evidence',
+        sourceId: 'quiz-module-cml-m03-q06',
+        sourceIds: CML_M03_SOURCE_IDS,
+        type: 'multiple-choice',
+      },
+    ],
+  },
 };
 
 function createGeneratedPostQuiz(post: ReleaseLearningPost, module: ReleaseLearningModule) {
@@ -2675,16 +3069,6 @@ interface PostQuizDraftDefinition {
 }
 
 const postQuizDraftDefinitions: Readonly<Record<string, PostQuizDraftDefinition>> = {
-  'cml-p05-regularization-ridge-lasso': {
-    coreMove: {
-      en: 'Use regularisation to favour stable coefficients when signals overlap or contain noise.',
-      vi: 'Dùng regularization để ưu tiên hệ số ổn định khi tín hiệu chồng chéo hoặc có nhiễu.',
-    },
-    trueAssertion: {
-      en: 'Ridge shrinks related coefficients, while Lasso can set a weak redundant coefficient to zero.',
-      vi: 'Ridge thu nhỏ hệ số liên quan, còn Lasso có thể đưa hệ số dư yếu về không.',
-    },
-  },
   'cml-p06-logistic-regression': {
     coreMove: {
       en: 'Read a probability estimate before deciding which threshold should trigger an action.',
