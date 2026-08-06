@@ -1,5 +1,5 @@
 import { ArrowLeft, RotateCcw, Square, Zap } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
@@ -206,7 +206,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     return () => controller.dispose();
   }, [controller]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const activePairKey = selectedRegistration ? getRegistrationKey(selectedRegistration) : null;
 
     if (previousActivePairKeyRef.current === activePairKey) {
