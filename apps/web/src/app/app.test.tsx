@@ -2187,6 +2187,11 @@ describe('public learning journey', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: /draft/i }));
+    expect(
+      await screen.findByText(
+        'Chỉ demo trên Emulator cục bộ. Thao tác này không phê duyệt publish production.',
+      ),
+    ).toBeVisible();
     await user.click(await screen.findByRole('button', { name: /Validate draft|Kiểm tra draft/i }));
     expect(await screen.findByText(/Draft passed validation|Draft đã qua kiểm tra/i)).toBeVisible();
     await user.clear(screen.getByLabelText(/Lifecycle reason|Lý do lifecycle/i));
@@ -2203,6 +2208,7 @@ describe('public learning journey', () => {
     expect(publishAdminContentRevision).toHaveBeenCalledWith({
       idToken: 'local-id-token',
       idempotencyKey: expect.any(String),
+      publicationScope: 'emulator-demo',
       reason: 'Reviewed localized draft copy for pilot release.',
       revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
     });

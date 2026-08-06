@@ -2239,6 +2239,16 @@ a {
   gap: 14px;
 }
 
+.admin-content-emulator-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .admin-content-lifecycle-form label {
   display: grid;
   color: var(--ink);

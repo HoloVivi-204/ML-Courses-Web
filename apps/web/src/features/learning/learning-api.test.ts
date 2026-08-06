@@ -263,6 +263,47 @@ describe('fetch learning API client', () => {
     });
   });
 
+  it('sends the explicit local Emulator scope when publishing an Admin draft', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            content: {},
+          },
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+
+    await client.publishAdminContentRevision({
+      idToken: 'local-admin-id-token',
+      idempotencyKey: 'publish-draft-local-01',
+      publicationScope: 'emulator-demo',
+      reason: 'Verify the local learner revision.',
+      revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/publish',
+      {
+        body: JSON.stringify({
+          publicationScope: 'emulator-demo',
+          reason: 'Verify the local learner revision.',
+        }),
+        headers: {
+          authorization: 'Bearer local-admin-id-token',
+          'content-type': 'application/json',
+          'idempotency-key': 'publish-draft-local-01',
+        },
+        method: 'POST',
+      },
+    );
+  });
+
   it('deletes the authenticated learner account with the owner bearer token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
 

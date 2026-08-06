@@ -231,6 +231,11 @@ const resources = {
         'Draft save failed. Reload if another edit changed this revision.',
       'admin.content.lifecycle': 'Lifecycle',
       'admin.content.lifecycleReason': 'Lifecycle reason',
+      'admin.content.publicationScope': 'Publication scope',
+      'admin.content.publicationScope.emulator-demo': 'Local Emulator demo only',
+      'admin.content.publicationScope.publish-quality': 'Publish-quality',
+      'admin.content.emulatorDemoOnly':
+        'Local Emulator demo only. This does not approve production publication.',
       'admin.content.validateDraft': 'Validate draft',
       'admin.content.validatingDraft': 'Validating draft…',
       'admin.content.draftValid': 'Draft passed validation.',
@@ -577,6 +582,11 @@ const resources = {
         'Save draft thất bại. Reload nếu revision này vừa có edit khác.',
       'admin.content.lifecycle': 'Lifecycle',
       'admin.content.lifecycleReason': 'Lý do lifecycle',
+      'admin.content.publicationScope': 'Phạm vi publish',
+      'admin.content.publicationScope.emulator-demo': 'Chỉ demo trên Emulator cục bộ',
+      'admin.content.publicationScope.publish-quality': 'Đủ điều kiện publish-quality',
+      'admin.content.emulatorDemoOnly':
+        'Chỉ demo trên Emulator cục bộ. Thao tác này không phê duyệt publish production.',
       'admin.content.validateDraft': 'Kiểm tra draft',
       'admin.content.validatingDraft': 'Đang kiểm tra draft…',
       'admin.content.draftValid': 'Draft đã qua kiểm tra.',

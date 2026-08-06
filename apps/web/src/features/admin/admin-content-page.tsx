@@ -315,6 +315,7 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
     const publishedContent = await learningApiClient.publishAdminContentRevision({
       idToken,
       idempotencyKey: createIdempotencyKey(),
+      publicationScope: 'emulator-demo',
       reason,
       revisionId: draft.draftRevisionId,
     });
@@ -519,6 +520,12 @@ function ContentPreview({
             <code>{item.publishedRevisionId}</code>
           </dd>
         </div>
+        {item.publicationScope ? (
+          <div>
+            <dt>{t('admin.content.publicationScope')}</dt>
+            <dd>{t(`admin.content.publicationScope.${item.publicationScope}`)}</dd>
+          </div>
+        ) : null}
         {item.previousPublishedRevisionId ? (
           <div>
             <dt>{t('admin.content.previousRevision')}</dt>
@@ -740,6 +747,10 @@ function DraftLifecyclePanel({
         <CheckCircle2 aria-hidden="true" size={18} />
         <h3>{t('admin.content.lifecycle')}</h3>
       </div>
+
+      <p className="admin-content-emulator-notice" role="note">
+        {t('admin.content.emulatorDemoOnly')}
+      </p>
 
       <label>
         <span>{t('admin.content.lifecycleReason')}</span>

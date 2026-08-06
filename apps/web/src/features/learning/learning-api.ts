@@ -272,6 +272,7 @@ export interface LearningProgressSnapshot {
 }
 
 export type AdminContentEntityType = 'course' | 'demo' | 'module' | 'post' | 'quiz';
+export type AdminContentPublicationScope = 'emulator-demo' | 'publish-quality';
 
 export interface AdminContentMetadata {
   attribution: {
@@ -302,6 +303,7 @@ export interface AdminContentSummary {
   localeAvailability: ReadonlyArray<'en' | 'vi'>;
   moduleId?: string | undefined;
   postId?: string | undefined;
+  publicationScope?: AdminContentPublicationScope | undefined;
   previousPublishedRevisionId?: string | null | undefined;
   preview: {
     en: string;
@@ -424,6 +426,7 @@ export interface AdminContentDraftRevisionInput {
 
 export interface AdminContentPublishRevisionInput extends AdminContentDraftRevisionInput {
   idempotencyKey: string;
+  publicationScope: AdminContentPublicationScope;
   reason: string;
 }
 
@@ -980,10 +983,16 @@ export function createFetchLearningApiClient(
 
       return data.draft;
     },
-    async publishAdminContentRevision({ idToken, idempotencyKey, reason, revisionId }) {
+    async publishAdminContentRevision({
+      idToken,
+      idempotencyKey,
+      publicationScope,
+      reason,
+      revisionId,
+    }) {
       const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
         await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/publish`, {
-          body: JSON.stringify({ reason }),
+          body: JSON.stringify({ publicationScope, reason }),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
