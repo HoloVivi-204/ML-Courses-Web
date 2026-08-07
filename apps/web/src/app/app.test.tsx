@@ -1379,6 +1379,45 @@ describe('public learning journey', () => {
     expect(window.location.pathname).toBe('/profile');
   });
 
+  it('loads and saves the learner profile preferences without copying Auth email to profile data', async () => {
+    window.history.pushState({}, '', '/profile');
+    const profile = {
+      ...createLearnerProfileFixture(),
+      createdAt: '2026-07-19T14:00:00.000Z',
+    };
+    const updatePreferences = vi.fn().mockResolvedValue({
+      ...profile,
+      locale: 'en' as const,
+      theme: 'dark' as const,
+    });
+    const learningApiClient = createLearningApiClient({
+      bootstrapProfile: vi.fn().mockResolvedValue(profile),
+      updatePreferences,
+    });
+    const user = userEvent.setup();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Local Student')).toBeVisible();
+    expect(screen.getByText('learner@example.test')).toBeVisible();
+
+    const selects = screen.getAllByRole('combobox');
+    expect(selects).toHaveLength(2);
+    await user.selectOptions(selects[0]!, 'en');
+    await user.selectOptions(selects[1]!, 'dark');
+    await user.click(screen.getByRole('button', { name: 'Lưu tùy chọn' }));
+
+    await waitFor(() =>
+      expect(updatePreferences).toHaveBeenCalledWith({
+        idToken: 'local-id-token',
+        locale: 'en',
+        theme: 'dark',
+      }),
+    );
+  });
+
   it('shows a safe not-found state for an unknown course', () => {
     window.history.pushState({}, '', '/courses/not-a-course');
 
@@ -1777,7 +1816,7 @@ describe('public learning journey', () => {
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
     expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
       idToken: 'local-id-token',
-      scenarioId: 'pg-xor',
+      limit: 12,
     });
   });
 
@@ -3690,7 +3729,10 @@ describe('public learning journey', () => {
       createQuizAttempt,
       getProgress,
       listPlaygroundConfigs: vi.fn(async () => [...savedConfigs.values()]),
-      listPlaygroundRuns: vi.fn(async () => [...savedRuns.values()]),
+      listPlaygroundRuns: vi.fn(async () => ({
+        nextCursor: null,
+        runs: [...savedRuns.values()],
+      })),
       savePlaygroundRun,
       submitQuizAttempt,
     });

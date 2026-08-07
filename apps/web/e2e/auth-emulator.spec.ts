@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 const runAuthEmulatorE2e = process.env.RUN_AUTH_EMULATOR_E2E === 'true';
@@ -7,7 +8,13 @@ const AUTH_EMULATOR_READY_URL =
   'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects?key=local-emulator-api-key';
 const API_EMULATOR_HEALTH_URL =
   'http://127.0.0.1:5001/demo-ml-learning-local/asia-southeast1/api/api/v1/health';
+const AUTH_SIGN_UP_URL = AUTH_EMULATOR_READY_URL.replace(
+  '/v1/projects?',
+  '/v1/accounts:signUp?',
+);
 const EMULATOR_FLOW_TIMEOUT_MS = 30_000;
+const configuredLocalAdminEmail = process.env.LOCAL_DEMO_ADMIN_EMAIL?.trim();
+const configuredLocalAdminPassword = process.env.LOCAL_DEMO_ADMIN_PASSWORD?.trim();
 
 async function areLocalAuthDependenciesReady(): Promise<boolean> {
   try {
@@ -148,8 +155,97 @@ test.describe('Firebase local Emulator journey', () => {
     await expect(page.getByText('Perceptron đã mở')).toBeVisible();
     await expect(page.getByText(savedRunIdText)).toBeVisible();
     await expect(page.getByText('client-computed', { exact: true })).toBeVisible();
+
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
+
+    await page.goto('/profile');
+    await expect(page.locator('main.profile-page')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await expect(page.locator('#profile-locale')).toHaveValue('vi');
+    await expect(page.locator('#profile-theme')).toHaveValue('system');
+    await page.locator('#profile-locale').selectOption('en');
+    await page.locator('#profile-theme').selectOption('dark');
+    await page.locator('.profile-preferences-form button[type="submit"]').click();
+    await expect(page.locator('.profile-success')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await expect(page.locator('#profile-locale')).toHaveValue('en');
+    await expect(page.locator('#profile-theme')).toHaveValue('dark');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
+
+    await page.reload();
+    await expect(page.locator('#profile-locale')).toHaveValue('en');
+    await expect(page.locator('#profile-theme')).toHaveValue('dark');
+  });
+
+  test('renders an Emulator-backed Admin report for the configured local admin', async ({
+    page,
+  }) => {
+    test.skip(
+      !configuredLocalAdminEmail || !configuredLocalAdminPassword,
+      'Set LOCAL_DEMO_ADMIN_EMAIL and LOCAL_DEMO_ADMIN_PASSWORD to exercise the local Admin report journey.',
+    );
+    test.setTimeout(60_000);
+
+    const authResponse = await fetch(AUTH_SIGN_UP_URL, {
+      body: JSON.stringify({
+        email: configuredLocalAdminEmail,
+        password: configuredLocalAdminPassword,
+        returnSecureToken: true,
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    if (!authResponse.ok) {
+      const authPayload = (await authResponse.json()) as { error?: { message?: string } };
+
+      expect(authPayload.error?.message).toBe('EMAIL_EXISTS');
+    }
+
+    await page.goto('/login');
+    await page.locator('#auth-email').fill(configuredLocalAdminEmail ?? '');
+    await page.locator('#auth-password').fill(configuredLocalAdminPassword ?? '');
+    await page.locator('.auth-submit').click();
+    await expect(page).toHaveURL('/', { timeout: EMULATOR_FLOW_TIMEOUT_MS });
+
+    await page.goto('/admin/reports');
+    await expect(page.locator('main.admin-reports-page')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await expect(page.locator('.admin-report-panel-verified')).toBeVisible();
+    await expect(page.locator('.admin-report-panel-client')).toBeVisible();
+    await expect(page.getByText(/server-verified/)).toBeVisible();
+    await expect(page.getByText('client-computed', { exact: true })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
   });
 });
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const layout = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  }));
+
+  expect(layout.overflow).toBe(0);
+}
+
+async function expectNoWcagViolations(page: Page) {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+
+  expect(
+    results.violations.map((violation) => ({
+      id: violation.id,
+      nodes: violation.nodes.map((node) => node.target.join(' ')),
+    })),
+  ).toEqual([]);
+}
 
 async function viewAllRequiredPostBlocks(page: Page) {
   const blocks = page.locator('[data-content-block-id]');

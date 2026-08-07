@@ -40,7 +40,10 @@ interface FakeTransaction {
   ): void;
 }
 
-function createFakeFirestore(initialDocuments: Record<string, Record<string, unknown>> = {}) {
+function createFakeFirestore(
+  initialDocuments: Record<string, Record<string, unknown>> = {},
+  options: { rejectListDocuments?: boolean } = {},
+) {
   const documents = new Map<string, Record<string, unknown>>(Object.entries(initialDocuments));
   const firestore = {
     batch() {
@@ -61,6 +64,10 @@ function createFakeFirestore(initialDocuments: Record<string, Record<string, unk
       return {
         path,
         async listDocuments() {
+          if (options.rejectListDocuments) {
+            throw new Error('Unbounded listDocuments calls are not allowed in progress reads.');
+          }
+
           const prefix = `${path}/`;
 
           return [...documents.keys()]
@@ -1247,6 +1254,135 @@ describe('Firestore learning repository', () => {
       contentType: 'post',
       entityId: 'cml-p03-linear-regression',
     });
+  });
+
+  it('returns progress for every enrolled course instead of selecting the first enrollment', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/enrollments/course-classical-ml': {
+        courseId: 'course-classical-ml',
+        progressPercent: 11,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/enrollments/course-deep-learning-basic': {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 33,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/moduleProgress/cml-m01-foundations': {
+        courseId: 'course-classical-ml',
+        moduleId: 'cml-m01-foundations',
+        overviewViewed: true,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/postViews/cml-p01-problem-data-types': {
+        contentViewed: true,
+        postId: 'cml-p01-problem-data-types',
+        schemaVersion: 1,
+        started: true,
+      },
+      'users/learner-01/moduleProgress/dl-m01-neuron-perceptron': {
+        courseId: 'course-deep-learning-basic',
+        moduleId: 'dl-m01-neuron-perceptron',
+        overviewViewed: true,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/postViews/dl-p01-neuron-perceptron': {
+        contentViewed: true,
+        postId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+        started: true,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.getProgress({ uid: 'learner-01' });
+
+    expect(result.data.courses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          courseId: 'course-classical-ml',
+          progressPercent: 11,
+          modules: expect.arrayContaining([
+            expect.objectContaining({ moduleId: 'cml-m01-foundations', status: 'in-progress' }),
+          ]),
+          posts: expect.arrayContaining([
+            expect.objectContaining({ postId: 'cml-p01-problem-data-types', started: true }),
+          ]),
+        }),
+        expect.objectContaining({
+          courseId: 'course-deep-learning-basic',
+          progressPercent: 33,
+          modules: expect.arrayContaining([
+            expect.objectContaining({
+              moduleId: 'dl-m01-neuron-perceptron',
+              status: 'in-progress',
+            }),
+          ]),
+          posts: expect.arrayContaining([
+            expect.objectContaining({ postId: 'dl-p01-neuron-perceptron', started: true }),
+          ]),
+        }),
+      ]),
+    );
+    expect(result.data.courses).toHaveLength(2);
+  });
+
+  it('reads progress from bounded stable release IDs instead of listing the owner collections', async () => {
+    const { firestore } = createFakeFirestore(
+      {
+        'users/learner-01/enrollments/course-deep-learning-basic': {
+          courseId: 'course-deep-learning-basic',
+          progressPercent: 0,
+          schemaVersion: 1,
+          status: 'in-progress',
+        },
+      },
+      { rejectListDocuments: true },
+    );
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.getProgress({ uid: 'learner-01' });
+
+    expect(result.data.courses).toHaveLength(1);
+    expect(result.data.courses[0]?.courseId).toBe('course-deep-learning-basic');
+  });
+
+  it('honors stored module completion state when rebuilding the course snapshot', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/enrollments/course-deep-learning-basic': {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 0,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-01/moduleProgress/dl-m01-neuron-perceptron': {
+        completedStepCount: 4,
+        progressPercent: 100,
+        requiredStepCount: 4,
+        status: 'completed',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.getProgress({ uid: 'learner-01' });
+    const course = result.data.courses.find(
+      (candidate) => candidate.courseId === 'course-deep-learning-basic',
+    );
+
+    expect(course?.modules).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          completedStepCount: 4,
+          moduleId: 'dl-m01-neuron-perceptron',
+          progressPercent: 100,
+          status: 'completed',
+        }),
+      ]),
+    );
   });
 
   it('does not expose revision-pinned content access documents in progress snapshots', async () => {

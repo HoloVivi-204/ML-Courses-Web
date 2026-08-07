@@ -4,15 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
+import { courses, localize, type Locale } from '../catalog/course-data';
 import type { AdminReportSummary, LearningApiClient } from '../learning/learning-api';
 
 interface AdminReportsPageProps {
   learningApiClient: LearningApiClient;
+  locale: Locale;
 }
 
 type AdminReportsStatus = 'failed' | 'loading' | 'ready';
 
-export function AdminReportsPage({ learningApiClient }: AdminReportsPageProps) {
+export function AdminReportsPage({ learningApiClient, locale }: AdminReportsPageProps) {
   const { t } = useTranslation();
   const { getIdToken } = useAuth();
   const [reportSummary, setReportSummary] = useState<AdminReportSummary | null>(null);
@@ -84,13 +86,17 @@ export function AdminReportsPage({ learningApiClient }: AdminReportsPageProps) {
         </div>
         <div className="admin-report-generated">
           <BarChart3 aria-hidden="true" size={21} />
-          <span>{t('admin.reports.generatedAt', { generatedAt: reportSummary.generatedAt })}</span>
+          <span>
+            {t('admin.reports.generatedAt', {
+              generatedAt: formatGeneratedAt(reportSummary.generatedAt, locale),
+            })}
+          </span>
         </div>
       </section>
 
       <div className="admin-report-grid">
-        <LearningVerifiedReport reportSummary={reportSummary} />
-        <PlaygroundClientReportedPanel reportSummary={reportSummary} />
+        <LearningVerifiedReport locale={locale} reportSummary={reportSummary} />
+        <PlaygroundClientReportedPanel locale={locale} reportSummary={reportSummary} />
       </div>
 
       <section className="admin-report-lifecycle" aria-label={t('admin.reports.lifecycleTitle')}>
@@ -98,9 +104,12 @@ export function AdminReportsPage({ learningApiClient }: AdminReportsPageProps) {
         <strong>{t('admin.reports.lifecycleTitle')}</strong>
         <span>
           {t('admin.reports.lifecycleCounts', {
-            draftCount: reportSummary.contentLifecycle.draftCount,
-            publishedCount: reportSummary.contentLifecycle.publishedCount,
-            validationPendingCount: reportSummary.contentLifecycle.validationPendingCount,
+            draftCount: formatCount(reportSummary.contentLifecycle.draftCount, locale),
+            publishedCount: formatCount(reportSummary.contentLifecycle.publishedCount, locale),
+            validationPendingCount: formatCount(
+              reportSummary.contentLifecycle.validationPendingCount,
+              locale,
+            ),
           })}
         </span>
       </section>
@@ -108,7 +117,13 @@ export function AdminReportsPage({ learningApiClient }: AdminReportsPageProps) {
   );
 }
 
-function LearningVerifiedReport({ reportSummary }: { reportSummary: AdminReportSummary }) {
+function LearningVerifiedReport({
+  locale,
+  reportSummary,
+}: {
+  locale: Locale;
+  reportSummary: AdminReportSummary;
+}) {
   const { t } = useTranslation();
   const learning = reportSummary.learningVerified;
 
@@ -118,18 +133,29 @@ function LearningVerifiedReport({ reportSummary }: { reportSummary: AdminReportS
         <ShieldCheck aria-hidden="true" size={22} />
         <div>
           <h2>{t('admin.reports.learning.title')}</h2>
-          <p>{t('admin.reports.learning.learnerCount', { count: learning.learnerCount })}</p>
+          <p>
+            {t('admin.reports.learning.learnerCount', {
+              count: formatCount(learning.learnerCount, locale),
+            })}
+          </p>
         </div>
       </div>
 
       <ul className="admin-report-list">
         {learning.courseProgress.map((courseProgress) => (
           <li key={courseProgress.courseId}>
-            <strong>{courseProgress.courseId}</strong>
-            <span>{t('admin.reports.learning.courseCounts', courseProgress)}</span>
+            <strong>{getCourseLabel(courseProgress.courseId, locale)}</strong>
+            <small>{courseProgress.courseId}</small>
+            <span>
+              {t('admin.reports.learning.courseCounts', {
+                completedCount: formatCount(courseProgress.completedCount, locale),
+                enrolledCount: formatCount(courseProgress.enrolledCount, locale),
+                startedCount: formatCount(courseProgress.startedCount, locale),
+              })}
+            </span>
             <span>
               {t('admin.reports.learning.averageProgress', {
-                percent: formatPercentNumber(courseProgress.averageProgressPercent),
+                percent: formatPercentNumber(courseProgress.averageProgressPercent, locale),
               })}
             </span>
           </li>
@@ -139,13 +165,13 @@ function LearningVerifiedReport({ reportSummary }: { reportSummary: AdminReportS
       <div className="admin-report-metric-row">
         <p>
           {t('admin.reports.learning.quizAverage', {
-            percent: formatPercentNumber(learning.quizSummary.averageScorePercent),
+            percent: formatPercentNumber(learning.quizSummary.averageScorePercent, locale),
           })}
         </p>
         <p>
           {t('admin.reports.learning.quizAttempts', {
-            passedAttemptCount: learning.quizSummary.passedAttemptCount,
-            totalAttemptCount: learning.quizSummary.totalAttemptCount,
+            passedAttemptCount: formatCount(learning.quizSummary.passedAttemptCount, locale),
+            totalAttemptCount: formatCount(learning.quizSummary.totalAttemptCount, locale),
           })}
         </p>
       </div>
@@ -157,7 +183,7 @@ function LearningVerifiedReport({ reportSummary }: { reportSummary: AdminReportS
             <span>
               {t('admin.reports.learning.wrongQuestion', {
                 questionId: question.questionId,
-                wrongCount: question.wrongCount,
+                wrongCount: formatCount(question.wrongCount, locale),
               })}
             </span>
           </li>
@@ -169,16 +195,45 @@ function LearningVerifiedReport({ reportSummary }: { reportSummary: AdminReportS
           <li key={unlock.algorithmId}>
             {t('admin.reports.learning.unlockCount', {
               algorithm: formatAlgorithmName(unlock.algorithmId),
-              count: unlock.unlockedLearnerCount,
+              count: formatCount(unlock.unlockedLearnerCount, locale),
             })}
           </li>
         ))}
       </ul>
+
+      <ReportProgressTable
+        label={t('admin.reports.learning.moduleProgressTitle')}
+        locale={locale}
+        rows={learning.moduleProgress.map((moduleProgress) => ({
+          completedCount: moduleProgress.completedCount,
+          id: moduleProgress.moduleId,
+          label: getModuleLabel(moduleProgress.moduleId, locale),
+          rate: moduleProgress.completionRate,
+          startedCount: moduleProgress.startedCount,
+        }))}
+      />
+      <ReportProgressTable
+        label={t('admin.reports.learning.postProgressTitle')}
+        locale={locale}
+        rows={learning.postProgress.map((postProgress) => ({
+          completedCount: postProgress.completedCount,
+          id: postProgress.postId,
+          label: getPostLabel(postProgress.postId, locale),
+          rate: postProgress.completionRate,
+          startedCount: postProgress.startedCount,
+        }))}
+      />
     </section>
   );
 }
 
-function PlaygroundClientReportedPanel({ reportSummary }: { reportSummary: AdminReportSummary }) {
+function PlaygroundClientReportedPanel({
+  locale,
+  reportSummary,
+}: {
+  locale: Locale;
+  reportSummary: AdminReportSummary;
+}) {
   const { t } = useTranslation();
   const playground = reportSummary.playgroundClientReported;
 
@@ -190,8 +245,8 @@ function PlaygroundClientReportedPanel({ reportSummary }: { reportSummary: Admin
           <h2>{t('admin.reports.playground.title')}</h2>
           <p>
             {t('admin.reports.playground.runCounts', {
-              failedRunCount: playground.failedRunCount,
-              runCount: playground.runCount,
+              failedRunCount: formatCount(playground.failedRunCount, locale),
+              runCount: formatCount(playground.runCount, locale),
             })}
           </p>
         </div>
@@ -199,7 +254,9 @@ function PlaygroundClientReportedPanel({ reportSummary }: { reportSummary: Admin
 
       <div className="admin-report-metric-row">
         <p>
-          {t('admin.reports.playground.errorRate', { percent: formatRate(playground.errorRate) })}
+          {t('admin.reports.playground.errorRate', {
+            percent: formatRate(playground.errorRate, locale),
+          })}
         </p>
         <p>{playground.verificationLevel}</p>
       </div>
@@ -211,13 +268,13 @@ function PlaygroundClientReportedPanel({ reportSummary }: { reportSummary: Admin
             <span>
               {t('admin.reports.playground.scenarioActivity', {
                 algorithm: formatAlgorithmName(activity.algorithmId),
-                runCount: activity.runCount,
+                runCount: formatCount(activity.runCount, locale),
                 scenarioId: activity.scenarioId,
               })}
             </span>
             <span>
               {t('admin.reports.playground.failedRuns', {
-                failedRunCount: activity.failedRunCount,
+                failedRunCount: formatCount(activity.failedRunCount, locale),
               })}
             </span>
           </li>
@@ -228,17 +285,95 @@ function PlaygroundClientReportedPanel({ reportSummary }: { reportSummary: Admin
 }
 
 function formatAlgorithmName(algorithmId: string): string {
-  if (algorithmId === 'perceptron') {
-    return 'Perceptron';
-  }
-
-  return algorithmId;
+  return algorithmId
+    .split('-')
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
+    .join(' ');
 }
 
-function formatPercentNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
+function formatCount(value: number, locale: Locale): string {
+  return new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-US').format(value);
 }
 
-function formatRate(value: number): string {
-  return formatPercentNumber(Math.round(value * 100));
+function formatPercentNumber(value: number, locale: Locale): string {
+  return new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatRate(value: number, locale: Locale): string {
+  return formatPercentNumber(Math.round(value * 100), locale);
+}
+
+function formatGeneratedAt(value: string, locale: Locale): string {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(date);
+}
+
+function getCourseLabel(courseId: string, locale: Locale): string {
+  const course = courses.find((candidate) => candidate.id === courseId);
+
+  return course ? localize(course.title, locale) : courseId;
+}
+
+function getModuleLabel(moduleId: string, locale: Locale): string {
+  const module = courses
+    .flatMap((course) => course.modules ?? [])
+    .find((candidate) => candidate.id === moduleId);
+
+  return module ? localize(module.title, locale) : moduleId;
+}
+
+function getPostLabel(postId: string, locale: Locale): string {
+  const module = courses
+    .flatMap((course) => course.modules ?? [])
+    .find((candidate) => candidate.postIds.includes(postId));
+
+  return module ? `${localize(module.title, locale)} / ${postId}` : postId;
+}
+
+function ReportProgressTable({
+  label,
+  locale,
+  rows,
+}: {
+  label: string;
+  locale: Locale;
+  rows: ReadonlyArray<{
+    completedCount: number;
+    id: string;
+    label: string;
+    rate: number;
+    startedCount: number;
+  }>;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <section className="admin-report-progress-section" aria-label={label}>
+      <h3>{label}</h3>
+      <ul className="admin-report-list">
+        {rows.map((row) => (
+          <li key={row.id}>
+            <strong>{row.label}</strong>
+            <small>{row.id}</small>
+            <span>
+              {t('admin.reports.learning.progressCounts', {
+                completedCount: formatCount(row.completedCount, locale),
+                rate: formatRate(row.rate, locale),
+                startedCount: formatCount(row.startedCount, locale),
+              })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }

@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { FieldValue, getFirestore, Timestamp, type Firestore } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  getFirestore,
+  Timestamp,
+  type Firestore,
+  type Query,
+} from 'firebase-admin/firestore';
 
 import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
@@ -40,7 +46,9 @@ export interface SavePlaygroundRunInput {
 }
 
 export interface ListPlaygroundRunsInput {
-  scenarioId: string;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  scenarioId?: string | undefined;
   uid: string;
 }
 
@@ -117,6 +125,11 @@ export interface PlaygroundRunRecord {
   verificationLevel: 'client-computed';
 }
 
+export interface PlaygroundRunPage {
+  nextCursor: string | null;
+  runs: PlaygroundRunRecord[];
+}
+
 export interface PlaygroundConfigRecord {
   adapterVersion?: string;
   algorithmId: string;
@@ -160,7 +173,7 @@ export interface PlaygroundRepository {
     statusCode: 200;
   }>;
   listRuns(input: ListPlaygroundRunsInput): Promise<{
-    data: { runs: PlaygroundRunRecord[] };
+    data: PlaygroundRunPage;
     statusCode: 200;
   }>;
   saveRun(input: SavePlaygroundRunInput): Promise<{
@@ -213,7 +226,9 @@ interface StoredPlaygroundRunDocument {
   chartSummary?: unknown;
   config?: unknown;
   configSchemaVersion?: unknown;
+  createdAt?: unknown;
   createdAtIso?: unknown;
+  createdAtMillis?: unknown;
   datasetVersionId?: unknown;
   durationMs?: unknown;
   feedback?: unknown;
@@ -240,8 +255,15 @@ interface StoredPlaygroundConfigDocument {
 const RUN_SESSION_TTL_MS = 15 * 60 * 1_000;
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
 const RUN_RETENTION_LIMIT = 50;
+const RUN_PAGE_DEFAULT_LIMIT = 20;
+const RUN_PAGE_MAX_LIMIT = 50;
 const FIRESTORE_BATCH_DELETE_LIMIT = 450;
 const LEARNER_PLAYGROUND_SUBCOLLECTIONS = ['playgroundConfigs', 'playgroundRuns'] as const;
+
+interface PlaygroundRunsCursor {
+  createdAtMillis: number;
+  runId: string;
+}
 
 function createExpiresAt(): { expiresAt: Timestamp; expiresAtIso: string } {
   const expiresAt = Timestamp.fromMillis(Date.now() + RUN_SESSION_TTL_MS);
@@ -478,6 +500,77 @@ function getTimestampMillis(value: unknown): number | null {
   }
 
   return null;
+}
+
+function getStoredRunCreatedAtMillis(data: unknown): number | null {
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  if (typeof data.createdAtMillis === 'number' && Number.isFinite(data.createdAtMillis)) {
+    return data.createdAtMillis;
+  }
+
+  const timestampMillis = getTimestampMillis(data.createdAt);
+
+  if (timestampMillis !== null) {
+    return timestampMillis;
+  }
+
+  if (typeof data.createdAtIso === 'string') {
+    const parsedMillis = Date.parse(data.createdAtIso);
+
+    return Number.isFinite(parsedMillis) ? parsedMillis : null;
+  }
+
+  return null;
+}
+
+function normalizeRunPageLimit(limit: number | undefined): number {
+  if (limit === undefined) {
+    return RUN_PAGE_DEFAULT_LIMIT;
+  }
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > RUN_PAGE_MAX_LIMIT) {
+    throw new ApiError(
+      400,
+      'PLAYGROUND_RUN_PAGE_INVALID',
+      `limit must be an integer between 1 and ${RUN_PAGE_MAX_LIMIT}.`,
+    );
+  }
+
+  return limit;
+}
+
+function encodePlaygroundRunsCursor(cursor: PlaygroundRunsCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodePlaygroundRunsCursor(cursor: string | undefined): PlaygroundRunsCursor | null {
+  if (cursor === undefined) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
+
+    if (
+      !isRecord(parsed) ||
+      typeof parsed.createdAtMillis !== 'number' ||
+      !Number.isFinite(parsed.createdAtMillis) ||
+      typeof parsed.runId !== 'string' ||
+      !parsed.runId
+    ) {
+      throw new Error('Invalid cursor shape.');
+    }
+
+    return {
+      createdAtMillis: parsed.createdAtMillis,
+      runId: parsed.runId,
+    };
+  } catch {
+    throw new ApiError(400, 'PLAYGROUND_RUN_CURSOR_INVALID', 'cursor is invalid.');
+  }
 }
 
 async function listLearnerPlaygroundDocumentRefs(
@@ -787,10 +880,8 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
     const unpinnedRunDocs = snapshot.docs
       .filter((doc) => doc.data().isPinned !== true)
       .sort((left, right) => {
-        const leftMillis =
-          getTimestampMillis(left.data().createdAt) ?? left.data().createdAtMillis ?? 0;
-        const rightMillis =
-          getTimestampMillis(right.data().createdAt) ?? right.data().createdAtMillis ?? 0;
+        const leftMillis = getStoredRunCreatedAtMillis(left.data()) ?? 0;
+        const rightMillis = getStoredRunCreatedAtMillis(right.data()) ?? 0;
 
         return Number(rightMillis) - Number(leftMillis);
       });
@@ -1035,21 +1126,46 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
       };
     },
     async listRuns(input) {
-      assertSupportedPlaygroundScenario(input.scenarioId);
+      if (input.scenarioId !== undefined) {
+        assertSupportedPlaygroundScenario(input.scenarioId);
+      }
 
-      const snapshot = await firestore
-        .collection(`users/${input.uid}/playgroundRuns`)
-        .where('scenarioId', '==', input.scenarioId)
-        .get();
-      const runs = snapshot.docs
+      const pageLimit = normalizeRunPageLimit(input.limit);
+      const cursor = decodePlaygroundRunsCursor(input.cursor);
+      let query: Query = firestore.collection(`users/${input.uid}/playgroundRuns`);
+
+      if (input.scenarioId !== undefined) {
+        query = query.where('scenarioId', '==', input.scenarioId);
+      }
+
+      query = query.orderBy('createdAt', 'desc').orderBy('runId', 'desc');
+
+      if (cursor !== null) {
+        query = query.startAfter(Timestamp.fromMillis(cursor.createdAtMillis), cursor.runId);
+      }
+
+      const snapshot = await query.limit(pageLimit + 1).get();
+      const pageDocs = snapshot.docs.slice(0, pageLimit);
+      const runs = pageDocs
         .map((doc) => toRunRecord(doc.id, doc.data()))
-        .filter((run): run is PlaygroundRunRecord => run !== null)
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-        .slice(0, RUN_RETENTION_LIMIT);
+        .filter((run): run is PlaygroundRunRecord => run !== null);
+      const lastDoc = pageDocs.at(-1);
+      const lastCreatedAtMillis = lastDoc ? getStoredRunCreatedAtMillis(lastDoc.data()) : null;
+      const lastRunId = lastDoc?.data()?.runId;
+      const hasNextPage = snapshot.docs.length > pageLimit;
 
       return {
         statusCode: 200 as const,
-        data: { runs },
+        data: {
+          nextCursor:
+            hasNextPage && lastCreatedAtMillis !== null && typeof lastRunId === 'string'
+              ? encodePlaygroundRunsCursor({
+                  createdAtMillis: lastCreatedAtMillis,
+                  runId: lastRunId,
+                })
+              : null,
+          runs,
+        },
       };
     },
     async saveRun(input) {
@@ -1167,7 +1283,6 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           note: null,
           createdAt: FieldValue.serverTimestamp(),
           createdAtIso,
-          createdAtMillis: nowMillis,
         });
         transaction.set(
           sessionRef,

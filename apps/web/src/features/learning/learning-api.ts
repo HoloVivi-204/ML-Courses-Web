@@ -8,6 +8,7 @@ export type LearnerThemePreference = 'dark' | 'light' | 'system';
 
 export interface LearnerProfile {
   avatarUrl: string | null;
+  createdAt?: string | undefined;
   displayName: string;
   locale: LearnerLocalePreference;
   schemaVersion: 1;
@@ -224,6 +225,51 @@ export interface QuizSubmissionResult {
   score: number;
 }
 
+export interface LearningModuleProgress {
+  completedStepCount: number;
+  moduleId: string;
+  overviewViewed: boolean;
+  progressPercent: number;
+  requiredStepCount: number;
+  status: 'completed' | 'in-progress' | 'locked';
+}
+
+export interface LearningPostProgress {
+  bestScore: number;
+  completed: boolean;
+  contentViewed: boolean;
+  postId: string;
+  quizId: string;
+  quizPassed: boolean;
+  readingPosition: string | null;
+  started: boolean;
+  viewedItemIds: readonly string[];
+}
+
+export interface LearningQuizProgress {
+  attemptCount: number;
+  bestScore: number;
+  passed: boolean;
+  quizId: string;
+  quizKind: 'module' | 'post';
+}
+
+export interface LearningDemoProgress {
+  completed: boolean;
+  demoId: string;
+  started: boolean;
+}
+
+export interface LearningCourseProgress {
+  courseId: string;
+  demos: ReadonlyArray<LearningDemoProgress>;
+  modules: ReadonlyArray<LearningModuleProgress>;
+  posts: ReadonlyArray<LearningPostProgress>;
+  progressPercent: number;
+  quizzes: ReadonlyArray<LearningQuizProgress>;
+  status: 'completed' | 'in-progress' | 'not-enrolled';
+}
+
 export interface LearningProgressSnapshot {
   algorithmUnlocks: ReadonlyArray<{
     algorithmId: string;
@@ -233,42 +279,16 @@ export interface LearningProgressSnapshot {
     contentType: 'demo' | 'module' | 'post';
     entityId: string;
   }>;
-  demos: ReadonlyArray<{
-    completed: boolean;
-    demoId: string;
-    started?: boolean | undefined;
-  }>;
+  courses?: ReadonlyArray<LearningCourseProgress> | undefined;
+  demos: ReadonlyArray<LearningDemoProgress>;
   enrollment: {
     courseId: string;
     progressPercent: number;
     status: 'completed' | 'in-progress' | 'not-enrolled';
   };
-  modules: ReadonlyArray<{
-    completedStepCount: number;
-    moduleId: string;
-    overviewViewed?: boolean | undefined;
-    progressPercent: number;
-    requiredStepCount: number;
-    status: 'completed' | 'in-progress' | 'locked';
-  }>;
-  posts: ReadonlyArray<{
-    bestScore: number;
-    completed: boolean;
-    contentViewed?: boolean | undefined;
-    postId: string;
-    quizId: string;
-    quizPassed: boolean;
-    readingPosition?: string | null | undefined;
-    started?: boolean | undefined;
-    viewedItemIds?: readonly string[] | undefined;
-  }>;
-  quizzes: ReadonlyArray<{
-    attemptCount: number;
-    bestScore: number;
-    passed: boolean;
-    quizId: string;
-    quizKind: 'module' | 'post';
-  }>;
+  modules: ReadonlyArray<LearningModuleProgress>;
+  posts: ReadonlyArray<LearningPostProgress>;
+  quizzes: ReadonlyArray<LearningQuizProgress>;
 }
 
 export type AdminContentEntityType = 'course' | 'demo' | 'module' | 'post' | 'quiz';
@@ -481,6 +501,11 @@ export interface PlaygroundRunRecord {
   verificationLevel: 'client-computed';
 }
 
+export interface PlaygroundRunPage {
+  nextCursor: string | null;
+  runs: PlaygroundRunRecord[];
+}
+
 export interface PlaygroundConfigRecord {
   adapterVersion?: string | undefined;
   algorithmId: string;
@@ -591,9 +616,11 @@ export interface LearningApiClient {
     scenarioId: string;
   }): Promise<PlaygroundConfigRecord[]>;
   listPlaygroundRuns(input: {
+    cursor?: string | undefined;
     idToken: string;
-    scenarioId: string;
-  }): Promise<PlaygroundRunRecord[]>;
+    limit?: number | undefined;
+    scenarioId?: string | undefined;
+  }): Promise<PlaygroundRunPage>;
   savePlaygroundRun(input: {
     idToken: string;
     idempotencyKey: string;
@@ -1068,16 +1095,31 @@ export function createFetchLearningApiClient(
 
       return data.configs;
     },
-    async listPlaygroundRuns({ idToken, scenarioId }) {
-      const data = await readSuccessEnvelope<{ runs: PlaygroundRunRecord[] }>(
-        await fetch(`/api/v1/playground-runs?scenarioId=${encodeURIComponent(scenarioId)}`, {
+    async listPlaygroundRuns({ cursor, idToken, limit, scenarioId }) {
+      const query = new URLSearchParams();
+
+      if (scenarioId !== undefined) {
+        query.set('scenarioId', scenarioId);
+      }
+
+      if (limit !== undefined) {
+        query.set('limit', String(limit));
+      }
+
+      if (cursor !== undefined) {
+        query.set('cursor', cursor);
+      }
+
+      const queryString = query.toString();
+      const data = await readSuccessEnvelope<PlaygroundRunPage>(
+        await fetch(`/api/v1/playground-runs${queryString ? `?${queryString}` : ''}`, {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
         }),
       );
 
-      return data.runs;
+      return data;
     },
     async savePlaygroundRun({ idToken, idempotencyKey, result, sessionId }) {
       const data = await readSuccessEnvelope<{ run: PlaygroundRunRecord }>(

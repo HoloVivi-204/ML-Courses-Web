@@ -197,7 +197,12 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                 element={
                   <RequireAuthenticated>
                     <Suspense fallback={<TrialRouteLoading />}>
-                      <ProfilePage learningApiClient={learningClient} />
+                      <ProfilePage
+                        learningApiClient={learningClient}
+                        locale={locale}
+                        onProfilePreferencesLoaded={applyProfilePreferences}
+                        themePreference={themePreference}
+                      />
                     </Suspense>
                   </RequireAuthenticated>
                 }
@@ -217,7 +222,7 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                 element={
                   <RequireAuthenticated>
                     <Suspense fallback={<TrialRouteLoading />}>
-                      <AdminReportsPage learningApiClient={learningClient} />
+                      <AdminReportsPage learningApiClient={learningClient} locale={locale} />
                     </Suspense>
                   </RequireAuthenticated>
                 }

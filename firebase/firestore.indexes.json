@@ -1,4 +1,22 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "playgroundRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "runId", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "playgroundRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "scenarioId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "runId", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

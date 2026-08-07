@@ -112,6 +112,43 @@ describe('fetch learning API client', () => {
     });
   });
 
+  it('loads a bounded playground run page across scenarios with a cursor', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            nextCursor: 'next-cursor',
+            runs: [],
+          },
+        }),
+        {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    const result = await client.listPlaygroundRuns({
+      cursor: 'cursor+01',
+      idToken: 'local-id-token',
+      limit: 2,
+      scenarioId: 'pg-xor',
+    });
+
+    expect(result).toEqual({ nextCursor: 'next-cursor', runs: [] });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/playground-runs?scenarioId=pg-xor&limit=2&cursor=cursor%2B01',
+      {
+        headers: {
+          authorization: 'Bearer local-id-token',
+        },
+      },
+    );
+  });
+
   it('adds the App Check token to protected read requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

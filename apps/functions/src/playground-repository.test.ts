@@ -9,8 +9,10 @@ interface FakeDocumentReference {
 
 interface FakeCollectionReference {
   get(): Promise<FakeQuerySnapshot>;
+  limit(limit: number): FakeCollectionReference;
   orderBy(fieldPath: string, directionStr?: 'asc' | 'desc'): FakeCollectionReference;
   path: string;
+  startAfter(...values: unknown[]): FakeCollectionReference;
   where(fieldPath: string, opStr: '==', value: unknown): FakeCollectionReference;
 }
 
@@ -37,6 +39,7 @@ interface FakeTransaction {
 
 function createFakeFirestore(initialDocuments: Record<string, Record<string, unknown>> = {}) {
   const documents = new Map<string, Record<string, unknown>>(Object.entries(initialDocuments));
+  const queryLog: Array<{ limit: number | null; path: string }> = [];
   const firestore = {
     batch() {
       const deletes: string[] = [];
@@ -53,7 +56,7 @@ function createFakeFirestore(initialDocuments: Record<string, Record<string, unk
       };
     },
     collection(path: string): FakeCollectionReference {
-      return createCollectionReference(documents, path);
+      return createCollectionReference(documents, path, [], [], [], null, queryLog);
     },
     doc(path: string): FakeDocumentReference {
       return { path };
@@ -76,14 +79,22 @@ function createFakeFirestore(initialDocuments: Record<string, Record<string, unk
     },
   } as unknown as Firestore;
 
-  return { documents, firestore };
+  return { documents, firestore, queryLog };
+}
+
+interface FakeOrdering {
+  direction: 'asc' | 'desc';
+  fieldPath: string;
 }
 
 function createCollectionReference(
   documents: Map<string, Record<string, unknown>>,
   path: string,
   filters: ReadonlyArray<{ fieldPath: string; value: unknown }> = [],
-  ordering: { fieldPath: string; direction: 'asc' | 'desc' } | null = null,
+  ordering: ReadonlyArray<FakeOrdering> = [],
+  startAfterValues: ReadonlyArray<unknown> = [],
+  pageLimit: number | null = null,
+  queryLog: Array<{ limit: number | null; path: string }> = [],
 ): FakeCollectionReference {
   return {
     path,
@@ -98,22 +109,53 @@ function createCollectionReference(
         .filter(([, data]) => filters.every((filter) => data[filter.fieldPath] === filter.value))
         .map(([documentPath, data]) => createSnapshot(documentPath, data));
 
-      if (ordering) {
-        docs.sort((left, right) => {
-          const leftValue = getComparableValue(left.data()?.[ordering.fieldPath]);
-          const rightValue = getComparableValue(right.data()?.[ordering.fieldPath]);
-
-          return ordering.direction === 'asc' ? leftValue - rightValue : rightValue - leftValue;
-        });
+      if (ordering.length > 0) {
+        docs.sort((left, right) => compareOrderedDocuments(left.data(), right.data(), ordering));
       }
 
-      return { docs };
+      const pageDocs =
+        startAfterValues.length > 0
+          ? docs.filter(
+              (doc) => compareDocumentToCursor(doc.data(), ordering, startAfterValues) > 0,
+            )
+          : docs;
+
+      queryLog.push({ limit: pageLimit, path });
+
+      return { docs: pageLimit === null ? pageDocs : pageDocs.slice(0, pageLimit) };
+    },
+    limit(limit) {
+      return createCollectionReference(
+        documents,
+        path,
+        filters,
+        ordering,
+        startAfterValues,
+        limit,
+        queryLog,
+      );
     },
     orderBy(fieldPath, directionStr = 'asc') {
-      return createCollectionReference(documents, path, filters, {
-        fieldPath,
-        direction: directionStr,
-      });
+      return createCollectionReference(
+        documents,
+        path,
+        filters,
+        [...ordering, { fieldPath, direction: directionStr }],
+        startAfterValues,
+        pageLimit,
+        queryLog,
+      );
+    },
+    startAfter(...values) {
+      return createCollectionReference(
+        documents,
+        path,
+        filters,
+        ordering,
+        values,
+        pageLimit,
+        queryLog,
+      );
     },
     where(fieldPath, opStr, value) {
       if (opStr !== '==') {
@@ -125,6 +167,9 @@ function createCollectionReference(
         path,
         [...filters, { fieldPath, value }],
         ordering,
+        startAfterValues,
+        pageLimit,
+        queryLog,
       );
     },
   };
@@ -142,8 +187,12 @@ function createSnapshot(
   };
 }
 
-function getComparableValue(value: unknown): number {
+function getComparableValue(value: unknown): number | string {
   if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
     return value;
   }
 
@@ -154,6 +203,52 @@ function getComparableValue(value: unknown): number {
     typeof value.toMillis === 'function'
   ) {
     return value.toMillis();
+  }
+
+  return 0;
+}
+
+function compareComparableValues(left: number | string, right: number | string): number {
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left.localeCompare(right);
+  }
+
+  return Number(left) - Number(right);
+}
+
+function compareOrderedDocuments(
+  left: Record<string, unknown> | undefined,
+  right: Record<string, unknown> | undefined,
+  ordering: ReadonlyArray<FakeOrdering>,
+): number {
+  for (const order of ordering) {
+    const comparison = compareComparableValues(
+      getComparableValue(left?.[order.fieldPath]),
+      getComparableValue(right?.[order.fieldPath]),
+    );
+
+    if (comparison !== 0) {
+      return order.direction === 'asc' ? comparison : -comparison;
+    }
+  }
+
+  return 0;
+}
+
+function compareDocumentToCursor(
+  document: Record<string, unknown> | undefined,
+  ordering: ReadonlyArray<FakeOrdering>,
+  cursorValues: ReadonlyArray<unknown>,
+): number {
+  for (const [index, order] of ordering.entries()) {
+    const comparison = compareComparableValues(
+      getComparableValue(document?.[order.fieldPath]),
+      getComparableValue(cursorValues[index]),
+    );
+
+    if (comparison !== 0) {
+      return order.direction === 'asc' ? comparison : -comparison;
+    }
   }
 
   return 0;
@@ -507,6 +602,51 @@ describe('Firestore playground repository run sessions', () => {
     ]);
   });
 
+  it('lists every scenario through a bounded cursor page', async () => {
+    const { firestore, queryLog } = createFakeFirestore({
+      'users/learner-01/playgroundRuns/run-xor': createStoredRunDocument({
+        createdAtIso: '2026-07-19T14:00:00.000Z',
+        runId: 'run-xor',
+      }),
+      'users/learner-01/playgroundRuns/run-pca': {
+        ...createStoredRunDocument({
+          createdAtIso: '2026-07-19T15:00:00.000Z',
+          runId: 'run-pca',
+        }),
+        scenarioId: 'pg-country-indicators',
+        algorithmId: 'pca',
+        datasetVersionId: 'ds-country-indicators-v1',
+        config: { components: 2, scale: true },
+        chartSummary: { feedback: ['low-variance'] },
+        metrics: { 'explained-variance': 0.82, 'reconstruction-error': 0.18 },
+      },
+      'users/learner-01/playgroundRuns/run-old': createStoredRunDocument({
+        createdAtIso: '2026-07-19T13:00:00.000Z',
+        runId: 'run-old',
+      }),
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const firstPage = await repository.listRuns({
+      limit: 2,
+      uid: 'learner-01',
+    });
+    const secondPage = await repository.listRuns({
+      cursor: firstPage.data.nextCursor ?? '',
+      limit: 2,
+      uid: 'learner-01',
+    });
+
+    expect(firstPage.data.runs.map((run) => run.runId)).toEqual(['run-pca', 'run-xor']);
+    expect(firstPage.data.nextCursor).toEqual(expect.any(String));
+    expect(secondPage.data.runs.map((run) => run.runId)).toEqual(['run-old']);
+    expect(secondPage.data.nextCursor).toBeNull();
+    expect(queryLog.filter((query) => query.path.endsWith('/playgroundRuns'))).toEqual([
+      { limit: 3, path: 'users/learner-01/playgroundRuns' },
+      { limit: 3, path: 'users/learner-01/playgroundRuns' },
+    ]);
+  });
+
   it('rejects saving a successful run through a cancelled session', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/algorithmUnlocks/perceptron': {
@@ -751,6 +891,7 @@ function createStoredRunDocument(input: {
     targetVersionId: null,
     verificationLevel: 'client-computed',
     isPinned: false,
+    createdAt: Timestamp.fromMillis(Date.parse(input.createdAtIso)),
     createdAtIso: input.createdAtIso,
     createdAtMillis: Date.parse(input.createdAtIso),
   };

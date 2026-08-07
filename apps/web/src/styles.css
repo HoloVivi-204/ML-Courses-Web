@@ -257,6 +257,10 @@ a {
   color: var(--ink-soft) !important;
 }
 
+.site-actions .utility-button > span {
+  color: var(--ink-soft) !important;
+}
+
 .site-actions .utility-button {
   padding-inline: 10px;
   font-size: 12px;
@@ -313,6 +317,10 @@ a {
   color: var(--ink-soft) !important;
   font-size: 12px;
   font-weight: 700;
+}
+
+.header-logout > span {
+  color: var(--ink-soft) !important;
 }
 
 .header-login:hover,
@@ -1475,6 +1483,132 @@ a {
   border-color: color-mix(in srgb, var(--amber) 34%, var(--line));
 }
 
+.dashboard-course-list,
+.dashboard-module-list,
+.dashboard-post-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 10px;
+}
+
+.dashboard-course-card {
+  display: grid;
+  padding: 15px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  gap: 12px;
+}
+
+.dashboard-course-heading,
+.dashboard-progress-row,
+.dashboard-client-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-course-heading h3,
+.dashboard-course-step-summary {
+  margin: 0;
+}
+
+.dashboard-course-heading h3 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.dashboard-course-heading p,
+.dashboard-course-step-summary {
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-status-badge {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--teal) 36%, transparent);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dashboard-module-list > li {
+  display: grid;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  gap: 8px;
+}
+
+.dashboard-progress-row {
+  align-items: center;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dashboard-progress-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-progress-row strong {
+  flex: 0 0 auto;
+  color: var(--teal);
+}
+
+.dashboard-post-list {
+  margin-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--teal) 28%, var(--line));
+  gap: 4px;
+}
+
+.dashboard-post-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0 4px 10px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  gap: 8px;
+}
+
+.dashboard-post-list li span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-client-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dashboard-client-actions > button,
+.profile-preferences-form > button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dashboard-client-actions > button:disabled,
+.profile-preferences-form > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .dashboard-panel-heading {
   display: flex;
   align-items: flex-start;
@@ -1724,6 +1858,61 @@ a {
   font-weight: 700;
 }
 
+.profile-status,
+.profile-success {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-success {
+  color: var(--teal);
+}
+
+.profile-avatar {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--teal) 44%, var(--line));
+  border-radius: 50%;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.profile-preferences-form {
+  display: grid;
+  gap: 9px;
+}
+
+.profile-preferences-form label {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-preferences-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--surface-strong);
+  color: var(--ink);
+}
+
+.profile-preferences-form select:focus {
+  border-color: var(--teal);
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--teal) 18%, transparent);
+  outline: 0;
+}
+
 .profile-delete-form {
   display: grid;
   gap: 10px;
@@ -1893,6 +2082,13 @@ a {
   font-size: 13px;
 }
 
+.admin-report-list small {
+  color: var(--ink-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
 .admin-report-list span {
   color: var(--ink-soft);
   font-size: 12px;
@@ -1913,6 +2109,19 @@ a {
   color: var(--ink);
   font-size: 13px;
   font-weight: 800;
+}
+
+.admin-report-progress-section {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-report-progress-section h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
 }
 
 .admin-report-lifecycle {
@@ -5057,6 +5266,20 @@ a {
 
   .admin-report-metric-row {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-course-heading {
+    flex-wrap: wrap;
+  }
+
+  .dashboard-course-heading > div {
+    min-width: 0;
+  }
+
+  .dashboard-post-list li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .lab-verdict {

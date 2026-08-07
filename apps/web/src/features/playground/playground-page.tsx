@@ -263,7 +263,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
   const loadSavedArtifacts = useCallback(
     async (idToken: string, currentScenarioId: string) => {
-      const [runs, configs] = await Promise.all([
+      const [runsPage, configs] = await Promise.all([
         learningApiClient.listPlaygroundRuns({
           idToken,
           scenarioId: currentScenarioId,
@@ -274,7 +274,10 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         }),
       ]);
 
-      return { configs, runs };
+      return {
+        configs,
+        runs: Array.isArray(runsPage) ? runsPage : runsPage.runs,
+      };
     },
     [learningApiClient],
   );

@@ -209,6 +209,30 @@ function getOptionalStringQueryField(request: Request, name: string): string | u
   return value.trim();
 }
 
+function getOptionalIntegerQueryField(request: Request, name: string): number | undefined {
+  const value = request.query[name];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) {
+    throw new ApiError(
+      400,
+      'INVALID_QUERY_PARAMETER',
+      `${name} query parameter must be an integer.`,
+    );
+  }
+
+  const parsedValue = Number(value.trim());
+
+  if (!Number.isSafeInteger(parsedValue)) {
+    throw new ApiError(400, 'INVALID_QUERY_PARAMETER', `${name} query parameter is out of range.`);
+  }
+
+  return parsedValue;
+}
+
 function assertNoClientContentRevisionSelection(request: Request): void {
   if (request.query.revisionId !== undefined) {
     throw new ApiError(
@@ -1056,9 +1080,9 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
 
         const authUser = getAuthUser(response);
         requireRecentAuthentication(authUser);
-        await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
         await getLearningRepository().deleteLearnerAccount({ uid: authUser.uid });
         await getPlaygroundRepository().deleteLearnerPlaygroundData({ uid: authUser.uid });
+        await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
 
         sendNoContent(response);
       } catch (error) {
@@ -1514,8 +1538,10 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     try {
       const authUser = getAuthUser(response);
       const result = await getPlaygroundRepository().listRuns({
+        cursor: getOptionalStringQueryField(request, 'cursor'),
+        limit: getOptionalIntegerQueryField(request, 'limit'),
+        scenarioId: getOptionalStringQueryField(request, 'scenarioId'),
         uid: authUser.uid,
-        scenarioId: getStringQueryField(request, 'scenarioId'),
       });
 
       sendSuccess(response, result.statusCode, result.data);

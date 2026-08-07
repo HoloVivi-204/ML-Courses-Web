@@ -584,9 +584,9 @@ describe('API foundation', () => {
     expect(deletedLearningAccounts).toEqual(['learner-01']);
     expect(deletedPlaygroundAccounts).toEqual(['learner-01']);
     expect(deletionSteps).toEqual([
-      'auth:learner-01',
       'learning:learner-01',
       'playground:learner-01',
+      'auth:learner-01',
     ]);
   });
 
@@ -619,6 +619,32 @@ describe('API foundation', () => {
       .expect(400);
 
     expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
+  });
+
+  it('keeps Auth deletion last when learner data cleanup fails', async () => {
+    const deletedAuthUsers: string[] = [];
+    const app = createApiApp({
+      deleteAuthUser: async (uid) => {
+        deletedAuthUsers.push(uid);
+      },
+      learningRepository: createLearningRepository({
+        deleteLearnerAccount: async () => {
+          throw new Error('Firestore cleanup failed.');
+        },
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+        authTime: Math.floor(Date.now() / 1000),
+      }),
+    });
+
+    await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(500);
+
+    expect(deletedAuthUsers).toEqual([]);
   });
 
   it('requires recent authentication before deleting a learner account', async () => {
@@ -2602,6 +2628,11 @@ describe('API foundation', () => {
   it('saves, lists, and deletes playground runs through the authenticated owner boundary', async () => {
     const savedRuns = new Set<string>();
     const listedRunScenarios = new Set<string>();
+    const listedRunQueries: Array<{
+      cursor: string | undefined;
+      limit: number | undefined;
+      scenarioId: string | undefined;
+    }> = [];
     const deletedRuns = new Set<string>();
     const app = createApiApp({
       playgroundRepository: createPlaygroundRepository({
@@ -2615,10 +2646,16 @@ describe('API foundation', () => {
         },
         listRuns: async (input) => {
           listedRunScenarios.add(`${input.uid}:${input.scenarioId}`);
+          listedRunQueries.push({
+            cursor: input.cursor,
+            limit: input.limit,
+            scenarioId: input.scenarioId,
+          });
 
           return {
             statusCode: 200,
             data: {
+              nextCursor: null,
               runs: [
                 {
                   runId: 'run-pg-xor-01',
@@ -2718,7 +2755,7 @@ describe('API foundation', () => {
       .expect(201);
     const listResponse = await request(app)
       .get('/api/v1/playground-runs')
-      .query({ scenarioId: 'pg-xor' })
+      .query({ cursor: 'cursor-01', limit: '2', scenarioId: 'pg-xor' })
       .set('authorization', 'Bearer local-id-token')
       .expect(200);
 
@@ -2736,6 +2773,7 @@ describe('API foundation', () => {
       new Set(['learner-01:3dd0b7e9-1c02-46e6-ae31-f5b3f63b39a0:session-pg-xor-01:result']),
     );
     expect(listedRunScenarios).toEqual(new Set(['learner-01:pg-xor']));
+    expect(listedRunQueries).toEqual([{ cursor: 'cursor-01', limit: 2, scenarioId: 'pg-xor' }]);
     expect(deletedRuns).toEqual(new Set(['learner-01:run-pg-xor-01']));
   });
 
