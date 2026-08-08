@@ -4,14 +4,15 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.9.0",
   "engines": {
-    "node": ">=22 <25"
+    "node": "22"
   },
   "scripts": {
     "dev": "pnpm --filter @ml-path/web dev",
     "build": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present build",
     "test": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present test",
     "test:coverage": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present test:coverage",
-    "test:e2e": "pnpm --filter @ml-path/web test:e2e",
+    "pretest:e2e": "pnpm firebase:build",
+    "test:e2e": "node firebase/emulator-seed/dist/run-emulators.js e2e",
     "test:performance": "pnpm --filter @ml-path/web test:performance",
     "typecheck": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present typecheck",
     "lint": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present lint",

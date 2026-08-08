@@ -307,7 +307,7 @@ function normalizeRunResult(value: unknown): NormalizedRunResult {
   const metrics = normalizeRunMetrics(value.metrics, manifest);
   const feedback = normalizeFeedback(value.feedback, manifest);
   const chartSummary = normalizeChartSummary(value);
-  const textAlternative = isRecord(value.textAlternative) ? value.textAlternative : {};
+  const textAlternative = toFirestoreSafeRecord(value.textAlternative);
 
   if (typeof value.runId !== 'string' || !value.runId.trim()) {
     throw new ApiError(400, 'PLAYGROUND_RUN_RESULT_INVALID', 'runId is required.');
@@ -454,19 +454,62 @@ function normalizeFeedback(value: unknown, manifest: PlaygroundPairManifest): re
 }
 
 function normalizeChartSummary(value: Record<string, unknown>): Record<string, unknown> {
-  const chartSummary = isRecord(value.chartSummary) ? { ...value.chartSummary } : {};
+  const chartSummary = toFirestoreSafeRecord(value.chartSummary);
 
   if (isRecord(value.boundary)) {
-    chartSummary.boundary = value.boundary;
+    chartSummary.boundary = toFirestoreSafeRecord(value.boundary);
   }
 
   const lossCurve = normalizeLossCurve(value.lossCurve);
+  const persistedLossCurve = toFirestoreSafeValue(lossCurve);
 
-  if (lossCurve.length > 0) {
-    chartSummary.lossCurve = lossCurve;
+  if (Array.isArray(persistedLossCurve) && persistedLossCurve.length > 0) {
+    chartSummary.lossCurve = persistedLossCurve;
   }
 
   return chartSummary;
+}
+
+function toFirestoreSafeRecord(value: unknown): Record<string, unknown> {
+  const persistedValue = toFirestoreSafeValue(value);
+
+  return isRecord(persistedValue) ? persistedValue : {};
+}
+
+function toFirestoreSafeValue(value: unknown, isNestedInArray = false): unknown | undefined {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (Array.isArray(value)) {
+    if (isNestedInArray) {
+      return undefined;
+    }
+
+    const persistedValues = value.map((item) => toFirestoreSafeValue(item, true));
+
+    return persistedValues.some((item) => item === undefined) ? undefined : persistedValues;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const persistedRecord: Record<string, unknown> = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    const persistedItem = toFirestoreSafeValue(item, isNestedInArray);
+
+    if (persistedItem !== undefined) {
+      persistedRecord[key] = persistedItem;
+    }
+  }
+
+  return persistedRecord;
 }
 
 function normalizeLossCurve(value: unknown): ReadonlyArray<Record<string, unknown>> {
@@ -1272,9 +1315,9 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           split: createSplitMetadata(result.manifest, config),
           metrics: result.metrics,
           chartSummary: {
+            ...result.chartSummary,
             feedback: result.feedback,
             textAlternative: result.textAlternative,
-            ...result.chartSummary,
           },
           durationMs: result.durationMs,
           targetReached: null,

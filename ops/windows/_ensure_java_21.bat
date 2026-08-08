@@ -16,6 +16,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
+if /i "%ML_PATH_NONINTERACTIVE%"=="true" (
+  echo ERROR: Java 21 is required, but no compatible runtime was found.
+  echo Install Temurin Java 21, then run this command again.
+  exit /b 1
+)
+
 set /p INSTALL_JAVA=Install Java 21 now? [Y/n]:
 if /i "%INSTALL_JAVA%"=="N" (
   echo Java 21 is required before the demo can start.
@@ -28,5 +34,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Java 21 was installed. Close this window, then double-click START_DEMO.bat again.
+echo Java 21 was installed. Close this window, then run the demo command again.
 exit /b 1

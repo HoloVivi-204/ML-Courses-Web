@@ -427,6 +427,66 @@ describe('Firestore playground repository run sessions', () => {
     expect(listedConfigs.data.configs[0]).toMatchObject(savedConfig.data.config);
   });
 
+  it('persists a Firestore-safe chart summary when a browser result contains matrix data', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/algorithmUnlocks/pca': {
+        algorithmId: 'pca',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+    const session = await repository.createRunSession({
+      uid: 'learner-01',
+      scenarioId: 'pg-country-indicators',
+      algorithmId: 'pca',
+      datasetVersionId: 'ds-country-indicators-v1',
+      deviceProfile: 'desktop',
+      config: {
+        components: 2,
+        scale: true,
+      },
+    });
+
+    const savedRun = await repository.saveRun({
+      uid: 'learner-01',
+      idempotencyKey: 'save-pca-matrix-run-key-01',
+      sessionId: session.data.sessionId,
+      result: {
+        runId: 'client-run-pca-matrix-01',
+        scenarioId: 'pg-country-indicators',
+        algorithmId: 'pca',
+        datasetVersionId: 'ds-country-indicators-v1',
+        configHash: session.data.configHash,
+        durationMs: 900,
+        metrics: {
+          'explained-variance': 0.82,
+          'reconstruction-error': 0.18,
+        },
+        feedback: ['low-variance'],
+        chartSummary: {
+          kind: 'projection-2d',
+          loadings: [
+            [0.12, 0.24],
+            [0.36, 0.48],
+          ],
+        },
+        textAlternative: {
+          en: 'Two principal components explain 82% of variance.',
+          vi: 'Hai thanh phan chinh giai thich 82% phuong sai.',
+        },
+      },
+    });
+
+    const storedRun = documents.get(`users/learner-01/playgroundRuns/${savedRun.data.run.runId}`);
+
+    expect(savedRun.statusCode).toBe(201);
+    expect(storedRun?.chartSummary).toMatchObject({
+      feedback: ['low-variance'],
+      kind: 'projection-2d',
+    });
+    expect(hasNestedArray(storedRun?.chartSummary)).toBe(false);
+  });
+
   it('rejects run results with metrics outside the pair manifest', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/algorithmUnlocks/pca': {
@@ -895,4 +955,16 @@ function createStoredRunDocument(input: {
     createdAtIso: input.createdAtIso,
     createdAtMillis: Date.parse(input.createdAtIso),
   };
+}
+
+function hasNestedArray(value: unknown, isNestedInArray = false): boolean {
+  if (Array.isArray(value)) {
+    return isNestedInArray || value.some((item) => hasNestedArray(item, true));
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  return Object.values(value).some((item) => hasNestedArray(item, isNestedInArray));
 }

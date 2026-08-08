@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import { configureFirebaseCliEnvironment } from './firebase-cli-environment.js';
 import { createHybridDemoEnvironment } from './hybrid-demo-environment.js';
 
 const HYBRID_DEMO_EMULATORS = 'firestore,functions,storage';
@@ -29,6 +32,11 @@ function runHybridDemoEmulators(environment: NodeJS.ProcessEnv): Promise<number>
   });
 }
 
-const exitCode = await runHybridDemoEmulators(createHybridDemoEnvironment(process.env));
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const environment = configureFirebaseCliEnvironment(
+  createHybridDemoEnvironment(process.env),
+  join(repositoryRoot, '.runtime'),
+);
+const exitCode = await runHybridDemoEmulators(environment);
 
 process.exitCode = exitCode;

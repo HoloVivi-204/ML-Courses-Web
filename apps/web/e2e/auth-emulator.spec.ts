@@ -8,10 +8,7 @@ const AUTH_EMULATOR_READY_URL =
   'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects?key=local-emulator-api-key';
 const API_EMULATOR_HEALTH_URL =
   'http://127.0.0.1:5001/demo-ml-learning-local/asia-southeast1/api/api/v1/health';
-const AUTH_SIGN_UP_URL = AUTH_EMULATOR_READY_URL.replace(
-  '/v1/projects?',
-  '/v1/accounts:signUp?',
-);
+const AUTH_SIGN_UP_URL = AUTH_EMULATOR_READY_URL.replace('/v1/projects?', '/v1/accounts:signUp?');
 const EMULATOR_FLOW_TIMEOUT_MS = 30_000;
 const configuredLocalAdminEmail = process.env.LOCAL_DEMO_ADMIN_EMAIL?.trim();
 const configuredLocalAdminPassword = process.env.LOCAL_DEMO_ADMIN_PASSWORD?.trim();

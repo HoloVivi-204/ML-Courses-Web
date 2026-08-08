@@ -22,9 +22,4 @@ export default defineConfig({
     reducedMotion: 'reduce',
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'pnpm dev --host 127.0.0.1 --port 4173',
-    reuseExistingServer: true,
-    url: baseURL,
-  },
 });

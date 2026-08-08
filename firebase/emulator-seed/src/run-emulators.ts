@@ -1,33 +1,30 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { LOCAL_FIREBASE_PROJECT_ID, createLocalEmulatorEnvironment } from './environment.js';
-
-const EMULATORS = 'auth,firestore,functions,storage';
-
-type EmulatorMode = 'start' | 'verify';
-
-function getMode(argument: string | undefined): EmulatorMode {
-  if (argument === 'start' || argument === 'verify') {
-    return argument;
-  }
-
-  throw new Error('Expected emulator mode to be start or verify.');
-}
+import {
+  getEmulatorMode,
+  getEmulatorRunConfiguration,
+  type EmulatorMode,
+} from './emulator-command.js';
+import { configureFirebaseCliEnvironment } from './firebase-cli-environment.js';
 
 function runFirebaseCommand(mode: EmulatorMode, environment: NodeJS.ProcessEnv): Promise<number> {
   const firebaseCli = createRequire(import.meta.url).resolve('firebase-tools/lib/bin/firebase.js');
+  const configuration = getEmulatorRunConfiguration(mode);
   const firebaseArguments = [
     firebaseCli,
-    mode === 'start' ? 'emulators:start' : 'emulators:exec',
+    configuration.command,
     '--project',
     LOCAL_FIREBASE_PROJECT_ID,
     '--only',
-    EMULATORS,
+    configuration.emulatorNames,
   ];
 
-  if (mode === 'verify') {
-    firebaseArguments.push('node firebase/emulator-seed/dist/verify-emulators.js');
+  if (configuration.executionCommand) {
+    firebaseArguments.push(configuration.executionCommand);
   }
 
   return new Promise((resolve, reject) => {
@@ -42,7 +39,12 @@ function runFirebaseCommand(mode: EmulatorMode, environment: NodeJS.ProcessEnv):
   });
 }
 
-const mode = getMode(process.argv[2]);
-const exitCode = await runFirebaseCommand(mode, createLocalEmulatorEnvironment(process.env));
+const mode = getEmulatorMode(process.argv[2]);
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const environment = configureFirebaseCliEnvironment(
+  createLocalEmulatorEnvironment(process.env),
+  join(repositoryRoot, '.runtime'),
+);
+const exitCode = await runFirebaseCommand(mode, environment);
 
 process.exitCode = exitCode;

@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
       include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
       maxWorkers: 1,
-      pool: 'threads',
+      pool: 'forks',
       setupFiles: './src/test/setup.ts',
       css: true,
       fileParallelism: false,
