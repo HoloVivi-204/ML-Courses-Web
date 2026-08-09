@@ -6,12 +6,19 @@ import {
   createStaticAdminContentRepository,
   type AdminContentSummary,
 } from './admin-content-repository.js';
+import type { AvatarUploadService } from './avatar-upload-service.js';
 import type { LearningContentRepository } from './learning-content-repository.js';
 import type { LearningRepository } from './learning-repository.js';
 import type { PlaygroundRepository } from './playground-repository.js';
 
 function createLearningRepository(overrides: Partial<LearningRepository>): LearningRepository {
   return {
+    beginLearnerAccountDeletion: async () => {
+      return {
+        data: { avatarUrl: null, status: 'deletion-pending' },
+        statusCode: 200,
+      };
+    },
     bootstrapLearner: async () => {
       throw new Error('Bootstrap is not part of this test.');
     },
@@ -42,11 +49,27 @@ function createLearningRepository(overrides: Partial<LearningRepository>): Learn
     getProgress: async () => {
       throw new Error('Progress snapshot is not part of this test.');
     },
+    getLearnerAccountStatus: async () => {
+      return { data: { status: 'active' }, statusCode: 200 };
+    },
     submitQuizAttempt: async () => {
       throw new Error('Quiz submission is not part of this test.');
     },
     updateLearnerPreferences: async () => {
       throw new Error('Learner preference update is not part of this test.');
+    },
+    ...overrides,
+  };
+}
+
+function createAvatarUploadService(overrides: Partial<AvatarUploadService>): AvatarUploadService {
+  return {
+    createUploadSession: async () => {
+      throw new Error('Avatar upload session creation is not part of this test.');
+    },
+    deleteAccountAvatars: async () => {},
+    finalizeUpload: async () => {
+      throw new Error('Avatar upload finalization is not part of this test.');
     },
     ...overrides,
   };
@@ -543,17 +566,153 @@ describe('API foundation', () => {
     expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
   });
 
-  it('deletes the recent authenticated learner account using only the token owner', async () => {
+  it('issues an owner-bound avatar upload session with the verified upload metadata', async () => {
+    const createdSessions: unknown[] = [];
+    const avatarUploadService = {
+      async createUploadSession(input: unknown) {
+        createdSessions.push(input);
+
+        return {
+          data: {
+            uploadSession: {
+              contentType: 'image/png',
+              expiresAt: '2026-08-09T16:30:00.000Z',
+              metadata: {
+                schemaVersion: '1',
+                sha256: 'a'.repeat(64),
+                sourceId: 'user-avatar',
+              },
+              storagePath: 'user-avatars/learner-01/avatar-object-01',
+              uploadSessionId: 'avatar-session-01',
+            },
+          },
+          statusCode: 201 as const,
+        };
+      },
+    };
+    const app = createApiApp({
+      ...({ avatarUploadService } as Parameters<typeof createApiApp>[0] & {
+        avatarUploadService: typeof avatarUploadService;
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/users/me/avatar/upload-sessions')
+      .set('authorization', 'Bearer local-id-token')
+      .send({
+        contentType: 'image/png',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 67,
+      })
+      .expect(201);
+
+    expect(response.body.data).toEqual({
+      uploadSession: {
+        contentType: 'image/png',
+        expiresAt: '2026-08-09T16:30:00.000Z',
+        metadata: {
+          schemaVersion: '1',
+          sha256: 'a'.repeat(64),
+          sourceId: 'user-avatar',
+        },
+        storagePath: 'user-avatars/learner-01/avatar-object-01',
+        uploadSessionId: 'avatar-session-01',
+      },
+    });
+    expect(createdSessions).toEqual([
+      {
+        contentType: 'image/png',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 67,
+        uid: 'learner-01',
+      },
+    ]);
+  });
+
+  it('finalizes an owner avatar upload through the server verification boundary', async () => {
+    const finalizedUploads: unknown[] = [];
+    const avatarUploadService = {
+      async finalizeUpload(input: unknown) {
+        finalizedUploads.push(input);
+
+        return {
+          data: {
+            profile: {
+              avatarUrl: 'https://storage.example.test/avatar-object-01',
+              displayName: 'Local Student',
+              locale: 'vi',
+              schemaVersion: 1,
+              status: 'active',
+              theme: 'system',
+              uid: 'learner-01',
+            },
+          },
+          statusCode: 200 as const,
+        };
+      },
+    };
+    const app = createApiApp({
+      ...({ avatarUploadService } as Parameters<typeof createApiApp>[0] & {
+        avatarUploadService: typeof avatarUploadService;
+      }),
+      verifyAuthToken: async () => ({
+        uid: 'learner-01',
+        displayName: 'Local Student',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/users/me/avatar/finalize')
+      .set('authorization', 'Bearer local-id-token')
+      .send({ uploadSessionId: 'avatar-session-01' })
+      .expect(200);
+
+    expect(response.body.data.profile).toMatchObject({
+      avatarUrl: 'https://storage.example.test/avatar-object-01',
+      uid: 'learner-01',
+    });
+    expect(finalizedUploads).toEqual([
+      {
+        displayName: 'Local Student',
+        uid: 'learner-01',
+        uploadSessionId: 'avatar-session-01',
+      },
+    ]);
+  });
+
+  it('revokes access before cleanup and deletes a recent authenticated learner account by token owner', async () => {
     const deletedAuthUsers: string[] = [];
     const deletedLearningAccounts: string[] = [];
     const deletedPlaygroundAccounts: string[] = [];
     const deletionSteps: string[] = [];
+    const revokedAuthUsers: string[] = [];
     const app = createApiApp({
+      avatarUploadService: createAvatarUploadService({
+        async deleteAccountAvatars(input: { avatarUrl: string | null; uid: string }) {
+          deletionSteps.push(`avatars:${input.uid}`);
+        },
+      }),
       deleteAuthUser: async (uid) => {
         deletedAuthUsers.push(uid);
         deletionSteps.push(`auth:${uid}`);
       },
       learningRepository: createLearningRepository({
+        beginLearnerAccountDeletion: async (input) => {
+          deletionSteps.push(`begin:${input.uid}`);
+
+          return {
+            data: {
+              avatarUrl:
+                'https://storage.example.test/v0/b/local/o/user-avatars%2Flearner-01%2F00000000-0000-4000-8000-000000000001',
+              status: 'deletion-pending',
+            },
+            statusCode: 200,
+          };
+        },
         deleteLearnerAccount: async (input) => {
           deletedLearningAccounts.push(input.uid);
           deletionSteps.push(`learning:${input.uid}`);
@@ -569,6 +728,10 @@ describe('API foundation', () => {
           return { data: null, statusCode: 204 };
         },
       }),
+      revokeAuthTokens: async (uid) => {
+        revokedAuthUsers.push(uid);
+        deletionSteps.push(`revoke:${uid}`);
+      },
       verifyAuthToken: async () => ({
         uid: 'learner-01',
         displayName: 'Local Student',
@@ -582,9 +745,13 @@ describe('API foundation', () => {
       .expect(204);
 
     expect(deletedAuthUsers).toEqual(['learner-01']);
+    expect(revokedAuthUsers).toEqual(['learner-01']);
     expect(deletedLearningAccounts).toEqual(['learner-01']);
     expect(deletedPlaygroundAccounts).toEqual(['learner-01']);
     expect(deletionSteps).toEqual([
+      'begin:learner-01',
+      'revoke:learner-01',
+      'avatars:learner-01',
       'learning:learner-01',
       'playground:learner-01',
       'auth:learner-01',
@@ -622,15 +789,122 @@ describe('API foundation', () => {
     expect(response.body.error.code).toBe('INVALID_REQUEST_BODY');
   });
 
-  it('keeps Auth deletion last when learner data cleanup fails', async () => {
-    const deletedAuthUsers: string[] = [];
+  it('blocks deletion-pending accounts from product access while allowing bootstrap and delete recovery', async () => {
+    const progressReads: string[] = [];
+    const recoverySteps: string[] = [];
     const app = createApiApp({
+      avatarUploadService: createAvatarUploadService({
+        async deleteAccountAvatars(input: { avatarUrl: string | null; uid: string }) {
+          recoverySteps.push(`avatars:${input.uid}`);
+        },
+      }),
+      deleteAuthUser: async (uid) => {
+        recoverySteps.push(`auth:${uid}`);
+      },
+      learningRepository: createLearningRepository({
+        beginLearnerAccountDeletion: async (input) => {
+          recoverySteps.push(`begin:${input.uid}`);
+
+          return { data: { avatarUrl: null, status: 'deletion-pending' }, statusCode: 200 };
+        },
+        bootstrapLearner: async (input) => {
+          recoverySteps.push(`bootstrap:${input.uid}`);
+
+          return {
+            data: {
+              profile: {
+                avatarUrl: null,
+                displayName: input.displayName,
+                locale: 'vi',
+                schemaVersion: 1,
+                status: 'deletion-pending',
+                theme: 'system',
+                uid: input.uid,
+              },
+            },
+            statusCode: 200,
+          };
+        },
+        deleteLearnerAccount: async (input) => {
+          recoverySteps.push(`learning:${input.uid}`);
+
+          return { data: null, statusCode: 204 };
+        },
+        getLearnerAccountStatus: async () => {
+          return { data: { status: 'deletion-pending' }, statusCode: 200 };
+        },
+        getProgress: async (input) => {
+          progressReads.push(input.uid);
+          throw new Error('Progress must stay inaccessible during deletion recovery.');
+        },
+      }),
+      playgroundRepository: createPlaygroundRepository({
+        deleteLearnerPlaygroundData: async (input) => {
+          recoverySteps.push(`playground:${input.uid}`);
+
+          return { data: null, statusCode: 204 };
+        },
+      }),
+      revokeAuthTokens: async (uid) => {
+        recoverySteps.push(`revoke:${uid}`);
+      },
+      verifyAuthToken: async () => ({
+        authTime: Math.floor(Date.now() / 1000),
+        displayName: 'Local Student',
+        uid: 'learner-01',
+      }),
+    });
+
+    const deniedResponse = await request(app)
+      .get('/api/v1/users/me/progress')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(403);
+    const bootstrapResponse = await request(app)
+      .post('/api/v1/users/me/bootstrap')
+      .set('authorization', 'Bearer local-id-token')
+      .send({})
+      .expect(200);
+    await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(204);
+
+    expect(deniedResponse.body.error.code).toBe('ACCOUNT_DELETION_PENDING');
+    expect(progressReads).toEqual([]);
+    expect(bootstrapResponse.body.data.profile.status).toBe('deletion-pending');
+    expect(recoverySteps).toEqual([
+      'bootstrap:learner-01',
+      'begin:learner-01',
+      'revoke:learner-01',
+      'avatars:learner-01',
+      'learning:learner-01',
+      'playground:learner-01',
+      'auth:learner-01',
+    ]);
+  });
+
+  it('keeps a failed deletion recoverable and retries cleanup before deleting Auth', async () => {
+    const deletedAuthUsers: string[] = [];
+    let cleanupAttempts = 0;
+    const app = createApiApp({
+      avatarUploadService: createAvatarUploadService({}),
       deleteAuthUser: async (uid) => {
         deletedAuthUsers.push(uid);
       },
       learningRepository: createLearningRepository({
         deleteLearnerAccount: async () => {
-          throw new Error('Firestore cleanup failed.');
+          cleanupAttempts += 1;
+
+          if (cleanupAttempts === 1) {
+            throw new Error('Firestore cleanup failed.');
+          }
+
+          return { data: null, statusCode: 204 };
+        },
+      }),
+      playgroundRepository: createPlaygroundRepository({
+        deleteLearnerPlaygroundData: async () => {
+          return { data: null, statusCode: 204 };
         },
       }),
       verifyAuthToken: async () => ({
@@ -640,12 +914,18 @@ describe('API foundation', () => {
       }),
     });
 
+    const failedResponse = await request(app)
+      .delete('/api/v1/users/me')
+      .set('authorization', 'Bearer local-id-token')
+      .expect(503);
     await request(app)
       .delete('/api/v1/users/me')
       .set('authorization', 'Bearer local-id-token')
-      .expect(500);
+      .expect(204);
 
-    expect(deletedAuthUsers).toEqual([]);
+    expect(failedResponse.body.error.code).toBe('ACCOUNT_DELETION_RECOVERY_REQUIRED');
+    expect(cleanupAttempts).toBe(2);
+    expect(deletedAuthUsers).toEqual(['learner-01']);
   });
 
   it('requires recent authentication before deleting a learner account', async () => {
@@ -681,6 +961,7 @@ describe('API foundation', () => {
   it('continues learner data cleanup when the Firebase Auth user is already deleted', async () => {
     const cleanedUpLearners: string[] = [];
     const app = createApiApp({
+      avatarUploadService: createAvatarUploadService({}),
       deleteAuthUser: async () => {
         const error = new Error('User not found.') as Error & { code: string };
 

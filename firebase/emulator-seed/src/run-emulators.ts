@@ -51,6 +51,9 @@ const runEnvironment =
         ...environment,
         // The local authenticated journey traverses both courses in one learner session.
         API_RATE_LIMIT_QUIZ_SUBMISSION_MAX: environment.API_RATE_LIMIT_QUIZ_SUBMISSION_MAX ?? '20',
+        // This affects only the Functions Emulator so the browser journey can prove reauthentication.
+        API_ACCOUNT_DELETION_RECENT_AUTH_WINDOW_SECONDS:
+          environment.API_ACCOUNT_DELETION_RECENT_AUTH_WINDOW_SECONDS ?? '1',
       }
     : environment;
 const exitCode = await runFirebaseCommand(mode, runEnvironment);

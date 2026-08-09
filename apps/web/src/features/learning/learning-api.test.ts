@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createFetchLearningApiClient } from './learning-api';
+import { LearningApiError, createFetchLearningApiClient } from './learning-api';
 
 describe('fetch learning API client', () => {
   afterEach(() => {
@@ -110,6 +110,116 @@ describe('fetch learning API client', () => {
       },
       method: 'PATCH',
     });
+  });
+
+  it('uses the two server-issued avatar endpoints without accepting a client URL', async () => {
+    const profile = {
+      avatarUrl: 'https://storage.example.test/v0/b/local/o/user-avatars%2Flearner-01%2Favatar-01',
+      displayName: 'Local Student',
+      locale: 'vi',
+      schemaVersion: 1,
+      status: 'active',
+      theme: 'system',
+      uid: 'learner-01',
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              uploadSession: {
+                contentType: 'image/png',
+                expiresAt: '2026-08-09T16:15:00.000Z',
+                metadata: {
+                  schemaVersion: '1',
+                  sha256: 'a'.repeat(64),
+                  sourceId: 'user-avatar',
+                },
+                storagePath: 'user-avatars/learner-01/avatar-01',
+                uploadSessionId: 'avatar-session-01',
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, data: { profile } }), {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        }),
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    const uploadSession = await client.createAvatarUploadSession({
+      contentType: 'image/png',
+      idToken: 'local-id-token',
+      sha256: 'a'.repeat(64),
+      sizeBytes: 67,
+    });
+    const finalizedProfile = await client.finalizeAvatarUpload({
+      idToken: 'local-id-token',
+      uploadSessionId: uploadSession.uploadSessionId,
+    });
+
+    expect(uploadSession).toMatchObject({
+      storagePath: 'user-avatars/learner-01/avatar-01',
+      uploadSessionId: 'avatar-session-01',
+    });
+    expect(finalizedProfile).toEqual(profile);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/users/me/avatar/upload-sessions', {
+      body: JSON.stringify({
+        contentType: 'image/png',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 67,
+      }),
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/users/me/avatar/finalize', {
+      body: JSON.stringify({ uploadSessionId: 'avatar-session-01' }),
+      headers: {
+        authorization: 'Bearer local-id-token',
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+  });
+
+  it('exposes a stale reauthentication response to the profile recovery UI', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              code: 'RECENT_SIGN_IN_REQUIRED',
+              details: [],
+              message: 'Recent authentication is required before deleting this account.',
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 401 },
+        ),
+      ),
+    );
+
+    const client = createFetchLearningApiClient();
+
+    await expect(client.deleteAccount({ idToken: 'stale-token' })).rejects.toEqual(
+      new LearningApiError(
+        401,
+        'RECENT_SIGN_IN_REQUIRED',
+        'Recent authentication is required before deleting this account.',
+      ),
+    );
   });
 
   it('loads a bounded playground run page across scenarios with a cursor', async () => {

@@ -2207,6 +2207,30 @@ a {
   font-size: 22px;
   font-weight: 900;
   letter-spacing: 0.04em;
+  overflow: hidden;
+}
+
+.profile-avatar > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-upload {
+  display: block;
+  margin-top: 14px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-avatar-upload + input[type='file'] {
+  width: 100%;
+  margin-top: 7px;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
 
 .profile-preferences-form {
@@ -2241,6 +2265,43 @@ a {
 .profile-delete-form {
   display: grid;
   gap: 10px;
+}
+
+.profile-reauthentication {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.profile-reauthentication h3,
+.profile-reauthentication p {
+  margin: 0;
+}
+
+.profile-reauthentication h3 {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.profile-reauthentication p {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.profile-reauthentication form {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-reauthentication label {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .profile-delete-form label {

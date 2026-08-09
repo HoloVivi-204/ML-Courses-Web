@@ -8,6 +8,10 @@ import { CourseCatalogPage, CoursePage, RouteNotFoundPage } from '../features/ca
 import type { Locale } from '../features/catalog/course-data';
 import type { AuthGateway } from '../features/auth/auth-context';
 import { useAuth } from '../features/auth/auth-context';
+import {
+  createFirebaseAvatarUploadStorageGateway,
+  type AvatarUploadStorageGateway,
+} from '../features/auth/firebase-avatar-storage-gateway';
 import { createFirebaseAuthGateway } from '../features/auth/firebase-auth-gateway';
 import { AuthProvider } from '../features/auth/auth-session';
 import { LandingPage } from '../features/landing/landing-page';
@@ -95,10 +99,11 @@ const ProfilePage = lazy(async () => {
 
 interface AppRoutesProps {
   authGateway?: AuthGateway | undefined;
+  avatarUploadStorageGateway?: AvatarUploadStorageGateway | undefined;
   learningApiClient?: LearningApiClient | undefined;
 }
 
-function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
+function AppRoutes({ authGateway, avatarUploadStorageGateway, learningApiClient }: AppRoutesProps) {
   const { i18n } = useTranslation();
   const { setThemePreference, theme, themePreference } = useTheme();
   const locale: Locale = i18n.resolvedLanguage === 'en' ? 'en' : 'vi';
@@ -106,6 +111,10 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
   const learningClient = useMemo(
     () => learningApiClient ?? createFetchLearningApiClient(),
     [learningApiClient],
+  );
+  const avatarStorageGateway = useMemo(
+    () => avatarUploadStorageGateway ?? createFirebaseAvatarUploadStorageGateway(),
+    [avatarUploadStorageGateway],
   );
 
   useEffect(() => {
@@ -204,6 +213,7 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                   <RequireAuthenticated>
                     <Suspense fallback={<TrialRouteLoading />}>
                       <ProfilePage
+                        avatarUploadStorageGateway={avatarStorageGateway}
                         learningApiClient={learningClient}
                         locale={locale}
                         onProfilePreferencesLoaded={applyProfilePreferences}
@@ -460,15 +470,20 @@ function AuthRouteLoading() {
 
 interface AppProps {
   authGateway?: AuthGateway | undefined;
+  avatarUploadStorageGateway?: AvatarUploadStorageGateway | undefined;
   learningApiClient?: LearningApiClient | undefined;
 }
 
-export function App({ authGateway, learningApiClient }: AppProps) {
+export function App({ authGateway, avatarUploadStorageGateway, learningApiClient }: AppProps) {
   const i18n = useMemo(() => createAppI18n(), []);
 
   return (
     <I18nextProvider i18n={i18n}>
-      <AppRoutes authGateway={authGateway} learningApiClient={learningApiClient} />
+      <AppRoutes
+        authGateway={authGateway}
+        avatarUploadStorageGateway={avatarUploadStorageGateway}
+        learningApiClient={learningApiClient}
+      />
     </I18nextProvider>
   );
 }

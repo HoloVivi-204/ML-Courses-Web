@@ -2,6 +2,22 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    match /user-avatars/{uid}/{objectId} {
+      // Avatar URLs contain server-issued UUID paths and download tokens.
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && objectId.matches('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$')
+                    && request.resource.size > 0
+                    && request.resource.size <= 2 * 1024 * 1024
+                    && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp']
+                    && 'sha256' in request.resource.metadata
+                    && request.resource.metadata.sha256.matches('^[a-f0-9]{64}$')
+                    && request.resource.metadata.schemaVersion == '1'
+                    && request.resource.metadata.sourceId == 'user-avatar';
+      allow update, delete: if false;
+    }
+
     match /{object=**} {
       allow read, write: if false;
     }

@@ -8,10 +8,11 @@ import { getFixedDemo } from '../../../functions/src/release-demo-content.js';
 import { getReadablePost } from '../../../functions/src/release-learning-content.js';
 import { getReleaseLearningCatalog } from '../../../functions/src/release-learning-catalog.js';
 import type { AuthGateway } from '../features/auth/auth-context';
-import type {
-  AdminContentSourceReview,
-  LearningApiClient,
-  PlaygroundConfig,
+import {
+  LearningApiError,
+  type AdminContentSourceReview,
+  type LearningApiClient,
+  type PlaygroundConfig,
 } from '../features/learning/learning-api';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
@@ -64,6 +65,17 @@ function createAuthenticatedGateway(): AuthGateway {
 function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): LearningApiClient {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
+    createAvatarUploadSession: vi.fn().mockResolvedValue({
+      contentType: 'image/png',
+      expiresAt: '2026-08-09T16:15:00.000Z',
+      metadata: {
+        schemaVersion: '1',
+        sha256: 'a'.repeat(64),
+        sourceId: 'user-avatar',
+      },
+      storagePath: 'user-avatars/learner-01/avatar-01',
+      uploadSessionId: 'avatar-session-01',
+    }),
     cancelPlaygroundRunSession: vi.fn().mockResolvedValue({
       sessionId: 'session-pg-xor-01',
       status: 'cancelled',
@@ -378,6 +390,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       }),
     ),
     deleteAccount: vi.fn().mockResolvedValue(undefined),
+    finalizeAvatarUpload: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
     deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
     updatePlaygroundConfig: vi.fn().mockResolvedValue(
@@ -1418,6 +1431,252 @@ describe('public learning journey', () => {
     );
   });
 
+  it('updates the display name through Firebase Auth and refreshes the verified profile', async () => {
+    window.history.pushState({}, '', '/profile');
+    const updateDisplayName = vi.fn().mockResolvedValue(undefined);
+    const initialProfile = createLearnerProfileFixture();
+    const refreshedProfile = {
+      ...initialProfile,
+      displayName: 'Updated Student',
+    };
+    const bootstrapProfile = vi
+      .fn()
+      .mockResolvedValueOnce(initialProfile)
+      .mockResolvedValueOnce(refreshedProfile);
+    const learningApiClient = createLearningApiClient({ bootstrapProfile });
+    const user = userEvent.setup();
+    const gateway = {
+      ...createAuthenticatedGateway(),
+      updateDisplayName,
+    };
+
+    render(<App authGateway={gateway} learningApiClient={learningApiClient} />);
+
+    const displayNameInput = await screen.findByLabelText('Tên hiển thị');
+
+    await user.clear(displayNameInput);
+    await user.type(displayNameInput, 'Updated Student');
+    await user.click(screen.getByRole('button', { name: 'Lưu tên hiển thị' }));
+
+    await waitFor(() => expect(updateDisplayName).toHaveBeenCalledWith('Updated Student'));
+    await waitFor(() =>
+      expect(bootstrapProfile).toHaveBeenLastCalledWith({
+        idToken: 'local-id-token',
+        locale: 'vi',
+        theme: 'system',
+      }),
+    );
+    expect(await screen.findByDisplayValue('Updated Student')).toBeVisible();
+  });
+
+  it('uploads an avatar through the server-issued session and renders only the finalized URL', async () => {
+    window.history.pushState({}, '', '/profile');
+    const initialProfile = createLearnerProfileFixture();
+    const updatedProfile = {
+      ...initialProfile,
+      avatarUrl:
+        'https://storage.example.test/v0/b/local/o/user-avatars%2Flearner-01%2Favatar-01?alt=media&token=server-token',
+    };
+    const createAvatarUploadSession = vi.fn().mockResolvedValue({
+      contentType: 'image/png',
+      expiresAt: '2026-08-09T16:15:00.000Z',
+      metadata: {
+        schemaVersion: '1',
+        sha256: 'a'.repeat(64),
+        sourceId: 'user-avatar',
+      },
+      storagePath: 'user-avatars/learner-01/avatar-01',
+      uploadSessionId: 'avatar-session-01',
+    });
+    const finalizeAvatarUpload = vi.fn().mockResolvedValue(updatedProfile);
+    const uploadAvatar = vi.fn().mockResolvedValue(undefined);
+    const learningApiClient = createLearningApiClient({
+      createAvatarUploadSession,
+      finalizeAvatarUpload,
+    });
+    const user = userEvent.setup();
+
+    render(
+      <App
+        authGateway={createAuthenticatedGateway()}
+        avatarUploadStorageGateway={{ uploadAvatar }}
+        learningApiClient={learningApiClient}
+      />,
+    );
+
+    const fileInput = await screen.findByLabelText('Tải ảnh đại diện');
+    const avatarFile = new File(
+      [Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])],
+      'avatar.png',
+      { type: 'image/png' },
+    );
+
+    await user.upload(fileInput, avatarFile);
+
+    await waitFor(() =>
+      expect(createAvatarUploadSession).toHaveBeenCalledWith({
+        contentType: 'image/png',
+        idToken: 'local-id-token',
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        sizeBytes: 9,
+      }),
+    );
+    await waitFor(() =>
+      expect(uploadAvatar).toHaveBeenCalledWith({
+        file: avatarFile,
+        uploadSession: expect.objectContaining({ uploadSessionId: 'avatar-session-01' }),
+      }),
+    );
+    expect(finalizeAvatarUpload).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      uploadSessionId: 'avatar-session-01',
+    });
+    expect(
+      await screen.findByRole('img', { name: 'Ảnh đại diện của Local Student' }),
+    ).toHaveAttribute('src', updatedProfile.avatarUrl);
+  });
+
+  it('asks a password-provider learner to reauthenticate before retrying a stale deletion', async () => {
+    window.history.pushState({}, '', '/profile');
+    let authListener: ((user: { email: string | null; uid: string } | null) => void) | null = null;
+    const reauthenticateWithPassword = vi.fn().mockResolvedValue(undefined);
+    const signOut = vi.fn(async () => authListener?.(null));
+    const gateway: AuthGateway = {
+      ...createAuthenticatedGateway(),
+      observe(listener) {
+        authListener = listener;
+        listener({
+          email: 'learner@example.test',
+          providerIds: ['password'],
+          uid: 'learner-01',
+        });
+        return () => undefined;
+      },
+      reauthenticateWithPassword,
+      signOut,
+    };
+    const deleteAccount = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new LearningApiError(
+          401,
+          'RECENT_SIGN_IN_REQUIRED',
+          'Recent authentication is required before deleting this account.',
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+
+    render(
+      <App authGateway={gateway} learningApiClient={createLearningApiClient({ deleteAccount })} />,
+    );
+
+    await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' });
+    await user.type(screen.getByLabelText('Nhập DELETE để xác nhận'), 'DELETE');
+    await user.click(screen.getByRole('button', { name: 'Xóa tài khoản' }));
+
+    const passwordInput = await screen.findByLabelText('Mật khẩu để xác thực lại');
+
+    await user.type(passwordInput, 'demo-password');
+    await user.click(screen.getByRole('button', { name: 'Xác thực lại và tiếp tục xóa' }));
+
+    await waitFor(() => expect(reauthenticateWithPassword).toHaveBeenCalledWith('demo-password'));
+    await waitFor(() => expect(deleteAccount).toHaveBeenCalledTimes(2));
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps password reauthentication available after an invalid credential', async () => {
+    window.history.pushState({}, '', '/profile');
+    const reauthenticateWithPassword = vi.fn().mockRejectedValue(new Error('Invalid credentials.'));
+    const gateway: AuthGateway = {
+      ...createAuthenticatedGateway(),
+      observe(listener) {
+        listener({
+          email: 'learner@example.test',
+          providerIds: ['password'],
+          uid: 'learner-01',
+        });
+        return () => undefined;
+      },
+      reauthenticateWithPassword,
+    };
+    const deleteAccount = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new LearningApiError(
+          401,
+          'RECENT_SIGN_IN_REQUIRED',
+          'Recent authentication is required before deleting this account.',
+        ),
+      );
+    const user = userEvent.setup();
+
+    render(
+      <App authGateway={gateway} learningApiClient={createLearningApiClient({ deleteAccount })} />,
+    );
+
+    await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' });
+    await user.type(screen.getByLabelText('Nhập DELETE để xác nhận'), 'DELETE');
+    await user.click(screen.getByRole('button', { name: 'Xóa tài khoản' }));
+
+    const passwordInput = await screen.findByLabelText('Mật khẩu để xác thực lại');
+
+    await user.type(passwordInput, 'incorrect-password');
+    await user.click(screen.getByRole('button', { name: 'Xác thực lại và tiếp tục xóa' }));
+
+    await waitFor(() =>
+      expect(reauthenticateWithPassword).toHaveBeenCalledWith('incorrect-password'),
+    );
+    expect(await screen.findByLabelText('Mật khẩu để xác thực lại')).toHaveValue(
+      'incorrect-password',
+    );
+    expect(deleteAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Google reauthentication without exposing a password field to a Google-only learner', async () => {
+    window.history.pushState({}, '', '/profile');
+    const reauthenticateWithGoogle = vi.fn().mockResolvedValue(undefined);
+    const gateway: AuthGateway = {
+      ...createAuthenticatedGateway(),
+      observe(listener) {
+        listener({
+          email: 'learner@example.test',
+          providerIds: ['google.com'],
+          uid: 'learner-01',
+        });
+        return () => undefined;
+      },
+      reauthenticateWithGoogle,
+    };
+    const deleteAccount = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new LearningApiError(
+          401,
+          'RECENT_SIGN_IN_REQUIRED',
+          'Recent authentication is required before deleting this account.',
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+
+    render(
+      <App authGateway={gateway} learningApiClient={createLearningApiClient({ deleteAccount })} />,
+    );
+
+    await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' });
+    await user.type(screen.getByLabelText('Nhập DELETE để xác nhận'), 'DELETE');
+    await user.click(screen.getByRole('button', { name: 'Xóa tài khoản' }));
+
+    expect(await screen.findByRole('button', { name: 'Xác thực lại với Google' })).toBeVisible();
+    expect(screen.queryByLabelText('Mật khẩu để xác thực lại')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Xác thực lại với Google' }));
+
+    await waitFor(() => expect(reauthenticateWithGoogle).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(deleteAccount).toHaveBeenCalledTimes(2));
+  });
+
   it('shows a safe not-found state for an unknown course', () => {
     window.history.pushState({}, '', '/courses/not-a-course');
 
@@ -1696,7 +1955,9 @@ describe('public learning journey', () => {
       idToken: 'local-id-token',
       postId: 'cml-p03-linear-regression',
     });
-    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    await waitFor(() =>
+      expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token'),
+    );
   });
 
   it('offers a saved reading position that survives a locale change', async () => {

@@ -17,6 +17,31 @@ export interface LearnerProfile {
   uid: string;
 }
 
+export type AvatarContentType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export interface AvatarUploadSession {
+  contentType: AvatarContentType;
+  expiresAt: string;
+  metadata: {
+    schemaVersion: string;
+    sha256: string;
+    sourceId: string;
+  };
+  storagePath: string;
+  uploadSessionId: string;
+}
+
+export class LearningApiError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'LearningApiError';
+  }
+}
+
 export interface EnrollmentResult {
   access: {
     moduleId: string;
@@ -525,6 +550,12 @@ export interface LearningApiClient {
     locale: LearnerLocalePreference;
     theme: LearnerThemePreference;
   }): Promise<LearnerProfile>;
+  createAvatarUploadSession(input: {
+    contentType: AvatarContentType;
+    idToken: string;
+    sha256: string;
+    sizeBytes: number;
+  }): Promise<AvatarUploadSession>;
   cancelPlaygroundRunSession(input: {
     idToken: string;
     sessionId: string;
@@ -603,6 +634,10 @@ export interface LearningApiClient {
     scenarioId: string;
   }): Promise<PlaygroundConfigRecord>;
   deleteAccount(input: { idToken: string }): Promise<void>;
+  finalizeAvatarUpload(input: {
+    idToken: string;
+    uploadSessionId: string;
+  }): Promise<LearnerProfile>;
   deletePlaygroundConfig(input: { configId: string; idToken: string }): Promise<void>;
   deletePlaygroundRun(input: { idToken: string; runId: string }): Promise<void>;
   updatePlaygroundConfig(input: {
@@ -645,9 +680,33 @@ interface SuccessEnvelope<TData> {
   success: true;
 }
 
+interface ErrorEnvelope {
+  error?: {
+    code?: unknown;
+    message?: unknown;
+  };
+}
+
+async function createLearningApiError(response: Response): Promise<LearningApiError> {
+  let body: ErrorEnvelope | undefined;
+
+  try {
+    body = (await response.json()) as ErrorEnvelope;
+  } catch {
+    // Use the generic client-safe error when the response is not JSON.
+  }
+
+  const code =
+    typeof body?.error?.code === 'string' ? body.error.code : 'LEARNING_API_REQUEST_FAILED';
+  const message =
+    typeof body?.error?.message === 'string' ? body.error.message : 'Learning API request failed.';
+
+  return new LearningApiError(response.status, code, message);
+}
+
 async function readSuccessEnvelope<TData>(response: Response): Promise<TData> {
   if (!response.ok) {
-    throw new Error('Learning API request failed.');
+    throw await createLearningApiError(response);
   }
 
   const body = (await response.json()) as SuccessEnvelope<TData>;
@@ -661,7 +720,7 @@ async function readSuccessEnvelope<TData>(response: Response): Promise<TData> {
 
 async function ensureSuccessResponse(response: Response): Promise<void> {
   if (!response.ok) {
-    throw new Error('Learning API request failed.');
+    throw await createLearningApiError(response);
   }
 }
 
@@ -705,6 +764,20 @@ export function createFetchLearningApiClient(
       );
 
       return data.profile;
+    },
+    async createAvatarUploadSession({ contentType, idToken, sha256, sizeBytes }) {
+      const data = await readSuccessEnvelope<{ uploadSession: AvatarUploadSession }>(
+        await fetch('/api/v1/users/me/avatar/upload-sessions', {
+          body: JSON.stringify({ contentType, sha256, sizeBytes }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.uploadSession;
     },
     async cancelPlaygroundRunSession({ idToken, sessionId }) {
       return readSuccessEnvelope<PlaygroundRunSessionCancellation>(
@@ -823,6 +896,20 @@ export function createFetchLearningApiClient(
           method: 'DELETE',
         }),
       );
+    },
+    async finalizeAvatarUpload({ idToken, uploadSessionId }) {
+      const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(
+        await fetch('/api/v1/users/me/avatar/finalize', {
+          body: JSON.stringify({ uploadSessionId }),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+          },
+          method: 'POST',
+        }),
+      );
+
+      return data.profile;
     },
     async deletePlaygroundConfig({ configId, idToken }) {
       await ensureSuccessResponse(

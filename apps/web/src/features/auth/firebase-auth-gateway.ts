@@ -6,17 +6,22 @@ import {
   type FirebaseOptions,
 } from 'firebase/app';
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   connectAuthEmulator,
   createUserWithEmailAndPassword,
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  reauthenticateWithRedirect,
   sendPasswordResetEmail as sendFirebasePasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
   signOut,
+  updateProfile,
   type Auth,
   type User,
 } from 'firebase/auth';
@@ -33,11 +38,14 @@ export function isFirebaseEmulator(): boolean {
 
 function getFirebaseOptions(): FirebaseOptions | null {
   if (isFirebaseEmulator()) {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? LOCAL_FIREBASE_PROJECT_ID;
+
     return {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'local-emulator-api-key',
       appId: import.meta.env.VITE_FIREBASE_APP_ID ?? 'local-emulator-app',
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'localhost',
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? LOCAL_FIREBASE_PROJECT_ID,
+      projectId,
+      storageBucket: `${projectId}.appspot.com`,
     };
   }
 
@@ -46,13 +54,15 @@ function getFirebaseOptions(): FirebaseOptions | null {
     VITE_FIREBASE_APP_ID,
     VITE_FIREBASE_AUTH_DOMAIN,
     VITE_FIREBASE_PROJECT_ID,
+    VITE_FIREBASE_STORAGE_BUCKET,
   } = import.meta.env;
 
   if (
     !VITE_FIREBASE_API_KEY ||
     !VITE_FIREBASE_APP_ID ||
     !VITE_FIREBASE_AUTH_DOMAIN ||
-    !VITE_FIREBASE_PROJECT_ID
+    !VITE_FIREBASE_PROJECT_ID ||
+    !VITE_FIREBASE_STORAGE_BUCKET
   ) {
     return null;
   }
@@ -62,6 +72,7 @@ function getFirebaseOptions(): FirebaseOptions | null {
     appId: VITE_FIREBASE_APP_ID,
     authDomain: VITE_FIREBASE_AUTH_DOMAIN,
     projectId: VITE_FIREBASE_PROJECT_ID,
+    storageBucket: VITE_FIREBASE_STORAGE_BUCKET,
   };
 }
 
@@ -78,7 +89,15 @@ export function getConfiguredFirebaseApp(): FirebaseApp | null {
 }
 
 function toAuthUser(user: User): AuthUser {
-  return { email: user.email, uid: user.uid };
+  const providerIds = user.providerData
+    .map((provider) => provider.providerId)
+    .filter((providerId): providerId is string => Boolean(providerId));
+
+  return {
+    email: user.email,
+    ...(providerIds.length > 0 ? { providerIds } : {}),
+    uid: user.uid,
+  };
 }
 
 function isPopupBlocked(error: unknown): boolean {
@@ -132,11 +151,14 @@ function createUnavailableGateway(): AuthGateway {
       listener(null);
       return () => undefined;
     },
+    reauthenticateWithGoogle: unavailable,
+    reauthenticateWithPassword: unavailable,
     signInWithEmail: unavailable,
     signInWithGoogle: unavailable,
     requestPasswordReset: unavailable,
     signOut: unavailable,
     signUpWithEmail: unavailable,
+    updateDisplayName: unavailable,
   };
 }
 
@@ -144,12 +166,38 @@ function createConfiguredGateway(auth: Auth): AuthGateway {
   const googleProvider = new GoogleAuthProvider();
 
   return {
-    async getIdToken() {
-      return auth.currentUser ? auth.currentUser.getIdToken() : null;
+    async getIdToken(forceRefresh = false) {
+      return auth.currentUser ? auth.currentUser.getIdToken(forceRefresh) : null;
     },
     observe(listener, onError) {
       void getRedirectResult(auth).catch(onError);
       return onAuthStateChanged(auth, (user) => listener(user ? toAuthUser(user) : null), onError);
+    },
+    async reauthenticateWithGoogle() {
+      if (!auth.currentUser) {
+        throw { code: 'auth/unavailable' };
+      }
+
+      try {
+        await reauthenticateWithPopup(auth.currentUser, googleProvider);
+        await auth.currentUser.getIdToken(true);
+      } catch (error) {
+        if (!isPopupBlocked(error)) {
+          throw error;
+        }
+
+        await reauthenticateWithRedirect(auth.currentUser, googleProvider);
+      }
+    },
+    async reauthenticateWithPassword(password) {
+      if (!auth.currentUser?.email) {
+        throw { code: 'auth/unavailable' };
+      }
+
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, password);
+
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await auth.currentUser.getIdToken(true);
     },
     async signInWithEmail(email, password) {
       await signInWithEmailAndPassword(auth, email, password);
@@ -181,6 +229,14 @@ function createConfiguredGateway(auth: Auth): AuthGateway {
     },
     async signUpWithEmail(email, password) {
       await createUserWithEmailAndPassword(auth, email, password);
+    },
+    async updateDisplayName(displayName) {
+      if (!auth.currentUser) {
+        throw { code: 'auth/unavailable' };
+      }
+
+      await updateProfile(auth.currentUser, { displayName });
+      await auth.currentUser.getIdToken(true);
     },
   };
 }

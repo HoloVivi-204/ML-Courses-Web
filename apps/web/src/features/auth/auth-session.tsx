@@ -70,15 +70,27 @@ export function AuthProvider({ children, gateway }: AuthProviderProps) {
   const value = useMemo<AuthContextValue>(
     () => ({
       error,
-      getIdToken: () => gateway.getIdToken(),
+      getIdToken: (forceRefresh) => gateway.getIdToken(forceRefresh),
       isSubmitting,
       requestPasswordReset: (email, continuePath) =>
         runPasswordReset(() => gateway.requestPasswordReset(email, continuePath)),
+      reauthenticateWithGoogle: () =>
+        gateway.reauthenticateWithGoogle
+          ? run(() => gateway.reauthenticateWithGoogle!())
+          : Promise.resolve(false),
+      reauthenticateWithPassword: (password) =>
+        gateway.reauthenticateWithPassword
+          ? run(() => gateway.reauthenticateWithPassword!(password))
+          : Promise.resolve(false),
       signInWithEmail: (email, password) => run(() => gateway.signInWithEmail(email, password)),
       signInWithGoogle: () => run(() => gateway.signInWithGoogle()),
       signOut: () => run(() => gateway.signOut()),
       signUpWithEmail: (email, password) => run(() => gateway.signUpWithEmail(email, password)),
       status,
+      updateDisplayName: (displayName) =>
+        gateway.updateDisplayName
+          ? run(() => gateway.updateDisplayName!(displayName))
+          : Promise.resolve(false),
       user,
     }),
     [error, gateway, isSubmitting, status, user],

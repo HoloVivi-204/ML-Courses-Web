@@ -25,6 +25,11 @@ import {
 } from './admin-report-repository.js';
 import { getAppCheckRuntimeConfig } from './api-security-config.js';
 import { ApiError } from './api-error.js';
+import {
+  createDefaultAvatarUploadService,
+  toAvatarUploadRequest,
+  type AvatarUploadService,
+} from './avatar-upload-service.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { hasLocalCloudAuthDemoAdminRole } from './local-cloud-auth-demo.js';
@@ -72,16 +77,36 @@ export interface ApiAppOptions {
   adminContentRepository?: AdminContentRepository | undefined;
   adminReportRepository?: AdminReportRepository | undefined;
   appCheckEnforcement?: 'disabled' | 'enforced' | undefined;
+  avatarUploadService?: AvatarUploadService | undefined;
   deleteAuthUser?: ((uid: string) => Promise<void>) | undefined;
   learningContentRepository?: LearningContentRepository | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   rateLimiter?: RateLimiter | undefined;
+  revokeAuthTokens?: ((uid: string) => Promise<void>) | undefined;
   verifyAppCheckToken?: ((appCheckToken: string) => Promise<void>) | undefined;
   verifyAuthToken?: ((idToken: string) => Promise<VerifiedAuthUser>) | undefined;
 }
 
-const RECENT_AUTHENTICATION_WINDOW_SECONDS = 5 * 60;
+const DEFAULT_RECENT_AUTHENTICATION_WINDOW_SECONDS = 5 * 60;
+
+export function getRecentAuthenticationWindowSeconds(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): number {
+  if (environment.FUNCTIONS_EMULATOR !== 'true') {
+    return DEFAULT_RECENT_AUTHENTICATION_WINDOW_SECONDS;
+  }
+
+  const configuredWindowSeconds = Number(
+    environment.API_ACCOUNT_DELETION_RECENT_AUTH_WINDOW_SECONDS,
+  );
+
+  return Number.isSafeInteger(configuredWindowSeconds) &&
+    configuredWindowSeconds >= 1 &&
+    configuredWindowSeconds <= DEFAULT_RECENT_AUTHENTICATION_WINDOW_SECONDS
+    ? configuredWindowSeconds
+    : DEFAULT_RECENT_AUTHENTICATION_WINDOW_SECONDS;
+}
 
 function getRequestId(response: Response): string {
   return String(response.locals.requestId);
@@ -569,6 +594,26 @@ function getLearnerPreferencesPatchBody(request: Request): {
   return preferences;
 }
 
+function getAvatarUploadSessionBody(request: Request) {
+  const body = getOptionalObjectBody(request);
+
+  assertBodyFieldsAllowlisted(body, ['contentType', 'sha256', 'sizeBytes']);
+
+  return toAvatarUploadRequest(body);
+}
+
+function getAvatarFinalizeBody(request: Request): { uploadSessionId: string } {
+  const body = getOptionalObjectBody(request);
+
+  assertBodyFieldsAllowlisted(body, ['uploadSessionId']);
+
+  if (typeof body.uploadSessionId !== 'string' || body.uploadSessionId.trim().length === 0) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'uploadSessionId must be a non-empty string.');
+  }
+
+  return { uploadSessionId: body.uploadSessionId.trim() };
+}
+
 function getBodyField(request: Request, name: string): unknown {
   const body = getObjectBody(request);
 
@@ -683,10 +728,15 @@ function normalizeQuizAnswerValue(value: QuizAnswerValue): QuizAnswerValue {
 
 function createAuthMiddleware(
   verifyAuthToken: (idToken: string) => Promise<VerifiedAuthUser>,
+  assertAccountAccess?:
+    ((request: Request, authUser: VerifiedAuthUser) => Promise<void>) | undefined,
 ): express.RequestHandler {
   return async (request, response, next) => {
     try {
-      response.locals.authUser = await verifyAuthToken(getBearerToken(request));
+      const authUser = await verifyAuthToken(getBearerToken(request));
+
+      await assertAccountAccess?.(request, authUser);
+      response.locals.authUser = authUser;
       next();
     } catch (error) {
       next(
@@ -696,6 +746,13 @@ function createAuthMiddleware(
       );
     }
   };
+}
+
+function isAccountDeletionRecoveryRequest(request: Request): boolean {
+  return (
+    (request.method === 'POST' && request.path === '/api/v1/users/me/bootstrap') ||
+    (request.method === 'DELETE' && request.path === '/api/v1/users/me')
+  );
 }
 
 function createAppCheckMiddleware(
@@ -754,7 +811,7 @@ function createRateLimitMiddleware(
 }
 
 async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser> {
-  const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(idToken);
+  const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(idToken, true);
   const email = typeof decodedToken.email === 'string' ? decodedToken.email : undefined;
 
   return {
@@ -782,6 +839,10 @@ async function defaultDeleteAuthUser(uid: string): Promise<void> {
   await getAuth(getFirebaseAdminApp()).deleteUser(uid);
 }
 
+async function defaultRevokeAuthTokens(uid: string): Promise<void> {
+  await getAuth(getFirebaseAdminApp()).revokeRefreshTokens(uid);
+}
+
 function requireRecentAuthentication(authUser: VerifiedAuthUser): void {
   const authTime = authUser.authTime;
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -790,7 +851,7 @@ function requireRecentAuthentication(authUser: VerifiedAuthUser): void {
     typeof authTime !== 'number' ||
     !Number.isFinite(authTime) ||
     authTime > nowSeconds + 30 ||
-    nowSeconds - authTime > RECENT_AUTHENTICATION_WINDOW_SECONDS
+    nowSeconds - authTime > getRecentAuthenticationWindowSeconds()
   ) {
     throw new ApiError(
       401,
@@ -864,10 +925,13 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   const app = express();
   let adminContentRepository = options.adminContentRepository;
   let adminReportRepository = options.adminReportRepository;
+  let avatarUploadService = options.avatarUploadService;
   let learningContentRepository = options.learningContentRepository;
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
   const deleteAuthUser = options.deleteAuthUser ?? defaultDeleteAuthUser;
+  const revokeAuthTokens =
+    options.revokeAuthTokens ?? (isTestRuntime() ? async () => {} : defaultRevokeAuthTokens);
   const appCheckEnforcement =
     options.appCheckEnforcement ??
     (isTestRuntime()
@@ -879,7 +943,6 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     appCheckEnforcement === 'enforced',
     options.verifyAppCheckToken ?? defaultVerifyAppCheckToken,
   );
-  const requireAuth = createAuthMiddleware(options.verifyAuthToken ?? defaultVerifyAuthToken);
   const rateLimitPolicies = getApiRateLimitPolicies();
   const rateLimiter =
     options.rateLimiter ??
@@ -994,6 +1057,12 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     return adminReportRepository;
   }
 
+  function getAvatarUploadService(): AvatarUploadService {
+    avatarUploadService ??= createDefaultAvatarUploadService();
+
+    return avatarUploadService;
+  }
+
   function getLearningRepository(): LearningRepository {
     learningRepository ??= createDefaultLearningRepository();
 
@@ -1011,6 +1080,30 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
 
     return playgroundRepository;
   }
+
+  const requireAuth = createAuthMiddleware(
+    options.verifyAuthToken ?? defaultVerifyAuthToken,
+    async (request, authUser) => {
+      if (
+        isAccountDeletionRecoveryRequest(request) ||
+        (isTestRuntime() && options.learningRepository === undefined)
+      ) {
+        return;
+      }
+
+      const accountState = await getLearningRepository().getLearnerAccountStatus({
+        uid: authUser.uid,
+      });
+
+      if (accountState.data.status !== 'active') {
+        throw new ApiError(
+          403,
+          'ACCOUNT_DELETION_PENDING',
+          'Account access is unavailable while account deletion is pending.',
+        );
+      }
+    },
+  );
 
   app.disable('x-powered-by');
   app.use(helmet());
@@ -1070,6 +1163,41 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     }
   });
 
+  app.post(
+    '/api/v1/users/me/avatar/upload-sessions',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const uploadRequest = getAvatarUploadSessionBody(request);
+        const result = await getAvatarUploadService().createUploadSession({
+          ...uploadRequest,
+          uid: authUser.uid,
+        });
+
+        sendSuccess(response, result.statusCode, result.data);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post('/api/v1/users/me/avatar/finalize', requireAuth, async (request, response, next) => {
+    try {
+      const authUser = getAuthUser(response);
+      const { uploadSessionId } = getAvatarFinalizeBody(request);
+      const result = await getAvatarUploadService().finalizeUpload({
+        displayName: authUser.displayName || 'Learner',
+        uid: authUser.uid,
+        uploadSessionId,
+      });
+
+      sendSuccess(response, result.statusCode, result.data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.delete(
     '/api/v1/users/me',
     requireAuth,
@@ -1080,9 +1208,27 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
 
         const authUser = getAuthUser(response);
         requireRecentAuthentication(authUser);
-        await getLearningRepository().deleteLearnerAccount({ uid: authUser.uid });
-        await getPlaygroundRepository().deleteLearnerPlaygroundData({ uid: authUser.uid });
-        await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
+        const deletionState = await getLearningRepository().beginLearnerAccountDeletion({
+          displayName: authUser.displayName,
+          uid: authUser.uid,
+        });
+
+        try {
+          await revokeAuthTokens(authUser.uid);
+          await getAvatarUploadService().deleteAccountAvatars({
+            avatarUrl: deletionState.data.avatarUrl,
+            uid: authUser.uid,
+          });
+          await getLearningRepository().deleteLearnerAccount({ uid: authUser.uid });
+          await getPlaygroundRepository().deleteLearnerPlaygroundData({ uid: authUser.uid });
+          await deleteAuthUserIdempotently(deleteAuthUser, authUser.uid);
+        } catch {
+          throw new ApiError(
+            503,
+            'ACCOUNT_DELETION_RECOVERY_REQUIRED',
+            'Account deletion is pending. Reauthenticate and retry to finish cleanup.',
+          );
+        }
 
         sendNoContent(response);
       } catch (error) {

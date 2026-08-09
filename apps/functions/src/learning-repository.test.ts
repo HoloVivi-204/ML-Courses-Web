@@ -214,7 +214,7 @@ describe('Firestore learning repository', () => {
     });
     const retryResult = await repository.bootstrapLearner({
       uid: 'learner-01',
-      displayName: 'Changed Name',
+      displayName: '  Local Student  ',
     });
 
     expect(firstResult).toEqual({
@@ -252,6 +252,39 @@ describe('Firestore learning repository', () => {
       locale: 'vi',
       theme: 'system',
       status: 'active',
+    });
+    expect(documents.get('users/learner-01')).not.toHaveProperty('email');
+  });
+
+  it('syncs a changed Firebase display name without copying Auth email into the profile', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01': {
+        schemaVersion: 1,
+        displayName: 'Local Student',
+        avatarUrl: null,
+        locale: 'vi',
+        theme: 'system',
+        status: 'active',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.bootstrapLearner({
+      uid: 'learner-01',
+      displayName: 'Updated Student',
+    });
+
+    expect(result).toEqual({
+      statusCode: 200,
+      data: {
+        profile: expect.objectContaining({
+          displayName: 'Updated Student',
+          uid: 'learner-01',
+        }),
+      },
+    });
+    expect(documents.get('users/learner-01')).toMatchObject({
+      displayName: 'Updated Student',
     });
     expect(documents.get('users/learner-01')).not.toHaveProperty('email');
   });
@@ -382,6 +415,9 @@ describe('Firestore learning repository', () => {
       'users/learner-01/algorithmUnlocks/perceptron': {
         algorithmId: 'perceptron',
       },
+      'users/learner-01/avatarUploadSessions/pending-avatar-01': {
+        storagePath: 'user-avatars/learner-01/00000000-0000-4000-8000-000000000001',
+      },
       'users/learner-01/idempotencyKeys/delete-key': {
         operation: 'course-enrollment',
       },
@@ -421,6 +457,51 @@ describe('Firestore learning repository', () => {
     expect(documents.get('users/learner-02/enrollments/course-deep-learning-basic')).toMatchObject({
       courseId: 'course-deep-learning-basic',
     });
+  });
+
+  it('marks account deletion pending idempotently before cleanup and retains only the avatar pointer', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01': {
+        avatarUrl:
+          'https://storage.example.test/v0/b/local/o/user-avatars%2Flearner-01%2F00000000-0000-4000-8000-000000000001',
+        displayName: 'Local Student',
+        locale: 'en',
+        schemaVersion: 1,
+        status: 'active',
+        theme: 'dark',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const firstResult = await repository.beginLearnerAccountDeletion({
+      displayName: 'Ignored Replacement',
+      uid: 'learner-01',
+    });
+    const retryResult = await repository.beginLearnerAccountDeletion({
+      displayName: 'Ignored Replacement',
+      uid: 'learner-01',
+    });
+    const accessState = await repository.getLearnerAccountStatus({ uid: 'learner-01' });
+
+    expect(firstResult).toEqual({
+      data: {
+        avatarUrl:
+          'https://storage.example.test/v0/b/local/o/user-avatars%2Flearner-01%2F00000000-0000-4000-8000-000000000001',
+        status: 'deletion-pending',
+      },
+      statusCode: 200,
+    });
+    expect(retryResult).toEqual(firstResult);
+    expect(accessState).toEqual({ data: { status: 'deletion-pending' }, statusCode: 200 });
+    expect(documents.get('users/learner-01')).toMatchObject({
+      avatarUrl:
+        'https://storage.example.test/v0/b/local/o/user-avatars%2Flearner-01%2F00000000-0000-4000-8000-000000000001',
+      displayName: 'Local Student',
+      locale: 'en',
+      status: 'deletion-pending',
+      theme: 'dark',
+    });
+    expect(documents.get('users/learner-01')).not.toHaveProperty('email');
   });
 
   it('enrolls a learner idempotently and grants only the first module until its overview is viewed', async () => {

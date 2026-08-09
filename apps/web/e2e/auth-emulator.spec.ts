@@ -59,6 +59,70 @@ test.describe('Firebase local Emulator journey', () => {
     await expect(page).toHaveURL('/', { timeout: EMULATOR_FLOW_TIMEOUT_MS });
   });
 
+  test('persists profile changes, requires reauthentication, and deletes the local account', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    const email = `profile-${randomUUID()}@example.test`;
+    const password = `test-${randomUUID()}`;
+    const displayName = 'Avatar Lifecycle Learner';
+    const avatarBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jE8UAAAAASUVORK5CYII=',
+      'base64',
+    );
+
+    await page.goto('/register');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Mật khẩu').fill(password);
+    await page.getByRole('button', { name: 'Tạo tài khoản' }).click();
+    await expect(page).toHaveURL('/', { timeout: EMULATOR_FLOW_TIMEOUT_MS });
+
+    await page.goto('/profile');
+    await expect(page.locator('main.profile-page')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await page.locator('#profile-display-name').fill(displayName);
+    await page.locator('.profile-display-name-form button[type="submit"]').click();
+    await expect(page.locator('#profile-display-name')).toHaveValue(displayName);
+
+    await page.locator('#profile-avatar-upload').setInputFiles({
+      buffer: avatarBytes,
+      mimeType: 'image/png',
+      name: 'avatar.png',
+    });
+    const avatarImage = page.locator('.profile-avatar img');
+
+    await expect(avatarImage).toBeVisible({ timeout: EMULATOR_FLOW_TIMEOUT_MS });
+    const avatarUrl = await avatarImage.getAttribute('src');
+
+    expect(avatarUrl).toMatch(/127\.0\.0\.1:9199\/v0\/b\/demo-ml-learning-local\.appspot\.com/);
+    await page.locator('#profile-locale').selectOption('en');
+    await page.locator('#profile-theme').selectOption('dark');
+    await page.locator('.profile-preferences-form button[type="submit"]').click();
+    await expect(page.locator('#profile-locale')).toHaveValue('en');
+    await expect(page.locator('#profile-theme')).toHaveValue('dark');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    await page.reload();
+    await expect(page.locator('#profile-display-name')).toHaveValue(displayName);
+    await expect(page.locator('.profile-avatar img')).toHaveAttribute('src', avatarUrl ?? '');
+    await expect(page.locator('#profile-locale')).toHaveValue('en');
+    await expect(page.locator('#profile-theme')).toHaveValue('dark');
+
+    await page.waitForTimeout(1_500);
+    await page.locator('#account-delete-confirmation').fill('DELETE');
+    await page.locator('.profile-delete-button').click();
+    await expect(page.locator('#profile-reauthentication-password')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await page.locator('#profile-reauthentication-password').fill(password);
+    await page.locator('.profile-reauthentication form button[type="submit"]').click();
+    await expect(page).toHaveURL(/\/login\?returnTo=%2Fprofile$/, {
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+  });
+
   test('runs the learner baseline from auth to dashboard through local emulators', async ({
     page,
   }) => {

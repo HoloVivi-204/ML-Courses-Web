@@ -37,12 +37,23 @@ import {
 
 export type LearnerLocalePreference = 'en' | 'vi';
 export type LearnerThemePreference = 'dark' | 'light' | 'system';
+export type LearnerAccountStatus = 'active' | 'anonymized' | 'deletion-pending';
 
 export interface BootstrapLearnerInput {
   displayName: string;
   locale?: LearnerLocalePreference | undefined;
   theme?: LearnerThemePreference | undefined;
   uid: string;
+}
+
+export interface BeginLearnerAccountDeletionInput {
+  displayName: string;
+  uid: string;
+}
+
+export interface LearnerAccountDeletionState {
+  avatarUrl: string | null;
+  status: LearnerAccountStatus;
 }
 
 export interface EnrollLearnerInput {
@@ -179,6 +190,10 @@ export interface LearningProgressSnapshot {
 }
 
 export interface LearningRepository {
+  beginLearnerAccountDeletion(input: BeginLearnerAccountDeletionInput): Promise<{
+    data: LearnerAccountDeletionState;
+    statusCode: 200;
+  }>;
   bootstrapLearner(input: BootstrapLearnerInput): Promise<{
     data: unknown;
     statusCode: 200 | 201;
@@ -217,6 +232,10 @@ export interface LearningRepository {
   }>;
   getProgress(input: GetProgressInput): Promise<{
     data: LearningProgressSnapshot;
+    statusCode: 200;
+  }>;
+  getLearnerAccountStatus(input: { uid: string }): Promise<{
+    data: { status: LearnerAccountStatus };
     statusCode: 200;
   }>;
   submitQuizAttempt(input: SubmitQuizAttemptInput): Promise<{
@@ -264,7 +283,7 @@ interface LearnerProfilePayload {
   displayName: string;
   locale: LearnerLocalePreference;
   schemaVersion: 1;
-  status: 'active' | 'anonymized' | 'deletion-pending';
+  status: LearnerAccountStatus;
   theme: LearnerThemePreference;
   uid: string;
 }
@@ -362,6 +381,7 @@ const QUIZ_ATTEMPT_TTL_MS = 2 * 60 * 60 * 1_000;
 const FIRESTORE_BATCH_DELETE_LIMIT = 450;
 const LEARNER_ACCOUNT_SUBCOLLECTIONS = [
   'algorithmUnlocks',
+  'avatarUploadSessions',
   'contentAccess',
   'demoCompletions',
   'demoViews',
@@ -1347,16 +1367,75 @@ export function createFirestoreLearningRepository(
     options.contentAuthority ?? createFirestoreLearningContentAuthority(firestore);
 
   return {
+    async beginLearnerAccountDeletion(input) {
+      return firestore.runTransaction(async (transaction) => {
+        const profileRef = firestore.doc(`users/${input.uid}`);
+        const profileSnapshot = await transaction.get(profileRef);
+        const currentProfile = profileSnapshot.exists
+          ? toProfileResponse(input.uid, profileSnapshot.data() ?? {})
+          : createProfilePayload(input);
+        const status: LearnerAccountStatus =
+          currentProfile.status === 'anonymized' ? 'anonymized' : 'deletion-pending';
+
+        if (!profileSnapshot.exists || currentProfile.status === 'active') {
+          transaction.set(
+            profileRef,
+            {
+              ...(profileSnapshot.exists
+                ? {}
+                : {
+                    schemaVersion: currentProfile.schemaVersion,
+                    displayName: currentProfile.displayName,
+                    avatarUrl: currentProfile.avatarUrl,
+                    locale: currentProfile.locale,
+                    theme: currentProfile.theme,
+                    createdAt: FieldValue.serverTimestamp(),
+                  }),
+              status,
+              deletionRequestedAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        return {
+          data: {
+            avatarUrl: currentProfile.avatarUrl,
+            status,
+          },
+          statusCode: 200 as const,
+        };
+      });
+    },
     async bootstrapLearner(input) {
       return firestore.runTransaction(async (transaction) => {
         const profileRef = firestore.doc(`users/${input.uid}`);
         const profileSnapshot = await transaction.get(profileRef);
 
         if (profileSnapshot.exists) {
+          const existingProfile = toProfileResponse(input.uid, profileSnapshot.data() ?? {});
+          const displayName = normalizeDisplayName(input.displayName);
+          const profile =
+            existingProfile.status === 'active' && existingProfile.displayName !== displayName
+              ? { ...existingProfile, displayName }
+              : existingProfile;
+
+          if (profile.displayName !== existingProfile.displayName) {
+            transaction.set(
+              profileRef,
+              {
+                displayName: profile.displayName,
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+          }
+
           return {
             statusCode: 200,
             data: {
-              profile: toProfileResponse(input.uid, profileSnapshot.data() ?? {}),
+              profile,
             },
           };
         }
@@ -2251,6 +2330,17 @@ export function createFirestoreLearningRepository(
           postViews,
           quizProgress,
         }),
+      };
+    },
+    async getLearnerAccountStatus(input) {
+      const profileSnapshot = await firestore.doc(`users/${input.uid}`).get();
+      const status = profileSnapshot.exists
+        ? toProfileResponse(input.uid, profileSnapshot.data() ?? {}).status
+        : 'active';
+
+      return {
+        data: { status },
+        statusCode: 200 as const,
       };
     },
     async submitQuizAttempt(input) {

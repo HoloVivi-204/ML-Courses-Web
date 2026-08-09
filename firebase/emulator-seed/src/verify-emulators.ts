@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { deleteApp } from 'firebase-admin/app';
 
@@ -15,6 +15,10 @@ import { readSeedSnapshot } from './seed-snapshot.js';
 
 const FIREBASE_REGION = 'asia-southeast1';
 const AUTH_EMULATOR_BASE_URL = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
+const VALID_PNG_BYTES = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jE8UAAAAASUVORK5CYII=',
+  'base64',
+);
 
 function getApiEndpoint(path: string): string {
   return `http://127.0.0.1:5001/${LOCAL_FIREBASE_PROJECT_ID}/${FIREBASE_REGION}/api${path}`;
@@ -32,6 +36,14 @@ function getRecordField(record: Record<string, unknown>, field: string): Record<
   const value = record[field];
 
   assertRecord(value, `${field} must be an object.`);
+
+  return value;
+}
+
+function getStringField(record: Record<string, unknown>, field: string): string {
+  const value = record[field];
+
+  assert.ok(typeof value === 'string', `${field} must be a string.`);
 
   return value;
 }
@@ -82,7 +94,7 @@ async function requestApiJson(
     body?: Record<string, unknown> | undefined;
     idToken: string;
     idempotencyKey?: string | undefined;
-    method?: 'GET' | 'PATCH' | 'POST' | undefined;
+    method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | undefined;
   },
 ): Promise<Response> {
   const headers: Record<string, string> = {
@@ -107,6 +119,43 @@ async function requestApiJson(
   }
 
   return fetch(getApiEndpoint(path), requestInit);
+}
+
+async function requestAvatarStorageUpload(input: {
+  idToken: string;
+  storagePath: string;
+}): Promise<Response> {
+  const boundary = `avatar-rule-${randomUUID()}`;
+  const sha256 = createHash('sha256').update(VALID_PNG_BYTES).digest('hex');
+  const metadata = JSON.stringify({
+    contentType: 'image/png',
+    metadata: {
+      schemaVersion: '1',
+      sha256,
+      sourceId: 'user-avatar',
+    },
+    name: input.storagePath,
+  });
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Type: application/json; charset=utf-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: image/png\r\n\r\n`,
+    ),
+    VALID_PNG_BYTES,
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+
+  return fetch(
+    `http://127.0.0.1:9199/v0/b/${LOCAL_STORAGE_BUCKET}/o?name=${encodeURIComponent(input.storagePath)}`,
+    {
+      body,
+      headers: {
+        Authorization: `Firebase ${input.idToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+        'X-Goog-Upload-Protocol': 'multipart',
+      },
+      method: 'POST',
+    },
+  );
 }
 
 async function registerWithEmailPassword(email: string, password: string): Promise<string> {
@@ -183,6 +232,128 @@ async function assertEmailPasswordAuthentication(): Promise<void> {
 
   await registerWithEmailPassword(email, password);
   await signInWithEmailPassword(email, password);
+}
+
+async function assertProfileAvatarAccountLifecycle(): Promise<void> {
+  const services = createLocalAdminServices();
+  const email = `profile-lifecycle-${randomUUID()}@example.test`;
+  const password = `test-${randomUUID()}`;
+
+  try {
+    const idToken = await registerWithEmailPassword(email, password);
+    const uid = (await services.auth.getUserByEmail(email)).uid;
+    const otherEmail = `avatar-other-${randomUUID()}@example.test`;
+    await registerWithEmailPassword(otherEmail, `test-${randomUUID()}`);
+    const otherUid = (await services.auth.getUserByEmail(otherEmail)).uid;
+    const crossOwnerUpload = await requestAvatarStorageUpload({
+      idToken,
+      storagePath: `user-avatars/${otherUid}/${randomUUID()}`,
+    });
+
+    assert.equal(
+      crossOwnerUpload.status,
+      403,
+      'Storage Rules must reject cross-owner avatar writes.',
+    );
+    const bootstrapResponse = await requestApiJson('/api/v1/users/me/bootstrap', {
+      body: { locale: 'vi', theme: 'system' },
+      idToken,
+      method: 'POST',
+    });
+
+    await readSuccessData(bootstrapResponse, 201);
+
+    const sha256 = createHash('sha256').update(VALID_PNG_BYTES).digest('hex');
+    const uploadSessionData = await readSuccessData(
+      await requestApiJson('/api/v1/users/me/avatar/upload-sessions', {
+        body: { contentType: 'image/png', sha256, sizeBytes: VALID_PNG_BYTES.byteLength },
+        idToken,
+        method: 'POST',
+      }),
+      201,
+    );
+    const uploadSession = getRecordField(uploadSessionData, 'uploadSession');
+    const storagePath = getStringField(uploadSession, 'storagePath');
+    const uploadMetadata = getRecordField(uploadSession, 'metadata');
+
+    await services.bucket.file(storagePath).save(VALID_PNG_BYTES, {
+      metadata: {
+        contentType: getStringField(uploadSession, 'contentType'),
+        metadata: {
+          schemaVersion: getStringField(uploadMetadata, 'schemaVersion'),
+          sha256: getStringField(uploadMetadata, 'sha256'),
+          sourceId: getStringField(uploadMetadata, 'sourceId'),
+        },
+      },
+      resumable: false,
+    });
+
+    const finalizedData = await readSuccessData(
+      await requestApiJson('/api/v1/users/me/avatar/finalize', {
+        body: { uploadSessionId: getStringField(uploadSession, 'uploadSessionId') },
+        idToken,
+        method: 'POST',
+      }),
+      200,
+    );
+    const finalizedProfile = getRecordField(finalizedData, 'profile');
+
+    assert.match(getStringField(finalizedProfile, 'avatarUrl'), /user-avatars%2F/);
+
+    const learnerDocuments = [
+      'algorithmUnlocks/perceptron',
+      'contentAccess/post_dl-p01-neuron-perceptron',
+      'demoCompletions/demo-perceptron-and-gate',
+      'demoViews/demo-perceptron-and-gate',
+      'enrollments/course-deep-learning-basic',
+      'idempotencyKeys/delete-lifecycle',
+      'moduleCompletions/dl-m01-neuron-perceptron',
+      'moduleProgress/dl-m01-neuron-perceptron',
+      'postCompletions/dl-p01-neuron-perceptron',
+      'postViews/dl-p01-neuron-perceptron',
+      'quizAttempts/attempt-lifecycle',
+      'quizProgress/quiz-module-dl-m01',
+      'playgroundConfigs/config-lifecycle',
+      'playgroundRuns/run-lifecycle',
+    ];
+
+    await Promise.all(
+      learnerDocuments.map((documentPath) =>
+        services.firestore.doc(`users/${uid}/${documentPath}`).set({ schemaVersion: 1 }),
+      ),
+    );
+    const playgroundRunSessionPath = `playgroundRunSessions/${randomUUID()}`;
+
+    await services.firestore.doc(playgroundRunSessionPath).set({ schemaVersion: 1, uid });
+    assert.equal((await services.bucket.file(storagePath).exists())[0], true);
+
+    const deletionResponse = await requestApiJson('/api/v1/users/me', {
+      idToken,
+      method: 'DELETE',
+    });
+
+    assert.equal(deletionResponse.status, 204);
+    await assert.rejects(services.auth.getUser(uid), { code: 'auth/user-not-found' });
+
+    const profileSnapshot = await services.firestore.doc(`users/${uid}`).get();
+
+    assert.equal(profileSnapshot.exists, true);
+    assert.equal(profileSnapshot.get('status'), 'anonymized');
+    assert.equal(profileSnapshot.get('avatarUrl'), null);
+    assert.equal(profileSnapshot.get('email'), undefined);
+    assert.equal((await services.bucket.file(storagePath).exists())[0], false);
+    assert.equal((await services.firestore.doc(playgroundRunSessionPath).get()).exists, false);
+
+    for (const documentPath of learnerDocuments) {
+      assert.equal(
+        (await services.firestore.doc(`users/${uid}/${documentPath}`).get()).exists,
+        false,
+        `${documentPath} must be deleted with the account.`,
+      );
+    }
+  } finally {
+    await deleteApp(services.app);
+  }
 }
 
 async function assertClientAccessDenied(): Promise<void> {
@@ -1010,6 +1181,7 @@ await assertEmulatorHub();
 await verifyResetAndSeed();
 await assertHealthEndpoint();
 await assertEmailPasswordAuthentication();
+await assertProfileAvatarAccountLifecycle();
 await assertProtectedLearningContentApi();
 await assertAdminContentLifecycleApi();
 await assertFirestoreAdminContentPersistence();
@@ -1028,6 +1200,7 @@ console.log(
     directProgressWrites: 'denied',
     adminContentLifecycle: 'verified',
     emergencyWithdraw: 'verified',
+    profileAvatarAccountLifecycle: 'verified',
     protectedLearningContent: 'verified',
   }),
 );

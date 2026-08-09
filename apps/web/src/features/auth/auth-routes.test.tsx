@@ -25,6 +25,17 @@ function createLearnerProfileFixture(
 function createLearningApiClient() {
   return {
     bootstrapProfile: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
+    createAvatarUploadSession: vi.fn().mockResolvedValue({
+      contentType: 'image/png',
+      expiresAt: '2026-08-09T16:15:00.000Z',
+      metadata: {
+        schemaVersion: '1',
+        sha256: 'a'.repeat(64),
+        sourceId: 'user-avatar',
+      },
+      storagePath: 'user-avatars/learner-01/avatar-01',
+      uploadSessionId: 'avatar-session-01',
+    }),
     cancelPlaygroundRunSession: vi.fn().mockResolvedValue({
       sessionId: 'session-pg-xor-01',
       status: 'cancelled',
@@ -271,6 +282,7 @@ function createLearningApiClient() {
       compatibilityReason: null,
     }),
     deleteAccount: vi.fn().mockResolvedValue(undefined),
+    finalizeAvatarUpload: vi.fn().mockResolvedValue(createLearnerProfileFixture()),
     deletePlaygroundConfig: vi.fn().mockResolvedValue(undefined),
     deletePlaygroundRun: vi.fn().mockResolvedValue(undefined),
     updatePlaygroundConfig: vi.fn().mockResolvedValue({
