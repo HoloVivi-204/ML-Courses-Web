@@ -1588,7 +1588,16 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
+    await user.click(
+      screen.getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('link', {
+        name: /Mở bài viết|Tiếp tục đọc|Tiếp tục bài viết|Xem lại bài viết|Ôn lại bài viết|Open post|Resume post|Review post/i,
+      }),
+    );
 
     expect(learningApiClient.recordModuleOverview).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -1690,6 +1699,62 @@ describe('public learning journey', () => {
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
   });
 
+  it('offers a saved reading position that survives a locale change', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    );
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createInitialProgressSnapshot(),
+        posts: [
+          {
+            bestScore: 0,
+            completed: false,
+            contentViewed: false,
+            postId: 'dl-p01-neuron-perceptron',
+            quizId: 'quiz-post-dl-p01',
+            quizPassed: false,
+            readingPosition: 'weighted-sum',
+            started: true,
+            viewedItemIds: ['what-is-a-neuron'],
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    const resumeBanner = await screen.findByRole(
+      'complementary',
+      { name: 'Tiếp tục phần đang đọc' },
+      { timeout: LAZY_ROUTE_TIMEOUT_MS },
+    );
+    expect(resumeBanner).toHaveAttribute('data-reading-position', 'weighted-sum');
+    expect(within(resumeBanner).getByText(/weighted-sum/i)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
+
+    const englishResumeBanner = await screen.findByRole('complementary', {
+      name: 'Resume your reading',
+    });
+    expect(englishResumeBanner).toHaveAttribute('data-reading-position', 'weighted-sum');
+    const savedBlock = document.getElementById('weighted-sum');
+    expect(savedBlock).not.toBeNull();
+    const scrollIntoView = vi.fn();
+    savedBlock!.scrollIntoView = scrollIntoView;
+
+    await user.click(
+      within(englishResumeBanner).getByRole('button', { name: 'Jump to saved position' }),
+    );
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+  });
+
   it('shows backend-verified progress and unlocked algorithms on the learning path', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     const learningApiClient = createLearningApiClient({
@@ -1772,11 +1837,224 @@ describe('public learning journey', () => {
     expect(screen.getByText('Quiz bài học: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
-    expect(screen.getByRole('link', { name: /Mở Playground XOR/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Mở Playground Perceptron/i })).toHaveAttribute(
       'href',
       '/playground/pg-xor',
     );
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+  });
+
+  it('shows a module overview CTA for every opened module and explains locked prerequisites', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        courses: [
+          {
+            courseId: 'course-deep-learning-basic',
+            demos: [],
+            modules: [
+              {
+                completedStepCount: 4,
+                moduleId: 'dl-m01-neuron-perceptron',
+                overviewViewed: true,
+                progressPercent: 100,
+                requiredStepCount: 4,
+                status: 'completed' as const,
+              },
+              {
+                completedStepCount: 0,
+                moduleId: 'dl-m02-mlp',
+                overviewViewed: false,
+                progressPercent: 0,
+                requiredStepCount: 4,
+                status: 'in-progress' as const,
+              },
+              {
+                completedStepCount: 0,
+                moduleId: 'dl-m03-training-generalization',
+                overviewViewed: false,
+                progressPercent: 0,
+                requiredStepCount: 4,
+                status: 'locked' as const,
+              },
+            ],
+            posts: [],
+            progressPercent: 33,
+            quizzes: [],
+            status: 'in-progress' as const,
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await waitFor(() =>
+      expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token'),
+    );
+    expect(await screen.findByRole('heading', { name: /lộ trình học/i })).toBeVisible();
+    expect(screen.getByRole('link', { name: /mở tổng quan module/i })).toHaveAttribute(
+      'href',
+      '/learn/course-deep-learning-basic/modules/dl-m02-mlp',
+    );
+    expect(screen.getByText('Hoàn thành dl-m02-mlp trước.')).toBeVisible();
+  });
+
+  it('opens the requested module overview and keeps its sequence links module-scoped', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/modules/dl-m02-mlp');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createInitialProgressSnapshot(),
+        contentAccess: [
+          { contentType: 'module' as const, entityId: 'dl-m02-mlp' },
+          { contentType: 'post' as const, entityId: 'dl-p02-mlp-forward-activation' },
+        ],
+        courses: [
+          {
+            courseId: 'course-deep-learning-basic',
+            demos: [],
+            modules: [
+              {
+                completedStepCount: 4,
+                moduleId: 'dl-m01-neuron-perceptron',
+                overviewViewed: true,
+                progressPercent: 100,
+                requiredStepCount: 4,
+                status: 'completed' as const,
+              },
+              {
+                completedStepCount: 0,
+                moduleId: 'dl-m02-mlp',
+                overviewViewed: false,
+                progressPercent: 0,
+                requiredStepCount: 4,
+                status: 'in-progress' as const,
+              },
+              {
+                completedStepCount: 0,
+                moduleId: 'dl-m03-training-generalization',
+                overviewViewed: false,
+                progressPercent: 0,
+                requiredStepCount: 4,
+                status: 'locked' as const,
+              },
+            ],
+            posts: [],
+            progressPercent: 33,
+            quizzes: [],
+            status: 'in-progress' as const,
+          },
+        ],
+      }),
+      recordModuleOverview: vi.fn().mockResolvedValue({
+        moduleOverview: {
+          moduleId: 'dl-m02-mlp',
+          nextPostId: 'dl-p02-mlp-forward-activation',
+          status: 'completed' as const,
+        },
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Mạng nơ-ron nhiều lớp' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: /mở bài viết/i })).toHaveAttribute(
+      'href',
+      '/learn/course-deep-learning-basic/posts/dl-p02-mlp-forward-activation',
+    );
+    expect(
+      screen.getByText('Hoàn thành mọi bài viết trong module trước khi xem demo.'),
+    ).toBeVisible();
+    expect(learningApiClient.recordModuleOverview).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      moduleId: 'dl-m02-mlp',
+    });
+  });
+
+  it('marks the first incomplete post as the next step after an earlier post is complete', async () => {
+    window.history.pushState({}, '', '/learn/course-classical-ml/modules/cml-m01-foundations');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createInitialProgressSnapshot(),
+        contentAccess: [
+          { contentType: 'module' as const, entityId: 'cml-m01-foundations' },
+          { contentType: 'post' as const, entityId: 'cml-p01-problem-data-types' },
+          { contentType: 'post' as const, entityId: 'cml-p02-train-test-metrics' },
+        ],
+        enrollment: {
+          courseId: 'course-classical-ml',
+          progressPercent: 25,
+          status: 'in-progress' as const,
+        },
+        modules: [
+          {
+            completedStepCount: 2,
+            moduleId: 'cml-m01-foundations',
+            overviewViewed: true,
+            progressPercent: 50,
+            requiredStepCount: 4,
+            status: 'in-progress' as const,
+          },
+        ],
+        posts: [
+          {
+            bestScore: 100,
+            completed: true,
+            contentViewed: true,
+            postId: 'cml-p01-problem-data-types',
+            quizId: 'quiz-post-cml-p01',
+            quizPassed: true,
+            readingPosition: 'problem-data-types',
+            started: true,
+            viewedItemIds: ['problem-data-types'],
+          },
+        ],
+      }),
+      recordModuleOverview: vi.fn().mockResolvedValue({
+        moduleOverview: {
+          moduleId: 'cml-m01-foundations',
+          nextPostId: 'cml-p01-problem-data-types',
+          status: 'completed' as const,
+        },
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    const nextPost = await screen.findByRole('link', { name: 'Mở bài viết' });
+    expect(nextPost).toHaveAttribute(
+      'href',
+      '/learn/course-classical-ml/posts/cml-p02-train-test-metrics',
+    );
+    expect(nextPost).toHaveAttribute('data-next-post', 'true');
+    expect(screen.getByRole('link', { name: 'Xem lại bài viết' })).not.toHaveAttribute(
+      'data-next-post',
+    );
+  });
+
+  it('fails closed when the backend rejects a locked module overview', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/modules/dl-m02-mlp');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn(),
+      recordModuleOverview: vi.fn().mockRejectedValue(new Error('Module prerequisite missing.')),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Module bị khóa' })).toBeVisible();
+    expect(screen.getByText('403 / MODULE')).toBeVisible();
+    expect(learningApiClient.getProgress).not.toHaveBeenCalled();
   });
 
   it('shows a learner dashboard with server-verified progress separate from client-computed runs', async () => {
@@ -3281,7 +3559,16 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
+    await user.click(
+      screen.getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('link', {
+        name: /Mở bài viết|Tiếp tục đọc|Tiếp tục bài viết|Xem lại bài viết|Ôn lại bài viết|Open post|Resume post|Review post/i,
+      }),
+    );
     expect(
       await screen.findByRole(
         'heading',
@@ -3397,7 +3684,16 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
+    await user.click(
+      screen.getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('link', {
+        name: /Mở bài viết|Tiếp tục đọc|Tiếp tục bài viết|Xem lại bài viết|Ôn lại bài viết|Open post|Resume post|Review post/i,
+      }),
+    );
     expect(
       await screen.findByRole(
         'heading',
@@ -3639,6 +3935,119 @@ describe('public learning journey', () => {
     );
   });
 
+  it('gives useful first-wrong feedback and renders hint levels one and two', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
+    const attempt = {
+      attempt: {
+        attemptId: 'attempt-quiz-post-dl-p01-feedback',
+        attemptNumber: 1,
+        expiresAt: '2026-07-19T13:00:00.000Z',
+        passingScorePercent: 100,
+        questionCount: 1,
+        quizId: 'quiz-post-dl-p01',
+        quizKind: 'post' as const,
+        quizRevisionId: 'quiz-post-dl-p01-rev-r1',
+        requiredCorrectCount: 1,
+        shuffleSeed: null,
+      },
+      mastery: {
+        en: 'Answer the question to review the lesson.',
+        vi: 'Trả lời câu hỏi để xem lại bài học.',
+      },
+      questions: [
+        {
+          options: [
+            { optionId: 'opt-correct', text: { en: 'Correct option', vi: 'Đáp án đúng' } },
+            { optionId: 'opt-wrong', text: { en: 'Wrong option', vi: 'Đáp án sai' } },
+          ],
+          prompt: { en: 'Which option is useful?', vi: 'Lựa chọn nào hữu ích?' },
+          questionId: 'q-feedback',
+          sourceId: 'source-feedback',
+          type: 'single-choice' as const,
+        },
+      ],
+    };
+    const submitQuizAttempt = vi
+      .fn()
+      .mockResolvedValueOnce({
+        bestScore: 0,
+        feedback: [
+          {
+            hint: null,
+            hintLevel: 0 as const,
+            isCorrect: false,
+            questionId: 'q-feedback',
+          },
+        ],
+        newlyUnlocked: [],
+        passed: false,
+        score: 0,
+      })
+      .mockResolvedValueOnce({
+        bestScore: 0,
+        feedback: [
+          {
+            hint: {
+              en: 'Start with the observable boundary.',
+              vi: 'Bắt đầu từ ranh giới quan sát được.',
+            },
+            hintLevel: 1 as const,
+            isCorrect: false,
+            questionId: 'q-feedback',
+          },
+        ],
+        newlyUnlocked: [],
+        passed: false,
+        score: 0,
+      })
+      .mockResolvedValueOnce({
+        bestScore: 0,
+        feedback: [
+          {
+            hint: {
+              en: 'Compare the straight boundary with XOR.',
+              vi: 'So sánh ranh giới thẳng với XOR.',
+            },
+            hintLevel: 2 as const,
+            isCorrect: false,
+            questionId: 'q-feedback',
+          },
+        ],
+        newlyUnlocked: [],
+        passed: false,
+        score: 0,
+      });
+    const learningApiClient = createLearningApiClient({
+      createQuizAttempt: vi.fn().mockResolvedValue(attempt),
+      submitQuizAttempt,
+    });
+    const user = userEvent.setup();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await screen.findByRole('radio', { name: 'Đáp án đúng' });
+    await user.click(screen.getByRole('button', { name: /tiếng Anh/i }));
+    await user.click(screen.getByRole('radio', { name: 'Correct option' }));
+    await user.click(screen.getByRole('button', { name: 'Submit quiz' }));
+    expect(
+      await screen.findByText(/Review this concept, then try the question again\./i),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(await screen.findByRole('radio', { name: 'Correct option' }));
+    await user.click(screen.getByRole('button', { name: 'Submit quiz' }));
+    expect(await screen.findByText(/Hint 1: Start with the observable boundary\./i)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(await screen.findByRole('radio', { name: 'Correct option' }));
+    await user.click(screen.getByRole('button', { name: 'Submit quiz' }));
+    expect(
+      await screen.findByText(/Hint 2: Compare the straight boundary with XOR\./i),
+    ).toBeVisible();
+  });
+
   it('lets an enrolled learner pass the post mastery quiz with server-side scoring', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     installVisibleContentBlockObserver();
@@ -3650,7 +4059,16 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
+    await user.click(
+      screen.getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('link', {
+        name: /Mở bài viết|Tiếp tục đọc|Tiếp tục bài viết|Xem lại bài viết|Ôn lại bài viết|Open post|Resume post|Review post/i,
+      }),
+    );
     expect(
       await screen.findByRole(
         'heading',
@@ -3678,6 +4096,10 @@ describe('public learning journey', () => {
     await user.click(screen.getByRole('button', { name: 'Nộp quiz' }));
 
     expect(await screen.findByText('quiz_passed: quiz-post-dl-p01')).toBeVisible();
+    expect(screen.getByText('Đáp án đúng')).toBeVisible();
+    expect(screen.getByText('Giải thích')).toBeVisible();
+    expect(screen.getByText('Nguồn tham khảo')).toBeVisible();
+    expect(screen.getByText('act-dl-p01-neuron-perceptron-quiz-01')).toBeVisible();
     expect(learningApiClient.submitQuizAttempt).toHaveBeenCalledWith({
       answers: [
         { questionId: 'q-dl-p01-perceptron-role', value: 'opt-linear-limit' },
@@ -3791,7 +4213,16 @@ describe('public learning journey', () => {
     expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
     expect(screen.getByText('Module hoàn thành: 0/4 bước')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: /Mở tổng quan module/i }));
+    await user.click(
+      screen.getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('link', {
+        name: /Mở bài viết|Tiếp tục đọc|Tiếp tục bài viết|Xem lại bài viết|Ôn lại bài viết|Open post|Resume post|Review post/i,
+      }),
+    );
     expect(
       await screen.findByRole(
         'heading',
@@ -3842,8 +4273,7 @@ describe('public learning journey', () => {
     });
 
     installImmediatePlaygroundWorker();
-    window.history.pushState({}, '', '/playground/pg-xor');
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    await user.click(screen.getByRole('link', { name: /Mở Playground Perceptron/i }));
 
     expect(
       await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),

@@ -1,5 +1,6 @@
 import { ApiError } from './api-error.js';
 import { getReleaseLearningCatalog } from './release-learning-catalog.js';
+import { getFixedDemo } from './release-demo-content.js';
 
 export interface DemoCompletionSeed {
   demoId: string;
@@ -7,43 +8,28 @@ export interface DemoCompletionSeed {
   requiredStepIds: readonly string[];
 }
 
-const handAuthoredDemoCompletionSeeds: Readonly<Record<string, DemoCompletionSeed>> = {
-  'demo-perceptron-and-gate': {
-    demoId: 'demo-perceptron-and-gate',
-    moduleId: 'dl-m01-neuron-perceptron',
-    requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
-  },
-  'demo-mlp-checkerboard': {
-    demoId: 'demo-mlp-checkerboard',
-    moduleId: 'dl-m02-mlp',
-    requiredStepIds: [
-      'checkerboard-problem',
-      'checkerboard-data',
-      'checkerboard-hidden-activation',
-      'checkerboard-output',
-    ],
-  },
-};
-
 function createDemoCompletionSeeds() {
   const generatedSeeds: Record<string, DemoCompletionSeed> = {};
 
   for (const module of getReleaseLearningCatalog().courses.flatMap((course) => course.modules)) {
-    if (!module.demoId || handAuthoredDemoCompletionSeeds[module.demoId]) {
+    if (!module.demoId) {
+      continue;
+    }
+
+    const demo = getFixedDemo(module.demoId);
+
+    if (!demo) {
       continue;
     }
 
     generatedSeeds[module.demoId] = {
       demoId: module.demoId,
       moduleId: module.moduleId,
-      requiredStepIds: ['problem', 'data', 'decision', 'result'],
+      requiredStepIds: demo.requiredStepIds,
     };
   }
 
-  return {
-    ...generatedSeeds,
-    ...handAuthoredDemoCompletionSeeds,
-  };
+  return generatedSeeds;
 }
 
 const demoCompletionSeeds: Readonly<Record<string, DemoCompletionSeed>> =

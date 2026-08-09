@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, RotateCcw } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
@@ -12,6 +12,7 @@ import type {
   QuizAttemptResult,
   QuizSubmissionResult,
 } from './learning-api';
+import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
 import { getPublicQuizRoute, type PublicQuizRoute } from './quiz-route-data';
 
 interface LearningQuizPageProps {
@@ -33,13 +34,20 @@ const copy: Readonly<
     {
       attempt: (attemptNumber: number) => string;
       backToLesson: string;
+      correctAnswer: string;
+      correctFeedback: string;
+      explanation: string;
       failed: string;
+      firstWrongFeedback: string;
+      hint: (level: 1 | 2) => string;
       loading: string;
       notFoundBack: string;
       notFoundBody: string;
       notFoundTitle: string;
+      openPlayground: (algorithm: string) => string;
       retry: string;
       score: (score: number, bestScore: number) => string;
+      sourceAttribution: string;
       submit: string;
       submitting: string;
     }
@@ -48,26 +56,40 @@ const copy: Readonly<
   en: {
     attempt: (attemptNumber) => `Attempt ${attemptNumber}`,
     backToLesson: 'Back to lesson',
+    correctAnswer: 'Correct answer',
+    correctFeedback: 'Correct',
+    explanation: 'Explanation',
     failed: 'The quiz could not be loaded or submitted. Try again.',
+    firstWrongFeedback: 'Review this concept, then try the question again.',
+    hint: (level) => `Hint ${level}`,
     loading: 'Loading quiz…',
     notFoundBack: 'Back to course catalog',
     notFoundBody: 'This quiz is not available for the current learner access.',
     notFoundTitle: 'Quiz not available',
+    openPlayground: (algorithm) => `Open ${algorithm} Playground`,
     retry: 'Try again',
     score: (score, bestScore) => `Score ${score}% · Best ${bestScore}%`,
+    sourceAttribution: 'Source attribution',
     submit: 'Submit quiz',
     submitting: 'Submitting quiz…',
   },
   vi: {
     attempt: (attemptNumber) => `Lần làm ${attemptNumber}`,
     backToLesson: 'Quay lại bài học',
+    correctAnswer: 'Đáp án đúng',
+    correctFeedback: 'Đúng',
+    explanation: 'Giải thích',
     failed: 'Chưa thể tải hoặc nộp quiz. Hãy thử lại.',
+    firstWrongFeedback: 'Hãy xem lại khái niệm này rồi thử lại câu hỏi.',
+    hint: (level) => `Gợi ý ${level}`,
     loading: 'Đang tải quiz…',
     notFoundBack: 'Về danh sách khóa học',
     notFoundBody: 'Quiz này chưa khả dụng với quyền truy cập hiện tại.',
     notFoundTitle: 'Quiz chưa khả dụng',
+    openPlayground: (algorithm) => `Mở Playground ${algorithm}`,
     retry: 'Làm lại',
     score: (score, bestScore) => `Điểm ${score}% · Cao nhất ${bestScore}%`,
+    sourceAttribution: 'Nguồn tham khảo',
     submit: 'Nộp quiz',
     submitting: 'Đang nộp quiz…',
   },
@@ -344,16 +366,42 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
             {submissionResult?.feedback
               .filter((feedback) => feedback.questionId === question.questionId)
               .map((feedback) => (
-                <p
-                  className={feedback.isCorrect ? 'quiz-feedback is-correct' : 'quiz-feedback'}
+                <div
+                  className="quiz-feedback-panel"
+                  data-hint-level={feedback.hintLevel}
                   key={feedback.questionId}
                 >
-                  {feedback.isCorrect ? '✓' : '•'}{' '}
-                  {feedback.hint ? localize(feedback.hint, locale) : null}
-                  {submissionResult.passed && feedback.explanation
-                    ? localize(feedback.explanation, locale)
-                    : null}
-                </p>
+                  <p className={feedback.isCorrect ? 'quiz-feedback is-correct' : 'quiz-feedback'}>
+                    {feedback.isCorrect ? '✓' : '•'}{' '}
+                    {feedback.isCorrect
+                      ? text.correctFeedback
+                      : feedback.hint
+                        ? `${text.hint(feedback.hintLevel === 1 ? 1 : 2)}: ${localize(feedback.hint, locale)}`
+                        : text.firstWrongFeedback}
+                  </p>
+                  {submissionResult.passed ? (
+                    <dl className="quiz-answer-review">
+                      {feedback.correctAnswer !== undefined ? (
+                        <div>
+                          <dt>{text.correctAnswer}</dt>
+                          <dd>{formatCorrectAnswer(question, feedback.correctAnswer, locale)}</dd>
+                        </div>
+                      ) : null}
+                      {feedback.explanation ? (
+                        <div>
+                          <dt>{text.explanation}</dt>
+                          <dd>{localize(feedback.explanation, locale)}</dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>{text.sourceAttribution}</dt>
+                        <dd>
+                          <code>{question.sourceId}</code>
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : null}
+                </div>
               ))}
           </fieldset>
         ))}
@@ -366,6 +414,24 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
             </p>
           ) : null}
           {submissionResult?.passed ? <p>quiz_passed: {attempt.attempt.quizId}</p> : null}
+          {submissionResult?.passed
+            ? submissionResult.newlyUnlocked
+                .filter((unlock) => unlock.type === 'algorithm')
+                .map((unlock) => {
+                  const playgroundPath = getPlaygroundPathForAlgorithm(unlock.id);
+
+                  return playgroundPath ? (
+                    <Link
+                      className="primary-link quiz-playground-link"
+                      key={unlock.id}
+                      to={playgroundPath}
+                    >
+                      {text.openPlayground(formatAlgorithmName(unlock.id))}
+                      <ArrowRight aria-hidden="true" size={17} />
+                    </Link>
+                  ) : null;
+                })
+            : null}
           {submitStatus === 'failed' ? <p role="alert">{text.failed}</p> : null}
           {submitStatus === 'submitting' ? <p>{text.submitting}</p> : null}
           <button
@@ -467,6 +533,22 @@ function isOptionSelected(value: QuizAnswerValue | undefined, optionId: string):
   }
 
   return value === optionId;
+}
+
+function formatCorrectAnswer(
+  question: QuizAttemptResult['questions'][number],
+  answer: QuizAnswerValue,
+  locale: Locale,
+): string {
+  const optionIds = Array.isArray(answer) ? answer : [answer];
+
+  return optionIds
+    .map((optionId) => {
+      const option = question.options.find((candidate) => candidate.optionId === optionId);
+
+      return option ? localize(option.text, locale) : optionId;
+    })
+    .join(', ');
 }
 
 function QuizNotFoundPage({ locale }: { locale: Locale }) {

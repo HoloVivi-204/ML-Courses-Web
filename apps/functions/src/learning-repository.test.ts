@@ -1070,6 +1070,57 @@ describe('Firestore learning repository', () => {
     }
   });
 
+  it('completes a module quiz without a demo when the module has no demo', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-classical/enrollments/course-classical-ml': {
+        courseId: 'course-classical-ml',
+        progressPercent: 0,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+      'users/learner-classical/contentAccess/module_cml-m01-foundations': {
+        contentType: 'module',
+        entityId: 'cml-m01-foundations',
+        schemaVersion: 1,
+      },
+      'users/learner-classical/postCompletions/cml-p01-problem-data-types': {
+        postId: 'cml-p01-problem-data-types',
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-classical/postCompletions/cml-p02-train-test-metrics': {
+        postId: 'cml-p02-train-test-metrics',
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-classical/quizAttempts/attempt-quiz-module-cml-m01':
+        createOpenAttemptDocument('quiz-module-cml-m01'),
+      'users/learner-classical/quizProgress/quiz-module-cml-m01': {
+        attemptCount: 1,
+        bestScore: 0,
+        passed: false,
+        schemaVersion: 1,
+        wrongCounts: {},
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.submitQuizAttempt({
+      answers: createPassingAnswers('quiz-module-cml-m01'),
+      attemptId: 'attempt-quiz-module-cml-m01',
+      idempotencyKey: 'pass-quiz-module-cml-m01',
+      uid: 'learner-classical',
+    });
+
+    expect(result.data).toMatchObject({ passed: true, score: 100 });
+    expect(
+      documents.get('users/learner-classical/moduleCompletions/cml-m01-foundations'),
+    ).toMatchObject({
+      moduleId: 'cml-m01-foundations',
+      status: 'completed',
+    });
+  });
+
   it('rejects direct module quiz completion when required post and demo completion are missing', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/quizAttempts/attempt-module-quiz-direct': {

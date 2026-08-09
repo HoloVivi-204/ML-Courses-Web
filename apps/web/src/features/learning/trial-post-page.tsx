@@ -117,6 +117,25 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
     }
   }, [courseId, getIdToken, hasFullAccess, learningApiClient, postId, status, uid]);
 
+  const restoreSavedReadingPosition = useCallback(() => {
+    if (!savedReadingPosition || !articleRef.current) {
+      return;
+    }
+
+    const target = document.getElementById(savedReadingPosition);
+
+    if (
+      !target ||
+      !articleRef.current.contains(target) ||
+      typeof target.scrollIntoView !== 'function'
+    ) {
+      return;
+    }
+
+    restoredReadingPositionRef.current = savedReadingPosition;
+    target.scrollIntoView({ block: 'start' });
+  }, [savedReadingPosition]);
+
   const queuePostView = useCallback(
     (blockId: string) => {
       observedItemIdsRef.current.add(blockId);
@@ -345,6 +364,10 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   }, [hasFullAccess, post, queuePostView, status]);
 
   useEffect(() => {
+    restoredReadingPositionRef.current = null;
+  }, [locale]);
+
+  useEffect(() => {
     if (
       !savedReadingPosition ||
       restoredReadingPositionRef.current === savedReadingPosition ||
@@ -353,19 +376,8 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       return;
     }
 
-    const target = document.getElementById(savedReadingPosition);
-
-    if (
-      !target ||
-      !articleRef.current.contains(target) ||
-      typeof target.scrollIntoView !== 'function'
-    ) {
-      return;
-    }
-
-    restoredReadingPositionRef.current = savedReadingPosition;
-    target.scrollIntoView({ block: 'start' });
-  }, [savedReadingPosition]);
+    restoreSavedReadingPosition();
+  }, [locale, restoreSavedReadingPosition, savedReadingPosition]);
 
   if (isContentLoading) {
     return (
@@ -381,6 +393,16 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
 
   const eyebrowKey = post.accessLevel === 'full' ? 'trial.fullEyebrow' : 'trial.eyebrow';
   const module = getCourse(post.courseId)?.modules?.find((item) => item.id === post.moduleId);
+  const backToLearningPath =
+    hasFullAccess && module
+      ? {
+          label: 'trial.backToModule' as const,
+          path: `/learn/${post.courseId}/modules/${post.moduleId}`,
+        }
+      : {
+          label: 'trial.backToCourse' as const,
+          path: `/courses/${post.courseId}`,
+        };
   const demoPath =
     post.accessLevel === 'full' && module?.demoId
       ? `/learn/${post.courseId}/demos/${module.demoId}`
@@ -413,9 +435,9 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
 
   return (
     <main className="trial-post-page page-shell">
-      <Link className="breadcrumb-link" to={`/courses/${post.courseId}`}>
+      <Link className="breadcrumb-link" to={backToLearningPath.path}>
         <ArrowLeft aria-hidden="true" size={16} />
-        {t('trial.backToCourse')}
+        {t(backToLearningPath.label)}
       </Link>
       <header className="trial-post-heading">
         <div className="trial-post-kicker">
@@ -433,6 +455,22 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
           <strong>{post.id}</strong>
         </div>
       </header>
+
+      {hasFullAccess && savedReadingPosition ? (
+        <aside
+          aria-label={t('trial.resumeReading.title')}
+          className="trial-resume-banner"
+          data-reading-position={savedReadingPosition}
+        >
+          <div>
+            <strong>{t('trial.resumeReading.title')}</strong>
+            <p>{t('trial.resumeReading.body', { position: savedReadingPosition })}</p>
+          </div>
+          <button className="secondary-link" onClick={restoreSavedReadingPosition} type="button">
+            {t('trial.resumeReading.cta')}
+          </button>
+        </aside>
+      ) : null}
 
       <div className="trial-reading-layout">
         <aside className="trial-contents">

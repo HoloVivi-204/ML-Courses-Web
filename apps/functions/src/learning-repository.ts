@@ -2389,7 +2389,7 @@ export function createFirestoreLearningRepository(
           grade.passed &&
           moduleSeed &&
           (moduleRequiredPostCompletionSnapshots.some((snapshot) => !snapshot.exists) ||
-            !moduleDemoCompletionSnapshot?.exists)
+            (moduleDemoCompletionRef !== null && !moduleDemoCompletionSnapshot?.exists))
         ) {
           throw new ApiError(
             403,

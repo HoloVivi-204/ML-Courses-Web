@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Clock3, LockKeyhole, Sparkles } from 'lucide-rea
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
+import { useAuth } from '../auth/auth-context';
 import { CourseCard } from './course-card';
 import { courses, getCourse, localize, type Locale } from './course-data';
 
@@ -37,6 +38,7 @@ export function CourseCatalogPage({ locale }: LocaleProps) {
 
 export function CoursePage({ locale }: LocaleProps) {
   const { t } = useTranslation();
+  const { status } = useAuth();
   const { courseId } = useParams();
   const course = getCourse(courseId);
 
@@ -70,6 +72,12 @@ export function CoursePage({ locale }: LocaleProps) {
                 {t('course.viewRoadmap')}
                 <ArrowRight aria-hidden="true" size={18} />
               </a>
+            ) : null}
+            {status === 'authenticated' ? (
+              <Link className="secondary-link" to={`/learn/${course.id}`}>
+                {t('course.openLearningPath')}
+                <ArrowRight aria-hidden="true" size={18} />
+              </Link>
             ) : null}
           </div>
           <div className="course-signal" aria-hidden="true">

@@ -27,4 +27,13 @@ describe('demo manifest', () => {
       assertRequiredDemoStepsViewed('demo-linear-calibration', ['problem', 'data', 'decision']),
     ).toThrowError(expect.objectContaining({ code: 'REQUIRED_DEMO_STEPS_MISSING' }));
   });
+
+  it('derives completion steps from the published demo content IDs', () => {
+    expect(getDemoCompletionSeed('demo-linear-calibration').requiredStepIds).toEqual([
+      'linear-problem',
+      'linear-data',
+      'linear-line',
+      'linear-residual',
+    ]);
+  });
 });

@@ -1,11 +1,20 @@
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LockKeyhole, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
-import { getCourse, localize, type Locale } from '../catalog/course-data';
-import type { LearningApiClient, LearningProgressSnapshot } from './learning-api';
+import { getCourse, localize, type CourseSummary, type Locale } from '../catalog/course-data';
+import type {
+  LearningApiClient,
+  LearningCourseProgress,
+  LearningProgressSnapshot,
+} from './learning-api';
+import {
+  getLearningCourseProgress,
+  getLearningModuleProgressEntries,
+  type LearningModuleProgressEntry,
+} from './learning-progression';
 import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
 
 interface LearningCoursePageProps {
@@ -27,14 +36,11 @@ function createIdempotencyKey(): string {
 export function LearningCoursePage({ learningApiClient, locale }: LearningCoursePageProps) {
   const { t } = useTranslation();
   const { getIdToken, user } = useAuth();
-  const navigate = useNavigate();
   const { courseId } = useParams();
   const course = getCourse(courseId);
-  const firstModule = course?.modules?.[0];
   const idempotencyKey = useRef(createIdempotencyKey());
   const enrollmentTaskRef = useRef<EnrollmentTask | null>(null);
   const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus>('syncing');
-  const [overviewStatus, setOverviewStatus] = useState<EnrollmentStatus>('ready');
   const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
 
   useEffect(() => {
@@ -94,45 +100,16 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
     };
   }, [course, getIdToken, learningApiClient, user]);
 
-  if (!course || !firstModule) {
-    return (
-      <main className="not-found page-shell">
-        <span aria-hidden="true">404 / LEARNING</span>
-        <h1>{t('learning.notFound.title')}</h1>
-        <p>{t('learning.notFound.body')}</p>
-        <Link className="primary-link" to="/courses">
-          {t('learning.notFound.back')}
-          <ArrowRight aria-hidden="true" size={18} />
-        </Link>
-      </main>
-    );
+  if (!course) {
+    return <LearningCourseNotFoundPage />;
   }
 
-  async function openFirstModuleOverview() {
-    if (!course || !firstModule) {
-      return;
-    }
-
-    setOverviewStatus('syncing');
-
-    try {
-      const idToken = await getIdToken();
-
-      if (!idToken || !user) {
-        throw new Error('Authenticated user is missing an ID token or user identity.');
-      }
-
-      const result = await learningApiClient.recordModuleOverview({
-        idToken,
-        moduleId: firstModule.id,
-      });
-
-      setOverviewStatus('ready');
-      navigate(`/learn/${course.id}/posts/${result.moduleOverview.nextPostId}`);
-    } catch {
-      setOverviewStatus('failed');
-    }
-  }
+  const moduleEntries = progressSnapshot
+    ? getLearningModuleProgressEntries(course, progressSnapshot)
+    : [];
+  const courseProgress = progressSnapshot
+    ? getLearningCourseProgress(progressSnapshot, course.id)
+    : undefined;
 
   return (
     <main className="learning-course-page page-shell">
@@ -150,30 +127,40 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
           {t(`learning.enrollment.${enrollmentStatus}`)}
         </p>
 
-        {progressSnapshot ? <VerifiedProgressPanel progressSnapshot={progressSnapshot} /> : null}
+        {progressSnapshot ? (
+          <VerifiedProgressPanel
+            courseProgress={courseProgress}
+            moduleEntries={moduleEntries}
+            progressSnapshot={progressSnapshot}
+          />
+        ) : null}
+      </section>
 
-        <div className="learning-open-module">
-          <span className="module-state open">
-            <Sparkles aria-hidden="true" size={14} />
-            {t('learning.firstModuleState')}
-          </span>
-          <h2>{localize(firstModule.title, locale)}</h2>
-          <p>{localize(firstModule.description, locale)}</p>
-          <button
-            className="primary-link"
-            disabled={enrollmentStatus !== 'ready' || overviewStatus === 'syncing'}
-            onClick={() => void openFirstModuleOverview()}
-            type="button"
-          >
-            {t('learning.openModuleOverview')}
-            <ArrowRight aria-hidden="true" size={18} />
-          </button>
-          {overviewStatus === 'failed' ? (
-            <p className="learning-sync-state" role="status">
-              {t('learning.overview.failed')}
-            </p>
-          ) : null}
+      <section aria-labelledby="learning-module-roadmap-title" className="learning-module-roadmap">
+        <div className="learning-module-roadmap-heading">
+          <div>
+            <span className="eyebrow">{t('learning.moduleRoadmap.eyebrow')}</span>
+            <h2 id="learning-module-roadmap-title">{t('learning.moduleRoadmap.title')}</h2>
+          </div>
+          <p>{t('learning.moduleRoadmap.intro')}</p>
         </div>
+
+        <div className="learning-module-list">
+          {moduleEntries.map((entry) => (
+            <LearningModuleCard
+              course={course}
+              entry={entry}
+              key={entry.module.id}
+              locale={locale}
+            />
+          ))}
+        </div>
+
+        {!moduleEntries.length && enrollmentStatus === 'ready' ? (
+          <p className="learning-sync-state" role="status">
+            {t('learning.moduleRoadmap.empty')}
+          </p>
+        ) : null}
       </section>
     </main>
   );
@@ -200,31 +187,118 @@ function createEnrollmentTask(input: {
   };
 }
 
+function LearningModuleCard({
+  course,
+  entry,
+  locale,
+}: {
+  course: CourseSummary;
+  entry: LearningModuleProgressEntry;
+  locale: Locale;
+}) {
+  const { t } = useTranslation();
+  const isLocked = entry.progress.status === 'locked';
+  const stateKey = `learning.moduleRoadmap.state.${entry.progress.status}` as const;
+
+  return (
+    <article
+      className={isLocked ? 'learning-module-card is-locked' : 'learning-module-card'}
+      data-module-id={entry.module.id}
+    >
+      <div className="learning-module-card-index" aria-hidden="true">
+        {String(entry.module.index).padStart(2, '0')}
+      </div>
+      <div className="learning-module-card-body">
+        <div className="learning-module-card-heading">
+          <div>
+            <code>{entry.module.id}</code>
+            <h3>{localize(entry.module.title, locale)}</h3>
+          </div>
+          <span className={isLocked ? 'module-state' : 'module-state open'}>
+            {isLocked ? (
+              <LockKeyhole aria-hidden="true" size={14} />
+            ) : (
+              <Sparkles aria-hidden="true" size={14} />
+            )}
+            {t(stateKey)}
+          </span>
+        </div>
+        <p>{localize(entry.module.description, locale)}</p>
+        <div className="learning-module-card-progress">
+          <span>
+            {t('learning.moduleRoadmap.progress', {
+              completed: entry.progress.completedStepCount,
+              percent: entry.progress.progressPercent,
+              required: entry.progress.requiredStepCount,
+            })}
+          </span>
+          <div aria-hidden="true" className="learning-module-progress-track">
+            <span style={{ width: `${entry.progress.progressPercent}%` }} />
+          </div>
+        </div>
+
+        {isLocked ? (
+          <div className="learning-module-lock" role="note">
+            <strong>{t('learning.moduleRoadmap.lockedTitle')}</strong>
+            <p>{t('learning.moduleRoadmap.lockedReason')}</p>
+            {entry.missingPrerequisiteIds.length ? (
+              <ul>
+                {entry.missingPrerequisiteIds.map((prerequisiteId) => (
+                  <li key={prerequisiteId}>
+                    {t('learning.moduleRoadmap.missingPrerequisite', {
+                      moduleId: prerequisiteId,
+                    })}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : (
+          <Link className="module-trial-link" to={`/learn/${course.id}/modules/${entry.module.id}`}>
+            {t(
+              entry.progress.overviewViewed
+                ? 'learning.moduleRoadmap.resume'
+                : 'learning.moduleRoadmap.open',
+            )}
+            <ArrowRight aria-hidden="true" size={17} />
+          </Link>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function VerifiedProgressPanel({
+  courseProgress,
+  moduleEntries,
   progressSnapshot,
 }: {
+  courseProgress: LearningCourseProgress | undefined;
+  moduleEntries: readonly LearningModuleProgressEntry[];
   progressSnapshot: LearningProgressSnapshot;
 }) {
   const { i18n, t } = useTranslation();
-  const firstModule = progressSnapshot.modules[0];
-  const unlockedAlgorithms = progressSnapshot.algorithmUnlocks;
+  const currentModule =
+    moduleEntries.find((entry) => entry.progress.status === 'in-progress') ??
+    moduleEntries.find((entry) => entry.progress.status === 'completed');
+  const quizzes = courseProgress?.quizzes ?? progressSnapshot.quizzes;
+  const progressPercent =
+    courseProgress?.progressPercent ?? progressSnapshot.enrollment.progressPercent;
 
   return (
     <section className="learning-progress-panel" aria-label={t('learning.progress.label')}>
-      <p>
-        {t('learning.progress.verified', { percent: progressSnapshot.enrollment.progressPercent })}
-      </p>
-      {firstModule ? (
+      <p>{t('learning.progress.verified', { percent: progressPercent })}</p>
+      {currentModule ? (
         <p>
           {t('learning.progress.moduleSteps', {
-            completed: firstModule.completedStepCount,
-            required: firstModule.requiredStepCount,
+            completed: currentModule.progress.completedStepCount,
+            required: currentModule.progress.requiredStepCount,
           })}
         </p>
       ) : null}
-      {progressSnapshot.quizzes.length ? (
+      {quizzes.length ? (
         <ul aria-label={t('learning.progress.quiz.label')} className="learning-progress-quiz-list">
-          {progressSnapshot.quizzes.map((quiz) => (
+          {quizzes.map((quiz) => (
             <li className={quiz.passed ? 'is-passed' : ''} key={quiz.quizId}>
               {t(`learning.progress.quiz.${quiz.quizKind}`, {
                 attempts: formatQuizAttemptCount(quiz.attemptCount, i18n.resolvedLanguage),
@@ -239,10 +313,10 @@ function VerifiedProgressPanel({
           ))}
         </ul>
       ) : null}
-      {unlockedAlgorithms.length ? (
+      {progressSnapshot.algorithmUnlocks.length ? (
         <>
           <ul className="learning-progress-algorithm-list">
-            {unlockedAlgorithms.map((unlock) => (
+            {progressSnapshot.algorithmUnlocks.map((unlock) => (
               <li key={unlock.algorithmId}>
                 {t('learning.progress.algorithmUnlocked', {
                   algorithm: formatAlgorithmName(unlock.algorithmId),
@@ -250,7 +324,7 @@ function VerifiedProgressPanel({
               </li>
             ))}
           </ul>
-          {unlockedAlgorithms
+          {progressSnapshot.algorithmUnlocks
             .map((unlock) => ({
               algorithmId: unlock.algorithmId,
               playgroundPath: getPlaygroundPathForAlgorithm(unlock.algorithmId),
@@ -262,7 +336,9 @@ function VerifiedProgressPanel({
                 key={unlock.algorithmId}
                 to={unlock.playgroundPath!}
               >
-                {t('learning.progress.openPlayground')}: {formatAlgorithmName(unlock.algorithmId)}
+                {t('learning.progress.openPlayground', {
+                  algorithm: formatAlgorithmName(unlock.algorithmId),
+                })}
                 <ArrowRight aria-hidden="true" size={17} />
               </Link>
             ))}
@@ -286,4 +362,20 @@ function formatQuizScore(score: number) {
   }
 
   return score.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function LearningCourseNotFoundPage() {
+  const { t } = useTranslation();
+
+  return (
+    <main className="not-found page-shell">
+      <span aria-hidden="true">404 / LEARNING</span>
+      <h1>{t('learning.notFound.title')}</h1>
+      <p>{t('learning.notFound.body')}</p>
+      <Link className="primary-link" to="/courses">
+        {t('learning.notFound.back')}
+        <ArrowRight aria-hidden="true" size={18} />
+      </Link>
+    </main>
+  );
 }

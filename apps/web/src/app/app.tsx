@@ -51,6 +51,12 @@ const LearningCoursePage = lazy(async () => {
   return { default: module.LearningCoursePage };
 });
 
+const LearningModulePage = lazy(async () => {
+  const module = await import('../features/learning/learning-module-page');
+
+  return { default: module.LearningModulePage };
+});
+
 const StudentDashboardPage = lazy(async () => {
   const module = await import('../features/dashboard/student-dashboard-page');
 
@@ -233,6 +239,16 @@ function AppRoutes({ authGateway, learningApiClient }: AppRoutesProps) {
                   <RequireAuthenticated>
                     <Suspense fallback={<TrialRouteLoading />}>
                       <LearningCoursePage learningApiClient={learningClient} locale={locale} />
+                    </Suspense>
+                  </RequireAuthenticated>
+                }
+              />
+              <Route
+                path="/learn/:courseId/modules/:moduleId"
+                element={
+                  <RequireAuthenticated>
+                    <Suspense fallback={<TrialRouteLoading />}>
+                      <LearningModulePage learningApiClient={learningClient} locale={locale} />
                     </Suspense>
                   </RequireAuthenticated>
                 }

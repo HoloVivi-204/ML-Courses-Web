@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 const runAuthEmulatorE2e = process.env.RUN_AUTH_EMULATOR_E2E === 'true';
 const AUTH_EMULATOR_READY_URL =
@@ -12,6 +12,8 @@ const AUTH_SIGN_UP_URL = AUTH_EMULATOR_READY_URL.replace('/v1/projects?', '/v1/a
 const EMULATOR_FLOW_TIMEOUT_MS = 30_000;
 const configuredLocalAdminEmail = process.env.LOCAL_DEMO_ADMIN_EMAIL?.trim();
 const configuredLocalAdminPassword = process.env.LOCAL_DEMO_ADMIN_PASSWORD?.trim();
+
+test.use({ actionTimeout: EMULATOR_FLOW_TIMEOUT_MS });
 
 async function areLocalAuthDependenciesReady(): Promise<boolean> {
   try {
@@ -60,7 +62,7 @@ test.describe('Firebase local Emulator journey', () => {
   test('runs the learner baseline from auth to dashboard through local emulators', async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(300_000);
 
     const email = `learner-${randomUUID()}@example.test`;
     const password = `test-${randomUUID()}`;
@@ -83,15 +85,16 @@ test.describe('Firebase local Emulator journey', () => {
     await expect(page.getByText(/Enrollment đã sẵn sàng/i)).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
-    await page.getByRole('button', { name: /Mở tổng quan module/i }).click();
+    await page.getByRole('link', { name: /Mở tổng quan module|Tiếp tục module/i }).click();
+    await page.getByRole('link', { name: /Mở bài viết|Tiếp tục đọc|Xem lại bài viết/i }).click();
     await expect(
       page.getByRole('heading', { name: 'Một neuron đưa ra quyết định như thế nào?' }),
     ).toBeVisible();
 
     const postContentViewed = waitForPostContentViewed(page, 'dl-p01-neuron-perceptron');
     await viewAllRequiredPostBlocks(page);
-    await page.getByRole('link', { name: /Mở quiz bài học/i }).click();
     await postContentViewed;
+    await page.getByRole('link', { name: /Mở quiz bài học/i }).click();
     await expect(page.getByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
@@ -101,8 +104,12 @@ test.describe('Firebase local Emulator journey', () => {
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
 
-    await page.getByRole('link', { name: 'Quay lại bài học' }).click();
-    await page.getByRole('link', { name: /Mở demo AND gate/i }).click();
+    await returnToModuleOverview(page);
+    const perceptronDemoLink = page.getByRole('link', {
+      name: /Mở demo AND gate|Xem demo|Open AND gate demo|View demo/i,
+    });
+    await expect(perceptronDemoLink).toBeVisible({ timeout: EMULATOR_FLOW_TIMEOUT_MS });
+    await perceptronDemoLink.click();
     await expect(page.getByRole('heading', { name: 'Demo Perceptron: cổng AND' })).toBeVisible();
     await page.getByRole('button', { name: 'Bước tiếp theo' }).click();
     await page.getByRole('button', { name: 'Bước tiếp theo' }).click();
@@ -121,7 +128,7 @@ test.describe('Firebase local Emulator journey', () => {
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
 
-    await page.goto('/playground/pg-xor');
+    await page.getByRole('link', { name: /Mở Playground Perceptron/i }).click();
     await expect(page.getByRole('heading', { name: 'Playground XOR: Perceptron' })).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
@@ -143,6 +150,139 @@ test.describe('Firebase local Emulator journey', () => {
     await page.getByRole('spinbutton', { name: 'Epochs' }).fill('120');
     await page.getByRole('button', { name: /Khôi phục XOR emulator baseline/i }).click();
     await expect(page.getByRole('spinbutton', { name: 'Epochs' })).toHaveValue('100');
+
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
+    await page.getByRole('link', { name: /Lộ trình khóa học|Course roadmap/i }).click();
+    await page
+      .locator('[data-module-id="dl-m02-mlp"]')
+      .getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      })
+      .click();
+    await expect(
+      page.getByRole('heading', { exact: true, name: 'Mạng nơ-ron nhiều lớp' }),
+    ).toBeVisible({ timeout: EMULATOR_FLOW_TIMEOUT_MS });
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
+
+    await completePostFromModuleOverview(page, 'dl-p02-mlp-forward-activation', [
+      'opt-affine-collapse',
+      ['opt-hidden-affine', 'opt-nonlinear-activation'],
+      'true',
+    ]);
+    await page.getByRole('link', { name: /Xem demo|View demo/i }).click();
+    await completeDemo(page, 'demo-mlp-checkerboard');
+    await page
+      .getByRole('link', {
+        name: /Mở quiz module|Làm quiz module|Open (?:the )?module quiz|Take (?:the )?module quiz/i,
+      })
+      .click();
+    await answerQuizByOptionIds(page, [
+      'opt-hidden-representation',
+      'opt-one-affine-map',
+      'opt-positive-pass-negative-zero',
+      'opt-nonlinear-hidden-step',
+      ['opt-hidden-h', 'opt-output-o'],
+      'true',
+    ]);
+    await page.getByRole('button', { name: /Nộp quiz|Submit quiz/i }).click();
+    await expect(page.getByText('quiz_passed: quiz-module-dl-m02')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await page.getByRole('link', { name: /Mở Playground MLP|Open MLP Playground/i }).click();
+    await expect(page).toHaveURL(/\/playground\/pg-nonlinear-2d/);
+
+    await page.getByRole('button', { name: 'Chuyển sang tiếng Anh' }).click();
+    await expect(page.getByRole('heading', { name: /Nonlinear 2D Playground: MLP/i })).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
+
+    await page.getByRole('link', { name: 'ML Path' }).click();
+    await page.getByRole('link', { name: 'View full catalog' }).click();
+    await page
+      .getByRole('link', { name: /Explore the Classical Machine Learning course/i })
+      .click();
+    await page.getByRole('link', { name: 'Open my learning path' }).click();
+    await expect(page.getByText(/Enrollment ready/i)).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await page
+      .locator('[data-module-id="cml-m01-foundations"]')
+      .getByRole('link', { name: /Open module overview|Resume module/i })
+      .click();
+    await completePostFromModuleOverview(page, 'cml-p01-problem-data-types', [
+      'opt-queue-label',
+      ['opt-delivery-delay', 'opt-ticket-routing'],
+      'true',
+    ]);
+    await completePostFromModuleOverview(page, 'cml-p02-train-test-metrics', [
+      'opt-heldout-evidence',
+      ['opt-error-consequence', 'opt-error-types'],
+      'false',
+    ]);
+    await page
+      .getByRole('link', {
+        name: /Open (?:the )?module quiz|Take (?:the )?module quiz/i,
+      })
+      .click();
+    await answerQuizByOptionIds(page, [
+      'opt-known-outcome',
+      ['opt-paired-answers', 'opt-check-against-label'],
+      'true',
+      'opt-generalisation-evidence',
+      ['opt-false-positive-cost', 'opt-false-negative-cost'],
+      'opt-eighty-five-percent',
+    ]);
+    await page.getByRole('button', { name: /Submit quiz/i }).click();
+    await expect(page.getByText('quiz_passed: quiz-module-cml-m01')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await returnToModuleOverview(page);
+    await page.getByRole('link', { name: /Back to course roadmap/i }).click();
+    await page
+      .locator('[data-module-id="cml-m02-linear-polynomial"]')
+      .getByRole('link', { name: /Open module overview|Resume module/i })
+      .click();
+    await completePostFromModuleOverview(page, 'cml-p03-linear-regression', [
+      'opt-observed-minus-predicted',
+      ['opt-square-gaps', 'opt-emphasise-large-miss'],
+      'true',
+    ]);
+    await completePostFromModuleOverview(page, 'cml-p04-polynomial-regression', [
+      'opt-squared-input',
+      ['opt-same-split', 'opt-heldout-error'],
+      'false',
+    ]);
+    await page.getByRole('link', { name: /View demo/i }).click();
+    await completeDemo(page, 'demo-linear-calibration');
+    await page
+      .getByRole('link', {
+        name: /Open (?:the )?module quiz|Take (?:the )?module quiz/i,
+      })
+      .click();
+    await answerQuizByOptionIds(page, [
+      'opt-numerical-estimate',
+      'true',
+      ['opt-transform-first', 'opt-repeat-transform'],
+      'opt-new-example-evidence',
+      ['opt-prediction-seven', 'opt-residual-plus-one'],
+      'opt-not-guaranteed',
+    ]);
+    await page.getByRole('button', { name: /Submit quiz/i }).click();
+    await expect(page.getByText('quiz_passed: quiz-module-cml-m02')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await page.getByRole('link', { name: /Open Linear Regression Playground/i }).click();
+    await expect(page).toHaveURL(/\/playground\/pg-house-price/);
+    await expectNoHorizontalOverflow(page);
+    await expectNoWcagViolations(page);
+    await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveCount(1);
+
+    await page.getByRole('button', { name: 'Switch to Vietnamese' }).click();
 
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: 'Dashboard học viên' })).toBeVisible({
@@ -214,8 +354,12 @@ test.describe('Firebase local Emulator journey', () => {
     await expect(page.locator('main.admin-reports-page')).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
-    await expect(page.locator('.admin-report-panel-verified')).toBeVisible();
-    await expect(page.locator('.admin-report-panel-client')).toBeVisible();
+    await expect(page.locator('.admin-report-panel-verified')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
+    await expect(page.locator('.admin-report-panel-client')).toBeVisible({
+      timeout: EMULATOR_FLOW_TIMEOUT_MS,
+    });
     await expect(page.getByText(/server-verified/)).toBeVisible();
     await expect(page.getByText('client-computed', { exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -251,48 +395,62 @@ async function viewAllRequiredPostBlocks(page: Page) {
   expect(blockCount).toBeGreaterThan(0);
 
   for (let index = 0; index < blockCount; index += 1) {
-    await blocks.nth(index).scrollIntoViewIfNeeded();
-    await page.waitForTimeout(80);
+    const block = blocks.nth(index);
+
+    await block.evaluate((element) => {
+      element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
+    });
+    await expect(block).toBeInViewport({ ratio: 0.1 });
+    await page.waitForTimeout(350);
   }
 
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(700);
 }
 
-async function waitForPostContentViewed(page: Page, postId: string) {
-  const response = await page.waitForResponse(
-    async (candidate) => {
+function waitForPostContentViewed(page: Page, postId: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let lastPayload: unknown;
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(
+        new Error(
+          `Post ${postId} did not become content-viewed within 15 seconds. Last response: ${JSON.stringify(lastPayload)}`,
+        ),
+      );
+    }, 15_000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      page.off('response', handleResponse);
+    }
+
+    async function handleResponse(candidate: Response) {
       if (
         candidate.request().method() !== 'POST' ||
+        candidate.status() !== 200 ||
         !candidate.url().includes(`/api/v1/posts/${postId}/views`)
       ) {
-        return false;
+        return;
       }
 
       try {
-        const payload = (await candidate.json()) as {
+        lastPayload = await candidate.json();
+        const payload = lastPayload as {
           data?: { postView?: { contentViewed?: boolean } };
           success?: boolean;
         };
 
-        return (
-          candidate.status() === 200 &&
-          payload.success === true &&
-          payload.data?.postView?.contentViewed === true
-        );
+        if (payload.success === true && payload.data?.postView?.contentViewed === true) {
+          cleanup();
+          resolve();
+        }
       } catch {
-        return false;
+        // Continue waiting for the response that confirms all required blocks.
       }
-    },
-    { timeout: 15_000 },
-  );
-  const payload = (await response.json()) as {
-    data?: { postView?: { contentViewed?: boolean } };
-    success?: boolean;
-  };
+    }
 
-  expect(response.status()).toBe(200);
-  expect(payload.success).toBe(true);
-  expect(payload.data?.postView?.contentViewed).toBe(true);
+    page.on('response', handleResponse);
+  });
 }
 
 async function answerPostQuiz(page: Page) {
@@ -347,4 +505,108 @@ async function answerModuleQuiz(page: Page) {
     .getByRole('group', { name: /thất bại XOR gợi ý cần hidden layer/i })
     .getByRole('radio', { name: 'Đúng' })
     .check();
+}
+
+type QuizAnswer = string | readonly string[];
+
+async function answerQuizByOptionIds(page: Page, answers: readonly QuizAnswer[]) {
+  const questions = page.locator('fieldset.quiz-question-card');
+
+  await expect(questions).toHaveCount(answers.length);
+
+  for (let questionIndex = 0; questionIndex < answers.length; questionIndex += 1) {
+    const question = questions.nth(questionIndex);
+    const optionIds = Array.isArray(answers[questionIndex])
+      ? answers[questionIndex]
+      : [answers[questionIndex]];
+
+    for (const optionId of optionIds) {
+      const option = question.locator(`input[value="${optionId}"]`);
+
+      await expect(option).toHaveCount(1);
+      await option.check();
+    }
+  }
+}
+
+async function completePostFromModuleOverview(
+  page: Page,
+  postId: string,
+  answers: readonly QuizAnswer[],
+) {
+  const nextPost = page.locator(`a[data-next-post="true"][href*="${postId}"]`);
+
+  await expect(nextPost).toHaveCount(1, { timeout: EMULATOR_FLOW_TIMEOUT_MS });
+  await nextPost.click();
+  const postContentViewed = waitForPostContentViewed(page, postId);
+
+  await expect(page.locator('[data-content-block-id]').first()).toBeVisible({
+    timeout: EMULATOR_FLOW_TIMEOUT_MS,
+  });
+
+  await viewAllRequiredPostBlocks(page);
+  await postContentViewed;
+  await page.getByRole('link', { name: /Mở quiz bài học|Open (?:the )?lesson quiz/i }).click();
+  await expect(page.locator('.learning-quiz-page')).toBeVisible({
+    timeout: EMULATOR_FLOW_TIMEOUT_MS,
+  });
+  await answerQuizByOptionIds(page, answers);
+  const submissionResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes('/api/v1/quiz-attempts/') &&
+      response.url().endsWith('/submissions'),
+  );
+  await page.getByRole('button', { name: /Nộp quiz|Submit quiz/i }).click();
+  const submission = await submissionResponse;
+  const submissionBody = await submission.text();
+  let submissionPayload: { data?: { passed?: boolean } } = {};
+
+  try {
+    submissionPayload = JSON.parse(submissionBody) as { data?: { passed?: boolean } };
+  } catch {
+    // Preserve the raw response in the diagnostic below.
+  }
+
+  if (!submission.ok() || submissionPayload.data?.passed !== true) {
+    throw new Error(
+      `Quiz submission failed (${submission.status()}): ${submissionBody || '<empty response>'}`,
+    );
+  }
+
+  await expect(page.getByText(/quiz_passed: quiz-post-/)).toBeVisible({
+    timeout: EMULATOR_FLOW_TIMEOUT_MS,
+  });
+  await returnToModuleOverview(page);
+}
+
+async function completeDemo(page: Page, demoId: string) {
+  const nextButton = page.getByRole('button', { name: /Bước tiếp theo|Next step/i });
+  const completionResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/demos/${demoId}/completions`),
+  );
+
+  for (let step = 0; step < 3; step += 1) {
+    await nextButton.click();
+  }
+
+  const response = await completionResponse;
+  const responseBody = await response.text();
+
+  if (!response.ok()) {
+    throw new Error(
+      `Demo completion failed (${response.status()}): ${responseBody || '<empty response>'}`,
+    );
+  }
+
+  await expect(page.getByText(`demo_completed: ${demoId}`)).toBeVisible({
+    timeout: EMULATOR_FLOW_TIMEOUT_MS,
+  });
+}
+
+async function returnToModuleOverview(page: Page) {
+  await page.getByRole('link', { name: /Quay lại bài học|Back to lesson/i }).click();
+  await page.getByRole('link', { name: /Về tổng quan module|Back to module overview/i }).click();
 }

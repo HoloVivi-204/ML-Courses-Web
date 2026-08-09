@@ -45,6 +45,14 @@ const environment = configureFirebaseCliEnvironment(
   createLocalEmulatorEnvironment(process.env),
   join(repositoryRoot, '.runtime'),
 );
-const exitCode = await runFirebaseCommand(mode, environment);
+const runEnvironment =
+  mode === 'e2e'
+    ? {
+        ...environment,
+        // The local authenticated journey traverses both courses in one learner session.
+        API_RATE_LIMIT_QUIZ_SUBMISSION_MAX: environment.API_RATE_LIMIT_QUIZ_SUBMISSION_MAX ?? '20',
+      }
+    : environment;
+const exitCode = await runFirebaseCommand(mode, runEnvironment);
 
 process.exitCode = exitCode;
