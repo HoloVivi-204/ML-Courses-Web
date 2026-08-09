@@ -3204,6 +3204,53 @@ describe('public learning journey', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('does not flash cached locked content after reload when local and session storage are forged', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
+    );
+    const forgedCache = JSON.stringify({
+      answerKey: 'forged-answer-key',
+      blocks: [{ id: 'forged-block', text: 'FORGED LOCKED CONTENT' }],
+      completed: true,
+      score: 100,
+      unlocked: ['perceptron'],
+    });
+    localStorage.setItem('ml-path-learning-content-cache', forgedCache);
+    sessionStorage.setItem('ml-path-learning-content-cache', forgedCache);
+    const learningApiClient = createLearningApiClient({
+      getFullPostContent: vi.fn().mockRejectedValue(new Error('Content emergency blocked.')),
+    });
+
+    const firstLoad = render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(screen.queryByText('FORGED LOCKED CONTENT')).not.toBeInTheDocument();
+    expect(screen.queryByText('forged-answer-key')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: /Một neuron đưa ra quyết định như thế nào/i,
+      }),
+    ).toBeVisible();
+    firstLoad.unmount();
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(screen.queryByText('FORGED LOCKED CONTENT')).not.toBeInTheDocument();
+    expect(screen.queryByText('forged-answer-key')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: /Một neuron đưa ra quyết định như thế nào/i,
+      }),
+    ).toBeVisible();
+    expect(learningApiClient.getFullPostContent).toHaveBeenCalledTimes(2);
+    expect(learningApiClient.getProgress).not.toHaveBeenCalled();
+  });
+
   it('keeps the fixed AND gate demo closed without a module access grant', async () => {
     window.history.pushState(
       {},

@@ -11,6 +11,7 @@ import {
 const contentFixture: AdminContentSummary = {
   courseId: 'course-deep-learning-basic',
   draftRevisionId: null,
+  emergencyBlocked: false,
   entityId: 'dl-p01-neuron-perceptron',
   entityType: 'post',
   localeAvailability: ['en', 'vi'],

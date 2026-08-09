@@ -110,6 +110,7 @@ function createPlaygroundRepository(
 const releaseOneContentFixture: AdminContentSummary = {
   courseId: 'course-deep-learning-basic',
   draftRevisionId: null,
+  emergencyBlocked: false,
   entityId: 'dl-p01-neuron-perceptron',
   entityType: 'post',
   localeAvailability: ['en', 'vi'],
@@ -2213,6 +2214,23 @@ describe('API foundation', () => {
         status: 'unpublished',
       }),
     ]);
+  });
+
+  it('does not expose emergency withdraw through a public API route', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        displayName: 'Local Administrator',
+        role: 'admin',
+        uid: 'admin-01',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/emergency-withdraw')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(404);
+
+    expect(response.body.success).toBe(false);
   });
 
   it('rolls back the published pointer to a previous immutable revision', async () => {

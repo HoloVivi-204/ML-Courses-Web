@@ -1,8 +1,12 @@
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getFirestore, type Firestore, type Transaction } from 'firebase-admin/firestore';
 
 import type { AdminContentDraft } from './admin-content-repository.js';
 import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import {
+  createFirestoreLearningContentAuthority,
+  type LearningContentAuthority,
+} from './learning-content-authority.js';
 import {
   getFixedDemo,
   type FixedDemoManifest,
@@ -61,14 +65,24 @@ export interface LearningContentAccessReader {
   hasStableContentAccess(input: {
     contentType: 'demo' | 'post';
     entityId: string;
+    transaction?: Transaction | undefined;
     uid: string;
   }): Promise<boolean>;
 }
 
 export interface PublishedLearningContentReader {
-  getDemoContent(input: { demoId: string }): Promise<LearnerDemoContent | null>;
-  getPostContent(input: { postId: string }): Promise<LearnerPostContent | null>;
-  getTrialPostContent(input: { postId: string }): Promise<LearnerPostContent | null>;
+  getDemoContent(input: {
+    demoId: string;
+    transaction?: Transaction | undefined;
+  }): Promise<LearnerDemoContent | null>;
+  getPostContent(input: {
+    postId: string;
+    transaction?: Transaction | undefined;
+  }): Promise<LearnerPostContent | null>;
+  getTrialPostContent(input: {
+    postId: string;
+    transaction?: Transaction | undefined;
+  }): Promise<LearnerPostContent | null>;
 }
 
 export interface LearningContentRepository {
@@ -149,10 +163,9 @@ export function isStableContentAccessDocument(data: unknown): boolean {
 
 function createFirestoreContentAccessReader(firestore: Firestore): LearningContentAccessReader {
   return {
-    async hasStableContentAccess({ contentType, entityId, uid }) {
-      const snapshot = await firestore
-        .doc(`users/${uid}/contentAccess/${contentType}_${entityId}`)
-        .get();
+    async hasStableContentAccess({ contentType, entityId, transaction, uid }) {
+      const reference = firestore.doc(`users/${uid}/contentAccess/${contentType}_${entityId}`);
+      const snapshot = transaction ? await transaction.get(reference) : await reference.get();
       const data = snapshot.data();
 
       return (
@@ -165,48 +178,10 @@ function createFirestoreContentAccessReader(firestore: Firestore): LearningConte
   };
 }
 
-const ADMIN_CONTENT_ENTITIES_COLLECTION = 'adminContentEntities';
 const ADMIN_CONTENT_REVISIONS_COLLECTION = 'adminContentRevisions';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function getAdminContentEntityDocumentId(
-  entityType: 'course' | 'demo' | 'post',
-  entityId: string,
-): string {
-  return `${entityType}:${entityId}`;
-}
-
-function getPublishedRevisionId(input: {
-  entityData: unknown;
-  entityId: string;
-  entityType: 'course' | 'demo' | 'post';
-}): string | null {
-  if (!isRecord(input.entityData) || !isRecord(input.entityData.currentContent)) {
-    throw new ApiError(
-      500,
-      'LEARNER_CONTENT_DATA_INTEGRITY_ERROR',
-      'Published learner content data is invalid.',
-    );
-  }
-
-  const currentContent = input.entityData.currentContent;
-
-  if (
-    currentContent.entityId !== input.entityId ||
-    currentContent.entityType !== input.entityType ||
-    typeof currentContent.publishedRevisionId !== 'string'
-  ) {
-    throw new ApiError(
-      500,
-      'LEARNER_CONTENT_DATA_INTEGRITY_ERROR',
-      'Published learner content data is invalid.',
-    );
-  }
-
-  return currentContent.status === 'published' ? currentContent.publishedRevisionId : null;
 }
 
 function assertPostContent(value: unknown, postId: string, revisionId: string): LearnerPostContent {
@@ -258,36 +233,54 @@ function assertDemoContent(value: unknown, demoId: string, revisionId: string): 
   return value as unknown as LearnerDemoContent;
 }
 
+async function assertCurrentContentAncestors(input: {
+  authority: LearningContentAuthority;
+  courseId: string;
+  moduleId: string;
+  transaction: Transaction;
+}): Promise<void> {
+  await Promise.all([
+    input.authority.assertCurrentPublishedEntity({
+      entityId: input.courseId,
+      entityType: 'course',
+      transaction: input.transaction,
+    }),
+    input.authority.assertCurrentPublishedEntity({
+      entityId: input.moduleId,
+      entityType: 'module',
+      transaction: input.transaction,
+    }),
+  ]);
+}
+
 function createFirestorePublishedLearningContentReader(
   firestore: Firestore,
+  authority: LearningContentAuthority,
 ): PublishedLearningContentReader {
   async function getPublishedLearnerContent(input: {
     entityId: string;
     entityType: 'demo' | 'post';
-  }): Promise<PublishedLearnerContent | null> {
-    const entitySnapshot = await firestore
-      .collection(ADMIN_CONTENT_ENTITIES_COLLECTION)
-      .doc(getAdminContentEntityDocumentId(input.entityType, input.entityId))
-      .get();
-
-    if (!entitySnapshot.exists) {
-      return null;
-    }
-
-    const revisionId = getPublishedRevisionId({
-      entityData: entitySnapshot.data(),
+    transaction?: Transaction | undefined;
+  }): Promise<{
+    currentEntity: { publishedRevisionId: string };
+    learnerContent: PublishedLearnerContent;
+  } | null> {
+    const currentEntity = await authority.getCurrentPublishedEntity({
       entityId: input.entityId,
       entityType: input.entityType,
+      transaction: input.transaction,
     });
 
-    if (revisionId === null) {
+    if (currentEntity === null) {
       return null;
     }
 
-    const revisionSnapshot = await firestore
+    const revisionReference = firestore
       .collection(ADMIN_CONTENT_REVISIONS_COLLECTION)
-      .doc(revisionId)
-      .get();
+      .doc(currentEntity.publishedRevisionId);
+    const revisionSnapshot = input.transaction
+      ? await input.transaction.get(revisionReference)
+      : await revisionReference.get();
     const revision = revisionSnapshot.data();
 
     if (!revisionSnapshot.exists || !isRecord(revision) || revision.state !== 'published') {
@@ -304,67 +297,76 @@ function createFirestorePublishedLearningContentReader(
       return null;
     }
 
-    return learnerContent as unknown as PublishedLearnerContent;
+    return {
+      currentEntity,
+      learnerContent: learnerContent as unknown as PublishedLearnerContent,
+    };
   }
 
   return {
-    async getDemoContent({ demoId }) {
-      const learnerContent = await getPublishedLearnerContent({
+    async getDemoContent({ demoId, transaction }) {
+      const publishedContent = await getPublishedLearnerContent({
         entityId: demoId,
         entityType: 'demo',
+        transaction,
       });
 
-      if (!learnerContent || learnerContent.contentType !== 'demo') {
+      if (!publishedContent || publishedContent.learnerContent.contentType !== 'demo') {
         return null;
       }
 
-      return assertDemoContent(learnerContent.demo, demoId, learnerContent.demo.revisionId);
+      return assertDemoContent(
+        publishedContent.learnerContent.demo,
+        demoId,
+        publishedContent.currentEntity.publishedRevisionId,
+      );
     },
-    async getPostContent({ postId }) {
-      const learnerContent = await getPublishedLearnerContent({
+    async getPostContent({ postId, transaction }) {
+      const publishedContent = await getPublishedLearnerContent({
         entityId: postId,
         entityType: 'post',
+        transaction,
       });
 
-      if (!learnerContent || learnerContent.contentType !== 'post') {
-        return null;
-      }
-
-      return assertPostContent(learnerContent.fullPost, postId, learnerContent.fullPost.revisionId);
-    },
-    async getTrialPostContent({ postId }) {
-      const learnerContent = await getPublishedLearnerContent({
-        entityId: postId,
-        entityType: 'post',
-      });
-
-      if (!learnerContent || learnerContent.contentType !== 'post' || !learnerContent.trialPost) {
-        return null;
-      }
-
-      const courseSnapshot = await firestore
-        .collection(ADMIN_CONTENT_ENTITIES_COLLECTION)
-        .doc(getAdminContentEntityDocumentId('course', learnerContent.trialPost.courseId))
-        .get();
-
-      if (!courseSnapshot.exists) {
-        return null;
-      }
-
-      const courseRevisionId = getPublishedRevisionId({
-        entityData: courseSnapshot.data(),
-        entityId: learnerContent.trialPost.courseId,
-        entityType: 'course',
-      });
-
-      if (courseRevisionId === null) {
+      if (!publishedContent || publishedContent.learnerContent.contentType !== 'post') {
         return null;
       }
 
       return assertPostContent(
-        learnerContent.trialPost,
+        publishedContent.learnerContent.fullPost,
         postId,
-        learnerContent.trialPost.revisionId,
+        publishedContent.currentEntity.publishedRevisionId,
+      );
+    },
+    async getTrialPostContent({ postId, transaction }) {
+      const publishedContent = await getPublishedLearnerContent({
+        entityId: postId,
+        entityType: 'post',
+        transaction,
+      });
+
+      if (
+        !publishedContent ||
+        publishedContent.learnerContent.contentType !== 'post' ||
+        !publishedContent.learnerContent.trialPost
+      ) {
+        return null;
+      }
+
+      const courseEntity = await authority.getCurrentPublishedEntity({
+        entityId: publishedContent.learnerContent.trialPost.courseId,
+        entityType: 'course',
+        transaction,
+      });
+
+      if (courseEntity === null) {
+        return null;
+      }
+
+      return assertPostContent(
+        publishedContent.learnerContent.trialPost,
+        postId,
+        publishedContent.currentEntity.publishedRevisionId,
       );
     },
   };
@@ -422,18 +424,34 @@ export function applyAdminDraftToPublishedLearnerContent(input: {
 export function createFirestoreLearningContentRepository(
   options: {
     accessReader?: LearningContentAccessReader | undefined;
+    authority?: LearningContentAuthority | undefined;
     firestore?: Firestore | undefined;
     publishedContentReader?: PublishedLearningContentReader | undefined;
   } = {},
 ): LearningContentRepository {
   const firestore = options.firestore ?? getFirestore(getFirebaseAdminApp());
   const accessReader = options.accessReader ?? createFirestoreContentAccessReader(firestore);
+  const authority = options.authority ?? createFirestoreLearningContentAuthority(firestore);
   const publishedContentReader =
-    options.publishedContentReader ?? createFirestorePublishedLearningContentReader(firestore);
+    options.publishedContentReader ??
+    createFirestorePublishedLearningContentReader(firestore, authority);
 
   return {
     async getTrialPostContent({ postId }) {
-      const trialPost = await publishedContentReader.getTrialPostContent({ postId });
+      const trialPost = await firestore.runTransaction(async (transaction) => {
+        const content = await publishedContentReader.getTrialPostContent({ postId, transaction });
+
+        if (content) {
+          await assertCurrentContentAncestors({
+            authority,
+            courseId: content.courseId,
+            moduleId: content.moduleId,
+            transaction,
+          });
+        }
+
+        return content;
+      });
 
       if (!trialPost) {
         throw new ApiError(404, 'TRIAL_POST_NOT_FOUND', 'The requested trial post was not found.');
@@ -442,46 +460,78 @@ export function createFirestoreLearningContentRepository(
       return { statusCode: 200, data: trialPost };
     },
     async getFullPostContent({ postId, uid }) {
-      const hasAccess = await accessReader.hasStableContentAccess({
-        contentType: 'post',
-        entityId: postId,
-        uid,
+      return firestore.runTransaction(async (transaction) => {
+        const hasAccess = await accessReader.hasStableContentAccess({
+          contentType: 'post',
+          entityId: postId,
+          transaction,
+          uid,
+        });
+
+        if (!hasAccess) {
+          throw new ApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.');
+        }
+
+        await authority.assertCurrentPublishedEntity({
+          entityId: postId,
+          entityType: 'post',
+          transaction,
+        });
+
+        const post = await publishedContentReader.getPostContent({ postId, transaction });
+
+        if (!post) {
+          throw new ApiError(
+            404,
+            'POST_CONTENT_NOT_FOUND',
+            'The requested post content was not found.',
+          );
+        }
+
+        await assertCurrentContentAncestors({
+          authority,
+          courseId: post.courseId,
+          moduleId: post.moduleId,
+          transaction,
+        });
+
+        return { statusCode: 200 as const, data: post };
       });
-
-      if (!hasAccess) {
-        throw new ApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.');
-      }
-
-      const post = await publishedContentReader.getPostContent({ postId });
-
-      if (!post) {
-        throw new ApiError(
-          404,
-          'POST_CONTENT_NOT_FOUND',
-          'The requested post content was not found.',
-        );
-      }
-
-      return { statusCode: 200, data: post };
     },
     async getDemoContent({ demoId, uid }) {
-      const hasAccess = await accessReader.hasStableContentAccess({
-        contentType: 'demo',
-        entityId: demoId,
-        uid,
+      return firestore.runTransaction(async (transaction) => {
+        const hasAccess = await accessReader.hasStableContentAccess({
+          contentType: 'demo',
+          entityId: demoId,
+          transaction,
+          uid,
+        });
+
+        if (!hasAccess) {
+          throw new ApiError(403, 'DEMO_ACCESS_REQUIRED', 'Demo access is required.');
+        }
+
+        await authority.assertCurrentPublishedEntity({
+          entityId: demoId,
+          entityType: 'demo',
+          transaction,
+        });
+
+        const demo = await publishedContentReader.getDemoContent({ demoId, transaction });
+
+        if (!demo) {
+          throw new ApiError(404, 'DEMO_NOT_FOUND', 'Demo content was not found.');
+        }
+
+        await assertCurrentContentAncestors({
+          authority,
+          courseId: demo.courseId,
+          moduleId: demo.moduleId,
+          transaction,
+        });
+
+        return { statusCode: 200 as const, data: demo };
       });
-
-      if (!hasAccess) {
-        throw new ApiError(403, 'DEMO_ACCESS_REQUIRED', 'Demo access is required.');
-      }
-
-      const demo = await publishedContentReader.getDemoContent({ demoId });
-
-      if (!demo) {
-        throw new ApiError(404, 'DEMO_NOT_FOUND', 'The requested demo was not found.');
-      }
-
-      return { statusCode: 200, data: demo };
     },
   };
 }

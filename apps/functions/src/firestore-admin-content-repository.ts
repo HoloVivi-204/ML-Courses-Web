@@ -39,6 +39,7 @@ import {
 } from './admin-content-repository.js';
 import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { getReleaseLearningCatalog, getReleasePost } from './release-learning-catalog.js';
 
 const ADMIN_CONTENT_ENTITIES_COLLECTION = 'adminContentEntities';
 const ADMIN_CONTENT_IDEMPOTENCY_COLLECTION = 'adminContentPublishIdempotency';
@@ -138,12 +139,54 @@ function readStoredEntity(snapshot: DocumentSnapshot): StoredAdminContentEntity 
     !isRecord(value.currentContent) ||
     typeof value.entityId !== 'string' ||
     !isAdminContentEntityType(String(value.entityType)) ||
-    (value.draftRevisionId !== null && typeof value.draftRevisionId !== 'string')
+    (value.draftRevisionId !== null && typeof value.draftRevisionId !== 'string') ||
+    value.currentContent.entityId !== value.entityId ||
+    value.currentContent.entityType !== value.entityType ||
+    typeof value.currentContent.emergencyBlocked !== 'boolean'
   ) {
     throw createDataIntegrityError();
   }
 
   return value as unknown as StoredAdminContentEntity;
+}
+
+function getAffectedQuizIds(content: AdminContentSummary): readonly string[] {
+  if (content.entityType === 'quiz') {
+    return [content.entityId];
+  }
+
+  if (content.entityType === 'post') {
+    const post = getReleasePost(content.entityId);
+    const module = getReleaseLearningCatalog()
+      .courses.flatMap((course) => course.modules)
+      .find((candidate) =>
+        candidate.posts.some((candidatePost) => candidatePost.postId === content.entityId),
+      );
+
+    if (!post || !module) {
+      throw createDataIntegrityError();
+    }
+
+    return [post.postQuizId, module.moduleQuizId];
+  }
+
+  if (content.entityType === 'demo') {
+    const module = getReleaseLearningCatalog()
+      .courses.flatMap((course) => course.modules)
+      .find((candidate) => candidate.demoId === content.entityId);
+
+    if (!module) {
+      throw createDataIntegrityError();
+    }
+
+    return [module.moduleQuizId];
+  }
+
+  throw new ApiError(
+    409,
+    'ADMIN_CONTENT_EMERGENCY_WITHDRAW_SCOPE_UNSUPPORTED',
+    'Emergency withdraw only supports demo, post, and quiz content.',
+  );
 }
 
 function readStoredDraftRevision(snapshot: DocumentSnapshot): StoredDraftRevision {
@@ -621,6 +664,7 @@ export function createFirestoreAdminContentRepository(
         const content: AdminContentSummary = {
           ...targetRevision.publishedContent,
           draftRevisionId: null,
+          emergencyBlocked: false,
           previousPublishedRevisionId: entity.currentContent.publishedRevisionId,
           status: 'published',
         };
@@ -643,6 +687,99 @@ export function createFirestoreAdminContentRepository(
           lastLifecycleEvent: lifecycleEvent,
           updatedAt: createdAt,
         } satisfies StoredAdminContentEntity);
+        transaction.create(eventReference, { ...lifecycleEvent, schemaVersion: 1 });
+
+        return { statusCode: 200, data: { content, lifecycleEvent } } as const;
+      });
+    },
+    async emergencyWithdrawEntity(input) {
+      assertActorUid(input.actorUid);
+
+      if (!isAdminContentEntityType(input.entityType)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_ENTITY_TYPE_INVALID',
+          'The requested admin content entity type is not supported.',
+        );
+      }
+
+      if (!['demo', 'post', 'quiz'].includes(input.entityType)) {
+        throw new ApiError(
+          409,
+          'ADMIN_CONTENT_EMERGENCY_WITHDRAW_SCOPE_UNSUPPORTED',
+          'Emergency withdraw only supports demo, post, and quiz content.',
+        );
+      }
+
+      const entityReference = entities.doc(getEntityDocumentId(input.entityType, input.entityId));
+      const eventReference = lifecycleEvents.doc();
+      const createdAt = now().toISOString();
+
+      return firestore.runTransaction(async (transaction) => {
+        const entity = readStoredEntity(await transaction.get(entityReference));
+
+        if (
+          entity.currentContent.entityId !== input.entityId ||
+          entity.currentContent.entityType !== input.entityType
+        ) {
+          throw createDataIntegrityError();
+        }
+
+        if (
+          entity.currentContent.emergencyBlocked &&
+          entity.lastLifecycleEvent?.type === 'emergency-withdrawn'
+        ) {
+          return {
+            statusCode: 200,
+            data: {
+              content: entity.currentContent,
+              lifecycleEvent: entity.lastLifecycleEvent,
+            },
+          } as const;
+        }
+
+        const affectedQuizIds = getAffectedQuizIds(entity.currentContent);
+        const attemptSnapshots = await transaction.get(
+          firestore.collectionGroup('quizAttempts').where('quizId', 'in', affectedQuizIds),
+        );
+        const content: AdminContentSummary = {
+          ...entity.currentContent,
+          emergencyBlocked: true,
+        };
+        const lifecycleEvent = createAdminContentLifecycleEvent({
+          actorUid: input.actorUid,
+          createdAt,
+          entityId: content.entityId,
+          entityType: content.entityType,
+          fromRevisionId: content.publishedRevisionId,
+          reason: input.reason,
+          requestId: input.requestId,
+          toRevisionId: content.publishedRevisionId,
+          type: 'emergency-withdrawn',
+          publicationScope: content.publicationScope,
+        });
+
+        transaction.set(entityReference, {
+          ...entity,
+          currentContent: content,
+          lastLifecycleEvent: lifecycleEvent,
+          updatedAt: createdAt,
+        } satisfies StoredAdminContentEntity);
+
+        for (const attemptSnapshot of attemptSnapshots.docs) {
+          if (attemptSnapshot.data().status === 'in-progress') {
+            transaction.set(
+              attemptSnapshot.ref,
+              {
+                invalidatedAt: createdAt,
+                invalidatedReason: 'emergency-withdraw',
+                status: 'invalidated',
+              },
+              { merge: true },
+            );
+          }
+        }
+
         transaction.create(eventReference, { ...lifecycleEvent, schemaVersion: 1 });
 
         return { statusCode: 200, data: { content, lifecycleEvent } } as const;

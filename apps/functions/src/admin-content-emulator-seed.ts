@@ -80,6 +80,7 @@ function createSummary(input: {
   return {
     courseId: input.courseId,
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: input.entityId,
     entityType: input.entityType,
     localeAvailability: ['en', 'vi'],

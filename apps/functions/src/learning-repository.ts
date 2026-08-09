@@ -1,10 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
-import { FieldValue, getFirestore, Timestamp, type Firestore } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  getFirestore,
+  Timestamp,
+  type Firestore,
+  type Transaction,
+} from 'firebase-admin/firestore';
 
 import { ApiError } from './api-error.js';
 import { getDemoCompletionSeed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import {
+  createFirestoreLearningContentAuthority,
+  type LearningContentAuthority,
+  type LearningContentEntityType,
+} from './learning-content-authority.js';
 import { getPostViewManifest } from './post-view-manifest.js';
 import {
   createQuizAttemptPayload,
@@ -216,6 +227,10 @@ export interface LearningRepository {
     data: unknown;
     statusCode: 200;
   }>;
+}
+
+export interface FirestoreLearningRepositoryOptions {
+  contentAuthority?: LearningContentAuthority | undefined;
 }
 
 interface EnrollmentSeed {
@@ -433,6 +448,65 @@ function getDemoAccessSeedByDemoId(demoId: string): DemoAccessSeed | null {
   }
 
   return null;
+}
+
+async function assertCurrentLearningContentEntities(input: {
+  authority: LearningContentAuthority;
+  entities: ReadonlyArray<{ entityId: string; entityType: LearningContentEntityType }>;
+  transaction: Transaction;
+}): Promise<void> {
+  const entities = [
+    ...new Map(
+      input.entities.map((entity) => [`${entity.entityType}:${entity.entityId}`, entity]),
+    ).values(),
+  ];
+
+  await Promise.all(
+    entities.map(({ entityId, entityType }) =>
+      input.authority.assertCurrentPublishedEntity({
+        entityId,
+        entityType,
+        transaction: input.transaction,
+      }),
+    ),
+  );
+}
+
+async function assertQuizAttemptContentIsActive(input: {
+  authority: LearningContentAuthority;
+  manifest: ReturnType<typeof getQuizManifest>;
+  transaction: Transaction;
+}): Promise<void> {
+  const entities: Array<{ entityId: string; entityType: LearningContentEntityType }> = [
+    { entityId: input.manifest.quizId, entityType: 'quiz' },
+    { entityId: input.manifest.moduleId, entityType: 'module' },
+  ];
+
+  if (input.manifest.postId) {
+    entities.push({ entityId: input.manifest.postId, entityType: 'post' });
+  }
+
+  if (input.manifest.demoId) {
+    entities.push({ entityId: input.manifest.demoId, entityType: 'demo' });
+  }
+
+  if (input.manifest.quizKind === 'module') {
+    for (const postId of getRequiredPostCompletionIdsForModule(input.manifest.moduleId)) {
+      entities.push({ entityId: postId, entityType: 'post' });
+    }
+  }
+
+  const module = getReleaseModule(input.manifest.moduleId);
+
+  if (module) {
+    entities.push({ entityId: module.courseId, entityType: 'course' });
+  }
+
+  await assertCurrentLearningContentEntities({
+    authority: input.authority,
+    entities,
+    transaction: input.transaction,
+  });
 }
 
 function normalizeDisplayName(displayName: string): string {
@@ -1265,7 +1339,13 @@ function createLearningProgressSnapshot(input: {
   };
 }
 
-export function createFirestoreLearningRepository(firestore: Firestore): LearningRepository {
+export function createFirestoreLearningRepository(
+  firestore: Firestore,
+  options: FirestoreLearningRepositoryOptions = {},
+): LearningRepository {
+  const contentAuthority =
+    options.contentAuthority ?? createFirestoreLearningContentAuthority(firestore);
+
   return {
     async bootstrapLearner(input) {
       return firestore.runTransaction(async (transaction) => {
@@ -1339,9 +1419,30 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
     },
     async completeDemo(input) {
       const requestHash = createDemoCompletionRequestHash(input);
+      const demoAccessSeed = getDemoAccessSeedByDemoId(input.demoId);
+      const demoModule = demoAccessSeed ? getReleaseModule(demoAccessSeed.moduleId) : null;
 
       return firestore.runTransaction(async (transaction) => {
-        const demoAccessSeed = getDemoAccessSeedByDemoId(input.demoId);
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            { entityId: input.demoId, entityType: 'demo' },
+            ...(demoModule
+              ? [{ entityId: demoModule.courseId, entityType: 'course' as const }]
+              : []),
+            ...(demoAccessSeed
+              ? [
+                  { entityId: demoAccessSeed.moduleId, entityType: 'module' as const },
+                  ...demoAccessSeed.requiredPostIds.map((entityId) => ({
+                    entityId,
+                    entityType: 'post' as const,
+                  })),
+                ]
+              : []),
+          ],
+          transaction,
+        });
+
         const accessRef = firestore.doc(`users/${input.uid}/contentAccess/demo_${input.demoId}`);
         const completionRef = firestore.doc(`users/${input.uid}/demoCompletions/${input.demoId}`);
         const idempotencyRef = firestore.doc(
@@ -1416,6 +1517,8 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
     },
     async recordDemoView(input) {
       const demoSeed = getDemoCompletionSeed(input.demoId);
+      const demoAccessSeed = getDemoAccessSeedByDemoId(input.demoId);
+      const demoModule = demoAccessSeed ? getReleaseModule(demoAccessSeed.moduleId) : null;
       const requestedViewedStepIds = [...new Set(input.viewedStepIds)].sort((leftItem, rightItem) =>
         leftItem.localeCompare(rightItem),
       );
@@ -1433,6 +1536,20 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
       }
 
       return firestore.runTransaction(async (transaction) => {
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            { entityId: input.demoId, entityType: 'demo' },
+            ...(demoModule
+              ? [{ entityId: demoModule.courseId, entityType: 'course' as const }]
+              : []),
+            ...(demoAccessSeed
+              ? [{ entityId: demoAccessSeed.moduleId, entityType: 'module' as const }]
+              : []),
+          ],
+          transaction,
+        });
+
         const accessRef = firestore.doc(`users/${input.uid}/contentAccess/demo_${input.demoId}`);
         const demoViewRef = firestore.doc(`users/${input.uid}/demoViews/${input.demoId}`);
         const [accessSnapshot, demoViewSnapshot] = await Promise.all([
@@ -1483,6 +1600,16 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
       const responseData = createModuleOverviewResponseData(module);
 
       return firestore.runTransaction(async (transaction) => {
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            { entityId: module.courseId, entityType: 'course' },
+            { entityId: input.moduleId, entityType: 'module' },
+            { entityId: responseData.moduleOverview.nextPostId, entityType: 'post' },
+          ],
+          transaction,
+        });
+
         const accessRef = firestore.doc(
           `users/${input.uid}/contentAccess/module_${input.moduleId}`,
         );
@@ -1555,6 +1682,8 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         throw new ApiError(404, 'POST_NOT_FOUND', 'The requested post was not found.');
       }
 
+      const moduleId = getModuleIdForPost(input.postId);
+      const module = moduleId ? getReleaseModule(moduleId) : null;
       const requestedViewedItemIds = [...new Set(input.viewedItemIds)].sort((leftItem, rightItem) =>
         leftItem.localeCompare(rightItem),
       );
@@ -1572,6 +1701,16 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
       }
 
       return firestore.runTransaction(async (transaction) => {
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            { entityId: input.postId, entityType: 'post' },
+            ...(module ? [{ entityId: module.courseId, entityType: 'course' as const }] : []),
+            ...(moduleId ? [{ entityId: moduleId, entityType: 'module' as const }] : []),
+          ],
+          transaction,
+        });
+
         const accessRef = firestore.doc(`users/${input.uid}/contentAccess/post_${input.postId}`);
         const postViewRef = firestore.doc(`users/${input.uid}/postViews/${input.postId}`);
         const [accessSnapshot, postViewSnapshot] = await Promise.all([
@@ -1636,6 +1775,7 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
         throw new ApiError(409, 'POST_MODULE_REQUIRED', 'The requested post is missing a module.');
       }
 
+      const module = getReleaseModule(moduleId);
       const requestHash = createPostCompletionRequestHash(input);
       const nextPostId = getNextPostIdInModule(moduleId, post.postId);
       const demoAccessSeed = getDemoAccessSeedByPostId(post.postId);
@@ -1645,6 +1785,17 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           .map((postId) => firestore.doc(`users/${input.uid}/postCompletions/${postId}`)) ?? [];
 
       return firestore.runTransaction(async (transaction) => {
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            { entityId: post.postId, entityType: 'post' },
+            ...(module ? [{ entityId: module.courseId, entityType: 'course' as const }] : []),
+            { entityId: moduleId, entityType: 'module' },
+            { entityId: post.postQuizId, entityType: 'quiz' },
+          ],
+          transaction,
+        });
+
         const accessRef = firestore.doc(`users/${input.uid}/contentAccess/post_${input.postId}`);
         const postViewRef = firestore.doc(`users/${input.uid}/postViews/${input.postId}`);
         const quizProgressRef = firestore.doc(`users/${input.uid}/quizProgress/${post.postQuizId}`);
@@ -1705,6 +1856,25 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           };
         }
 
+        const shouldGrantDemo =
+          demoAccessSeed !== null &&
+          areAllOtherRequiredPostsComplete({
+            completedPostId: input.postId,
+            requiredPostIds: demoAccessSeed.requiredPostIds,
+            snapshots: siblingCompletionSnapshots,
+          });
+
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            ...(nextPostId ? [{ entityId: nextPostId, entityType: 'post' as const }] : []),
+            ...(shouldGrantDemo && demoAccessSeed
+              ? [{ entityId: demoAccessSeed.demoId, entityType: 'demo' as const }]
+              : []),
+          ],
+          transaction,
+        });
+
         const responseData = createPostCompletionResponseData(input.postId);
 
         transaction.set(
@@ -1735,14 +1905,7 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
           );
         }
 
-        if (
-          demoAccessSeed &&
-          areAllOtherRequiredPostsComplete({
-            completedPostId: input.postId,
-            requiredPostIds: demoAccessSeed.requiredPostIds,
-            snapshots: siblingCompletionSnapshots,
-          })
-        ) {
+        if (shouldGrantDemo && demoAccessSeed) {
           transaction.set(
             firestore.doc(`users/${input.uid}/contentAccess/demo_${demoAccessSeed.demoId}`),
             {
@@ -1777,6 +1940,12 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
       const expiresAtIso = expiresAt.toDate().toISOString();
 
       return firestore.runTransaction(async (transaction) => {
+        await assertQuizAttemptContentIsActive({
+          authority: contentAuthority,
+          manifest,
+          transaction,
+        });
+
         const accessRef =
           manifest.quizKind === 'post' && manifest.postId
             ? firestore.doc(`users/${input.uid}/contentAccess/post_${manifest.postId}`)
@@ -1908,6 +2077,15 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
       const requestHash = createEnrollmentRequestHash(input);
 
       return firestore.runTransaction(async (transaction) => {
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            { entityId: seed.courseId, entityType: 'course' },
+            { entityId: seed.firstModuleId, entityType: 'module' },
+          ],
+          transaction,
+        });
+
         const profileRef = firestore.doc(`users/${input.uid}`);
         const enrollmentRef = firestore.doc(`users/${input.uid}/enrollments/${input.courseId}`);
         const idempotencyRef = firestore.doc(
@@ -2117,6 +2295,12 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
 
         const manifest = getQuizManifest(attemptData.quizId);
 
+        await assertQuizAttemptContentIsActive({
+          authority: contentAuthority,
+          manifest,
+          transaction,
+        });
+
         if (attemptData.quizRevisionId !== manifest.quizRevisionId) {
           throw new ApiError(409, 'QUIZ_REVISION_MISMATCH', 'Quiz attempt revision is stale.');
         }
@@ -2213,6 +2397,33 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
             'Post and demo completion are required before completing this module.',
           );
         }
+
+        const hasNewlyPassedPost =
+          grade.passed && grade.newlyUnlocked.some((unlocked) => unlocked.type === 'post');
+        const shouldGrantPostDemo =
+          hasNewlyPassedPost &&
+          postDemoAccessSeed !== null &&
+          areAllOtherRequiredPostsComplete({
+            completedPostId: manifest.postId ?? '',
+            requiredPostIds: postDemoAccessSeed.requiredPostIds,
+            snapshots: postDemoSiblingCompletionSnapshots,
+          });
+
+        await assertCurrentLearningContentEntities({
+          authority: contentAuthority,
+          entities: [
+            ...(grade.passed && moduleSeed?.nextModuleId
+              ? [{ entityId: moduleSeed.nextModuleId, entityType: 'module' as const }]
+              : []),
+            ...(hasNewlyPassedPost && nextPostId
+              ? [{ entityId: nextPostId, entityType: 'post' as const }]
+              : []),
+            ...(shouldGrantPostDemo && postDemoAccessSeed
+              ? [{ entityId: postDemoAccessSeed.demoId, entityType: 'demo' as const }]
+              : []),
+          ],
+          transaction,
+        });
 
         transaction.set(
           attemptRef,
@@ -2341,14 +2552,7 @@ export function createFirestoreLearningRepository(firestore: Firestore): Learnin
                 );
               }
 
-              if (
-                demoAccessSeed &&
-                areAllOtherRequiredPostsComplete({
-                  completedPostId: unlocked.id,
-                  requiredPostIds: demoAccessSeed.requiredPostIds,
-                  snapshots: postDemoSiblingCompletionSnapshots,
-                })
-              ) {
+              if (shouldGrantPostDemo && demoAccessSeed) {
                 transaction.set(
                   firestore.doc(`users/${input.uid}/contentAccess/demo_${demoAccessSeed.demoId}`),
                   {

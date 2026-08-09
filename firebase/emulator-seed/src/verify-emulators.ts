@@ -448,6 +448,18 @@ interface FirestoreLifecycleRepository {
     entityId: string;
     entityType: string;
   }): Promise<{ data: { draft: { draftRevisionId: string; revisionVersion: number } } }>;
+  emergencyWithdrawEntity(input: {
+    actorUid: string;
+    entityId: string;
+    entityType: string;
+    reason: string;
+    requestId: string;
+  }): Promise<{
+    data: {
+      content: { emergencyBlocked: boolean; publishedRevisionId: string };
+      lifecycleEvent: Record<string, unknown>;
+    };
+  }>;
   listContent(input: { entityType?: string }): Promise<{
     data: {
       content: Array<{
@@ -719,6 +731,12 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       completed: true,
       schemaVersion: 1,
     });
+    await services.firestore.doc(`users/${studentUid}/postViews/${postId}`).set({
+      contentViewed: true,
+      postId,
+      schemaVersion: 1,
+      started: true,
+    });
 
     await services.auth.createUser({
       uid: adminUid,
@@ -866,6 +884,110 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     assert.equal(getRecordField(learnerAfterRollback, 'title').en, initialLearnerTitle);
     assert.equal((await services.firestore.doc(postProgressPath).get()).get('completed'), true);
 
+    const openAttemptData = await readSuccessData(
+      await requestApiJson('/api/v1/quizzes/quiz-post-dl-p01/attempts', {
+        idToken: studentToken,
+        method: 'POST',
+      }),
+      201,
+    );
+    const openAttempt = getRecordField(openAttemptData, 'attempt');
+    const openAttemptId = String(openAttempt.attemptId);
+    const dependentModuleAttemptPath = `users/${studentUid}/quizAttempts/attempt-dependent-module`;
+    await services.firestore.doc(dependentModuleAttemptPath).set({
+      quizId: 'quiz-module-dl-m01',
+      schemaVersion: 1,
+      status: 'in-progress',
+    });
+
+    const publicEmergencyResponse = await requestApiJson(
+      `/api/v1/admin/content/post/${postId}/emergency-withdraw`,
+      {
+        body: { reason: 'This route must remain unavailable.' },
+        idToken: adminToken,
+        method: 'POST',
+      },
+    );
+    assert.equal(publicEmergencyResponse.status, 404);
+
+    const emergencyRepository = await createFirestoreLifecycleRepositoryForVerification(
+      services.firestore,
+    );
+    const emergencyWithdraw = await emergencyRepository.emergencyWithdrawEntity({
+      actorUid: adminUid,
+      entityId: postId,
+      entityType: 'post',
+      reason: 'Withdraw an unsafe lesson revision immediately.',
+      requestId: 'request-emergency-withdraw-test',
+    });
+    const emergencyContent = emergencyWithdraw.data.content;
+    const emergencyLifecycleEvent = emergencyWithdraw.data.lifecycleEvent;
+    assert.equal(emergencyContent.emergencyBlocked, true);
+    assert.equal(emergencyContent.publishedRevisionId, 'post-dl-p01-neuron-perceptron-rev-r1');
+    assert.equal(emergencyLifecycleEvent.type, 'emergency-withdrawn');
+    assert.equal(
+      (await services.firestore.doc(`users/${studentUid}/quizAttempts/${openAttemptId}`).get()).get(
+        'status',
+      ),
+      'invalidated',
+    );
+    assert.equal(
+      (await services.firestore.doc(dependentModuleAttemptPath).get()).get('status'),
+      'invalidated',
+    );
+    assert.equal((await services.firestore.doc(postProgressPath).get()).get('completed'), true);
+
+    const blockedContentResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+      idToken: studentToken,
+    });
+    assert.equal(blockedContentResponse.status, 403);
+    assert.equal(
+      getRecordField(await readJsonObject(blockedContentResponse), 'error').code,
+      'CONTENT_EMERGENCY_BLOCKED',
+    );
+
+    const blockedTrialResponse = await fetch(
+      getApiEndpoint(`/api/v1/posts/${postId}/trial-content`),
+    );
+    assert.equal(blockedTrialResponse.status, 403);
+    assert.equal(
+      getRecordField(await readJsonObject(blockedTrialResponse), 'error').code,
+      'CONTENT_EMERGENCY_BLOCKED',
+    );
+
+    const blockedNewAttemptResponse = await requestApiJson(
+      '/api/v1/quizzes/quiz-post-dl-p01/attempts',
+      {
+        idToken: studentToken,
+        method: 'POST',
+      },
+    );
+    assert.equal(blockedNewAttemptResponse.status, 403);
+    assert.equal(
+      getRecordField(await readJsonObject(blockedNewAttemptResponse), 'error').code,
+      'CONTENT_EMERGENCY_BLOCKED',
+    );
+
+    const blockedCompletionIdempotencyKey = 'post-emergency-completion-bypass';
+    const blockedCompletionResponse = await requestApiJson(`/api/v1/posts/${postId}/completions`, {
+      idToken: studentToken,
+      idempotencyKey: blockedCompletionIdempotencyKey,
+      method: 'POST',
+    });
+    assert.equal(blockedCompletionResponse.status, 403);
+    assert.equal(
+      getRecordField(await readJsonObject(blockedCompletionResponse), 'error').code,
+      'CONTENT_EMERGENCY_BLOCKED',
+    );
+    assert.equal(
+      (
+        await services.firestore
+          .doc(`users/${studentUid}/idempotencyKeys/${blockedCompletionIdempotencyKey}`)
+          .get()
+      ).exists,
+      false,
+    );
+
     const reportData = await readSuccessData(
       await requestApiJson('/api/v1/admin/reports/summary', { idToken: adminToken }),
       200,
@@ -905,6 +1027,7 @@ console.log(
     clientAccess: 'deny-by-default',
     directProgressWrites: 'denied',
     adminContentLifecycle: 'verified',
+    emergencyWithdraw: 'verified',
     protectedLearningContent: 'verified',
   }),
 );

@@ -2,7 +2,11 @@ import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 
 import { createFirestoreLearningRepository } from './learning-repository.js';
-import { getReleaseModule, getSubmissionLearningUnits } from './release-learning-catalog.js';
+import {
+  getReleaseLearningCatalog,
+  getReleaseModule,
+  getSubmissionLearningUnits,
+} from './release-learning-catalog.js';
 import { getQuizManifest, type QuizAnswer } from './quiz-manifest.js';
 
 const revisionPinFieldNames = [
@@ -21,6 +25,7 @@ interface FakeDocumentReference {
 }
 
 interface FakeCollectionReference {
+  doc(documentId: string): FakeDocumentReference;
   listDocuments(): Promise<FakeDocumentReference[]>;
   path: string;
 }
@@ -44,7 +49,10 @@ function createFakeFirestore(
   initialDocuments: Record<string, Record<string, unknown>> = {},
   options: { rejectListDocuments?: boolean } = {},
 ) {
-  const documents = new Map<string, Record<string, unknown>>(Object.entries(initialDocuments));
+  const documents = new Map<string, Record<string, unknown>>([
+    ...Object.entries(createActiveContentEntities()),
+    ...Object.entries(initialDocuments),
+  ]);
   const firestore = {
     batch() {
       const deletes: string[] = [];
@@ -62,6 +70,9 @@ function createFakeFirestore(
     },
     collection(path: string): FakeCollectionReference {
       return {
+        doc(documentId) {
+          return createDocumentReference(documents, `${path}/${documentId}`);
+        },
         path,
         async listDocuments() {
           if (options.rejectListDocuments) {
@@ -102,6 +113,46 @@ function createFakeFirestore(
   } as unknown as Firestore;
 
   return { documents, firestore };
+}
+
+function createActiveContentEntities(): Record<string, Record<string, unknown>> {
+  const entities: Record<string, Record<string, unknown>> = {};
+
+  function addEntity(entityType: string, entityId: string): void {
+    entities[`adminContentEntities/${entityType}:${entityId}`] = {
+      currentContent: {
+        emergencyBlocked: false,
+        entityId,
+        entityType,
+        publishedRevisionId: `${entityType}-${entityId}-rev-r1`,
+        status: 'published',
+      },
+      draftRevisionId: null,
+      entityId,
+      entityType,
+      schemaVersion: 1,
+    };
+  }
+
+  for (const course of getReleaseLearningCatalog().courses) {
+    addEntity('course', course.courseId);
+
+    for (const module of course.modules) {
+      addEntity('module', module.moduleId);
+      addEntity('quiz', module.moduleQuizId);
+
+      if (module.demoId) {
+        addEntity('demo', module.demoId);
+      }
+
+      for (const post of module.posts) {
+        addEntity('post', post.postId);
+        addEntity('quiz', post.postQuizId);
+      }
+    }
+  }
+
+  return entities;
 }
 
 function createDocumentReference(
@@ -515,6 +566,87 @@ describe('Firestore learning repository', () => {
     });
   });
 
+  it('does not grant an emergency-blocked post from an otherwise accessible module overview', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'adminContentEntities/post:dl-p01-neuron-perceptron': {
+        currentContent: {
+          emergencyBlocked: true,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post',
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          status: 'published',
+        },
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/module_dl-m01-neuron-perceptron': {
+        contentType: 'module',
+        entityId: 'dl-m01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.recordModuleOverview({
+        moduleId: 'dl-m01-neuron-perceptron',
+        uid: 'learner-01',
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONTENT_EMERGENCY_BLOCKED',
+      statusCode: 403,
+    });
+    expect(
+      documents.get('users/learner-01/moduleProgress/dl-m01-neuron-perceptron'),
+    ).toBeUndefined();
+    expect(
+      documents.get('users/learner-01/contentAccess/post_dl-p01-neuron-perceptron'),
+    ).toBeUndefined();
+  });
+
+  it('rejects a new quiz attempt when the authoritative quiz entity is emergency blocked', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'adminContentEntities/quiz:quiz-post-dl-p01': {
+        currentContent: {
+          emergencyBlocked: true,
+          entityId: 'quiz-post-dl-p01',
+          entityType: 'quiz',
+          publishedRevisionId: 'quiz-post-dl-p01-rev-r1',
+          status: 'published',
+        },
+        draftRevisionId: null,
+        entityId: 'quiz-post-dl-p01',
+        entityType: 'quiz',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+      'users/learner-01/postViews/dl-p01-neuron-perceptron': {
+        contentViewed: true,
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.createQuizAttempt({
+        quizId: 'quiz-post-dl-p01',
+        uid: 'learner-01',
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONTENT_EMERGENCY_BLOCKED',
+      statusCode: 403,
+    });
+    expect(
+      [...documents.keys()].some((path) => path.startsWith('users/learner-01/quizAttempts/')),
+    ).toBe(false);
+  });
+
   it('rejects enrollment when an idempotency key belongs to another request', async () => {
     const { firestore } = createFakeFirestore({
       'users/learner-01/idempotencyKeys/enroll-conflict-key': {
@@ -716,6 +848,55 @@ describe('Firestore learning repository', () => {
       contentType: 'demo',
       entityId: 'demo-perceptron-and-gate',
     });
+  });
+
+  it('rejects post completion and preserves downstream grants when the post is emergency blocked', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'adminContentEntities/post:dl-p01-neuron-perceptron': {
+        currentContent: {
+          emergencyBlocked: true,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post',
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          status: 'published',
+        },
+        draftRevisionId: null,
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+      'users/learner-01/postViews/dl-p01-neuron-perceptron': {
+        contentViewed: true,
+        schemaVersion: 1,
+      },
+      'users/learner-01/quizProgress/quiz-post-dl-p01': {
+        passed: true,
+        schemaVersion: 1,
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.completePost({
+        idempotencyKey: 'post-emergency-bypass-key',
+        postId: 'dl-p01-neuron-perceptron',
+        uid: 'learner-01',
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONTENT_EMERGENCY_BLOCKED',
+      statusCode: 403,
+    });
+    expect(
+      documents.get('users/learner-01/postCompletions/dl-p01-neuron-perceptron'),
+    ).toBeUndefined();
+    expect(
+      documents.get('users/learner-01/contentAccess/demo_demo-perceptron-and-gate'),
+    ).toBeUndefined();
   });
 
   it('completes the module, updates enrollment progress, and opens the next module after passing the module quiz', async () => {
@@ -1085,6 +1266,51 @@ describe('Firestore learning repository', () => {
       code: 'DEMO_ACCESS_REQUIRED',
       statusCode: 403,
     });
+  });
+
+  it('rejects demo completion and preserves unlocks when the authoritative demo is emergency blocked', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'adminContentEntities/demo:demo-perceptron-and-gate': {
+        currentContent: {
+          emergencyBlocked: true,
+          entityId: 'demo-perceptron-and-gate',
+          entityType: 'demo',
+          publishedRevisionId: 'demo-perceptron-and-gate-rev-r1',
+          status: 'published',
+        },
+        draftRevisionId: null,
+        entityId: 'demo-perceptron-and-gate',
+        entityType: 'demo',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/demo_demo-perceptron-and-gate': {
+        contentType: 'demo',
+        entityId: 'demo-perceptron-and-gate',
+        schemaVersion: 1,
+      },
+      'users/learner-01/postCompletions/dl-p01-neuron-perceptron': {
+        schemaVersion: 1,
+        status: 'completed',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.completeDemo({
+        demoId: 'demo-perceptron-and-gate',
+        idempotencyKey: 'demo-emergency-bypass-key',
+        moduleId: 'dl-m01-neuron-perceptron',
+        requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+        uid: 'learner-01',
+        viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONTENT_EMERGENCY_BLOCKED',
+      statusCode: 403,
+    });
+    expect(
+      documents.get('users/learner-01/demoCompletions/demo-perceptron-and-gate'),
+    ).toBeUndefined();
   });
 
   it('returns a backend-verified progress snapshot from stored progress documents', async () => {

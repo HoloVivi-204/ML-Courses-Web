@@ -58,13 +58,14 @@ export interface AdminContentLifecycleEvent {
   reason: string;
   requestId: string;
   toRevisionId: string | null;
-  type: 'published' | 'rolled-back' | 'unpublished';
+  type: 'emergency-withdrawn' | 'published' | 'rolled-back' | 'unpublished';
   publicationScope?: AdminContentPublicationScope | undefined;
 }
 
 export interface AdminContentSummary {
   courseId: string;
   draftRevisionId: string | null;
+  emergencyBlocked: boolean;
   entityId: string;
   entityType: AdminContentEntityType;
   localeAvailability: readonly ['en', 'vi'];
@@ -142,6 +143,14 @@ export interface UnpublishAdminContentEntityInput {
   requestId: string;
 }
 
+export interface EmergencyWithdrawAdminContentEntityInput {
+  actorUid: string;
+  entityId: string;
+  entityType: string;
+  reason: string;
+  requestId: string;
+}
+
 export interface RollbackAdminContentRevisionInput {
   actorUid: string;
   reason: string;
@@ -179,6 +188,9 @@ export interface AdminContentRepository {
     };
     statusCode: 201;
   }>;
+  emergencyWithdrawEntity(
+    input: EmergencyWithdrawAdminContentEntityInput,
+  ): Promise<AdminContentLifecycleResult>;
   listContent(input: ListAdminContentInput): Promise<{
     data: {
       content: readonly AdminContentSummary[];
@@ -273,6 +285,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-classical-ml',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'course-classical-ml',
     entityType: 'course',
     localeAvailability: ['en', 'vi'],
@@ -293,6 +306,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'course-deep-learning-basic',
     entityType: 'course',
     localeAvailability: ['en', 'vi'],
@@ -313,6 +327,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'dl-m01-neuron-perceptron',
     entityType: 'module',
     localeAvailability: ['en', 'vi'],
@@ -334,6 +349,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'dl-m02-mlp',
     entityType: 'module',
     localeAvailability: ['en', 'vi'],
@@ -355,6 +371,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'dl-m03-training-generalization',
     entityType: 'module',
     localeAvailability: ['en', 'vi'],
@@ -376,6 +393,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'dl-p01-neuron-perceptron',
     entityType: 'post',
     localeAvailability: ['en', 'vi'],
@@ -401,6 +419,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'demo-perceptron-and-gate',
     entityType: 'demo',
     localeAvailability: ['en', 'vi'],
@@ -426,6 +445,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'quiz-post-dl-p01',
     entityType: 'quiz',
     localeAvailability: ['en', 'vi'],
@@ -456,6 +476,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
   {
     courseId: 'course-deep-learning-basic',
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: 'quiz-module-dl-m01',
     entityType: 'quiz',
     localeAvailability: ['en', 'vi'],
@@ -808,6 +829,7 @@ export function createPublishedContentFromDraft(input: {
   return {
     courseId: input.draft.courseId,
     draftRevisionId: null,
+    emergencyBlocked: false,
     entityId: input.draft.entityId,
     entityType: input.draft.entityType,
     localeAvailability: input.draft.localeAvailability,
@@ -1148,6 +1170,7 @@ export function createStaticAdminContentRepository(
       const rolledBackContent: AdminContentSummary = {
         ...targetRevision,
         draftRevisionId: null,
+        emergencyBlocked: false,
         previousPublishedRevisionId: currentContent.publishedRevisionId,
         status: 'published',
       };
@@ -1174,6 +1197,60 @@ export function createStaticAdminContentRepository(
           content: rolledBackContent,
           lifecycleEvent,
         },
+      };
+    },
+    async emergencyWithdrawEntity(input) {
+      if (!input.actorUid) {
+        throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
+      }
+
+      if (!isAdminContentEntityType(input.entityType)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_ENTITY_TYPE_INVALID',
+          'The requested admin content entity type is not supported.',
+        );
+      }
+
+      if (!['demo', 'post', 'quiz'].includes(input.entityType)) {
+        throw new ApiError(
+          409,
+          'ADMIN_CONTENT_EMERGENCY_WITHDRAW_SCOPE_UNSUPPORTED',
+          'Emergency withdraw only supports demo, post, and quiz content.',
+        );
+      }
+
+      const currentContent = findCurrentPublishedContent(input.entityType, input.entityId);
+
+      if (currentContent === undefined) {
+        throw new ApiError(
+          404,
+          'ADMIN_CONTENT_NOT_FOUND',
+          'The requested admin content item was not found.',
+        );
+      }
+
+      const content: AdminContentSummary = {
+        ...currentContent,
+        emergencyBlocked: true,
+      };
+      const lifecycleEvent = createAdminContentLifecycleEvent({
+        actorUid: input.actorUid,
+        entityId: content.entityId,
+        entityType: content.entityType,
+        fromRevisionId: currentContent.publishedRevisionId,
+        reason: input.reason,
+        requestId: input.requestId,
+        toRevisionId: currentContent.publishedRevisionId,
+        type: 'emergency-withdrawn',
+        publicationScope: content.publicationScope,
+      });
+
+      publishedByContentKey.set(getAdminContentKey(content.entityType, content.entityId), content);
+
+      return {
+        statusCode: 200,
+        data: { content, lifecycleEvent },
       };
     },
     async unpublishEntity(input) {
