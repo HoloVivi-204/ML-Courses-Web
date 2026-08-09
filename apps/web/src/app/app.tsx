@@ -1,6 +1,6 @@
 import { ConfigProvider, theme as antTheme } from 'antd';
 import type { i18n as I18nInstance } from 'i18next';
-import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from 'react';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 
@@ -336,49 +336,7 @@ function PreferenceAwareHeader({
   theme,
 }: PreferenceAwareHeaderProps) {
   const { getIdToken, isSubmitting, signOut, status, user } = useAuth();
-  const authenticatedUserId = status === 'authenticated' ? (user?.uid ?? null) : null;
-  const [adminAccess, setAdminAccess] = useState({
-    hasAccess: false,
-    uid: null as string | null,
-  });
-  const hasAdminAccess =
-    authenticatedUserId !== null &&
-    adminAccess.uid === authenticatedUserId &&
-    adminAccess.hasAccess;
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    if (!authenticatedUserId) {
-      return () => {
-        isCurrent = false;
-      };
-    }
-
-    async function loadAdminAccess() {
-      try {
-        const idToken = await getIdToken();
-        const nextHasAdminAccess =
-          idToken && learningApiClient.getAdminAccess
-            ? await learningApiClient.getAdminAccess(idToken)
-            : false;
-
-        if (isCurrent) {
-          setAdminAccess({ hasAccess: nextHasAdminAccess, uid: authenticatedUserId });
-        }
-      } catch {
-        if (isCurrent) {
-          setAdminAccess({ hasAccess: false, uid: authenticatedUserId });
-        }
-      }
-    }
-
-    void loadAdminAccess();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [authenticatedUserId, getIdToken, learningApiClient]);
+  const hasAdminAccess = status === 'authenticated' && user?.role === 'admin';
 
   const syncPreferences = useCallback(
     async (preferences: {

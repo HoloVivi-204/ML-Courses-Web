@@ -11,7 +11,30 @@ import { getAuth } from 'firebase-admin/auth';
 import helmet from 'helmet';
 
 import {
+  avatarFinalizeRequestSchema,
+  avatarUploadSessionRequestSchema,
+  avatarUploadSessionResponseSchema,
+  bootstrapProfileRequestSchema,
+  demoViewRequestSchema,
+  demoViewResponseSchema,
+  learnerProfileResponseSchema,
+  learningProgressSnapshotSchema,
+  moduleOverviewViewResponseSchema,
+  playgroundConfigCreateRequestSchema,
+  playgroundConfigResponseSchema,
+  playgroundConfigsListQuerySchema,
+  playgroundConfigsResponseSchema,
+  playgroundConfigUpdateRequestSchema,
+  postViewRequestSchema,
+  postViewResponseSchema,
+  MUST_API_CONTRACTS,
+  type MustApiRouteId,
+  updatePreferencesRequestSchema,
+} from '@ml-path/contracts';
+
+import {
   createStaticAdminContentRepository,
+  isAdminContentEntityType,
   isAdminContentPublicationScope,
   type AdminContentDraftPatch,
   type AdminContentMetadata,
@@ -33,10 +56,6 @@ import {
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { hasLocalCloudAuthDemoAdminRole } from './local-cloud-auth-demo.js';
-import {
-  createDefaultLearningContentRepository,
-  type LearningContentRepository,
-} from './learning-content-repository.js';
 import { createFirestoreAdminContentRepository } from './firestore-admin-content-repository.js';
 import {
   createDefaultLearningRepository,
@@ -73,13 +92,16 @@ interface ApiErrorBody {
   message: string;
 }
 
+interface ContractSchema<TValue> {
+  safeParse(value: unknown): { data: TValue; success: true } | { error: unknown; success: false };
+}
+
 export interface ApiAppOptions {
   adminContentRepository?: AdminContentRepository | undefined;
   adminReportRepository?: AdminReportRepository | undefined;
   appCheckEnforcement?: 'disabled' | 'enforced' | undefined;
   avatarUploadService?: AvatarUploadService | undefined;
   deleteAuthUser?: ((uid: string) => Promise<void>) | undefined;
-  learningContentRepository?: LearningContentRepository | undefined;
   learningRepository?: LearningRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   rateLimiter?: RateLimiter | undefined;
@@ -110,6 +132,37 @@ export function getRecentAuthenticationWindowSeconds(
 
 function getRequestId(response: Response): string {
   return String(response.locals.requestId);
+}
+
+function parseContractRequest<TValue>(schema: ContractSchema<TValue>, value: unknown): TValue {
+  const parsed = schema.safeParse(value);
+
+  if (!parsed.success) {
+    throw new ApiError(
+      400,
+      'INVALID_REQUEST_BODY',
+      'The request body does not match the API contract.',
+    );
+  }
+
+  return parsed.data;
+}
+
+function assertContractResponse<TValue>(schema: ContractSchema<TValue>, value: unknown): TValue {
+  const parsed = schema.safeParse(value);
+
+  if (!parsed.success) {
+    throw new ApiError(500, 'API_CONTRACT_VIOLATION', 'The API response contract was violated.');
+  }
+
+  return parsed.data;
+}
+
+function assertMustApiRequest(routeId: MustApiRouteId, value: unknown): void {
+  parseContractRequest<unknown>(
+    MUST_API_CONTRACTS[routeId].request as ContractSchema<unknown>,
+    value,
+  );
 }
 
 function getAuthUser(response: Response): VerifiedAuthUser {
@@ -154,11 +207,6 @@ function sendSuccess(response: Response, statusCode: number, data: unknown): voi
     data,
     requestId: getRequestId(response),
   });
-}
-
-function sendLearningContentSuccess(response: Response, data: unknown): void {
-  response.setHeader('cache-control', 'private, no-store');
-  sendSuccess(response, 200, data);
 }
 
 function sendNoContent(response: Response): void {
@@ -210,16 +258,6 @@ function getRouteParam(request: Request, name: string): string {
   return value;
 }
 
-function getStringQueryField(request: Request, name: string): string {
-  const value = request.query[name];
-
-  if (typeof value !== 'string' || !value.trim()) {
-    throw new ApiError(400, 'INVALID_QUERY_PARAMETER', `${name} query parameter is required.`);
-  }
-
-  return value.trim();
-}
-
 function getOptionalStringQueryField(request: Request, name: string): string | undefined {
   const value = request.query[name];
 
@@ -258,16 +296,6 @@ function getOptionalIntegerQueryField(request: Request, name: string): number | 
   return parsedValue;
 }
 
-function assertNoClientContentRevisionSelection(request: Request): void {
-  if (request.query.revisionId !== undefined) {
-    throw new ApiError(
-      400,
-      'CONTENT_REVISION_SELECTION_FORBIDDEN',
-      'Content revisions are selected by the server.',
-    );
-  }
-}
-
 function getStringArrayBodyField(request: Request, name: string): string[] {
   const value = (request.body as Record<string, unknown> | undefined)?.[name];
 
@@ -290,20 +318,6 @@ function getObjectBody(request: Request): Record<string, unknown> {
 
 function getStringBodyField(request: Request, name: string): string {
   const value = getObjectBody(request)[name];
-
-  if (typeof value !== 'string' || !value.trim()) {
-    throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a non-empty string.`);
-  }
-
-  return value.trim();
-}
-
-function getOptionalStringBodyField(request: Request, name: string): string | undefined {
-  const value = getObjectBody(request)[name];
-
-  if (value === undefined) {
-    return undefined;
-  }
 
   if (typeof value !== 'string' || !value.trim()) {
     throw new ApiError(400, 'INVALID_REQUEST_BODY', `${name} must be a non-empty string.`);
@@ -531,67 +545,11 @@ function assertNoAccountDeletionBody(request: Request): void {
   assertBodyFieldsAllowlisted(getOptionalObjectBody(request), []);
 }
 
-function getOptionalLearnerLocalePreference(
-  body: Record<string, unknown>,
-): LearnerLocalePreference | undefined {
-  const value = body.locale;
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value !== 'en' && value !== 'vi') {
-    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'locale must be either en or vi.');
-  }
-
-  return value;
-}
-
-function getOptionalLearnerThemePreference(
-  body: Record<string, unknown>,
-): LearnerThemePreference | undefined {
-  const value = body.theme;
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value !== 'dark' && value !== 'light' && value !== 'system') {
-    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'theme must be dark, light, or system.');
-  }
-
-  return value;
-}
-
-function getOptionalLearnerPreferencesBody(request: Request): {
-  locale?: LearnerLocalePreference | undefined;
-  theme?: LearnerThemePreference | undefined;
-} {
-  const body = getOptionalObjectBody(request);
-
-  assertBodyFieldsAllowlisted(body, ['locale', 'theme']);
-
-  return {
-    locale: getOptionalLearnerLocalePreference(body),
-    theme: getOptionalLearnerThemePreference(body),
-  };
-}
-
 function getLearnerPreferencesPatchBody(request: Request): {
   locale?: LearnerLocalePreference | undefined;
   theme?: LearnerThemePreference | undefined;
 } {
-  const preferences = getOptionalLearnerPreferencesBody(request);
-
-  if (preferences.locale === undefined && preferences.theme === undefined) {
-    throw new ApiError(
-      400,
-      'INVALID_REQUEST_BODY',
-      'At least one learner preference must be provided.',
-    );
-  }
-
-  return preferences;
+  return parseContractRequest(updatePreferencesRequestSchema, getOptionalObjectBody(request));
 }
 
 function getAvatarUploadSessionBody(request: Request) {
@@ -599,19 +557,14 @@ function getAvatarUploadSessionBody(request: Request) {
 
   assertBodyFieldsAllowlisted(body, ['contentType', 'sha256', 'sizeBytes']);
 
-  return toAvatarUploadRequest(body);
+  const parsed = avatarUploadSessionRequestSchema.safeParse(body);
+
+  // Preserve domain-specific 422 errors for invalid MIME, size, and digest values.
+  return toAvatarUploadRequest(parsed.success ? parsed.data : body);
 }
 
 function getAvatarFinalizeBody(request: Request): { uploadSessionId: string } {
-  const body = getOptionalObjectBody(request);
-
-  assertBodyFieldsAllowlisted(body, ['uploadSessionId']);
-
-  if (typeof body.uploadSessionId !== 'string' || body.uploadSessionId.trim().length === 0) {
-    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'uploadSessionId must be a non-empty string.');
-  }
-
-  return { uploadSessionId: body.uploadSessionId.trim() };
+  return parseContractRequest(avatarFinalizeRequestSchema, getOptionalObjectBody(request));
 }
 
 function getBodyField(request: Request, name: string): unknown {
@@ -657,38 +610,11 @@ function getPostViewBody(request: Request): {
   readingPosition: string;
   viewedItemIds: string[];
 } {
-  const body = getObjectBody(request);
-  assertBodyFieldsAllowlisted(body, ['readingPosition', 'viewedItemIds']);
-  const viewedItemIds = getStringArrayBodyField(request, 'viewedItemIds');
-
-  if (viewedItemIds.length > 80 || viewedItemIds.some((item) => item.length > 160)) {
-    throw new ApiError(
-      400,
-      'INVALID_REQUEST_BODY',
-      'viewedItemIds must contain at most 80 identifiers of 160 characters or fewer.',
-    );
-  }
-
-  return {
-    readingPosition: getTrimmedStringValue(body.readingPosition, 'readingPosition', 160),
-    viewedItemIds,
-  };
+  return parseContractRequest(postViewRequestSchema, getObjectBody(request));
 }
 
 function getDemoViewBody(request: Request): string[] {
-  const body = getObjectBody(request);
-  assertBodyFieldsAllowlisted(body, ['viewedStepIds']);
-  const viewedStepIds = getStringArrayBodyField(request, 'viewedStepIds');
-
-  if (viewedStepIds.length > 20 || viewedStepIds.some((item) => item.length > 160)) {
-    throw new ApiError(
-      400,
-      'INVALID_REQUEST_BODY',
-      'viewedStepIds must contain at most 20 identifiers of 160 characters or fewer.',
-    );
-  }
-
-  return viewedStepIds;
+  return parseContractRequest(demoViewRequestSchema, getObjectBody(request)).viewedStepIds;
 }
 
 function isQuizAnswerBodyItem(
@@ -926,7 +852,6 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   let adminContentRepository = options.adminContentRepository;
   let adminReportRepository = options.adminReportRepository;
   let avatarUploadService = options.avatarUploadService;
-  let learningContentRepository = options.learningContentRepository;
   let learningRepository = options.learningRepository;
   let playgroundRepository = options.playgroundRepository;
   const deleteAuthUser = options.deleteAuthUser ?? defaultDeleteAuthUser;
@@ -1069,12 +994,6 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     return learningRepository;
   }
 
-  function getLearningContentRepository(): LearningContentRepository {
-    learningContentRepository ??= createDefaultLearningContentRepository();
-
-    return learningContentRepository;
-  }
-
   function getPlaygroundRepository(): PlaygroundRepository {
     playgroundRepository ??= createDefaultPlaygroundRepository();
 
@@ -1126,13 +1045,23 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
 
   /** Returns Release 1 runtime feature flags after App Check verification. */
   app.get('/api/v1/system/features', (_request, response) => {
-    sendSuccess(response, 200, getRuntimeFeatureManifest());
+    sendSuccess(
+      response,
+      200,
+      assertContractResponse(
+        MUST_API_CONTRACTS.systemFeatures.response,
+        getRuntimeFeatureManifest(),
+      ),
+    );
   });
 
   app.post('/api/v1/users/me/bootstrap', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);
-      const preferences = getOptionalLearnerPreferencesBody(request);
+      const preferences = parseContractRequest(
+        bootstrapProfileRequestSchema,
+        getOptionalObjectBody(request),
+      );
       const result = await getLearningRepository().bootstrapLearner({
         uid: authUser.uid,
         displayName: authUser.displayName || 'Learner',
@@ -1140,7 +1069,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         theme: preferences.theme,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(learnerProfileResponseSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1157,7 +1090,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         theme: preferences.theme,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(learnerProfileResponseSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1175,7 +1112,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           uid: authUser.uid,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(avatarUploadSessionResponseSchema, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1192,7 +1133,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         uploadSessionId,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(learnerProfileResponseSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1244,62 +1189,30 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const courseId = getRouteParam(request, 'courseId');
+        const idempotencyKey = getIdempotencyKey(request);
+
+        assertMustApiRequest('enrollCourse', {
+          headers: { 'idempotency-key': idempotencyKey },
+          params: { courseId },
+        });
         const result = await getLearningRepository().enrollLearner({
-          courseId: getRouteParam(request, 'courseId'),
+          courseId,
           displayName: authUser.displayName,
-          idempotencyKey: getIdempotencyKey(request),
+          idempotencyKey,
           uid: authUser.uid,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.enrollCourse.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
     },
   );
-
-  app.get('/api/v1/posts/:postId/trial-content', async (request, response, next) => {
-    try {
-      assertNoClientContentRevisionSelection(request);
-      const result = await getLearningContentRepository().getTrialPostContent({
-        postId: getRouteParam(request, 'postId'),
-      });
-
-      sendLearningContentSuccess(response, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get('/api/v1/posts/:postId/content', requireAuth, async (request, response, next) => {
-    try {
-      assertNoClientContentRevisionSelection(request);
-      const authUser = getAuthUser(response);
-      const result = await getLearningContentRepository().getFullPostContent({
-        postId: getRouteParam(request, 'postId'),
-        uid: authUser.uid,
-      });
-
-      sendLearningContentSuccess(response, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get('/api/v1/demos/:demoId/content', requireAuth, async (request, response, next) => {
-    try {
-      assertNoClientContentRevisionSelection(request);
-      const authUser = getAuthUser(response);
-      const result = await getLearningContentRepository().getDemoContent({
-        demoId: getRouteParam(request, 'demoId'),
-        uid: authUser.uid,
-      });
-
-      sendLearningContentSuccess(response, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   app.post(
     '/api/v1/demos/:demoId/completions',
@@ -1310,17 +1223,28 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         const authUser = getAuthUser(response);
         const demoId = getRouteParam(request, 'demoId');
         const viewedStepIds = getStringArrayBodyField(request, 'viewedStepIds');
+        const idempotencyKey = getIdempotencyKey(request);
+
+        assertMustApiRequest('completeDemo', {
+          body: getObjectBody(request),
+          headers: { 'idempotency-key': idempotencyKey },
+          params: { demoId },
+        });
         const seed = assertRequiredDemoStepsViewed(demoId, viewedStepIds);
         const result = await getLearningRepository().completeDemo({
           demoId,
-          idempotencyKey: getIdempotencyKey(request),
+          idempotencyKey,
           moduleId: seed.moduleId,
           requiredStepIds: seed.requiredStepIds,
           uid: authUser.uid,
           viewedStepIds,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.completeDemo.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1330,13 +1254,24 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.post('/api/v1/demos/:demoId/views', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);
+      const demoId = getRouteParam(request, 'demoId');
+      const body = getObjectBody(request);
+
+      assertMustApiRequest('recordDemoView', {
+        body,
+        params: { demoId },
+      });
       const result = await getLearningRepository().recordDemoView({
-        demoId: getRouteParam(request, 'demoId'),
+        demoId,
         uid: authUser.uid,
         viewedStepIds: getDemoViewBody(request),
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(demoViewResponseSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1348,12 +1283,19 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const moduleId = getRouteParam(request, 'moduleId');
+
+        assertMustApiRequest('recordModuleOverviewView', { moduleId });
         const result = await getLearningRepository().recordModuleOverview({
-          moduleId: getRouteParam(request, 'moduleId'),
+          moduleId,
           uid: authUser.uid,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(moduleOverviewViewResponseSchema, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1364,14 +1306,24 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     try {
       const authUser = getAuthUser(response);
       const postView = getPostViewBody(request);
+      const postId = getRouteParam(request, 'postId');
+
+      assertMustApiRequest('recordPostView', {
+        body: getObjectBody(request),
+        params: { postId },
+      });
       const result = await getLearningRepository().recordPostView({
-        postId: getRouteParam(request, 'postId'),
+        postId,
         readingPosition: postView.readingPosition,
         uid: authUser.uid,
         viewedItemIds: postView.viewedItemIds,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(postViewResponseSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1384,13 +1336,24 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const postId = getRouteParam(request, 'postId');
+        const idempotencyKey = getIdempotencyKey(request);
+
+        assertMustApiRequest('completePost', {
+          headers: { 'idempotency-key': idempotencyKey },
+          params: { postId },
+        });
         const result = await getLearningRepository().completePost({
-          idempotencyKey: getIdempotencyKey(request),
-          postId: getRouteParam(request, 'postId'),
+          idempotencyKey,
+          postId,
           uid: authUser.uid,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.completePost.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1404,12 +1367,19 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const quizId = getRouteParam(request, 'quizId');
+
+        assertMustApiRequest('createQuizAttempt', { params: { quizId } });
         const result = await getLearningRepository().createQuizAttempt({
-          quizId: getRouteParam(request, 'quizId'),
+          quizId,
           uid: authUser.uid,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.createQuizAttempt.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1423,14 +1393,26 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const attemptId = getRouteParam(request, 'attemptId');
+        const idempotencyKey = getIdempotencyKey(request);
+
+        assertMustApiRequest('submitQuizAttempt', {
+          body: getObjectBody(request),
+          headers: { 'idempotency-key': idempotencyKey },
+          params: { attemptId },
+        });
         const result = await getLearningRepository().submitQuizAttempt({
           answers: getQuizAnswersBodyField(request),
-          attemptId: getRouteParam(request, 'attemptId'),
-          idempotencyKey: getIdempotencyKey(request),
+          attemptId,
+          idempotencyKey,
           uid: authUser.uid,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.submitQuizAttempt.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1444,17 +1426,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         uid: authUser.uid,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get('/api/v1/admin/access', requireAuth, (_request, response, next) => {
-    try {
-      sendSuccess(response, 200, {
-        isAdmin: getAuthUser(response).role === 'admin',
-      });
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(learningProgressSnapshotSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1463,14 +1439,33 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.get('/api/v1/admin/content', requireAuth, async (request, response, next) => {
     try {
       requireAdminUser(response);
+      const requestedEntityType = getOptionalStringQueryField(request, 'entityType');
 
-      const result = await getAdminContentRepository().listContent({
-        entityType: getOptionalStringQueryField(request, 'entityType'),
-        courseId: getOptionalStringQueryField(request, 'courseId'),
-        moduleId: getOptionalStringQueryField(request, 'moduleId'),
+      if (requestedEntityType !== undefined && !isAdminContentEntityType(requestedEntityType)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_ENTITY_TYPE_INVALID',
+          'The requested admin content entity type is not supported.',
+        );
+      }
+
+      const query = parseContractRequest(MUST_API_CONTRACTS.listAdminContent.request, {
+        query: request.query,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      const result = await getAdminContentRepository().listContent({
+        courseId: query.query.courseId,
+        cursor: query.query.cursor,
+        entityType: query.query.entityType,
+        limit: query.query.limit,
+        moduleId: query.query.moduleId,
+      });
+
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(MUST_API_CONTRACTS.listAdminContent.response, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1483,7 +1478,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         actorUid: adminUser.uid,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(MUST_API_CONTRACTS.getAdminReportSummary.response, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1496,13 +1495,23 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
+        const entityId = getRouteParam(request, 'entityId');
+        const entityType = getRouteParam(request, 'entityType');
+
+        assertMustApiRequest('createAdminContentDraft', {
+          params: { entityId, entityType },
+        });
         const result = await getAdminContentRepository().createDraft({
           createdByUid: adminUser.uid,
-          entityId: getRouteParam(request, 'entityId'),
-          entityType: getRouteParam(request, 'entityType'),
+          entityId,
+          entityType,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.createAdminContentDraft.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1517,14 +1526,27 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       try {
         const adminUser = requireAdminUser(response);
         const updateBody = getAdminContentDraftPatchBody(request);
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('updateAdminContentRevision', {
+          body: getObjectBody(request),
+          params: { revisionId },
+        });
         const result = await getAdminContentRepository().updateDraft({
           actorUid: adminUser.uid,
           patch: updateBody.patch,
-          revisionId: getRouteParam(request, 'revisionId'),
+          revisionId,
           revisionVersion: updateBody.revisionVersion,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.updateAdminContentRevision.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1538,12 +1560,22 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('validateAdminContentRevision', { params: { revisionId } });
         const result = await getAdminContentRepository().validateDraft({
           actorUid: adminUser.uid,
-          revisionId: getRouteParam(request, 'revisionId'),
+          revisionId,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.validateAdminContentRevision.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1558,16 +1590,31 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       try {
         const adminUser = requireAdminUser(response);
         const publishBody = getAdminContentPublishBody(request);
+        const idempotencyKey = getIdempotencyKey(request);
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('publishAdminContentRevision', {
+          body: getObjectBody(request),
+          headers: { 'idempotency-key': idempotencyKey },
+          params: { revisionId },
+        });
         const result = await getAdminContentRepository().publishRevision({
           actorUid: adminUser.uid,
-          idempotencyKey: getIdempotencyKey(request),
+          idempotencyKey,
           publicationScope: publishBody.publicationScope,
           reason: publishBody.reason,
-          revisionId: getRouteParam(request, 'revisionId'),
+          revisionId,
           requestId: getRequestId(response),
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.publishAdminContentRevision.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1581,14 +1628,28 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
+        const reason = getAdminContentLifecycleReasonBody(request);
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('rollbackAdminContentRevision', {
+          body: getObjectBody(request),
+          params: { revisionId },
+        });
         const result = await getAdminContentRepository().rollbackRevision({
           actorUid: adminUser.uid,
-          reason: getAdminContentLifecycleReasonBody(request),
-          revisionId: getRouteParam(request, 'revisionId'),
+          reason,
+          revisionId,
           requestId: getRequestId(response),
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.rollbackAdminContentRevision.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1602,14 +1663,28 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const adminUser = requireAdminUser(response);
+        const entityId = getRouteParam(request, 'entityId');
+        const reason = getAdminContentLifecycleReasonBody(request);
+
+        assertMustApiRequest('unpublishAdminContentEntity', {
+          body: getObjectBody(request),
+          params: { entityId },
+        });
         const result = await getAdminContentRepository().unpublishEntity({
           actorUid: adminUser.uid,
-          entityId: getRouteParam(request, 'entityId'),
-          reason: getAdminContentLifecycleReasonBody(request),
+          entityId,
+          reason,
           requestId: getRequestId(response),
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.unpublishAdminContentEntity.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1624,6 +1699,8 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       try {
         const authUser = getAuthUser(response);
         const body = getObjectBody(request);
+
+        assertMustApiRequest('createPlaygroundRunSession', { body });
         const result = await getPlaygroundRepository().createRunSession({
           uid: authUser.uid,
           scenarioId: getStringBodyField(request, 'scenarioId'),
@@ -1633,7 +1710,14 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           deviceProfile: getDeviceProfileBodyField(request),
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.createPlaygroundRunSession.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1647,12 +1731,22 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const sessionId = getRouteParam(request, 'sessionId');
+
+        assertMustApiRequest('cancelPlaygroundRunSession', { params: { sessionId } });
         const result = await getPlaygroundRepository().cancelRunSession({
           uid: authUser.uid,
-          sessionId: getRouteParam(request, 'sessionId'),
+          sessionId,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.cancelPlaygroundRunSession.response,
+            result.data,
+          ),
+        );
       } catch (error) {
         next(error);
       }
@@ -1666,14 +1760,24 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const idempotencyKey = getIdempotencyKey(request);
+
+        assertMustApiRequest('savePlaygroundRun', {
+          body: getObjectBody(request),
+          headers: { 'idempotency-key': idempotencyKey },
+        });
         const result = await getPlaygroundRepository().saveRun({
           uid: authUser.uid,
-          idempotencyKey: getIdempotencyKey(request),
+          idempotencyKey,
           sessionId: getStringBodyField(request, 'sessionId'),
           result: getBodyField(request, 'result'),
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.savePlaygroundRun.response, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1683,6 +1787,8 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.get('/api/v1/playground-runs', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);
+
+      assertMustApiRequest('listPlaygroundRuns', { query: request.query });
       const result = await getPlaygroundRepository().listRuns({
         cursor: getOptionalStringQueryField(request, 'cursor'),
         limit: getOptionalIntegerQueryField(request, 'limit'),
@@ -1690,7 +1796,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         uid: authUser.uid,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(MUST_API_CONTRACTS.listPlaygroundRuns.response, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1703,10 +1813,13 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const runId = getRouteParam(request, 'runId');
+
+        assertMustApiRequest('deletePlaygroundRun', { params: { runId } });
 
         await getPlaygroundRepository().deleteRun({
           uid: authUser.uid,
-          runId: getRouteParam(request, 'runId'),
+          runId,
         });
 
         sendNoContent(response);
@@ -1723,17 +1836,26 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
-        const body = getObjectBody(request);
+        const body = parseContractRequest(
+          playgroundConfigCreateRequestSchema,
+          getObjectBody(request),
+        );
+
+        assertMustApiRequest('createPlaygroundConfig', { body });
         const result = await getPlaygroundRepository().createConfig({
           uid: authUser.uid,
-          name: getStringBodyField(request, 'name'),
-          scenarioId: getStringBodyField(request, 'scenarioId'),
-          algorithmId: getStringBodyField(request, 'algorithmId'),
-          datasetVersionId: getStringBodyField(request, 'datasetVersionId'),
+          name: body.name,
+          scenarioId: body.scenarioId,
+          algorithmId: body.algorithmId,
+          datasetVersionId: body.datasetVersionId,
           config: body.config,
         });
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(playgroundConfigResponseSchema, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1743,12 +1865,19 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   app.get('/api/v1/playground-configs', requireAuth, async (request, response, next) => {
     try {
       const authUser = getAuthUser(response);
+      const query = parseContractRequest(playgroundConfigsListQuerySchema, request.query);
+
+      assertMustApiRequest('listPlaygroundConfigs', { query });
       const result = await getPlaygroundRepository().listConfigs({
         uid: authUser.uid,
-        scenarioId: getStringQueryField(request, 'scenarioId'),
+        scenarioId: query.scenarioId,
       });
 
-      sendSuccess(response, result.statusCode, result.data);
+      sendSuccess(
+        response,
+        result.statusCode,
+        assertContractResponse(playgroundConfigsResponseSchema, result.data),
+      );
     } catch (error) {
       next(error);
     }
@@ -1761,24 +1890,36 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
-        const body = getObjectBody(request);
+        const body = parseContractRequest(
+          playgroundConfigUpdateRequestSchema,
+          getObjectBody(request),
+        );
+        const configId = getRouteParam(request, 'configId');
+
+        assertMustApiRequest('updatePlaygroundConfig', {
+          body,
+          params: { configId },
+        });
         const input: UpdatePlaygroundConfigInput = {
           uid: authUser.uid,
-          configId: getRouteParam(request, 'configId'),
+          configId,
         };
-        const name = getOptionalStringBodyField(request, 'name');
 
-        if (name !== undefined) {
-          input.name = name;
+        if (body.name !== undefined) {
+          input.name = body.name;
         }
 
-        if ('config' in body) {
+        if (body.config !== undefined) {
           input.config = body.config;
         }
 
         const result = await getPlaygroundRepository().updateConfig(input);
 
-        sendSuccess(response, result.statusCode, result.data);
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(playgroundConfigResponseSchema, result.data),
+        );
       } catch (error) {
         next(error);
       }
@@ -1792,10 +1933,13 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     async (request, response, next) => {
       try {
         const authUser = getAuthUser(response);
+        const configId = getRouteParam(request, 'configId');
+
+        assertMustApiRequest('deletePlaygroundConfig', { params: { configId } });
 
         await getPlaygroundRepository().deleteConfig({
           uid: authUser.uid,
-          configId: getRouteParam(request, 'configId'),
+          configId,
         });
 
         sendNoContent(response);

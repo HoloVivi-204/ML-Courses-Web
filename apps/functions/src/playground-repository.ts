@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  FieldPath,
   FieldValue,
   getFirestore,
   Timestamp,
@@ -1181,7 +1182,7 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
         query = query.where('scenarioId', '==', input.scenarioId);
       }
 
-      query = query.orderBy('createdAt', 'desc').orderBy('runId', 'desc');
+      query = query.orderBy('createdAt', 'desc').orderBy(FieldPath.documentId(), 'desc');
 
       if (cursor !== null) {
         query = query.startAfter(Timestamp.fromMillis(cursor.createdAtMillis), cursor.runId);

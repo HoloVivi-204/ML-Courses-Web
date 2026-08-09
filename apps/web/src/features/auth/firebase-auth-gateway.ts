@@ -88,14 +88,23 @@ export function getConfiguredFirebaseApp(): FirebaseApp | null {
   return options ? getFirebaseApp(options) : null;
 }
 
-function toAuthUser(user: User): AuthUser {
+export function getAuthRoleFromClaims(
+  claims: Readonly<Record<string, unknown>>,
+): 'admin' | undefined {
+  return claims.role === 'admin' ? 'admin' : undefined;
+}
+
+async function toAuthUser(user: User): Promise<AuthUser> {
   const providerIds = user.providerData
     .map((provider) => provider.providerId)
     .filter((providerId): providerId is string => Boolean(providerId));
+  const tokenResult = await user.getIdTokenResult();
+  const role = getAuthRoleFromClaims(tokenResult.claims);
 
   return {
     email: user.email,
     ...(providerIds.length > 0 ? { providerIds } : {}),
+    ...(role ? { role } : {}),
     uid: user.uid,
   };
 }
@@ -171,7 +180,20 @@ function createConfiguredGateway(auth: Auth): AuthGateway {
     },
     observe(listener, onError) {
       void getRedirectResult(auth).catch(onError);
-      return onAuthStateChanged(auth, (user) => listener(user ? toAuthUser(user) : null), onError);
+      return onAuthStateChanged(
+        auth,
+        (user) => {
+          if (!user) {
+            listener(null);
+            return;
+          }
+
+          void toAuthUser(user)
+            .then(listener)
+            .catch((error: unknown) => onError?.(error));
+        },
+        onError,
+      );
     },
     async reauthenticateWithGoogle() {
       if (!auth.currentUser) {

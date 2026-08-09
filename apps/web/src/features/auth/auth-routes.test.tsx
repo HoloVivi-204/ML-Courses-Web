@@ -367,6 +367,24 @@ function createLearningApiClient() {
         },
       ],
     }),
+    getRuntimeFeatureManifest: vi.fn().mockResolvedValue({
+      checksum: 'a'.repeat(64),
+      featureFlags: {
+        additionalScenarioPairs: false,
+        compareRuns: false,
+        csvReports: false,
+        demoAnimation: false,
+        guidedPrediction: false,
+        lessonSearch: false,
+        pinRuns: false,
+        quizDragDrop: false,
+        quizMatching: false,
+        studentDetailReports: false,
+        targetScores: false,
+      },
+      releaseId: 'release-1',
+      schemaVersion: 1,
+    }),
     getTrialPostContent: vi
       .fn()
       .mockRejectedValue(new Error('Trial post content is not part of this test.')),
@@ -400,7 +418,7 @@ function createLearningApiClient() {
         unpublishedCount: 0,
       },
     }),
-    listAdminContent: vi.fn().mockResolvedValue([]),
+    listAdminContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null }),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
     savePlaygroundRun: vi.fn().mockResolvedValue({

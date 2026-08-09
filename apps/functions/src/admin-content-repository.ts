@@ -21,6 +21,7 @@ export interface AdminContentMetadata {
 export interface AdminContentSourceReview {
   attribution: LocalizedText;
   license: {
+    id?: string | undefined;
     name: string;
     url: string;
   };
@@ -160,7 +161,9 @@ export interface RollbackAdminContentRevisionInput {
 
 export interface ListAdminContentInput {
   courseId?: string | undefined;
+  cursor?: string | undefined;
   entityType?: string | undefined;
+  limit?: number | undefined;
   moduleId?: string | undefined;
 }
 
@@ -194,6 +197,7 @@ export interface AdminContentRepository {
   listContent(input: ListAdminContentInput): Promise<{
     data: {
       content: readonly AdminContentSummary[];
+      nextCursor: string | null;
     };
     statusCode: 200;
   }>;
@@ -215,6 +219,41 @@ export interface AdminContentRepository {
     };
     statusCode: 200;
   }>;
+}
+
+const DEFAULT_ADMIN_CONTENT_PAGE_SIZE = 25;
+
+export function getAdminContentCursor(input: {
+  entityId: string;
+  entityType: AdminContentEntityType;
+}): string {
+  return `${input.entityType}:${input.entityId}`;
+}
+
+export function paginateAdminContent<
+  T extends {
+    entityId: string;
+    entityType: AdminContentEntityType;
+  },
+>(input: {
+  content: readonly T[];
+  cursor?: string | undefined;
+  limit?: number | undefined;
+}): { content: readonly T[]; nextCursor: string | null } {
+  const orderedContent = [...input.content].sort((left, right) =>
+    getAdminContentCursor(left).localeCompare(getAdminContentCursor(right)),
+  );
+  const eligibleContent = input.cursor
+    ? orderedContent.filter((item) => getAdminContentCursor(item) > input.cursor!)
+    : orderedContent;
+  const limit = input.limit ?? DEFAULT_ADMIN_CONTENT_PAGE_SIZE;
+  const content = eligibleContent.slice(0, limit);
+  const hasMore = eligibleContent.length > content.length;
+
+  return {
+    content,
+    nextCursor: hasMore ? getAdminContentCursor(content[content.length - 1]!) : null,
+  };
 }
 
 const releaseOneSourceReviews: Record<
@@ -1411,35 +1450,41 @@ export function createStaticAdminContentRepository(
         );
       }
 
+      const page = paginateAdminContent({
+        content: content
+          .filter((item) => {
+            if (input.entityType !== undefined && item.entityType !== input.entityType) {
+              return false;
+            }
+
+            if (input.courseId !== undefined && item.courseId !== input.courseId) {
+              return false;
+            }
+
+            if (input.moduleId !== undefined && item.moduleId !== input.moduleId) {
+              return false;
+            }
+
+            return true;
+          })
+          .map((item) => {
+            const currentPublishedContent =
+              publishedByContentKey.get(getAdminContentKey(item.entityType, item.entityId)) ?? item;
+
+            return withDraftRevision(
+              currentPublishedContent,
+              draftsByContentKey.get(getAdminContentKey(item.entityType, item.entityId)),
+            );
+          }),
+        cursor: input.cursor,
+        limit: input.limit,
+      });
+
       return {
         statusCode: 200,
         data: {
-          content: content
-            .filter((item) => {
-              if (input.entityType !== undefined && item.entityType !== input.entityType) {
-                return false;
-              }
-
-              if (input.courseId !== undefined && item.courseId !== input.courseId) {
-                return false;
-              }
-
-              if (input.moduleId !== undefined && item.moduleId !== input.moduleId) {
-                return false;
-              }
-
-              return true;
-            })
-            .map((item) => {
-              const currentPublishedContent =
-                publishedByContentKey.get(getAdminContentKey(item.entityType, item.entityId)) ??
-                item;
-
-              return withDraftRevision(
-                currentPublishedContent,
-                draftsByContentKey.get(getAdminContentKey(item.entityType, item.entityId)),
-              );
-            }),
+          content: page.content,
+          nextCursor: page.nextCursor,
         },
       };
     },

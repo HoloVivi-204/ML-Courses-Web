@@ -5,6 +5,7 @@ import type { SafeAuthError } from './auth-service';
 export interface AuthUser {
   email: string | null;
   providerIds?: readonly string[] | undefined;
+  role?: 'admin' | undefined;
   uid: string;
 }
 

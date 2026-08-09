@@ -2,6 +2,95 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isActivePublishedEntity(entityType, entityId) {
+      return exists(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ) &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ).data.schemaVersion == 1 &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ).data.entityType == entityType &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ).data.entityId == entityId &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ).data.currentContent.status == 'published' &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ).data.currentContent.emergencyBlocked == false;
+    }
+
+    function isCurrentPublishedEntity(entityType, entityId, revisionId) {
+      return isActivePublishedEntity(entityType, entityId) &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$(entityType + ':' + entityId)
+        ).data.currentContent.publishedRevisionId == revisionId;
+    }
+
+    function hasStableContentGrant(entityType, entityId) {
+      return request.auth != null &&
+        exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)/contentAccess/$(entityType + '_' + entityId)
+        ) &&
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)/contentAccess/$(entityType + '_' + entityId)
+        ).data.schemaVersion == 1 &&
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)/contentAccess/$(entityType + '_' + entityId)
+        ).data.contentType == entityType &&
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)/contentAccess/$(entityType + '_' + entityId)
+        ).data.entityId == entityId &&
+        !('revisionId' in get(
+          /databases/$(database)/documents/users/$(request.auth.uid)/contentAccess/$(entityType + '_' + entityId)
+        ).data);
+    }
+
+    function hasActiveAncestors(content) {
+      return isActivePublishedEntity('course', content.courseId) &&
+        isActivePublishedEntity('module', content.moduleId);
+    }
+
+    function isCurrentLearnerContent() {
+      return resource.data.schemaVersion == 1 &&
+        isCurrentPublishedEntity(
+          resource.data.entityType,
+          resource.data.entityId,
+          resource.data.revisionId
+        ) &&
+        hasActiveAncestors(resource.data.content);
+    }
+
+    function isPublicTrialPost(documentId) {
+      return documentId == 'post:' + resource.data.entityId + ':trial' &&
+        resource.data.documentKind == 'post-trial' &&
+        resource.data.entityType == 'post' &&
+        resource.data.content.accessLevel == 'trial';
+    }
+
+    function isGrantedLearnerContent(documentId) {
+      return (
+          documentId == 'post:' + resource.data.entityId + ':full' &&
+          resource.data.documentKind == 'post-full' &&
+          resource.data.entityType == 'post' &&
+          resource.data.content.accessLevel == 'full'
+        ) || (
+          documentId == 'demo:' + resource.data.entityId + ':full' &&
+          resource.data.documentKind == 'demo-full' &&
+          resource.data.entityType == 'demo'
+        );
+    }
+
+    match /publishedLearnerContent/{documentId} {
+      allow get: if isCurrentLearnerContent() &&
+        (isPublicTrialPost(documentId) ||
+          (isGrantedLearnerContent(documentId) &&
+            hasStableContentGrant(resource.data.entityType, resource.data.entityId)));
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -47,11 +47,15 @@ function createLearnerProfileFixture(
   };
 }
 
-function createAuthenticatedGateway(): AuthGateway {
+function createAuthenticatedGateway(input: { role?: 'admin' | undefined } = {}): AuthGateway {
   return {
     getIdToken: vi.fn().mockResolvedValue('local-id-token'),
     observe(listener) {
-      listener({ email: 'learner@example.test', uid: 'learner-01' });
+      listener({
+        email: 'learner@example.test',
+        ...(input.role ? { role: input.role } : {}),
+        uid: 'learner-01',
+      });
       return () => undefined;
     },
     signInWithEmail: vi.fn().mockResolvedValue(undefined),
@@ -60,6 +64,10 @@ function createAuthenticatedGateway(): AuthGateway {
     signOut: vi.fn().mockResolvedValue(undefined),
     signUpWithEmail: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function createAdminContentPage<T>(content: readonly T[]) {
+  return { content: [...content], nextCursor: null };
 }
 
 function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): LearningApiClient {
@@ -485,6 +493,24 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       ],
     }),
+    getRuntimeFeatureManifest: vi.fn().mockResolvedValue({
+      checksum: 'a'.repeat(64),
+      featureFlags: {
+        additionalScenarioPairs: false,
+        compareRuns: false,
+        csvReports: false,
+        demoAnimation: false,
+        guidedPrediction: false,
+        lessonSearch: false,
+        pinRuns: false,
+        quizDragDrop: false,
+        quizMatching: false,
+        studentDetailReports: false,
+        targetScores: false,
+      },
+      releaseId: 'release-1',
+      schemaVersion: 1,
+    }),
     getTrialPostContent: vi.fn().mockImplementation((postId) => {
       const course = getReleaseLearningCatalog().courses.find(
         (candidate) => candidate.trialPostId === postId,
@@ -496,8 +522,7 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         : Promise.reject(new Error(`Missing test trial post content for ${postId}.`));
     }),
     getAdminReportSummary: vi.fn().mockResolvedValue(createAdminReportSummaryFixture()),
-    getAdminAccess: vi.fn().mockResolvedValue(false),
-    listAdminContent: vi.fn().mockResolvedValue([]),
+    listAdminContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null }),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
     savePlaygroundRun: vi.fn().mockResolvedValue(
@@ -1270,15 +1295,10 @@ describe('public learning journey', () => {
     );
   });
 
-  it('shows the Administration navigation item only after the server confirms admin access', async () => {
+  it('shows the Administration navigation item when the Firebase token carries the Admin claim', async () => {
     window.history.pushState({}, '', '/');
-    const learningApiClient = createLearningApiClient({
-      getAdminAccess: vi.fn().mockResolvedValue(true),
-    });
 
-    render(
-      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
-    );
+    render(<App authGateway={createAuthenticatedGateway({ role: 'admin' })} />);
 
     expect(await screen.findByRole('link', { name: /quản trị|administration/i })).toHaveAttribute(
       'href',
@@ -1288,15 +1308,8 @@ describe('public learning journey', () => {
 
   it('does not show the Administration navigation item to a learner', async () => {
     window.history.pushState({}, '', '/');
-    const learningApiClient = createLearningApiClient();
+    render(<App authGateway={createAuthenticatedGateway()} />);
 
-    render(
-      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
-    );
-
-    await waitFor(() =>
-      expect(learningApiClient.getAdminAccess).toHaveBeenCalledWith('local-id-token'),
-    );
     expect(
       screen.queryByRole('link', { name: /quản trị|administration/i }),
     ).not.toBeInTheDocument();
@@ -2396,29 +2409,31 @@ describe('public learning journey', () => {
 
   it('lets an authenticated admin preview the seeded content inventory', async () => {
     window.history.pushState({}, '', '/admin/content');
-    const listAdminContent = vi.fn().mockResolvedValue([
-      {
-        courseId: 'course-deep-learning-basic',
-        draftRevisionId: null,
-        entityId: 'dl-p01-neuron-perceptron',
-        entityType: 'post',
-        localeAvailability: ['en', 'vi'],
-        moduleId: 'dl-m01-neuron-perceptron',
-        preview: {
-          en: 'Read from a single neuron decision to the XOR limit.',
-          vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR.',
+    const listAdminContent = vi.fn().mockResolvedValue(
+      createAdminContentPage([
+        {
+          courseId: 'course-deep-learning-basic',
+          draftRevisionId: null,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post',
+          localeAvailability: ['en', 'vi'],
+          moduleId: 'dl-m01-neuron-perceptron',
+          preview: {
+            en: 'Read from a single neuron decision to the XOR limit.',
+            vi: 'Đọc từ một quyết định của neuron đến giới hạn XOR.',
+          },
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          sourceReview: seedSourceReview,
+          sourceStatus: 'seeded',
+          status: 'published',
+          title: {
+            en: 'How does a neuron make a decision?',
+            vi: 'Một neuron đưa ra quyết định như thế nào?',
+          },
+          validationStatus: 'not-run',
         },
-        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
-        sourceReview: seedSourceReview,
-        sourceStatus: 'seeded',
-        status: 'published',
-        title: {
-          en: 'How does a neuron make a decision?',
-          vi: 'Một neuron đưa ra quyết định như thế nào?',
-        },
-        validationStatus: 'not-run',
-      },
-    ]);
+      ]),
+    );
     const learningApiClient = {
       ...createLearningApiClient(),
       listAdminContent,
@@ -2443,28 +2458,30 @@ describe('public learning journey', () => {
   it('lets an authenticated admin create and preview a draft without replacing the published preview', async () => {
     window.history.pushState({}, '', '/admin/content');
     const user = userEvent.setup();
-    const listAdminContent = vi.fn().mockResolvedValue([
-      {
-        courseId: 'course-deep-learning-basic',
-        draftRevisionId: null,
-        entityId: 'dl-p01-neuron-perceptron',
-        entityType: 'post',
-        localeAvailability: ['en', 'vi'],
-        moduleId: 'dl-m01-neuron-perceptron',
-        preview: {
-          en: 'Published learner copy',
-          vi: 'Báº£n published cho learner',
+    const listAdminContent = vi.fn().mockResolvedValue(
+      createAdminContentPage([
+        {
+          courseId: 'course-deep-learning-basic',
+          draftRevisionId: null,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post',
+          localeAvailability: ['en', 'vi'],
+          moduleId: 'dl-m01-neuron-perceptron',
+          preview: {
+            en: 'Published learner copy',
+            vi: 'Báº£n published cho learner',
+          },
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          sourceStatus: 'seeded',
+          status: 'published',
+          title: {
+            en: 'How does a neuron make a decision?',
+            vi: 'Má»™t neuron Ä‘Æ°a ra quyáº¿t Ä‘á»‹nh nhÆ° tháº¿ nÃ o?',
+          },
+          validationStatus: 'not-run',
         },
-        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
-        sourceStatus: 'seeded',
-        status: 'published',
-        title: {
-          en: 'How does a neuron make a decision?',
-          vi: 'Má»™t neuron Ä‘Æ°a ra quyáº¿t Ä‘á»‹nh nhÆ° tháº¿ nÃ o?',
-        },
-        validationStatus: 'not-run',
-      },
-    ]);
+      ]),
+    );
     const createAdminContentDraft = vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',
@@ -2524,28 +2541,30 @@ describe('public learning journey', () => {
   it('lets an authenticated admin edit a draft with revision concurrency', async () => {
     window.history.pushState({}, '', '/admin/content');
     const user = userEvent.setup();
-    const listAdminContent = vi.fn().mockResolvedValue([
-      {
-        courseId: 'course-deep-learning-basic',
-        draftRevisionId: null,
-        entityId: 'dl-p01-neuron-perceptron',
-        entityType: 'post',
-        localeAvailability: ['en', 'vi'],
-        moduleId: 'dl-m01-neuron-perceptron',
-        preview: {
-          en: 'Published learner copy',
-          vi: 'Published learner copy VI',
+    const listAdminContent = vi.fn().mockResolvedValue(
+      createAdminContentPage([
+        {
+          courseId: 'course-deep-learning-basic',
+          draftRevisionId: null,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post',
+          localeAvailability: ['en', 'vi'],
+          moduleId: 'dl-m01-neuron-perceptron',
+          preview: {
+            en: 'Published learner copy',
+            vi: 'Published learner copy VI',
+          },
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          sourceStatus: 'seeded',
+          status: 'published',
+          title: {
+            en: 'Published title',
+            vi: 'Published title VI',
+          },
+          validationStatus: 'not-run',
         },
-        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
-        sourceStatus: 'seeded',
-        status: 'published',
-        title: {
-          en: 'Published title',
-          vi: 'Published title VI',
-        },
-        validationStatus: 'not-run',
-      },
-    ]);
+      ]),
+    );
     const createAdminContentDraft = vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',
@@ -2653,28 +2672,30 @@ describe('public learning journey', () => {
   it('lets an authenticated admin validate and publish a draft from the content screen', async () => {
     window.history.pushState({}, '', '/admin/content');
     const user = userEvent.setup();
-    const listAdminContent = vi.fn().mockResolvedValue([
-      {
-        courseId: 'course-deep-learning-basic',
-        draftRevisionId: null,
-        entityId: 'dl-p01-neuron-perceptron',
-        entityType: 'post',
-        localeAvailability: ['en', 'vi'],
-        moduleId: 'dl-m01-neuron-perceptron',
-        preview: {
-          en: 'Published learner copy',
-          vi: 'Published learner copy VI',
+    const listAdminContent = vi.fn().mockResolvedValue(
+      createAdminContentPage([
+        {
+          courseId: 'course-deep-learning-basic',
+          draftRevisionId: null,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post',
+          localeAvailability: ['en', 'vi'],
+          moduleId: 'dl-m01-neuron-perceptron',
+          preview: {
+            en: 'Published learner copy',
+            vi: 'Published learner copy VI',
+          },
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          sourceStatus: 'seeded',
+          status: 'published',
+          title: {
+            en: 'Published title',
+            vi: 'Published title VI',
+          },
+          validationStatus: 'not-run',
         },
-        publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
-        sourceStatus: 'seeded',
-        status: 'published',
-        title: {
-          en: 'Published title',
-          vi: 'Published title VI',
-        },
-        validationStatus: 'not-run',
-      },
-    ]);
+      ]),
+    );
     const createAdminContentDraft = vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',

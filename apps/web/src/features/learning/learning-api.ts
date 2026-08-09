@@ -1,7 +1,35 @@
 import {
+  adminContentListQuerySchema,
+  avatarFinalizeRequestSchema,
+  avatarUploadSessionRequestSchema,
+  avatarUploadSessionResponseSchema,
+  bootstrapProfileRequestSchema,
+  buildApiPath,
+  demoViewRequestSchema,
+  demoViewResponseSchema,
+  learnerProfileResponseSchema,
+  learningProgressSnapshotSchema,
+  MUST_API_CONTRACTS,
+  moduleOverviewViewResponseSchema,
+  playgroundConfigCreateRequestSchema,
+  playgroundConfigResponseSchema,
+  playgroundConfigsListQuerySchema,
+  playgroundConfigsResponseSchema,
+  playgroundConfigUpdateRequestSchema,
+  postViewRequestSchema,
+  postViewResponseSchema,
+  type RuntimeFeatureManifest,
+  updatePreferencesRequestSchema,
+} from '@ml-path/contracts';
+
+import {
   createFirebaseAppCheckTokenProvider,
   type AppCheckTokenProvider,
 } from '../auth/firebase-app-check-gateway';
+import {
+  createFirebaseLearningContentReader,
+  type LearningContentReader,
+} from './firebase-learning-content-gateway';
 
 export type LearnerLocalePreference = 'en' | 'vi';
 export type LearnerThemePreference = 'dark' | 'light' | 'system';
@@ -123,7 +151,7 @@ export interface LearningDemoContent {
   algorithmId: string;
   courseId: string;
   demoId: string;
-  fixedRun?: LearningDemoFixedRun;
+  fixedRun?: LearningDemoFixedRun | undefined;
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
@@ -143,7 +171,7 @@ export interface LearningDemoVisualization {
     y: number;
   }[];
   points: readonly {
-    classification?: 'negative' | 'positive';
+    classification?: 'negative' | 'positive' | undefined;
     label: string;
     positiveFromStep: number;
     x: number;
@@ -152,10 +180,12 @@ export interface LearningDemoVisualization {
 }
 
 export interface LearningDemoFixedRun {
-  caption?: {
-    en: string;
-    vi: string;
-  };
+  caption?:
+    | {
+        en: string;
+        vi: string;
+      }
+    | undefined;
   datasetVersionId: string;
   parameterValues: readonly {
     id: string;
@@ -232,11 +262,13 @@ export interface QuizAttemptResult {
 export interface QuizSubmissionResult {
   bestScore: number;
   feedback: ReadonlyArray<{
-    correctAnswer?: QuizAnswerValue;
-    explanation?: {
-      en: string;
-      vi: string;
-    };
+    correctAnswer?: QuizAnswerValue | undefined;
+    explanation?:
+      | {
+          en: string;
+          vi: string;
+        }
+      | undefined;
     hint: {
       en: string;
       vi: string;
@@ -333,6 +365,7 @@ export interface AdminContentSourceReview {
     vi: string;
   };
   license: {
+    id?: string | undefined;
     name: string;
     url: string;
   };
@@ -363,6 +396,11 @@ export interface AdminContentSummary {
     vi: string;
   };
   validationStatus: 'not-run' | 'valid';
+}
+
+export interface AdminContentPage {
+  content: AdminContentSummary[];
+  nextCursor: string | null;
 }
 
 export interface AdminContentDraft {
@@ -594,18 +632,20 @@ export interface LearningApiClient {
     idToken: string;
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
-  getAdminAccess?(idToken: string): Promise<boolean>;
   getDemoContent(input: { demoId: string; idToken: string }): Promise<LearningDemoContent>;
   getFullPostContent(input: { idToken: string; postId: string }): Promise<LearningPostContent>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
+  getRuntimeFeatureManifest(): Promise<RuntimeFeatureManifest>;
   getTrialPostContent(postId: string): Promise<LearningPostContent>;
   getAdminReportSummary(input: { idToken: string }): Promise<AdminReportSummary>;
   listAdminContent(input: {
     courseId?: string | undefined;
+    cursor?: string | undefined;
     entityType?: AdminContentEntityType | undefined;
     idToken: string;
+    limit?: number | undefined;
     moduleId?: string | undefined;
-  }): Promise<AdminContentSummary[]>;
+  }): Promise<AdminContentPage>;
   publishAdminContentRevision(
     input: AdminContentPublishRevisionInput,
   ): Promise<AdminContentSummary>;
@@ -680,6 +720,10 @@ interface SuccessEnvelope<TData> {
   success: true;
 }
 
+interface ContractSchema<TValue> {
+  safeParse(value: unknown): { data: TValue; success: true } | { error: unknown; success: false };
+}
+
 interface ErrorEnvelope {
   error?: {
     code?: unknown;
@@ -704,18 +748,31 @@ async function createLearningApiError(response: Response): Promise<LearningApiEr
   return new LearningApiError(response.status, code, message);
 }
 
-async function readSuccessEnvelope<TData>(response: Response): Promise<TData> {
+async function readSuccessEnvelope<TData>(
+  response: Response,
+  schema?: ContractSchema<TData>,
+): Promise<TData> {
   if (!response.ok) {
     throw await createLearningApiError(response);
   }
 
-  const body = (await response.json()) as SuccessEnvelope<TData>;
+  const body = (await response.json()) as SuccessEnvelope<unknown>;
 
   if (body.success !== true) {
     throw new Error('Learning API returned an invalid success envelope.');
   }
 
-  return body.data;
+  if (!schema) {
+    return body.data as TData;
+  }
+
+  const parsed = schema.safeParse(body.data);
+
+  if (!parsed.success) {
+    throw new Error('Learning API returned data that does not match the shared contract.');
+  }
+
+  return parsed.data;
 }
 
 async function ensureSuccessResponse(response: Response): Promise<void> {
@@ -727,10 +784,12 @@ async function ensureSuccessResponse(response: Response): Promise<void> {
 export function createFetchLearningApiClient(
   options: {
     appCheckTokenProvider?: AppCheckTokenProvider | undefined;
+    contentReader?: LearningContentReader | undefined;
   } = {},
 ): LearningApiClient {
   const appCheckTokenProvider =
     options.appCheckTokenProvider ?? createFirebaseAppCheckTokenProvider();
+  const contentReader = options.contentReader ?? createFirebaseLearningContentReader();
   const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const appCheckToken = await appCheckTokenProvider.getToken();
 
@@ -749,52 +808,55 @@ export function createFetchLearningApiClient(
 
   return {
     async bootstrapProfile({ idToken, locale, theme }) {
+      const requestBody = bootstrapProfileRequestSchema.parse({ locale, theme });
       const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(
-        await fetch('/api/v1/users/me/bootstrap', {
-          body: JSON.stringify({
-            locale,
-            theme,
-          }),
+        await fetch(buildApiPath('bootstrapProfile'), {
+          body: JSON.stringify(requestBody),
           method: 'POST',
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
         }),
+        learnerProfileResponseSchema,
       );
 
       return data.profile;
     },
     async createAvatarUploadSession({ contentType, idToken, sha256, sizeBytes }) {
+      const requestBody = avatarUploadSessionRequestSchema.parse({
+        contentType,
+        sha256,
+        sizeBytes,
+      });
       const data = await readSuccessEnvelope<{ uploadSession: AvatarUploadSession }>(
-        await fetch('/api/v1/users/me/avatar/upload-sessions', {
-          body: JSON.stringify({ contentType, sha256, sizeBytes }),
+        await fetch(buildApiPath('createAvatarUploadSession'), {
+          body: JSON.stringify(requestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'POST',
         }),
+        avatarUploadSessionResponseSchema,
       );
 
       return data.uploadSession;
     },
     async cancelPlaygroundRunSession({ idToken, sessionId }) {
       return readSuccessEnvelope<PlaygroundRunSessionCancellation>(
-        await fetch(
-          `/api/v1/playground-run-sessions/${encodeURIComponent(sessionId)}/cancellations`,
-          {
-            headers: {
-              authorization: `Bearer ${idToken}`,
-            },
-            method: 'POST',
+        await fetch(buildApiPath('cancelPlaygroundRunSession', { sessionId }), {
+          headers: {
+            authorization: `Bearer ${idToken}`,
           },
-        ),
+          method: 'POST',
+        }),
+        MUST_API_CONTRACTS.cancelPlaygroundRunSession.response,
       );
     },
     async completeDemo({ demoId, idToken, idempotencyKey, viewedStepIds }) {
       return readSuccessEnvelope<DemoCompletionResult>(
-        await fetch(`/api/v1/demos/${encodeURIComponent(demoId)}/completions`, {
+        await fetch(buildApiPath('completeDemo', { demoId }), {
           body: JSON.stringify({ viewedStepIds }),
           headers: {
             authorization: `Bearer ${idToken}`,
@@ -803,61 +865,69 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.completeDemo.response,
       );
     },
     async completePost({ idToken, idempotencyKey, postId }) {
       return readSuccessEnvelope<PostCompletionResult>(
-        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/completions`, {
+        await fetch(buildApiPath('completePost', { postId }), {
           headers: {
             authorization: `Bearer ${idToken}`,
             'idempotency-key': idempotencyKey,
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.completePost.response,
       );
     },
     async recordDemoView({ demoId, idToken, viewedStepIds }) {
+      const requestBody = demoViewRequestSchema.parse({ viewedStepIds });
       return readSuccessEnvelope<DemoViewResult>(
-        await fetch(`/api/v1/demos/${encodeURIComponent(demoId)}/views`, {
-          body: JSON.stringify({ viewedStepIds }),
+        await fetch(buildApiPath('recordDemoView', { demoId }), {
+          body: JSON.stringify(requestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'POST',
         }),
+        demoViewResponseSchema,
       );
     },
     async recordModuleOverview({ idToken, moduleId }) {
       return readSuccessEnvelope<ModuleOverviewResult>(
-        await fetch(`/api/v1/module-overviews/${encodeURIComponent(moduleId)}/views`, {
+        await fetch(buildApiPath('recordModuleOverviewView', { moduleId }), {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
           method: 'POST',
         }),
+        moduleOverviewViewResponseSchema,
       );
     },
     async recordPostView({ idToken, postId, readingPosition, viewedItemIds }) {
+      const requestBody = postViewRequestSchema.parse({ readingPosition, viewedItemIds });
       return readSuccessEnvelope<PostViewResult>(
-        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/views`, {
-          body: JSON.stringify({ readingPosition, viewedItemIds }),
+        await fetch(buildApiPath('recordPostView', { postId }), {
+          body: JSON.stringify(requestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'POST',
         }),
+        postViewResponseSchema,
       );
     },
     async createQuizAttempt({ idToken, quizId }) {
       return readSuccessEnvelope<QuizAttemptResult>(
-        await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/attempts`, {
+        await fetch(buildApiPath('createQuizAttempt', { quizId }), {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.createQuizAttempt.response,
       );
     },
     async createPlaygroundConfig({
@@ -868,21 +938,23 @@ export function createFetchLearningApiClient(
       name,
       scenarioId,
     }) {
+      const requestBody = playgroundConfigCreateRequestSchema.parse({
+        algorithmId,
+        config,
+        datasetVersionId,
+        name,
+        scenarioId,
+      });
       const data = await readSuccessEnvelope<{ config: PlaygroundConfigRecord }>(
-        await fetch('/api/v1/playground-configs', {
-          body: JSON.stringify({
-            name,
-            scenarioId,
-            algorithmId,
-            datasetVersionId,
-            config,
-          }),
+        await fetch(buildApiPath('createPlaygroundConfig'), {
+          body: JSON.stringify(requestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'POST',
         }),
+        playgroundConfigResponseSchema,
       );
 
       return data.config;
@@ -898,15 +970,17 @@ export function createFetchLearningApiClient(
       );
     },
     async finalizeAvatarUpload({ idToken, uploadSessionId }) {
+      const requestBody = avatarFinalizeRequestSchema.parse({ uploadSessionId });
       const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(
-        await fetch('/api/v1/users/me/avatar/finalize', {
-          body: JSON.stringify({ uploadSessionId }),
+        await fetch(buildApiPath('finalizeAvatarUpload'), {
+          body: JSON.stringify(requestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'POST',
         }),
+        learnerProfileResponseSchema,
       );
 
       return data.profile;
@@ -932,129 +1006,122 @@ export function createFetchLearningApiClient(
       );
     },
     async updatePlaygroundConfig({ config, configId, idToken, name }) {
-      const body: { config?: PlaygroundRunSession['config']; name?: string } = {};
-
-      if (name !== undefined) {
-        body.name = name;
-      }
-
-      if (config !== undefined) {
-        body.config = config;
-      }
+      const requestBody = playgroundConfigUpdateRequestSchema.parse({ config, name });
+      const serializedRequestBody = {
+        ...(requestBody.name !== undefined ? { name: requestBody.name } : {}),
+        ...(requestBody.config !== undefined ? { config: requestBody.config } : {}),
+      };
 
       const data = await readSuccessEnvelope<{ config: PlaygroundConfigRecord }>(
-        await fetch(`/api/v1/playground-configs/${encodeURIComponent(configId)}`, {
-          body: JSON.stringify(body),
+        await fetch(buildApiPath('updatePlaygroundConfig', { configId }), {
+          body: JSON.stringify(serializedRequestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'PATCH',
         }),
+        playgroundConfigResponseSchema,
       );
 
       return data.config;
     },
     async enrollCourse({ courseId, idToken, idempotencyKey }) {
       return readSuccessEnvelope<EnrollmentResult>(
-        await fetch(`/api/v1/courses/${encodeURIComponent(courseId)}/enrollments`, {
+        await fetch(buildApiPath('enrollCourse', { courseId }), {
           method: 'POST',
           headers: {
             authorization: `Bearer ${idToken}`,
             'idempotency-key': idempotencyKey,
           },
         }),
+        MUST_API_CONTRACTS.enrollCourse.response,
       );
     },
-    async getDemoContent({ demoId, idToken }) {
-      return readSuccessEnvelope<LearningDemoContent>(
-        await fetch(`/api/v1/demos/${encodeURIComponent(demoId)}/content`, {
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        }),
-      );
+    async getDemoContent({ demoId }) {
+      return contentReader.getDemoContent(demoId);
     },
-    async getFullPostContent({ idToken, postId }) {
-      return readSuccessEnvelope<LearningPostContent>(
-        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/content`, {
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        }),
-      );
+    async getFullPostContent({ postId }) {
+      return contentReader.getFullPostContent(postId);
     },
     async getProgress(idToken) {
       return readSuccessEnvelope<LearningProgressSnapshot>(
-        await fetch('/api/v1/users/me/progress', {
+        await fetch(buildApiPath('getProgress'), {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
         }),
+        learningProgressSnapshotSchema,
+      );
+    },
+    async getRuntimeFeatureManifest() {
+      return readSuccessEnvelope<RuntimeFeatureManifest>(
+        await fetch(buildApiPath('systemFeatures')),
+        MUST_API_CONTRACTS.systemFeatures.response,
       );
     },
     async getTrialPostContent(postId) {
-      return readSuccessEnvelope<LearningPostContent>(
-        await fetch(`/api/v1/posts/${encodeURIComponent(postId)}/trial-content`),
-      );
-    },
-    async getAdminAccess(idToken) {
-      const data = await readSuccessEnvelope<{ isAdmin: boolean }>(
-        await fetch('/api/v1/admin/access', {
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        }),
-      );
-
-      return data.isAdmin;
+      return contentReader.getTrialPostContent(postId);
     },
     async getAdminReportSummary({ idToken }) {
       return readSuccessEnvelope<AdminReportSummary>(
-        await fetch('/api/v1/admin/reports/summary', {
+        await fetch(buildApiPath('getAdminReportSummary'), {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
         }),
+        MUST_API_CONTRACTS.getAdminReportSummary.response,
       );
     },
-    async listAdminContent({ courseId, entityType, idToken, moduleId }) {
+    async listAdminContent({ courseId, cursor, entityType, idToken, limit, moduleId }) {
+      const queryInput = adminContentListQuerySchema.parse({
+        courseId,
+        cursor,
+        entityType,
+        limit,
+        moduleId,
+      });
       const query = new URLSearchParams();
 
-      if (entityType !== undefined) {
-        query.set('entityType', entityType);
+      if (queryInput.entityType !== undefined) {
+        query.set('entityType', queryInput.entityType);
       }
 
-      if (courseId !== undefined) {
-        query.set('courseId', courseId);
+      if (queryInput.courseId !== undefined) {
+        query.set('courseId', queryInput.courseId);
       }
 
-      if (moduleId !== undefined) {
-        query.set('moduleId', moduleId);
+      if (queryInput.moduleId !== undefined) {
+        query.set('moduleId', queryInput.moduleId);
+      }
+
+      if (queryInput.cursor !== undefined) {
+        query.set('cursor', queryInput.cursor);
+      }
+
+      if (queryInput.limit !== undefined) {
+        query.set('limit', String(queryInput.limit));
       }
 
       const queryString = query.toString();
-      const data = await readSuccessEnvelope<{ content: AdminContentSummary[] }>(
-        await fetch(`/api/v1/admin/content${queryString ? `?${queryString}` : ''}`, {
+      return readSuccessEnvelope<AdminContentPage>(
+        await fetch(`${buildApiPath('listAdminContent')}${queryString ? `?${queryString}` : ''}`, {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
         }),
+        MUST_API_CONTRACTS.listAdminContent.response,
       );
-
-      return data.content;
     },
     async createAdminContentDraft({ entityId, entityType, idToken }) {
       const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
-        await fetch(
-          `/api/v1/admin/content/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/drafts`,
-          {
-            headers: {
-              authorization: `Bearer ${idToken}`,
-            },
-            method: 'POST',
+        await fetch(buildApiPath('createAdminContentDraft', { entityId, entityType }), {
+          headers: {
+            authorization: `Bearer ${idToken}`,
           },
-        ),
+          method: 'POST',
+        }),
+        MUST_API_CONTRACTS.createAdminContentDraft.response,
       );
 
       return data.draft;
@@ -1068,7 +1135,7 @@ export function createFetchLearningApiClient(
       title,
     }) {
       const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
-        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}`, {
+        await fetch(buildApiPath('updateAdminContentRevision', { revisionId }), {
           body: JSON.stringify({
             revisionVersion,
             title,
@@ -1081,18 +1148,20 @@ export function createFetchLearningApiClient(
           },
           method: 'PATCH',
         }),
+        MUST_API_CONTRACTS.updateAdminContentRevision.response,
       );
 
       return data.draft;
     },
     async validateAdminContentDraft({ idToken, revisionId }) {
       const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
-        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/validate`, {
+        await fetch(buildApiPath('validateAdminContentRevision', { revisionId }), {
           headers: {
             authorization: `Bearer ${idToken}`,
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.validateAdminContentRevision.response,
       );
 
       return data.draft;
@@ -1105,7 +1174,7 @@ export function createFetchLearningApiClient(
       revisionId,
     }) {
       const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
-        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/publish`, {
+        await fetch(buildApiPath('publishAdminContentRevision', { revisionId }), {
           body: JSON.stringify({ publicationScope, reason }),
           headers: {
             authorization: `Bearer ${idToken}`,
@@ -1114,13 +1183,14 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.publishAdminContentRevision.response,
       );
 
       return data.content;
     },
     async rollbackAdminContentRevision({ idToken, reason, revisionId }) {
       const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
-        await fetch(`/api/v1/admin/revisions/${encodeURIComponent(revisionId)}/rollback`, {
+        await fetch(buildApiPath('rollbackAdminContentRevision', { revisionId }), {
           body: JSON.stringify({ reason }),
           headers: {
             authorization: `Bearer ${idToken}`,
@@ -1128,13 +1198,14 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.rollbackAdminContentRevision.response,
       );
 
       return data.content;
     },
     async unpublishAdminContentEntity({ entityId, idToken, reason }) {
       const data = await readSuccessEnvelope<{ content: AdminContentSummary }>(
-        await fetch(`/api/v1/admin/entities/${encodeURIComponent(entityId)}/unpublish`, {
+        await fetch(buildApiPath('unpublishAdminContentEntity', { entityId }), {
           body: JSON.stringify({ reason }),
           headers: {
             authorization: `Bearer ${idToken}`,
@@ -1142,6 +1213,7 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.unpublishAdminContentEntity.response,
       );
 
       return data.content;
@@ -1155,7 +1227,7 @@ export function createFetchLearningApiClient(
       scenarioId,
     }) {
       return readSuccessEnvelope<PlaygroundRunSession>(
-        await fetch('/api/v1/playground-run-sessions', {
+        await fetch(buildApiPath('createPlaygroundRunSession'), {
           body: JSON.stringify({
             scenarioId,
             algorithmId,
@@ -1169,15 +1241,21 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.createPlaygroundRunSession.response,
       );
     },
     async listPlaygroundConfigs({ idToken, scenarioId }) {
+      const query = playgroundConfigsListQuerySchema.parse({ scenarioId });
       const data = await readSuccessEnvelope<{ configs: PlaygroundConfigRecord[] }>(
-        await fetch(`/api/v1/playground-configs?scenarioId=${encodeURIComponent(scenarioId)}`, {
-          headers: {
-            authorization: `Bearer ${idToken}`,
+        await fetch(
+          `${buildApiPath('listPlaygroundConfigs')}?scenarioId=${encodeURIComponent(query.scenarioId)}`,
+          {
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
           },
-        }),
+        ),
+        playgroundConfigsResponseSchema,
       );
 
       return data.configs;
@@ -1199,18 +1277,22 @@ export function createFetchLearningApiClient(
 
       const queryString = query.toString();
       const data = await readSuccessEnvelope<PlaygroundRunPage>(
-        await fetch(`/api/v1/playground-runs${queryString ? `?${queryString}` : ''}`, {
-          headers: {
-            authorization: `Bearer ${idToken}`,
+        await fetch(
+          `${buildApiPath('listPlaygroundRuns')}${queryString ? `?${queryString}` : ''}`,
+          {
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
           },
-        }),
+        ),
+        MUST_API_CONTRACTS.listPlaygroundRuns.response,
       );
 
       return data;
     },
     async savePlaygroundRun({ idToken, idempotencyKey, result, sessionId }) {
       const data = await readSuccessEnvelope<{ run: PlaygroundRunRecord }>(
-        await fetch('/api/v1/playground-runs', {
+        await fetch(buildApiPath('savePlaygroundRun'), {
           body: JSON.stringify({ sessionId, result }),
           headers: {
             authorization: `Bearer ${idToken}`,
@@ -1219,13 +1301,14 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.savePlaygroundRun.response,
       );
 
       return data.run;
     },
     async submitQuizAttempt({ answers, attemptId, idToken, idempotencyKey }) {
       return readSuccessEnvelope<QuizSubmissionResult>(
-        await fetch(`/api/v1/quiz-attempts/${encodeURIComponent(attemptId)}/submissions`, {
+        await fetch(buildApiPath('submitQuizAttempt', { attemptId }), {
           body: JSON.stringify({ answers }),
           headers: {
             authorization: `Bearer ${idToken}`,
@@ -1234,31 +1317,22 @@ export function createFetchLearningApiClient(
           },
           method: 'POST',
         }),
+        MUST_API_CONTRACTS.submitQuizAttempt.response,
       );
     },
     async updatePreferences({ idToken, locale, theme }) {
-      const body: {
-        locale?: LearnerLocalePreference;
-        theme?: LearnerThemePreference;
-      } = {};
-
-      if (locale !== undefined) {
-        body.locale = locale;
-      }
-
-      if (theme !== undefined) {
-        body.theme = theme;
-      }
+      const requestBody = updatePreferencesRequestSchema.parse({ locale, theme });
 
       const data = await readSuccessEnvelope<{ profile: LearnerProfile }>(
-        await fetch('/api/v1/users/me/preferences', {
-          body: JSON.stringify(body),
+        await fetch(buildApiPath('updatePreferences'), {
+          body: JSON.stringify(requestBody),
           headers: {
             authorization: `Bearer ${idToken}`,
             'content-type': 'application/json',
           },
           method: 'PATCH',
         }),
+        learnerProfileResponseSchema,
       );
 
       return data.profile;

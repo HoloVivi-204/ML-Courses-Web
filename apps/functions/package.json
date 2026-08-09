@@ -8,6 +8,9 @@
     "node": "22"
   },
   "scripts": {
+    "prebuild": "pnpm --filter @ml-path/contracts build",
+    "pretest": "pnpm --filter @ml-path/contracts build",
+    "pretypecheck": "pnpm --filter @ml-path/contracts build",
     "build": "tsc -p tsconfig.build.json",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
@@ -16,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ml-path/contracts": "workspace:*",
     "express": "^5.2.1",
     "firebase-admin": "^14.2.0",
     "firebase-functions": "^7.3.0",

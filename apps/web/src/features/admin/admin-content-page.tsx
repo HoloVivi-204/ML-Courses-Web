@@ -169,7 +169,8 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
           throw new Error('Authenticated user is missing an ID token.');
         }
 
-        const nextContent = await learningApiClient.listAdminContent({ idToken });
+        const page = await learningApiClient.listAdminContent({ idToken });
+        const nextContent = page.content;
 
         if (isActive) {
           setContent(nextContent);

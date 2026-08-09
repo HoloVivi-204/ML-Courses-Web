@@ -15,6 +15,9 @@ import { readSeedSnapshot } from './seed-snapshot.js';
 
 const FIREBASE_REGION = 'asia-southeast1';
 const AUTH_EMULATOR_BASE_URL = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
+const FIRESTORE_DOCUMENTS_BASE_URL =
+  `http://127.0.0.1:8080/v1/projects/${LOCAL_FIREBASE_PROJECT_ID}` +
+  '/databases/(default)/documents';
 const VALID_PNG_BYTES = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jE8UAAAAASUVORK5CYII=',
   'base64',
@@ -80,8 +83,9 @@ async function readSuccessData(
   response: Response,
   expectedStatus: number,
 ): Promise<Record<string, unknown>> {
-  assert.equal(response.status, expectedStatus);
   const body = await readJsonObject(response);
+
+  assert.equal(response.status, expectedStatus, JSON.stringify(body));
 
   assert.equal(body.success, true);
 
@@ -119,6 +123,73 @@ async function requestApiJson(
   }
 
   return fetch(getApiEndpoint(path), requestInit);
+}
+
+async function requestFirestoreDocument(input: {
+  documentPath: string;
+  idToken?: string | undefined;
+}): Promise<Response> {
+  return fetch(`${FIRESTORE_DOCUMENTS_BASE_URL}/${input.documentPath}`, {
+    ...(input.idToken ? { headers: { authorization: `Bearer ${input.idToken}` } } : {}),
+  });
+}
+
+function decodeFirestoreValue(value: unknown): unknown {
+  assertRecord(value, 'Firestore value must be an object.');
+
+  if (typeof value.stringValue === 'string') {
+    return value.stringValue;
+  }
+  if (typeof value.integerValue === 'string') {
+    return Number(value.integerValue);
+  }
+  if (typeof value.doubleValue === 'number') {
+    return value.doubleValue;
+  }
+  if (typeof value.booleanValue === 'boolean') {
+    return value.booleanValue;
+  }
+  if ('nullValue' in value) {
+    return null;
+  }
+  if (typeof value.timestampValue === 'string') {
+    return value.timestampValue;
+  }
+  if (isRecord(value.mapValue)) {
+    const fields = value.mapValue.fields;
+
+    if (!isRecord(fields)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(fields).map(([field, nestedValue]) => [
+        field,
+        decodeFirestoreValue(nestedValue),
+      ]),
+    );
+  }
+  if (isRecord(value.arrayValue)) {
+    const values = value.arrayValue.values;
+
+    return Array.isArray(values) ? values.map(decodeFirestoreValue) : [];
+  }
+
+  throw new Error('Unsupported Firestore REST value in local Emulator verification.');
+}
+
+async function readFirestoreDocument(
+  response: Response,
+  expectedStatus: number,
+): Promise<Record<string, unknown>> {
+  assert.equal(response.status, expectedStatus);
+  const body = await readJsonObject(response);
+  const fields = getRecordField(body, 'fields');
+  const decoded = decodeFirestoreValue({ mapValue: { fields } });
+
+  assertRecord(decoded, 'Firestore document must decode to an object.');
+
+  return decoded;
 }
 
 async function requestAvatarStorageUpload(input: {
@@ -400,7 +471,7 @@ async function assertDirectProgressMutationDenied(): Promise<void> {
   }
 }
 
-async function assertProtectedLearningContentApi(): Promise<void> {
+async function assertDirectLearnerContentRules(): Promise<void> {
   const services = createLocalAdminServices();
   const otherUid = `content-other-${randomUUID()}`;
   const ownerEmail = `content-owner-${randomUUID()}@example.test`;
@@ -414,34 +485,37 @@ async function assertProtectedLearningContentApi(): Promise<void> {
     const ownerUid = (await services.auth.getUserByEmail(ownerEmail)).uid;
     const postAccessPath = `users/${ownerUid}/contentAccess/post_${postId}`;
     const demoAccessPath = `users/${ownerUid}/contentAccess/demo_${demoId}`;
-    const trialResponse = await fetch(getApiEndpoint(`/api/v1/posts/${postId}/trial-content`));
-    const trialData = await readSuccessData(trialResponse, 200);
+    const trialData = await readFirestoreDocument(
+      await requestFirestoreDocument({
+        documentPath: `publishedLearnerContent/post:${postId}:trial`,
+      }),
+      200,
+    );
+    const trialContent = getRecordField(trialData, 'content');
 
-    assert.equal(trialResponse.headers.get('cache-control'), 'private, no-store');
-    assert.equal(trialData.accessLevel, 'trial');
+    assert.equal(trialContent.accessLevel, 'trial');
     assert.equal(JSON.stringify(trialData).includes('xor-linear-limit'), false);
 
-    const unauthenticatedResponse = await fetch(getApiEndpoint(`/api/v1/posts/${postId}/content`));
-    assert.equal(unauthenticatedResponse.status, 401);
+    const unauthenticatedResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:full`,
+    });
+    assert.equal(unauthenticatedResponse.status, 403);
 
-    const missingGrantResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+    const missingGrantResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:full`,
       idToken: ownerToken,
     });
     assert.equal(missingGrantResponse.status, 403);
-    assert.equal(
-      getRecordField(await readJsonObject(missingGrantResponse), 'error').code,
-      'POST_ACCESS_REQUIRED',
-    );
 
     await services.firestore.doc(`users/${otherUid}/contentAccess/post_${postId}`).set({
       contentType: 'post',
       entityId: postId,
       schemaVersion: 1,
     });
-    const wrongUidResponse = await requestApiJson(
-      `/api/v1/posts/${postId}/content?uid=${otherUid}`,
-      { idToken: ownerToken },
-    );
+    const wrongUidResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:full`,
+      idToken: ownerToken,
+    });
     assert.equal(wrongUidResponse.status, 403);
 
     await services.firestore.doc(postAccessPath).set({
@@ -450,7 +524,8 @@ async function assertProtectedLearningContentApi(): Promise<void> {
       revisionId: 'post-dl-p01-neuron-perceptron-rev-r0',
       schemaVersion: 1,
     });
-    const revisionPinnedGrantResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+    const revisionPinnedGrantResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:full`,
       idToken: ownerToken,
     });
     assert.equal(revisionPinnedGrantResponse.status, 403);
@@ -460,39 +535,31 @@ async function assertProtectedLearningContentApi(): Promise<void> {
       entityId: postId,
       schemaVersion: 1,
     });
-    const staleRevisionResponse = await requestApiJson(
-      `/api/v1/posts/${postId}/content?revisionId=post-dl-p01-neuron-perceptron-rev-r0`,
-      { idToken: ownerToken },
-    );
-    assert.equal(staleRevisionResponse.status, 400);
-    assert.equal(
-      getRecordField(await readJsonObject(staleRevisionResponse), 'error').code,
-      'CONTENT_REVISION_SELECTION_FORBIDDEN',
-    );
-
-    const fullPostResponse = await requestApiJson(
-      `/api/v1/posts/${postId}/content?uid=${otherUid}`,
-      {
+    const fullPostData = await readFirestoreDocument(
+      await requestFirestoreDocument({
+        documentPath: `publishedLearnerContent/post:${postId}:full`,
         idToken: ownerToken,
-      },
+      }),
+      200,
     );
-    const fullPostData = await readSuccessData(fullPostResponse, 200);
+    const fullPostContent = getRecordField(fullPostData, 'content');
 
-    assert.equal(fullPostResponse.headers.get('cache-control'), 'private, no-store');
-    assert.equal(fullPostData.accessLevel, 'full');
+    assert.equal(fullPostContent.accessLevel, 'full');
     assert.equal(JSON.stringify(fullPostData).includes('xor-linear-limit'), true);
     assert.equal(
-      /answerKey|correctAnswer|correctOption/i.test(JSON.stringify(fullPostData)),
+      /answerKey|correctAnswer|correctOption/i.test(JSON.stringify(fullPostContent)),
       false,
     );
 
     await services.firestore.doc(postAccessPath).delete();
-    const replayAfterRevocationResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+    const replayAfterRevocationResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:full`,
       idToken: ownerToken,
     });
     assert.equal(replayAfterRevocationResponse.status, 403);
 
-    const missingDemoGrantResponse = await requestApiJson(`/api/v1/demos/${demoId}/content`, {
+    const missingDemoGrantResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/demo:${demoId}:full`,
       idToken: ownerToken,
     });
     assert.equal(missingDemoGrantResponse.status, 403);
@@ -502,15 +569,18 @@ async function assertProtectedLearningContentApi(): Promise<void> {
       entityId: demoId,
       schemaVersion: 1,
     });
-    const demoResponse = await requestApiJson(`/api/v1/demos/${demoId}/content?uid=${otherUid}`, {
-      idToken: ownerToken,
-    });
-    const demoData = await readSuccessData(demoResponse, 200);
+    const demoData = await readFirestoreDocument(
+      await requestFirestoreDocument({
+        documentPath: `publishedLearnerContent/demo:${demoId}:full`,
+        idToken: ownerToken,
+      }),
+      200,
+    );
+    const demoContent = getRecordField(demoData, 'content');
 
-    assert.equal(demoResponse.headers.get('cache-control'), 'private, no-store');
-    assert.equal(demoData.demoId, demoId);
-    assert.ok(Array.isArray(demoData.steps));
-    assert.ok(isRecord(demoData.visualization));
+    assert.equal(demoContent.demoId, demoId);
+    assert.ok(Array.isArray(demoContent.steps));
+    assert.ok(isRecord(demoContent.visualization));
   } finally {
     await deleteApp(services.app);
   }
@@ -940,11 +1010,17 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     );
     assert.equal(initialPost.publishedRevisionId, 'post-dl-p01-neuron-perceptron-rev-r1');
 
-    const learnerBeforeDraft = await readSuccessData(
-      await requestApiJson(`/api/v1/posts/${postId}/content`, { idToken: studentToken }),
+    const learnerBeforeDraft = await readFirestoreDocument(
+      await requestFirestoreDocument({
+        documentPath: `publishedLearnerContent/post:${postId}:full`,
+        idToken: studentToken,
+      }),
       200,
     );
-    const initialLearnerTitle = getRecordField(learnerBeforeDraft, 'title').en;
+    const initialLearnerTitle = getRecordField(
+      getRecordField(learnerBeforeDraft, 'content'),
+      'title',
+    ).en;
 
     const createDraftData = await readSuccessData(
       await requestApiJson('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts', {
@@ -1027,12 +1103,15 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     const locallyPublishedContent = getRecordField(localPublishData, 'content');
     assert.equal(locallyPublishedContent.publicationScope, 'emulator-demo');
 
-    const learnerAfterLocalPublish = await readSuccessData(
-      await requestApiJson(`/api/v1/posts/${postId}/content`, { idToken: studentToken }),
+    const learnerAfterLocalPublish = await readFirestoreDocument(
+      await requestFirestoreDocument({
+        documentPath: `publishedLearnerContent/post:${postId}:full`,
+        idToken: studentToken,
+      }),
       200,
     );
     assert.equal(
-      getRecordField(learnerAfterLocalPublish, 'title').en,
+      getRecordField(getRecordField(learnerAfterLocalPublish, 'content'), 'title').en,
       'Draft neuron decision title',
     );
 
@@ -1048,11 +1127,17 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       200,
     );
 
-    const learnerAfterRollback = await readSuccessData(
-      await requestApiJson(`/api/v1/posts/${postId}/content`, { idToken: studentToken }),
+    const learnerAfterRollback = await readFirestoreDocument(
+      await requestFirestoreDocument({
+        documentPath: `publishedLearnerContent/post:${postId}:full`,
+        idToken: studentToken,
+      }),
       200,
     );
-    assert.equal(getRecordField(learnerAfterRollback, 'title').en, initialLearnerTitle);
+    assert.equal(
+      getRecordField(getRecordField(learnerAfterRollback, 'content'), 'title').en,
+      initialLearnerTitle,
+    );
     assert.equal((await services.firestore.doc(postProgressPath).get()).get('completed'), true);
 
     const openAttemptData = await readSuccessData(
@@ -1108,23 +1193,16 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     );
     assert.equal((await services.firestore.doc(postProgressPath).get()).get('completed'), true);
 
-    const blockedContentResponse = await requestApiJson(`/api/v1/posts/${postId}/content`, {
+    const blockedContentResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:full`,
       idToken: studentToken,
     });
     assert.equal(blockedContentResponse.status, 403);
-    assert.equal(
-      getRecordField(await readJsonObject(blockedContentResponse), 'error').code,
-      'CONTENT_EMERGENCY_BLOCKED',
-    );
 
-    const blockedTrialResponse = await fetch(
-      getApiEndpoint(`/api/v1/posts/${postId}/trial-content`),
-    );
+    const blockedTrialResponse = await requestFirestoreDocument({
+      documentPath: `publishedLearnerContent/post:${postId}:trial`,
+    });
     assert.equal(blockedTrialResponse.status, 403);
-    assert.equal(
-      getRecordField(await readJsonObject(blockedTrialResponse), 'error').code,
-      'CONTENT_EMERGENCY_BLOCKED',
-    );
 
     const blockedNewAttemptResponse = await requestApiJson(
       '/api/v1/quizzes/quiz-post-dl-p01/attempts',
@@ -1182,7 +1260,7 @@ await verifyResetAndSeed();
 await assertHealthEndpoint();
 await assertEmailPasswordAuthentication();
 await assertProfileAvatarAccountLifecycle();
-await assertProtectedLearningContentApi();
+await assertDirectLearnerContentRules();
 await assertAdminContentLifecycleApi();
 await assertFirestoreAdminContentPersistence();
 await assertClientAccessDenied();

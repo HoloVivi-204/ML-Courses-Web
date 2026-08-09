@@ -96,6 +96,7 @@ describe('Firestore Admin content repository', () => {
         draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
       },
     ]);
+    expect(result.data.nextCursor).toBeNull();
   });
 
   it('rejects the Emulator seed helper outside the Emulator Suite before a write', async () => {

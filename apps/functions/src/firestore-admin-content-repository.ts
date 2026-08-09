@@ -18,6 +18,11 @@ import {
   type PublishedLearnerContent,
 } from './learning-content-repository.js';
 import {
+  createPublishedLearnerContentDocuments,
+  getPublishedLearnerContentDocumentIdsForEntity,
+  PUBLISHED_LEARNER_CONTENT_COLLECTION,
+} from './published-learner-content.js';
+import {
   applyDraftPatch,
   createAdminContentLifecycleEvent,
   createDraftFromPublished,
@@ -29,6 +34,7 @@ import {
   hasDraftPatchValue,
   isAdminContentEntityType,
   isAdminContentPublicationScope,
+  paginateAdminContent,
   type AdminContentDraft,
   type AdminContentEntityType,
   type AdminContentLifecycleEvent,
@@ -310,6 +316,33 @@ function getEvidenceDocumentPath(revisionId: string, kind: string): string {
   return `${ADMIN_CONTENT_REVISIONS_COLLECTION}/${revisionId}/externalEvidence/${kind}`;
 }
 
+function syncPublishedLearnerContent(input: {
+  content: AdminContentSummary;
+  firestore: Firestore;
+  learnerContent: PublishedLearnerContent | null;
+  transaction: Transaction;
+}): void {
+  const collection = input.firestore.collection(PUBLISHED_LEARNER_CONTENT_COLLECTION);
+  const documents = createPublishedLearnerContentDocuments({
+    content: input.content,
+    learnerContent: input.learnerContent,
+  });
+  const activeDocumentIds = new Set(documents.map((document) => document.documentId));
+
+  for (const document of documents) {
+    input.transaction.set(collection.doc(document.documentId), document.data);
+  }
+
+  for (const documentId of getPublishedLearnerContentDocumentIdsForEntity({
+    entityId: input.content.entityId,
+    entityType: input.content.entityType,
+  })) {
+    if (!activeDocumentIds.has(documentId)) {
+      input.transaction.delete(collection.doc(documentId));
+    }
+  }
+}
+
 async function readPublishEvidence(
   transaction: Transaction,
   firestore: Firestore,
@@ -433,7 +466,16 @@ export function createFirestoreAdminContentRepository(
         })
         .map((entity) => withDraftRevision(entity.currentContent, entity.draftRevisionId));
 
-      return { statusCode: 200, data: { content } } as const;
+      const page = paginateAdminContent({
+        content,
+        cursor: input.cursor,
+        limit: input.limit,
+      });
+
+      return {
+        statusCode: 200,
+        data: { content: page.content, nextCursor: page.nextCursor },
+      } as const;
     },
     async updateDraft(input) {
       assertActorUid(input.actorUid);
@@ -630,6 +672,12 @@ export function createFirestoreAdminContentRepository(
           lastLifecycleEvent: lifecycleEvent,
           updatedAt: createdAt,
         } satisfies StoredAdminContentEntity);
+        syncPublishedLearnerContent({
+          content,
+          firestore,
+          learnerContent: publishedRevision.learnerContent,
+          transaction,
+        });
         transaction.create(idempotencyReference, idempotencyRecord);
         transaction.create(eventReference, { ...lifecycleEvent, schemaVersion: 1 });
 
@@ -687,6 +735,12 @@ export function createFirestoreAdminContentRepository(
           lastLifecycleEvent: lifecycleEvent,
           updatedAt: createdAt,
         } satisfies StoredAdminContentEntity);
+        syncPublishedLearnerContent({
+          content,
+          firestore,
+          learnerContent: targetRevision.learnerContent,
+          transaction,
+        });
         transaction.create(eventReference, { ...lifecycleEvent, schemaVersion: 1 });
 
         return { statusCode: 200, data: { content, lifecycleEvent } } as const;
@@ -917,6 +971,16 @@ export async function seedFirestoreAdminContentForEmulator(input: {
 
     batch.set(entityReference, entity);
     batch.set(revisionReference, revision);
+
+    for (const document of createPublishedLearnerContentDocuments({
+      content,
+      learnerContent: revision.learnerContent,
+    })) {
+      batch.set(
+        input.firestore.collection(PUBLISHED_LEARNER_CONTENT_COLLECTION).doc(document.documentId),
+        document.data,
+      );
+    }
   }
 
   await batch.commit();

@@ -18,6 +18,8 @@
     "lint": "pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present lint",
     "format:check": "prettier --check package.json pnpm-workspace.yaml firebase.json && prettier --check .firebaserc --parser json && pnpm -r --workspace-concurrency=1 --filter \"!ml-courses-web\" --if-present format:check",
     "firebase:build": "pnpm --filter @ml-path/functions --filter @ml-path/emulator-seed build",
+    "firebase:indexes:validate": "pnpm --filter @ml-path/emulator-seed build && pnpm --filter @ml-path/emulator-seed validate:indexes",
+    "firebase:migrations:validate": "pnpm --filter @ml-path/functions build && node tools/migrations/20260810-release-one-published-learner-content.mjs --dry-run",
     "prefirebase:validate": "pnpm firebase:build",
     "firebase:validate": "node firebase/emulator-seed/dist/validate-environment.js",
     "prefirebase:emulators:start": "pnpm firebase:build",

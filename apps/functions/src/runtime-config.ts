@@ -1,30 +1,37 @@
 import { createHash } from 'node:crypto';
 
+import {
+  createDisabledBuildFeatureFlags,
+  createDisabledRuntimeFeatureFlags,
+  runtimeFeatureManifestSchema,
+  serializeRuntimeFeatureManifestPayload,
+  type BuildFeatureFlags,
+  type RuntimeFeatureManifest,
+  type RuntimeFeatureManifestPayload,
+} from '@ml-path/contracts';
+
 export const FIREBASE_REGION = 'asia-southeast1';
 
 const runtimeFeatureManifestSource = {
+  schemaVersion: 1,
   releaseId: 'release-1',
-  featureFlags: {
-    capstones: false,
-    csvReports: false,
-    pinRuns: false,
-    studentDetailReports: false,
-    targetScores: false,
-  },
-} as const;
+  featureFlags: createDisabledRuntimeFeatureFlags(),
+} satisfies RuntimeFeatureManifestPayload;
 
-export type RuntimeFeatureManifest = typeof runtimeFeatureManifestSource & {
-  checksum: string;
-};
+const buildFeatureFlags = createDisabledBuildFeatureFlags();
 
 const runtimeFeatureManifestChecksum = createHash('sha256')
-  .update(JSON.stringify(runtimeFeatureManifestSource))
+  .update(serializeRuntimeFeatureManifestPayload(runtimeFeatureManifestSource))
   .digest('hex');
 
 export function getRuntimeFeatureManifest(): RuntimeFeatureManifest {
-  return {
+  return runtimeFeatureManifestSchema.parse({
     ...runtimeFeatureManifestSource,
     featureFlags: { ...runtimeFeatureManifestSource.featureFlags },
     checksum: runtimeFeatureManifestChecksum,
-  };
+  });
+}
+
+export function getBuildFeatureFlags(): BuildFeatureFlags {
+  return { ...buildFeatureFlags };
 }
