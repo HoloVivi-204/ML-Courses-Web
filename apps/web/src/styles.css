@@ -3627,6 +3627,54 @@ a {
   color: var(--ink-soft);
 }
 
+.playground-training-diagnostics {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.playground-training-diagnostics h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.playground-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.playground-training-diagnostics table {
+  width: 100%;
+  min-width: 470px;
+  border-collapse: collapse;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.playground-training-diagnostics caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.playground-training-diagnostics th,
+.playground-training-diagnostics td {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.playground-training-diagnostics th {
+  font-weight: 900;
+}
+
 .playground-summary-list {
   display: grid;
   margin: 0;
@@ -3774,7 +3822,8 @@ a {
 }
 
 .playground-history-card small,
-.playground-config-card small {
+.playground-config-card small,
+.playground-history-card time {
   color: var(--ink-soft);
   font-size: 11px;
 }
@@ -3892,6 +3941,18 @@ a {
 
   .playground-dataset-list {
     grid-template-columns: 1fr;
+  }
+
+  .playground-training-diagnostics table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .playground-training-diagnostics th,
+  .playground-training-diagnostics td {
+    padding: 7px 4px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 

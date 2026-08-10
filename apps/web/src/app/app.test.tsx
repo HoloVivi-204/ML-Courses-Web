@@ -16,6 +16,8 @@ import {
   type PlaygroundConfig,
 } from '../features/learning/learning-api';
 import { getPublicQuizRoute } from '../features/learning/quiz-route-data';
+import { getPlaygroundDataset } from '../features/playground/playground-datasets';
+import { PlaygroundResult } from '../features/playground/playground-page';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
 const STOP_FALLBACK_SETTLE_MS = 300;
@@ -765,6 +767,7 @@ function createSavedPlaygroundRunFixture(input: { runId: string }) {
 }
 
 function createSavedPlaygroundConfigFixture(input: {
+  adapterVersion?: string;
   compatibilityReason?: string | null;
   compatibilityStatus?: 'compatible' | 'incompatible';
   config?: PlaygroundConfig;
@@ -777,6 +780,7 @@ function createSavedPlaygroundConfigFixture(input: {
     scenarioId: 'pg-xor' as const,
     algorithmId: 'perceptron' as const,
     datasetVersionId: 'ds-xor-noisy-v1' as const,
+    ...(input.adapterVersion ? { adapterVersion: input.adapterVersion } : {}),
     config: input.config ?? {
       learningRate: 0.1,
       epochs: 100,
@@ -1331,6 +1335,72 @@ function installMobileViewport() {
 }
 
 describe('public learning journey', () => {
+  it('shows derived accuracy alongside precision, recall, and F1 for imbalanced results', () => {
+    render(
+      <PlaygroundResult
+        dataset={getPlaygroundDataset('ds-credit-risk-v1')}
+        locale="vi"
+        result={{
+          algorithmId: 'logistic-regression',
+          chartSummary: {
+            falseNegative: 1,
+            falsePositive: 1,
+            kind: 'confusion-matrix',
+            trueNegative: 7,
+            truePositive: 1,
+          },
+          datasetVersionId: 'ds-credit-risk-v1',
+          determinism: 'exact',
+          feedback: ['imbalance'],
+          metrics: { f1: 0.5, precision: 0.5, recall: 0.5 },
+          runId: 'run-imbalanced-ui',
+          scenarioId: 'pg-credit-risk',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Accuracy')).toBeVisible();
+    expect(screen.getByText('80%')).toBeVisible();
+    expect(screen.getByText('Precision')).toBeVisible();
+    expect(screen.getByText('Recall')).toBeVisible();
+    expect(screen.getByText('F1')).toBeVisible();
+    expect(
+      screen.getByText('Mất cân bằng lớp: xem precision và recall thay vì chỉ dựa vào accuracy.'),
+    ).toBeVisible();
+  });
+
+  it('renders train loss, test loss, and epoch metric rows when supplied by a gradient run', () => {
+    render(
+      <PlaygroundResult
+        dataset={getPlaygroundDataset('ds-moons-2d-v1')}
+        locale="en"
+        result={{
+          algorithmId: 'mlp',
+          datasetVersionId: 'ds-moons-2d-v1',
+          determinism: 'exact',
+          feedback: [],
+          lossCurve: [
+            { epoch: 1, metric: { id: 'accuracy', value: 0.6 }, testLoss: 0.7, trainLoss: 0.8 },
+            { epoch: 10, metric: { id: 'accuracy', value: 0.9 }, testLoss: 0.3, trainLoss: 0.2 },
+          ],
+          metrics: { accuracy: 0.9, loss: 0.3 },
+          runId: 'run-gradient-ui',
+          scenarioId: 'pg-nonlinear-2d',
+        }}
+      />,
+    );
+
+    const diagnostics = screen.getByTestId('playground-training-diagnostics');
+
+    expect(diagnostics).toHaveTextContent('Train loss');
+    expect(diagnostics).toHaveTextContent('Test loss');
+    expect(diagnostics).toHaveTextContent('Metric');
+    expect(diagnostics).toHaveTextContent('0.8');
+    expect(diagnostics).toHaveTextContent('0.7');
+    expect(diagnostics).toHaveTextContent('Accuracy 60%');
+    expect(diagnostics).toHaveTextContent('Accuracy 90%');
+  });
+
   it('does not expose the static lab preview as an interactive run control', () => {
     window.history.pushState({}, '', '/');
 
@@ -3344,6 +3414,69 @@ describe('public learning journey', () => {
     expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent('ds-xor-noisy-v1');
   });
 
+  it('opens the owning scenario when a different approved dataset card is used', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        algorithmUnlocks: [
+          {
+            algorithmId: 'perceptron',
+            moduleId: 'dl-m01-neuron-perceptron',
+          },
+          {
+            algorithmId: 'linear-regression',
+            moduleId: 'cml-m02-linear-polynomial',
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    await user.click(
+      within(screen.getByTestId('playground-dataset-card-ds-house-price-v1')).getByRole('button', {
+        name: 'Mở scenario',
+      }),
+    );
+
+    expect(await screen.findByRole('heading', { name: /Playground giá nhà/i })).toBeVisible();
+    expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent(
+      'ds-house-price-v1',
+    );
+  });
+
+  it('keeps the unlocked mobile K-Means pair playable instead of treating it as locked', async () => {
+    window.history.pushState({}, '', '/playground/pg-retail-segments');
+    installMobileViewport();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        algorithmUnlocks: [
+          {
+            algorithmId: 'kmeans',
+            moduleId: 'cml-m08-clustering',
+          },
+        ],
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: /K-Means/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Chạy' })).toBeEnabled();
+    expect(screen.getByRole('spinbutton', { name: /Số cụm/i })).toHaveAttribute('max', '8');
+    vi.unstubAllGlobals();
+  });
+
   it('reshuffles a seeded dataset without starting a new run', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
     const user = userEvent.setup();
@@ -3579,6 +3712,7 @@ describe('public learning journey', () => {
     expect(screen.getByText('100%')).toBeVisible();
     expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
       idToken: 'local-id-token',
+      limit: 50,
       scenarioId: 'pg-country-indicators',
     });
     expect(learningApiClient.createPlaygroundRunSession).toHaveBeenCalledWith({
@@ -3697,6 +3831,7 @@ describe('public learning journey', () => {
       expect(await screen.findByText(`${scenarioId} / ${algorithmId}`)).toBeVisible();
       expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
         idToken: 'local-id-token',
+        limit: 50,
         scenarioId,
       });
       expect(learningApiClient.listPlaygroundConfigs).toHaveBeenCalledWith({
@@ -3760,9 +3895,17 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    expect(await screen.findByText('Lịch sử run')).toBeVisible();
+    expect(
+      await screen.findByText('Lịch sử run', {}, { timeout: LAZY_ROUTE_TIMEOUT_MS }),
+    ).toBeVisible();
     expect(screen.getByText('run-history-01')).toBeVisible();
     expect(screen.getByText('XOR tuned')).toBeVisible();
+    const historyCard = screen.getByTestId('playground-history-card-run-history-01');
+
+    expect(historyCard).toHaveTextContent('2026-07-19T14:00:00.000Z');
+    expect(historyCard).toHaveTextContent('seed 42');
+    expect(historyCard).toHaveTextContent('train split 0.75');
+    expect(historyCard).toHaveTextContent('target none');
 
     await user.click(screen.getByRole('button', { name: /Khôi phục/i }));
 
@@ -3772,6 +3915,7 @@ describe('public learning journey', () => {
     expect(screen.getByRole('spinbutton', { name: 'Seed' })).toHaveValue(7);
     expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
       idToken: 'local-id-token',
+      limit: 50,
       scenarioId: 'pg-xor',
     });
     expect(learningApiClient.listPlaygroundConfigs).toHaveBeenCalledWith({
@@ -3779,6 +3923,30 @@ describe('public learning journey', () => {
       scenarioId: 'pg-xor',
     });
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps the history view bounded to the newest fifty runs', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const runs = Array.from({ length: 51 }, (_, index) =>
+      createSavedPlaygroundRunFixture({
+        runId: `run-history-${String(index + 1).padStart(2, '0')}`,
+      }),
+    );
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundRuns: vi.fn().mockResolvedValue(runs),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByText('Lịch sử run', {}, { timeout: LAZY_ROUTE_TIMEOUT_MS }),
+    ).toBeVisible();
+    expect(screen.getAllByTestId(/^playground-history-card-/)).toHaveLength(50);
+    expect(screen.getByTestId('playground-history-card-run-history-01')).toBeVisible();
+    expect(screen.queryByTestId('playground-history-card-run-history-51')).not.toBeInTheDocument();
   });
 
   it('renames and updates a saved pg-xor config without creating a duplicate', async () => {
@@ -3920,6 +4088,32 @@ describe('public learning journey', () => {
       configId: 'config-pg-xor-legacy',
     });
     expect(learningApiClient.createPlaygroundRunSession).not.toHaveBeenCalled();
+  });
+
+  it('marks a saved config with a stale adapter version read-only with a reason', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundConfigs: vi.fn().mockResolvedValue([
+        createSavedPlaygroundConfigFixture({
+          adapterVersion: 'tfjs-core-v0',
+          configId: 'config-pg-xor-stale-adapter',
+          name: 'Legacy adapter',
+        }),
+      ]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Legacy adapter')).toBeVisible();
+    expect(screen.getByText(/tfjs-core-v0.*tfjs-core-v1/i)).toBeVisible();
+    expect(screen.getByRole('button', { name: /Khôi phục Legacy adapter/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Đổi tên Legacy adapter/i })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /Cập nhật thông số Legacy adapter/i }),
+    ).toBeDisabled();
   });
 
   it('keeps a desktop-compatible config read-only when it exceeds the mobile limit', async () => {

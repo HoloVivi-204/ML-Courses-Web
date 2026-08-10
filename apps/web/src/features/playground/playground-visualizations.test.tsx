@@ -118,6 +118,40 @@ describe('Playground visualizations', () => {
     );
   });
 
+  it('plots separate train and test loss traces for gradient diagnostics', async () => {
+    const result: MlRunResult = {
+      algorithmId: 'mlp',
+      datasetVersionId: 'ds-moons-2d-v1',
+      determinism: 'exact',
+      feedback: [],
+      lossCurve: [
+        { epoch: 1, testLoss: 0.7, trainLoss: 0.8 },
+        { epoch: 10, testLoss: 0.3, trainLoss: 0.2 },
+      ],
+      metrics: { accuracy: 0.9, loss: 0.3 },
+      runId: 'run-gradient-plot',
+      scenarioId: 'pg-nonlinear-2d',
+    };
+
+    const { getByTestId } = render(
+      <PlaygroundVisualization
+        dataset={getPlaygroundDataset('ds-moons-2d-v1')}
+        locale="en"
+        result={result}
+      />,
+    );
+
+    const lossChart = getByTestId('playground-loss-chart');
+
+    await waitFor(() => expect(plotly.newPlot).toHaveBeenCalledTimes(2));
+    expect(getPlotlyData(lossChart)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Train loss', x: [1, 10], y: [0.8, 0.2] }),
+        expect.objectContaining({ name: 'Test loss', x: [1, 10], y: [0.7, 0.3] }),
+      ]),
+    );
+  });
+
   it.each([
     ['confusion-matrix', { trueNegative: 3, falsePositive: 1, falseNegative: 2, truePositive: 4 }],
     [

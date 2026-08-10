@@ -846,6 +846,91 @@ describe('Firestore playground repository run sessions', () => {
     ).toBe(false);
   });
 
+  it('keeps a saved config visible and read-only when its adapter version is stale', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/playgroundConfigs/config-stale-adapter': {
+        configId: 'config-stale-adapter',
+        name: 'Legacy XOR setup',
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v1',
+        adapterVersion: 'tfjs-core-v0',
+        configSchemaVersion: 1,
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const result = await repository.listConfigs({
+      uid: 'learner-01',
+      scenarioId: 'pg-xor',
+    });
+
+    expect(result.data.configs).toEqual([
+      expect.objectContaining({
+        configId: 'config-stale-adapter',
+        compatibilityStatus: 'incompatible',
+        compatibilityReason: expect.stringContaining('tfjs-core-v0'),
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+      }),
+    ]);
+
+    await expect(
+      repository.updateConfig({
+        uid: 'learner-01',
+        configId: 'config-stale-adapter',
+        name: 'Should stay read-only',
+      }),
+    ).rejects.toMatchObject({
+      code: 'PLAYGROUND_CONFIG_INCOMPATIBLE',
+      statusCode: 409,
+    });
+  });
+
+  it('keeps a saved config visible and read-only when its dataset version is no longer published', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01/playgroundConfigs/config-legacy-dataset': {
+        configId: 'config-legacy-dataset',
+        name: 'Legacy dataset setup',
+        scenarioId: 'pg-xor',
+        algorithmId: 'perceptron',
+        datasetVersionId: 'ds-xor-noisy-v0',
+        adapterVersion: 'tfjs-core-v0',
+        configSchemaVersion: 1,
+        config: {
+          learningRate: 0.1,
+          epochs: 100,
+          trainRatio: 0.75,
+          seed: 42,
+        },
+      },
+    });
+    const repository = createFirestorePlaygroundRepository(firestore);
+
+    const result = await repository.listConfigs({
+      uid: 'learner-01',
+      scenarioId: 'pg-xor',
+    });
+
+    expect(result.data.configs).toEqual([
+      expect.objectContaining({
+        configId: 'config-legacy-dataset',
+        compatibilityStatus: 'incompatible',
+        compatibilityReason: expect.stringContaining('no longer published'),
+      }),
+    ]);
+  });
+
   it('deletes only the owner Playground data for account deletion', async () => {
     const { documents, firestore } = createFakeFirestore({
       'users/learner-01/playgroundRuns/run-01': {

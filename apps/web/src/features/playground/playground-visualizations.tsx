@@ -139,9 +139,12 @@ function LossCurveChart({
 }) {
   const curve = points.flatMap((point) => {
     const epoch = readFiniteNumber(point.epoch);
-    const loss = readFiniteNumber(point.loss);
+    const trainLoss = readFiniteNumber(point.trainLoss ?? point.trainingLoss ?? point.loss);
+    const testLoss = readFiniteNumber(point.testLoss ?? point.validationLoss);
 
-    return epoch === null || loss === null ? [] : [{ epoch, loss }];
+    return epoch === null || (trainLoss === null && testLoss === null)
+      ? []
+      : [{ epoch, testLoss, trainLoss }];
   });
 
   if (curve.length === 0) {
@@ -151,9 +154,9 @@ function LossCurveChart({
   const title = locale === 'vi' ? 'Đường cong loss' : 'Loss curve';
   const description =
     locale === 'vi'
-      ? 'Loss theo từng epoch trong quá trình huấn luyện.'
-      : 'Loss measured at each training epoch.';
-  const spec = createLossCurveSpec(curve);
+      ? 'Loss train và loss test theo từng epoch trong quá trình huấn luyện.'
+      : 'Train and test loss measured at each training epoch.';
+  const spec = createLossCurveSpec(curve, locale);
 
   return (
     <figure className="playground-chart-figure playground-loss-figure">
@@ -412,24 +415,54 @@ function createDendrogramSpec(
   };
 }
 
-function createLossCurveSpec(curve: readonly { epoch: number; loss: number }[]): PlotlyChartSpec {
+function createLossCurveSpec(
+  curve: readonly {
+    epoch: number;
+    testLoss: number | null;
+    trainLoss: number | null;
+  }[],
+  locale: Locale,
+): PlotlyChartSpec {
   const theme = getPlotlyTheme();
+  const trainPoints = curve
+    .filter((point) => point.trainLoss !== null)
+    .map((point) => ({ epoch: point.epoch, trainLoss: point.trainLoss as number }));
+  const testPoints = curve
+    .filter((point) => point.testLoss !== null)
+    .map((point) => ({ epoch: point.epoch, testLoss: point.testLoss as number }));
+  const data: PlotlyTrace[] = [];
+
+  if (trainPoints.length > 0) {
+    data.push({
+      hovertemplate: `${locale === 'vi' ? 'Epoch' : 'Epoch'} %{x}: %{y}<extra></extra>`,
+      line: { color: theme.teal, width: 3 },
+      marker: { color: theme.teal, size: 6 },
+      mode: 'lines+markers',
+      name: locale === 'vi' ? 'Loss train' : 'Train loss',
+      type: 'scatter',
+      x: trainPoints.map((point) => point.epoch),
+      y: trainPoints.map((point) => point.trainLoss),
+    });
+  }
+
+  if (testPoints.length > 0) {
+    data.push({
+      hovertemplate: `${locale === 'vi' ? 'Epoch' : 'Epoch'} %{x}: %{y}<extra></extra>`,
+      line: { color: PLOTLY_COLORS[1], dash: 'dot', width: 3 },
+      marker: { color: PLOTLY_COLORS[1], size: 6 },
+      mode: 'lines+markers',
+      name: locale === 'vi' ? 'Loss test' : 'Test loss',
+      type: 'scatter',
+      x: testPoints.map((point) => point.epoch),
+      y: testPoints.map((point) => point.testLoss),
+    });
+  }
 
   return {
-    data: [
-      {
-        hovertemplate: 'Epoch %{x}: %{y}<extra></extra>',
-        line: { color: theme.teal, width: 3 },
-        marker: { color: theme.teal, size: 6 },
-        mode: 'lines+markers',
-        type: 'scatter',
-        x: curve.map((point) => point.epoch),
-        y: curve.map((point) => point.loss),
-      },
-    ],
+    data,
     layout: {
       ...createBaseLayout(theme),
-      showlegend: false,
+      showlegend: data.length > 1,
       xaxis: { ...createAxis(theme), title: { text: 'Epoch' } },
       yaxis: { ...createAxis(theme), title: { text: 'Loss' } },
     },

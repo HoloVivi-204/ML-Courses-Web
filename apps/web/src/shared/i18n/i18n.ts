@@ -380,6 +380,7 @@ const resources = {
         'Drag a published card here or use its button. Arbitrary uploads are not supported.',
       'playground.dataset.selected': 'Using dataset',
       'playground.dataset.use': 'Use dataset',
+      'playground.dataset.openScenario': 'Open scenario',
       'playground.dataset.rows': '{{count}} rows',
       'playground.dataset.features': '{{count}} features',
       'playground.dataset.current': 'Current dataset: {{dataset}}',
@@ -430,6 +431,10 @@ const resources = {
       'playground.configs.restore': 'Restore',
       'playground.configs.delete': 'Delete',
       'playground.configs.incompatible': 'This saved config is no longer compatible.',
+      'playground.configs.missingPair':
+        'This saved config belongs to a pair that is no longer published or unlocked.',
+      'playground.configs.versionMismatch':
+        'This saved config uses an older adapter or schema version and is read-only.',
       'playground.notFound.title': 'Playground not found',
       'playground.notFound.body': 'This scenario is not part of the current playground release.',
       'learning.notFound.title': 'Learning path not found',
@@ -852,6 +857,7 @@ const resources = {
         'Kéo thẻ đã publish vào đây hoặc dùng nút. Không hỗ trợ upload tùy ý.',
       'playground.dataset.selected': 'Đang dùng',
       'playground.dataset.use': 'Sử dụng dataset',
+      'playground.dataset.openScenario': 'Mở scenario',
       'playground.dataset.rows': '{{count}} mẫu',
       'playground.dataset.features': '{{count}} feature',
       'playground.dataset.current': 'Dataset hiện tại: {{dataset}}',
@@ -902,6 +908,10 @@ const resources = {
       'playground.configs.restore': 'Khôi phục',
       'playground.configs.delete': 'Xóa',
       'playground.configs.incompatible': 'Cấu hình đã lưu này không còn tương thích.',
+      'playground.configs.missingPair':
+        'Cấu hình thuộc pair không còn được publish hoặc chưa được mở khóa.',
+      'playground.configs.versionMismatch':
+        'Cấu hình dùng adapter hoặc schema phiên bản cũ nên chỉ đọc.',
       'playground.notFound.title': 'Không tìm thấy Playground',
       'playground.notFound.body': 'Scenario này không thuộc bản phát hành Playground hiện tại.',
       'learning.notFound.title': 'Không tìm thấy lộ trình học',

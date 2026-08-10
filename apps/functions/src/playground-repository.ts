@@ -778,7 +778,7 @@ function toRunRecord(documentId: string, data: unknown): PlaygroundRunRecord | n
       algorithmId: manifest.algorithmId,
       datasetVersionId: manifest.datasetVersionId,
       adapterVersion: getStoredAdapterVersion(stored, manifest),
-      configSchemaVersion: getStoredConfigSchemaVersion(stored),
+      configSchemaVersion: getStoredConfigSchemaVersion(),
       config: normalizePlaygroundConfig({
         scenarioId: manifest.scenarioId,
         algorithmId: manifest.algorithmId,
@@ -816,21 +816,64 @@ function toConfigRecord(documentId: string, data: unknown): PlaygroundConfigReco
   }
 
   const stored = data as StoredPlaygroundConfigDocument;
-  const manifest = getStoredDocumentManifest(stored);
+  const identity = getStoredConfigIdentity(documentId, stored);
 
-  if (!manifest) {
+  if (!identity) {
     return null;
+  }
+
+  const storedAdapterVersion = getStoredAdapterVersionValue(stored);
+  const storedConfigSchemaVersion = getStoredConfigSchemaVersionValue(stored);
+  let manifest: PlaygroundPairManifest;
+
+  try {
+    manifest = assertSupportedPlaygroundPair(identity);
+  } catch (error) {
+    if (!(error instanceof ApiError)) {
+      throw error;
+    }
+
+    return {
+      ...identity,
+      ...(storedAdapterVersion ? { adapterVersion: storedAdapterVersion } : {}),
+      ...(storedConfigSchemaVersion === 1 ? { configSchemaVersion: 1 as const } : {}),
+      config: toFirestoreSafeRecord(stored.config),
+      compatibilityStatus: 'incompatible',
+      compatibilityReason:
+        'This saved scenario, algorithm, or dataset version is no longer published.',
+    };
+  }
+
+  if (storedAdapterVersion !== null && storedAdapterVersion !== manifest.adapterVersion) {
+    return {
+      ...identity,
+      adapterVersion: storedAdapterVersion,
+      config: toFirestoreSafeRecord(stored.config),
+      configSchemaVersion: manifest.configSchemaVersion,
+      compatibilityStatus: 'incompatible',
+      compatibilityReason: `This saved config uses adapter ${storedAdapterVersion}; the current pair uses ${manifest.adapterVersion}.`,
+    };
+  }
+
+  if (
+    storedConfigSchemaVersion !== null &&
+    storedConfigSchemaVersion !== manifest.configSchemaVersion
+  ) {
+    return {
+      ...identity,
+      adapterVersion: storedAdapterVersion ?? manifest.adapterVersion,
+      config: toFirestoreSafeRecord(stored.config),
+      configSchemaVersion: manifest.configSchemaVersion,
+      compatibilityStatus: 'incompatible',
+      compatibilityReason: `This saved config uses schema v${storedConfigSchemaVersion}; the current pair uses schema v${manifest.configSchemaVersion}.`,
+    };
   }
 
   try {
     return {
-      configId: typeof stored.configId === 'string' ? stored.configId : documentId,
-      name: typeof stored.name === 'string' ? stored.name : 'Playground config',
-      scenarioId: manifest.scenarioId,
-      algorithmId: manifest.algorithmId,
-      datasetVersionId: manifest.datasetVersionId,
-      adapterVersion: getStoredAdapterVersion(stored, manifest),
-      configSchemaVersion: getStoredConfigSchemaVersion(stored),
+      ...identity,
+      adapterVersion: storedAdapterVersion ?? manifest.adapterVersion,
+      configSchemaVersion: manifest.configSchemaVersion,
       config: normalizePlaygroundConfig({
         scenarioId: manifest.scenarioId,
         algorithmId: manifest.algorithmId,
@@ -843,18 +886,38 @@ function toConfigRecord(documentId: string, data: unknown): PlaygroundConfigReco
     };
   } catch {
     return {
-      configId: typeof stored.configId === 'string' ? stored.configId : documentId,
-      name: typeof stored.name === 'string' ? stored.name : 'Playground config',
-      scenarioId: manifest.scenarioId,
-      algorithmId: manifest.algorithmId,
-      datasetVersionId: manifest.datasetVersionId,
-      adapterVersion: getStoredAdapterVersion(stored, manifest),
-      configSchemaVersion: getStoredConfigSchemaVersion(stored),
-      config: manifest.defaultConfig,
+      ...identity,
+      adapterVersion: storedAdapterVersion ?? manifest.adapterVersion,
+      configSchemaVersion: manifest.configSchemaVersion,
+      config: toFirestoreSafeRecord(stored.config),
       compatibilityStatus: 'incompatible',
       compatibilityReason: 'Current parameter bounds no longer accept this saved config.',
     };
   }
+}
+
+function getStoredConfigIdentity(
+  documentId: string,
+  stored: StoredPlaygroundConfigDocument,
+): Pick<
+  PlaygroundConfigRecord,
+  'algorithmId' | 'configId' | 'datasetVersionId' | 'name' | 'scenarioId'
+> | null {
+  if (
+    typeof stored.scenarioId !== 'string' ||
+    typeof stored.algorithmId !== 'string' ||
+    typeof stored.datasetVersionId !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    configId: typeof stored.configId === 'string' ? stored.configId : documentId,
+    name: typeof stored.name === 'string' ? stored.name : 'Playground config',
+    scenarioId: stored.scenarioId,
+    algorithmId: stored.algorithmId,
+    datasetVersionId: stored.datasetVersionId,
+  };
 }
 
 function getStoredDocumentManifest(
@@ -887,6 +950,18 @@ function getStoredAdapterVersion(
   stored: StoredPlaygroundConfigDocument | StoredPlaygroundRunDocument,
   manifest: PlaygroundPairManifest,
 ): string {
+  const storedVersion = getStoredAdapterVersionValue(stored);
+
+  return storedVersion ?? manifest.adapterVersion;
+}
+
+function getStoredConfigSchemaVersion(): 1 {
+  return 1;
+}
+
+function getStoredAdapterVersionValue(
+  stored: StoredPlaygroundConfigDocument | StoredPlaygroundRunDocument,
+): string | null {
   const storedVersion =
     'adapterVersion' in stored && typeof stored.adapterVersion === 'string'
       ? stored.adapterVersion
@@ -896,13 +971,16 @@ function getStoredAdapterVersion(
       ? stored.algorithmAdapterVersion
       : null;
 
-  return storedVersion ?? legacyRunVersion ?? manifest.adapterVersion;
+  return storedVersion ?? legacyRunVersion;
 }
 
-function getStoredConfigSchemaVersion(
+function getStoredConfigSchemaVersionValue(
   stored: StoredPlaygroundConfigDocument | StoredPlaygroundRunDocument,
-): 1 {
-  return stored.configSchemaVersion === 1 ? 1 : 1;
+): number | null {
+  return typeof stored.configSchemaVersion === 'number' &&
+    Number.isInteger(stored.configSchemaVersion)
+    ? stored.configSchemaVersion
+    : null;
 }
 
 function assertSupportedPlaygroundScenario(scenarioId: string): void {
@@ -1374,6 +1452,14 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
 
         if (!currentConfig) {
           throw new ApiError(409, 'PLAYGROUND_CONFIG_INVALID', 'Saved config is invalid.');
+        }
+
+        if (currentConfig.compatibilityStatus !== 'compatible') {
+          throw new ApiError(
+            409,
+            'PLAYGROUND_CONFIG_INCOMPATIBLE',
+            'This saved config is read-only because it is no longer compatible with the current pair.',
+          );
         }
 
         const manifest = assertSupportedPlaygroundPair(currentConfig);

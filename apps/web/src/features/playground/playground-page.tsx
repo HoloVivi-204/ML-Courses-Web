@@ -19,7 +19,7 @@ import {
   type DragEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { courses, localize, type Locale } from '../catalog/course-data';
 import { useAuth } from '../auth/auth-context';
@@ -195,6 +195,7 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
 
 export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { scenarioId } = useParams();
   const routeScenarioId = scenarioId ?? '';
   const scenarioRegistrations = useMemo(
@@ -206,6 +207,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     () => [...new Set(scenarioRegistrations.map((entry) => entry.datasetVersionId))],
     [scenarioRegistrations],
   );
+  const datasetEntries = useMemo(() => getPlaygroundDatasetEntries(), []);
   const [datasetSelection, setDatasetSelection] = useState<{
     datasetVersionId: string | null;
     scenarioId: string;
@@ -312,6 +314,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       const [runsPage, configs] = await Promise.all([
         learningApiClient.listPlaygroundRuns({
           idToken,
+          limit: 50,
           scenarioId: currentScenarioId,
         }),
         learningApiClient.listPlaygroundConfigs({
@@ -322,7 +325,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
       return {
         configs,
-        runs: Array.isArray(runsPage) ? runsPage : runsPage.runs,
+        runs: (Array.isArray(runsPage) ? runsPage : runsPage.runs).slice(0, 50),
       };
     },
     [learningApiClient],
@@ -846,11 +849,13 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       </section>
 
       <DatasetTray
+        currentScenarioId={routeScenarioId}
         disabled={isRunBusy}
+        entries={datasetEntries}
         locale={locale}
         onSelect={handleDatasetSelect}
+        onNavigate={(nextScenarioId) => navigate(`/playground/${nextScenarioId}`)}
         selectedDatasetVersionId={selectedDatasetVersionId}
-        scenarioDatasetIds={scenarioDatasetIds}
       />
 
       <section className="playground-workspace">
@@ -904,7 +909,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
             {formatLimitSummary(selectedRegistration.parameterFields, deviceProfile, locale)}
           </p>
           <div className="playground-run-actions">
-            <button disabled={isRunBusy || !selectedDataset} onClick={handleRun}>
+            <button disabled={isRunBusy || !selectedDataset} onClick={handleRun} type="button">
               <Zap aria-hidden="true" size={16} />
               {t('playground.run')}
             </button>
@@ -952,7 +957,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           {result ? (
             <PlaygroundResult dataset={selectedDataset} locale={locale} result={result} />
           ) : null}
-          {safeError ? <p className="playground-error">{safeError}</p> : null}
+          {safeError ? (
+            <p className="playground-error" role="alert">
+              {safeError}
+            </p>
+          ) : null}
         </section>
       </section>
 
@@ -970,11 +979,16 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                 const metricSummary = formatSavedRunMetric(savedRun, scenarioRegistrations);
 
                 return (
-                  <li className="playground-history-card" key={savedRun.runId}>
+                  <li
+                    className="playground-history-card"
+                    data-testid={`playground-history-card-${savedRun.runId}`}
+                    key={savedRun.runId}
+                  >
                     <div>
                       <strong>{savedRun.runId}</strong>
                       <span>{savedRun.verificationLevel}</span>
                     </div>
+                    <time dateTime={savedRun.createdAt}>{savedRun.createdAt}</time>
                     <code>
                       {savedRun.scenarioId} / {savedRun.algorithmId} · {savedRun.datasetVersionId}
                     </code>
@@ -987,6 +1001,8 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                         duration: savedRun.durationMs,
                       })}
                     </p>
+                    <small>{formatSavedRunConfigSummary(savedRun.config)}</small>
+                    <small>{formatSavedRunTargetSummary(savedRun)}</small>
                     <button onClick={() => void handleDeleteRun(savedRun.runId)} type="button">
                       {t('playground.history.delete')}
                     </button>
@@ -1014,17 +1030,27 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                   savedConfig,
                   deviceProfile,
                 );
+                const compatibilityReason = getSavedConfigCompatibilityReason(
+                  savedConfig,
+                  savedConfigRegistration,
+                  deviceCompatibilityError,
+                  {
+                    incompatible: t('playground.configs.incompatible'),
+                    missingPair: t('playground.configs.missingPair'),
+                    versionMismatch: t('playground.configs.versionMismatch'),
+                  },
+                );
                 const isRestorable =
                   savedConfig.compatibilityStatus === 'compatible' &&
                   Boolean(savedConfigRegistration) &&
-                  deviceCompatibilityError === null;
+                  compatibilityReason === null;
                 const isUpdatable = isRestorable && isSamePair(savedConfig, selectedRegistration);
 
                 return (
                   <li className="playground-config-card" key={savedConfig.configId}>
                     <div>
                       <strong>{savedConfig.name}</strong>
-                      <span>{savedConfig.compatibilityStatus}</span>
+                      <span>{isRestorable ? savedConfig.compatibilityStatus : 'read-only'}</span>
                     </div>
                     <p>
                       {savedConfig.algorithmId} · {savedConfig.datasetVersionId} ·{' '}
@@ -1036,14 +1062,10 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                         savedConfig.configSchemaVersion,
                       )}
                     </small>
-                    {savedConfig.compatibilityStatus === 'incompatible' ? (
-                      <p className="playground-error">
-                        {savedConfig.compatibilityReason ?? t('playground.configs.incompatible')}
+                    {compatibilityReason ? (
+                      <p className="playground-error" role="alert">
+                        {compatibilityReason}
                       </p>
-                    ) : null}
-                    {savedConfig.compatibilityStatus === 'compatible' &&
-                    deviceCompatibilityError ? (
-                      <p className="playground-error">{deviceCompatibilityError}</p>
                     ) : null}
                     <label className="playground-config-edit">
                       <span>{t('playground.configs.savedName')}</span>
@@ -1104,22 +1126,30 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           )}
         </section>
       </section>
-      {persistenceError ? <p className="playground-error">{persistenceError}</p> : null}
+      {persistenceError ? (
+        <p className="playground-error" role="alert">
+          {persistenceError}
+        </p>
+      ) : null}
     </main>
   );
 }
 
 function DatasetTray({
+  currentScenarioId,
   disabled,
+  entries,
   locale,
   onSelect,
-  scenarioDatasetIds,
+  onNavigate,
   selectedDatasetVersionId,
 }: {
+  currentScenarioId: string;
   disabled: boolean;
+  entries: readonly PlaygroundDatasetEntry[];
   locale: Locale;
   onSelect: (datasetVersionId: string) => void;
-  scenarioDatasetIds: readonly string[];
+  onNavigate: (scenarioId: string) => void;
   selectedDatasetVersionId: string | null;
 }) {
   const { t } = useTranslation();
@@ -1127,16 +1157,32 @@ function DatasetTray({
 
   function handleDragStart(event: DragEvent<HTMLElement>, datasetVersionId: string): void {
     event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/x-playground-dataset', datasetVersionId);
     event.dataTransfer.setData('text/plain', datasetVersionId);
   }
 
   function handleDrop(event: DragEvent<HTMLElement>): void {
     event.preventDefault();
-    const droppedDatasetVersionId = event.dataTransfer.getData('text/plain');
+    if (disabled) {
+      return;
+    }
 
-    if (droppedDatasetVersionId && scenarioDatasetIds.includes(droppedDatasetVersionId)) {
+    const droppedDatasetVersionId =
+      event.dataTransfer.getData('application/x-playground-dataset') ||
+      event.dataTransfer.getData('text/plain');
+    const droppedDataset = entries.find(
+      (entry) => entry.datasetVersionId === droppedDatasetVersionId,
+    );
+
+    if (droppedDataset) {
       setDropMessage(null);
-      onSelect(droppedDatasetVersionId);
+
+      if (droppedDataset.scenarioId === currentScenarioId) {
+        onSelect(droppedDataset.datasetVersionId);
+      } else {
+        onNavigate(droppedDataset.scenarioId);
+      }
+
       return;
     }
 
@@ -1146,6 +1192,7 @@ function DatasetTray({
   return (
     <section
       aria-label={t('playground.dataset.trayLabel')}
+      aria-describedby="playground-dataset-tray-hint"
       className="playground-dataset-tray"
       data-testid="playground-dataset-tray"
       onDragOver={(event) => event.preventDefault()}
@@ -1156,29 +1203,36 @@ function DatasetTray({
           <span className="eyebrow">{t('playground.dataset.eyebrow')}</span>
           <h2>{t('playground.dataset.title')}</h2>
         </div>
-        <p>{t('playground.dataset.hint')}</p>
+        <p id="playground-dataset-tray-hint">{t('playground.dataset.hint')}</p>
       </div>
       <div className="playground-dataset-list">
-        {scenarioDatasetIds.map((datasetVersionId) => {
-          const dataset = getPlaygroundDataset(datasetVersionId);
-          const isSelected = datasetVersionId === selectedDatasetVersionId;
+        {entries.map((entry) => {
+          const dataset = getPlaygroundDataset(entry.datasetVersionId);
+          const isSelected =
+            entry.scenarioId === currentScenarioId &&
+            entry.datasetVersionId === selectedDatasetVersionId;
+          const isCurrentScenario = entry.scenarioId === currentScenarioId;
 
           return (
             <article
               className={
                 isSelected ? 'playground-dataset-card is-selected' : 'playground-dataset-card'
               }
-              data-testid={`playground-dataset-card-${datasetVersionId}`}
+              data-testid={`playground-dataset-card-${entry.datasetVersionId}`}
               draggable={!disabled}
-              key={datasetVersionId}
-              onDragStart={(event) => handleDragStart(event, datasetVersionId)}
+              key={entry.datasetVersionId}
+              onDragStart={(event) => handleDragStart(event, entry.datasetVersionId)}
             >
               <div className="playground-dataset-card-heading">
                 <div>
                   <Database aria-hidden="true" size={17} />
                   <code>{dataset.datasetVersionId}</code>
                 </div>
-                <span>{isSelected ? t('playground.dataset.selected') : dataset.task}</span>
+                <span>
+                  {isSelected
+                    ? t('playground.dataset.selected')
+                    : formatScenarioName(entry.scenarioId, locale)}
+                </span>
               </div>
               <p>{localize(dataset.textAlternative, locale)}</p>
               <div className="playground-dataset-facts">
@@ -1188,12 +1242,18 @@ function DatasetTray({
                 </span>
               </div>
               <button
-                aria-pressed={isSelected}
+                aria-pressed={isCurrentScenario ? isSelected : undefined}
                 disabled={disabled}
-                onClick={() => onSelect(datasetVersionId)}
+                onClick={() =>
+                  isCurrentScenario
+                    ? onSelect(entry.datasetVersionId)
+                    : onNavigate(entry.scenarioId)
+                }
                 type="button"
               >
-                {t('playground.dataset.use')}
+                {isCurrentScenario
+                  ? t('playground.dataset.use')
+                  : t('playground.dataset.openScenario')}
               </button>
             </article>
           );
@@ -1202,7 +1262,11 @@ function DatasetTray({
       <p className="playground-dataset-selection" data-testid="playground-selected-dataset">
         {t('playground.dataset.current', { dataset: selectedDatasetVersionId ?? '—' })}
       </p>
-      {dropMessage ? <p className="playground-error">{dropMessage}</p> : null}
+      {dropMessage ? (
+        <p className="playground-error" role="alert">
+          {dropMessage}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -1320,7 +1384,7 @@ function NumberField({
   );
 }
 
-function PlaygroundResult({
+export function PlaygroundResult({
   dataset,
   locale,
   result,
@@ -1329,7 +1393,7 @@ function PlaygroundResult({
   locale: Locale;
   result: MlRunResult;
 }) {
-  const metricEntries = Object.entries(result.metrics);
+  const metricEntries = Object.entries(getDisplayMetrics(result));
 
   return (
     <div className="playground-result" data-testid="playground-result">
@@ -1341,19 +1405,74 @@ function PlaygroundResult({
           </div>
         ))}
       </div>
+      <TrainingDiagnostics locale={locale} result={result} />
       {result.textAlternative ? (
         <p className="playground-result-text">{result.textAlternative[locale]}</p>
       ) : null}
       <PlaygroundVisualization dataset={dataset} locale={locale} result={result} />
       <ResultSummary locale={locale} result={result} />
       {result.feedback.length > 0 ? (
-        <ul className="playground-feedback">
+        <ul
+          aria-label={locale === 'vi' ? 'Phản hồi học tập' : 'Learning feedback'}
+          className="playground-feedback"
+        >
           {result.feedback.map((feedbackId) => (
             <li key={feedbackId}>{formatFeedback(feedbackId, locale)}</li>
           ))}
         </ul>
       ) : null}
     </div>
+  );
+}
+
+function TrainingDiagnostics({ locale, result }: { locale: Locale; result: MlRunResult }) {
+  const rows = normalizeTrainingDiagnostics(result);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-label={
+        locale === 'vi' ? 'Chẩn đoán huấn luyện theo epoch' : 'Training diagnostics by epoch'
+      }
+      className="playground-training-diagnostics"
+      data-testid="playground-training-diagnostics"
+    >
+      <h3>{locale === 'vi' ? 'Theo dõi huấn luyện' : 'Training diagnostics'}</h3>
+      <div className="playground-table-scroll">
+        <table>
+          <caption>
+            {locale === 'vi'
+              ? 'Loss train, loss test và metric ở từng epoch khi dữ liệu run cung cấp.'
+              : 'Train loss, test loss, and metric at each epoch when supplied by the run.'}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Epoch</th>
+              <th scope="col">Train loss</th>
+              <th scope="col">Test loss</th>
+              <th scope="col">Metric</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.epoch}>
+                <th scope="row">{row.epoch}</th>
+                <td>{formatMetricValue('loss', row.trainLoss)}</td>
+                <td>{formatMetricValue('loss', row.testLoss)}</td>
+                <td>
+                  {row.metricId
+                    ? `${formatMetricLabel(row.metricId)} ${formatMetricValue(row.metricId, row.metricValue)}`
+                    : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -1603,8 +1722,11 @@ function formatProgressEvent(progress: MlProgressEvent, locale: Locale): string 
     const total = typeof progress.totalEpochs === 'number' ? `/${progress.totalEpochs}` : '';
     const loss =
       typeof progress.loss === 'number' ? `, loss ${formatMetricValue('loss', progress.loss)}` : '';
+    const metric = progress.metric
+      ? `, ${formatMetricLabel(progress.metric.id)} ${formatMetricValue(progress.metric.id, progress.metric.value)}`
+      : '';
 
-    return `Epoch ${progress.epoch}${total}${loss}`;
+    return `Epoch ${progress.epoch}${total}${loss}${metric}`;
   }
 
   if (typeof progress.iteration === 'number') {
@@ -1632,6 +1754,134 @@ function formatSavedRunMetric(
   const metricId = registration?.primaryMetricId ?? Object.keys(savedRun.metrics)[0] ?? 'metric';
 
   return `${formatMetricLabel(metricId)} ${formatMetricValue(metricId, savedRun.metrics[metricId])}`;
+}
+
+interface TrainingDiagnosticRow {
+  epoch: number;
+  metricId: string | null;
+  metricValue: MlMetricValue | undefined;
+  testLoss: number | undefined;
+  trainLoss: number | undefined;
+}
+
+function getDisplayMetrics(result: MlRunResult): Record<string, MlMetricValue> {
+  const metrics = { ...result.metrics };
+
+  if (!('accuracy' in metrics)) {
+    const accuracy = deriveAccuracyFromChartSummary(result.chartSummary);
+
+    if (accuracy !== null) {
+      return { accuracy, ...metrics };
+    }
+  }
+
+  return metrics;
+}
+
+function normalizeTrainingDiagnostics(result: MlRunResult): TrainingDiagnosticRow[] {
+  if (!result.lossCurve || result.lossCurve.length === 0) {
+    return [];
+  }
+
+  const lastIndex = result.lossCurve.length - 1;
+  const fallbackMetricId = getFirstMetricId(result.metrics);
+
+  return result.lossCurve.flatMap((point, index) => {
+    const epoch = readFiniteNumber(point.epoch);
+
+    if (epoch === null) {
+      return [];
+    }
+
+    const trainLoss =
+      readFiniteNumber(point.trainLoss ?? point.trainingLoss ?? point.loss) ?? undefined;
+    const testLoss =
+      readFiniteNumber(point.testLoss ?? point.validationLoss) ??
+      (index === lastIndex ? (readFiniteNumber(result.metrics.loss) ?? undefined) : undefined);
+    const pointMetric = readMetricPoint(point);
+    const metricId = pointMetric?.id ?? (index === lastIndex ? fallbackMetricId : null);
+    const metricValue =
+      pointMetric?.value ??
+      (index === lastIndex && metricId ? result.metrics[metricId] : undefined);
+
+    if (trainLoss === undefined && testLoss === undefined && metricValue === undefined) {
+      return [];
+    }
+
+    return [{ epoch, metricId, metricValue, testLoss, trainLoss }];
+  });
+}
+
+function readMetricPoint(point: Record<string, unknown>): {
+  id: string;
+  value: MlMetricValue;
+} | null {
+  if (point.metric && typeof point.metric === 'object' && !Array.isArray(point.metric)) {
+    const metric = point.metric as Record<string, unknown>;
+
+    if (typeof metric.id === 'string') {
+      return {
+        id: metric.id,
+        value: readFiniteNumber(metric.value),
+      };
+    }
+  }
+
+  const metricId = typeof point.metricId === 'string' ? point.metricId : null;
+  const metricValue = readFiniteNumber(point.metricValue ?? point.value);
+
+  if (metricId && metricValue !== null) {
+    return { id: metricId, value: metricValue };
+  }
+
+  return null;
+}
+
+function getFirstMetricId(metrics: Record<string, MlMetricValue>): string | null {
+  return Object.keys(metrics).find((metricId) => metricId !== 'loss') ?? null;
+}
+
+function deriveAccuracyFromChartSummary(
+  summary: Record<string, unknown> | undefined,
+): number | null {
+  if (!summary) {
+    return null;
+  }
+
+  const matrix = Array.isArray(summary.matrix)
+    ? summary.matrix
+        .flatMap((row) => (Array.isArray(row) ? [row] : []))
+        .map((row) => row.map((value) => readFiniteNumber(value) ?? 0))
+    : null;
+
+  if (matrix && matrix.length === 2 && matrix.every((row) => row.length === 2)) {
+    const total = matrix.flat().reduce((sum, value) => sum + value, 0);
+
+    return total === 0 ? null : ((matrix[0]?.[0] ?? 0) + (matrix[1]?.[1] ?? 0)) / total;
+  }
+
+  const trueNegative = readFiniteNumber(summary.trueNegative);
+  const falsePositive = readFiniteNumber(summary.falsePositive);
+  const falseNegative = readFiniteNumber(summary.falseNegative);
+  const truePositive = readFiniteNumber(summary.truePositive);
+
+  if ([trueNegative, falsePositive, falseNegative, truePositive].some((value) => value === null)) {
+    return null;
+  }
+
+  const total = trueNegative! + falsePositive! + falseNegative! + truePositive!;
+
+  return total === 0 ? null : (trueNegative! + truePositive!) / total;
+}
+
+function formatSavedRunConfigSummary(config: PlaygroundConfig): string {
+  return `parameters ${formatSavedConfigSummary(config)}`;
+}
+
+function formatSavedRunTargetSummary(savedRun: PlaygroundRunRecord): string {
+  const target = savedRun.targetVersionId ?? (savedRun.targetReached === null ? null : 'reached');
+
+  return `target ${target ?? 'none'}`;
 }
 
 function getNumberFieldMax(
@@ -1693,6 +1943,41 @@ function getSavedConfigDeviceCompatibilityError(
   } catch (error) {
     return error instanceof Error ? error.message : 'Saved config is not valid for this device.';
   }
+}
+
+function getSavedConfigCompatibilityReason(
+  savedConfig: PlaygroundConfigRecord,
+  registration: PlaygroundPairRegistration | null,
+  deviceCompatibilityError: string | null,
+  fallback: {
+    incompatible: string;
+    missingPair: string;
+    versionMismatch: string;
+  },
+): string | null {
+  if (savedConfig.compatibilityStatus === 'incompatible') {
+    return savedConfig.compatibilityReason ?? fallback.incompatible;
+  }
+
+  if (!registration) {
+    return fallback.missingPair;
+  }
+
+  if (
+    savedConfig.adapterVersion !== undefined &&
+    savedConfig.adapterVersion !== registration.adapterVersion
+  ) {
+    return `${fallback.versionMismatch} (${savedConfig.adapterVersion} → ${registration.adapterVersion}).`;
+  }
+
+  if (
+    savedConfig.configSchemaVersion !== undefined &&
+    savedConfig.configSchemaVersion !== registration.configSchemaVersion
+  ) {
+    return `${fallback.versionMismatch} (schema v${savedConfig.configSchemaVersion} → v${registration.configSchemaVersion}).`;
+  }
+
+  return deviceCompatibilityError;
 }
 
 function isSamePair(
@@ -1796,6 +2081,10 @@ function formatMetricValue(metricId: string, value: MlMetricValue | undefined): 
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
+function readFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 function formatSummaryValue(value: Record<string, unknown>): string {
   return Object.entries(value)
     .map(([key, item]) => `${key}: ${formatUnknownValue(item)}`)
@@ -1864,6 +2153,10 @@ function formatSavedConfigSummary(config: PlaygroundConfig): string {
 
   if (typeof record.seed === 'number') {
     summaryParts.push(`seed ${record.seed}`);
+  }
+
+  if (typeof record.trainRatio === 'number') {
+    summaryParts.push(`train split ${record.trainRatio}`);
   }
 
   return summaryParts.length > 0 ? summaryParts.join(' · ') : 'custom parameters';
@@ -1978,6 +2271,26 @@ function getScenarioGroups(): Array<{
     .map(([scenarioId, registrations]) => ({ registrations, scenarioId }));
 }
 
+interface PlaygroundDatasetEntry {
+  datasetVersionId: string;
+  scenarioId: string;
+}
+
+function getPlaygroundDatasetEntries(): PlaygroundDatasetEntry[] {
+  const entries = new Map<string, PlaygroundDatasetEntry>();
+
+  for (const registration of getPlaygroundPairRegistry()) {
+    if (!entries.has(registration.datasetVersionId)) {
+      entries.set(registration.datasetVersionId, {
+        datasetVersionId: registration.datasetVersionId,
+        scenarioId: registration.scenarioId,
+      });
+    }
+  }
+
+  return [...entries.values()];
+}
+
 function getScenarioOrder(scenarioId: string): number {
   const index = SCENARIO_DISPLAY_ORDER.indexOf(scenarioId);
 
@@ -2019,6 +2332,34 @@ function formatFeedback(feedbackId: string, locale: Locale): string {
     imbalance: {
       en: 'Imbalance: inspect precision and recall instead of relying on accuracy alone.',
       vi: 'Mất cân bằng lớp: xem precision và recall thay vì chỉ dựa vào accuracy.',
+    },
+    'invalid-parameter': {
+      en: 'Invalid parameter: check the highlighted bounds before running again.',
+      vi: 'Tham số không hợp lệ: kiểm tra giới hạn trước khi chạy lại.',
+    },
+    'invalid-parameter-value': {
+      en: 'Invalid parameter: check the highlighted bounds before running again.',
+      vi: 'Tham số không hợp lệ: kiểm tra giới hạn trước khi chạy lại.',
+    },
+    'invalid-params': {
+      en: 'Invalid parameters: check the highlighted bounds before running again.',
+      vi: 'Tham số không hợp lệ: kiểm tra giới hạn trước khi chạy lại.',
+    },
+    'learning-rate-too-high': {
+      en: 'Learning rate is high: reduce it if the loss oscillates or diverges.',
+      vi: 'Tốc độ học cao: giảm xuống nếu loss dao động hoặc phân kỳ.',
+    },
+    'learning-rate-too-low': {
+      en: 'Learning rate is low: increase it slightly if progress is too slow.',
+      vi: 'Tốc độ học thấp: tăng nhẹ nếu tiến bộ quá chậm.',
+    },
+    'learning-rate-high': {
+      en: 'Learning rate is high: reduce it if the loss oscillates or diverges.',
+      vi: 'Tốc độ học cao: giảm xuống nếu loss dao động hoặc phân kỳ.',
+    },
+    'learning-rate-low': {
+      en: 'Learning rate is low: increase it slightly if progress is too slow.',
+      vi: 'Tốc độ học thấp: tăng nhẹ nếu tiến bộ quá chậm.',
     },
     'linear-limit': {
       en: 'Linear limit: one straight boundary cannot separate XOR.',
