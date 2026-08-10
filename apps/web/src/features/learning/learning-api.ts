@@ -148,6 +148,7 @@ export interface LearningPostContent {
 }
 
 export interface LearningDemoContent {
+  adapterVersion?: string | undefined;
   algorithmId: string;
   courseId: string;
   demoId: string;
@@ -155,13 +156,22 @@ export interface LearningDemoContent {
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
+  resultHash?: string | undefined;
   revisionId: string;
   seed: number;
+  sourceIds?: readonly string[] | undefined;
   steps: readonly LearningDemoStep[];
   title: {
     en: string;
     vi: string;
   };
+  visualFixture?:
+    | {
+        hash: string;
+        totalDurationMs: number;
+        version: 'release-fixed-demo-visual-v1';
+      }
+    | undefined;
   visualization: LearningDemoVisualization;
 }
 
@@ -199,6 +209,7 @@ export interface LearningDemoFixedRun {
 }
 
 export interface LearningDemoStep {
+  durationMs?: number | undefined;
   id: string;
   narration: {
     en: string;
@@ -395,6 +406,7 @@ export interface AdminContentSummary {
     en: string;
     vi: string;
   };
+  trialPostId?: string | null | undefined;
   validationStatus: 'not-run' | 'valid';
 }
 
@@ -425,6 +437,7 @@ export interface AdminContentDraft {
     en: string;
     vi: string;
   };
+  trialPostId?: string | null | undefined;
   validationStatus: 'not-run' | 'valid';
 }
 
@@ -500,6 +513,7 @@ export interface UpdateAdminContentDraftInput {
     en: string;
     vi: string;
   };
+  trialPostId?: string | null | undefined;
 }
 
 export interface AdminContentDraftRevisionInput {
@@ -1133,6 +1147,7 @@ export function createFetchLearningApiClient(
       revisionId,
       revisionVersion,
       title,
+      trialPostId,
     }) {
       const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(
         await fetch(buildApiPath('updateAdminContentRevision', { revisionId }), {
@@ -1141,6 +1156,7 @@ export function createFetchLearningApiClient(
             title,
             preview,
             metadata,
+            ...(trialPostId !== undefined ? { trialPostId } : {}),
           }),
           headers: {
             authorization: `Bearer ${idToken}`,

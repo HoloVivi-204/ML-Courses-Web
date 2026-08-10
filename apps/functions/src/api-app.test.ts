@@ -1810,6 +1810,37 @@ describe('API foundation', () => {
     ]);
   });
 
+  it('accepts a stable course-level trial post selection through the Admin draft contract', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    const createdDraft = await request(app)
+      .post('/api/v1/admin/content/course/course-deep-learning-basic/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    expect(createdDraft.body.data.draft.trialPostId).toBe('dl-p01-neuron-perceptron');
+
+    const updatedDraft = await request(app)
+      .patch('/api/v1/admin/revisions/draft-course-course-deep-learning-basic-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        trialPostId: 'dl-p01-neuron-perceptron',
+      })
+      .expect(200);
+
+    expect(updatedDraft.body.data.draft).toMatchObject({
+      revisionVersion: 2,
+      trialPostId: 'dl-p01-neuron-perceptron',
+    });
+  });
+
   it('rejects stale draft edits with optimistic concurrency conflict', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({

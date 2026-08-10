@@ -37,6 +37,15 @@ describe('quiz manifest', () => {
         quizKind: 'post',
         requiredCorrectCount: 3,
       });
+      expect(
+        manifest.questions.map(
+          (question) => (question as typeof question & { activityId?: unknown }).activityId,
+        ),
+      ).toEqual([
+        `act-${post.postId}-quiz-01`,
+        `act-${post.postId}-quiz-02`,
+        `act-${post.postId}-quiz-03`,
+      ]);
       expect(attemptPayload.questions).toHaveLength(3);
       expect(JSON.stringify(attemptPayload)).not.toMatch(
         /correctAnswer|correctOption|correctOptionIds|hint|explanation/i,
@@ -63,6 +72,7 @@ describe('quiz manifest', () => {
       expect(new Set(attemptPayload.questions.map((question) => question.type))).toEqual(
         new Set(['single-choice', 'multiple-choice', 'true-false']),
       );
+      expect(manifest.questions.every((question) => !('activityId' in question))).toBe(true);
       expect(JSON.stringify(attemptPayload)).not.toMatch(
         /correctAnswer|correctOption|correctOptionIds|hint|explanation/i,
       );

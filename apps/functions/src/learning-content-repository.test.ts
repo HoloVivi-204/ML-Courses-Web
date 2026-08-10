@@ -154,6 +154,23 @@ describe('learning content repository', () => {
         { input: [1, 1], predictedOutput: 1, targetOutput: 1 },
       ],
     });
+    expect(demo.data).toMatchObject({
+      adapterVersion: 'perceptron-js-v1',
+      resultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      sourceIds: ['microsoft-ai-for-beginners', 'd2l-vi'],
+      visualFixture: {
+        hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        totalDurationMs: 12_000,
+        version: 'release-fixed-demo-visual-v1',
+      },
+    });
+    expect(
+      demo.data.steps.every(
+        (step) =>
+          typeof (step as typeof step & { durationMs?: unknown }).durationMs === 'number' &&
+          (step as typeof step & { durationMs: number }).durationMs === 3_000,
+      ),
+    ).toBe(true);
   });
 
   it('returns the twelve-block training and generalisation lesson only after post access is granted', async () => {
@@ -172,7 +189,7 @@ describe('learning content repository', () => {
       postQuizId: 'quiz-post-dl-p03',
       title: {
         en: 'How gradients and validation evidence guide training',
-        vi: 'Gradient và bằng chứng validation định hướng huấn luyện',
+        vi: 'Độ dốc (Gradient) và bằng chứng xác thực (validation) định hướng huấn luyện',
       },
     });
     expect(post.data.blocks).toHaveLength(12);
@@ -415,7 +432,7 @@ describe('learning content repository', () => {
       postQuizId: 'quiz-post-cml-p07',
       title: {
         en: 'Choose a classification metric from the error trade-off',
-        vi: 'Chọn metric phân loại từ đánh đổi lỗi',
+        vi: 'Chọn chỉ số đánh giá (metric) phân loại từ đánh đổi lỗi',
       },
     });
     expect(metricsPost.data.blocks).toHaveLength(10);

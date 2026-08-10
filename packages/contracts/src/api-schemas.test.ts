@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  adminContentDraftPatchRequestSchema,
   adminContentListQuerySchema,
   avatarUploadSessionRequestSchema,
   getPublishedLearnerContentDocumentId,
@@ -88,6 +89,18 @@ describe('Release 1 shared API schemas', () => {
         schemaVersion: 1,
       }),
     ).toMatchObject({ releaseId: 'release-1', schemaVersion: 1 });
+  });
+
+  it('allows an Admin course draft to select one stable trial post', () => {
+    expect(
+      adminContentDraftPatchRequestSchema.parse({
+        revisionVersion: 3,
+        trialPostId: 'cml-p01-problem-data-types',
+      }),
+    ).toEqual({
+      revisionVersion: 3,
+      trialPostId: 'cml-p01-problem-data-types',
+    });
   });
 
   it('uses one stable document-id contract for direct learner-content reads', () => {

@@ -80,6 +80,7 @@ export interface AdminContentSummary {
   sourceStatus: 'seeded';
   status: 'published' | 'unpublished';
   title: LocalizedText;
+  trialPostId?: string | null | undefined;
   validationManifest?: AdminContentValidationManifest | undefined;
   validationStatus: AdminContentValidationStatus;
 }
@@ -100,6 +101,7 @@ export interface AdminContentDraft {
   sourceStatus: 'seeded';
   status: 'draft';
   title: LocalizedText;
+  trialPostId?: string | null | undefined;
   validationManifest?: AdminContentValidationManifest | undefined;
   validationStatus: AdminContentValidationStatus;
 }
@@ -114,6 +116,7 @@ export interface AdminContentDraftPatch {
   metadata?: AdminContentMetadata | undefined;
   preview?: LocalizedText | undefined;
   title?: LocalizedText | undefined;
+  trialPostId?: string | null | undefined;
 }
 
 export interface UpdateAdminContentDraftInput {
@@ -361,6 +364,7 @@ const releaseOneAdminContent: readonly AdminContentSummary[] = [
       en: 'Deep Learning Basics',
       vi: 'Học sâu cơ bản',
     },
+    trialPostId: 'dl-p01-neuron-perceptron',
     validationStatus: 'not-run',
   },
   {
@@ -613,13 +617,19 @@ export function createDraftFromPublished(published: AdminContentSummary): AdminC
     sourceStatus: 'seeded',
     status: 'draft',
     title: { ...published.title },
+    ...(published.trialPostId !== undefined ? { trialPostId: published.trialPostId } : {}),
     validationManifest: cloneValidationManifest(published.validationManifest),
     validationStatus: 'not-run',
   };
 }
 
 export function hasDraftPatchValue(patch: AdminContentDraftPatch): boolean {
-  return patch.title !== undefined || patch.preview !== undefined || patch.metadata !== undefined;
+  return (
+    patch.title !== undefined ||
+    patch.preview !== undefined ||
+    patch.metadata !== undefined ||
+    patch.trialPostId !== undefined
+  );
 }
 
 export function applyDraftPatch(
@@ -639,6 +649,7 @@ export function applyDraftPatch(
     ...(patch.preview !== undefined ? { preview: { ...patch.preview } } : {}),
     revisionVersion: draft.revisionVersion + 1,
     ...(patch.title !== undefined ? { title: { ...patch.title } } : {}),
+    ...(patch.trialPostId !== undefined ? { trialPostId: patch.trialPostId } : {}),
     validationStatus: 'not-run',
   };
 }
@@ -773,6 +784,28 @@ function hasValidTaskFingerprintRegistry(content: readonly AdminContentSummary[]
   );
 }
 
+function hasValidCourseTrialPostRegistry(content: readonly AdminContentSummary[]): boolean {
+  const courses = content.filter((item) => item.entityType === 'course');
+
+  return courses.every((course) => {
+    const trialPostId = course.trialPostId;
+
+    if (trialPostId === undefined) {
+      return true;
+    }
+
+    return (
+      typeof trialPostId === 'string' &&
+      content.some(
+        (item) =>
+          item.entityType === 'post' &&
+          item.courseId === course.courseId &&
+          item.entityId === trialPostId,
+      )
+    );
+  });
+}
+
 function createValidationChecks(input: {
   draft: AdminContentDraft;
   publishCandidateContent: readonly AdminContentSummary[];
@@ -834,6 +867,14 @@ function createValidationChecks(input: {
       isPassed: hasValidTaskFingerprintRegistry(publishCandidateContent),
       message: 'Example and quiz task fingerprints must be present and unique.',
     }),
+    createValidationCheck({
+      checkId: 'trial-post-configuration',
+      isPassed:
+        (draft.entityType === 'course' || draft.trialPostId === undefined) &&
+        hasValidCourseTrialPostRegistry(publishCandidateContent),
+      message:
+        'Each course must select exactly one post from that course as its Admin-configured trial post.',
+    }),
   ];
 }
 
@@ -882,6 +923,7 @@ export function createPublishedContentFromDraft(input: {
     sourceStatus: input.draft.sourceStatus,
     status: 'published',
     title: { ...input.draft.title },
+    ...(input.draft.trialPostId !== undefined ? { trialPostId: input.draft.trialPostId } : {}),
     validationManifest: cloneValidationManifest(input.draft.validationManifest),
     validationStatus: 'valid',
   };

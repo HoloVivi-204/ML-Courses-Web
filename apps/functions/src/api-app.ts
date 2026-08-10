@@ -470,7 +470,13 @@ function getAdminContentDraftPatchBody(request: Request): {
   revisionVersion: number;
 } {
   const body = getObjectBody(request);
-  assertBodyFieldsAllowlisted(body, ['revisionVersion', 'title', 'preview', 'metadata']);
+  assertBodyFieldsAllowlisted(body, [
+    'revisionVersion',
+    'title',
+    'preview',
+    'metadata',
+    'trialPostId',
+  ]);
 
   const title = getOptionalLocalizedTextBodyField(body, 'title', 160);
   const preview = getOptionalLocalizedTextBodyField(body, 'preview', 600);
@@ -487,6 +493,13 @@ function getAdminContentDraftPatchBody(request: Request): {
 
   if (metadata !== undefined) {
     patch.metadata = metadata;
+  }
+
+  if (body.trialPostId !== undefined) {
+    patch.trialPostId =
+      body.trialPostId === null
+        ? null
+        : getTrimmedStringValue(body.trialPostId, 'trialPostId', 160);
   }
 
   return {

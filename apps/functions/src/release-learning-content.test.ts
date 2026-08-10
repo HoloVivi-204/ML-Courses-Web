@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { getFixedDemo } from './release-demo-content.js';
 import { getReadablePost } from './release-learning-content.js';
 import { getReleaseLearningCatalog } from './release-learning-catalog.js';
-import { getQuizManifest } from './quiz-manifest.js';
+import { getQuizManifest, getReleaseQuizManifests } from './quiz-manifest.js';
 
 describe('Release 1 protected learning content', () => {
   it('serves every learning unit from local data when source network access is unavailable', () => {
@@ -125,6 +125,69 @@ describe('Release 1 protected learning content', () => {
         expect(step.textAlternative.vi.trim()).not.toHaveLength(0);
       }
     }
+  });
+
+  it('attaches deterministic proof and semantic fingerprints to every baseline demo and quiz', () => {
+    const catalog = getReleaseLearningCatalog();
+    const posts = catalog.courses.flatMap((course) =>
+      course.modules.flatMap((module) =>
+        module.posts.map((post) => getReadablePost(course.courseId, post.postId, true)!),
+      ),
+    );
+    const demos = catalog.courses.flatMap((course) =>
+      course.modules
+        .map((module) => module.demoId)
+        .filter((demoId): demoId is string => demoId !== null)
+        .map((demoId) => getFixedDemo(demoId)!),
+    );
+    const quizzes = getReleaseQuizManifests();
+    const questions = quizzes.flatMap((quiz) => quiz.questions);
+
+    expect(posts).toHaveLength(18);
+    expect(demos).toHaveLength(10);
+    expect(quizzes).toHaveLength(30);
+    expect(questions).toHaveLength(126);
+
+    expect(posts.every((post) => /^[a-f0-9]{64}$/.test(post.taskFingerprint))).toBe(true);
+
+    for (const demo of demos) {
+      const proof = demo as typeof demo & {
+        adapterVersion?: unknown;
+        resultHash?: unknown;
+        sourceIds?: unknown;
+        visualFixture?: { hash?: unknown; totalDurationMs?: unknown } | undefined;
+      };
+
+      expect(proof.adapterVersion).toMatch(/^[a-z0-9-]+-v\d+$/);
+      expect(proof.resultHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(proof.sourceIds).toEqual(expect.arrayContaining([expect.any(String)]));
+      expect(proof.visualFixture?.hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(proof.visualFixture?.totalDurationMs).toEqual(expect.any(Number));
+      expect(demo.taskFingerprint).toMatch(/^[a-f0-9]{64}$/);
+      expect(
+        demo.steps.every(
+          (step) =>
+            typeof (step as typeof step & { durationMs?: unknown }).durationMs === 'number' &&
+            (step as typeof step & { durationMs: number }).durationMs > 0,
+        ),
+      ).toBe(true);
+    }
+
+    const manifestFingerprints = quizzes.map(
+      (quiz) => (quiz as typeof quiz & { taskFingerprint?: unknown }).taskFingerprint,
+    );
+    const questionFingerprints = questions.map(
+      (question) => (question as typeof question & { taskFingerprint?: unknown }).taskFingerprint,
+    );
+
+    expect(
+      manifestFingerprints.every((fingerprint) => /^[a-f0-9]{64}$/.test(String(fingerprint))),
+    ).toBe(true);
+    expect(
+      questionFingerprints.every((fingerprint) => /^[a-f0-9]{64}$/.test(String(fingerprint))),
+    ).toBe(true);
+    expect(new Set(manifestFingerprints).size).toBe(30);
+    expect(new Set(questionFingerprints).size).toBe(126);
   });
 
   it('pins the dl-m01 learning batch to the source snapshots used for its prose, demo, and quizzes', () => {

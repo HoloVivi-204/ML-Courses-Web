@@ -13,6 +13,14 @@ describe('Release 1 Firestore Admin content seed', () => {
     expect(content.filter((item) => item.entityType === 'post')).toHaveLength(18);
     expect(content.filter((item) => item.entityType === 'demo')).toHaveLength(10);
     expect(content.filter((item) => item.entityType === 'quiz')).toHaveLength(30);
+    expect(
+      content
+        .filter((item) => item.entityType === 'course')
+        .map((item) => ({ courseId: item.courseId, trialPostId: item.trialPostId })),
+    ).toEqual([
+      { courseId: 'course-classical-ml', trialPostId: 'cml-p01-problem-data-types' },
+      { courseId: 'course-deep-learning-basic', trialPostId: 'dl-p01-neuron-perceptron' },
+    ]);
 
     const postSeed = seed.find(
       (record) =>
@@ -40,6 +48,14 @@ describe('Release 1 Firestore Admin content seed', () => {
         revisionId: 'demo-perceptron-and-gate-rev-r1',
       },
     });
+
+    const taskFingerprints = content.flatMap(
+      (item) => item.validationManifest?.taskFingerprints ?? [],
+    );
+
+    expect(taskFingerprints).toHaveLength(154);
+    expect(taskFingerprints.every((fingerprint) => /^[a-f0-9]{64}$/.test(fingerprint))).toBe(true);
+    expect(new Set(taskFingerprints).size).toBe(154);
   });
 
   it('creates a validation candidate that stays within every locked Release 1 limit', async () => {

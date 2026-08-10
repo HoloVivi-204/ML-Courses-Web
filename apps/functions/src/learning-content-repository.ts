@@ -30,6 +30,7 @@ export interface LearnerPostContent {
 }
 
 export interface LearnerDemoContent {
+  adapterVersion?: string;
   algorithmId: string;
   courseId: string;
   demoId: string;
@@ -37,9 +38,12 @@ export interface LearnerDemoContent {
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
+  resultHash?: string;
   revisionId: string;
   seed: number;
+  sourceIds?: readonly string[];
   steps: readonly {
+    durationMs?: number;
     id: string;
     narration: { en: string; vi: string };
     required: boolean;
@@ -47,6 +51,7 @@ export interface LearnerDemoContent {
     title: { en: string; vi: string };
   }[];
   title: { en: string; vi: string };
+  visualFixture?: FixedDemoManifest['visualFixture'];
   visualization: FixedDemoVisualization;
 }
 
@@ -117,6 +122,7 @@ function toLearnerPostContent(post: TrialPost): LearnerPostContent {
 
 function toLearnerDemoContent(demo: FixedDemoManifest): LearnerDemoContent {
   return {
+    adapterVersion: demo.adapterVersion,
     algorithmId: demo.algorithmId,
     courseId: demo.courseId,
     demoId: demo.demoId,
@@ -124,10 +130,13 @@ function toLearnerDemoContent(demo: FixedDemoManifest): LearnerDemoContent {
     moduleId: demo.moduleId,
     problemId: demo.problemId,
     requiredStepIds: demo.requiredStepIds,
+    resultHash: demo.resultHash,
     revisionId: demo.revisionId,
     seed: demo.seed,
+    sourceIds: demo.sourceIds,
     steps: demo.steps,
     title: demo.title,
+    visualFixture: demo.visualFixture,
     visualization: demo.visualization,
   };
 }

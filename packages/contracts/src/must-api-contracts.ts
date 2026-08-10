@@ -280,6 +280,7 @@ export const adminContentSummarySchema = z
     sourceStatus: z.literal('seeded'),
     status: z.enum(['published', 'unpublished']),
     title: localizedTextSchema,
+    trialPostId: stableIdSchema.nullable().optional(),
     validationManifest: adminContentValidationManifestSchema.optional(),
     validationStatus: z.enum(['not-run', 'valid']),
   })
@@ -305,6 +306,7 @@ export const adminContentDraftSchema = z
     sourceStatus: z.literal('seeded'),
     status: z.literal('draft'),
     title: localizedTextSchema,
+    trialPostId: stableIdSchema.nullable().optional(),
     validationManifest: adminContentValidationManifestSchema.optional(),
     validationStatus: z.enum(['not-run', 'valid']),
   })

@@ -268,6 +268,7 @@ export const learnerFullPostContentSchema = learnerPostContentSchema.extend({
 
 export const learnerDemoContentSchema = z
   .object({
+    adapterVersion: stableIdSchema.optional(),
     algorithmId: stableIdSchema,
     courseId: stableIdSchema,
     demoId: stableIdSchema,
@@ -302,12 +303,23 @@ export const learnerDemoContentSchema = z
     moduleId: stableIdSchema,
     problemId: stableIdSchema,
     requiredStepIds: z.array(stableIdSchema).min(1).max(100),
+    resultHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     revisionId: stableIdSchema,
     seed: z.number().int().min(0).max(2_147_483_647),
+    sourceIds: z.array(stableIdSchema).min(1).max(100).optional(),
     steps: z
       .array(
         z
           .object({
+            durationMs: z
+              .number()
+              .int()
+              .min(1)
+              .max(10 * 60 * 1_000)
+              .optional(),
             id: stableIdSchema,
             narration: localizedTextSchema,
             required: z.boolean(),
@@ -319,6 +331,18 @@ export const learnerDemoContentSchema = z
       .min(1)
       .max(100),
     title: localizedTextSchema,
+    visualFixture: z
+      .object({
+        hash: z.string().regex(/^[a-f0-9]{64}$/),
+        totalDurationMs: z
+          .number()
+          .int()
+          .min(1)
+          .max(60 * 60 * 1_000),
+        version: z.literal('release-fixed-demo-visual-v1'),
+      })
+      .strict()
+      .optional(),
     visualization: z
       .object({
         boundary: z
@@ -614,11 +638,15 @@ export const adminContentDraftPatchRequestSchema = z
     preview: localizedTextSchema.optional(),
     revisionVersion: z.number().int().min(1),
     title: localizedTextSchema.optional(),
+    trialPostId: stableIdSchema.nullable().optional(),
   })
   .strict()
   .refine(
     (input) =>
-      input.metadata !== undefined || input.preview !== undefined || input.title !== undefined,
+      input.metadata !== undefined ||
+      input.preview !== undefined ||
+      input.title !== undefined ||
+      input.trialPostId !== undefined,
     { message: 'At least one draft field must be provided.' },
   );
 

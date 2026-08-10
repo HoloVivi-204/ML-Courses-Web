@@ -14,6 +14,7 @@ import {
   type ReleaseLearningPost,
 } from './release-learning-catalog.js';
 import { getReadablePost, getTrialPost, type TrialPost } from './release-learning-content.js';
+import { getQuizManifest } from './quiz-manifest.js';
 
 function copyForFirestore<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -75,6 +76,7 @@ function createSummary(input: {
   publishedRevisionId: string;
   sourceReview: AdminContentSourceReview;
   title: { en: string; vi: string };
+  trialPostId?: string | undefined;
   validationManifest?: AdminContentSummary['validationManifest'];
 }): AdminContentSummary {
   return {
@@ -93,6 +95,7 @@ function createSummary(input: {
     sourceStatus: 'seeded',
     status: 'published',
     title: { ...input.title },
+    ...(input.trialPostId ? { trialPostId: input.trialPostId } : {}),
     ...(input.validationManifest ? { validationManifest: input.validationManifest } : {}),
     validationStatus: 'not-run',
   };
@@ -127,6 +130,7 @@ function toLearnerPostContent(post: TrialPost, revisionId: string): LearnerPostC
 
 function toLearnerDemoContent(demo: FixedDemoManifest): LearnerDemoContent {
   return copyForFirestore({
+    adapterVersion: demo.adapterVersion,
     algorithmId: demo.algorithmId,
     courseId: demo.courseId,
     demoId: demo.demoId,
@@ -134,10 +138,13 @@ function toLearnerDemoContent(demo: FixedDemoManifest): LearnerDemoContent {
     moduleId: demo.moduleId,
     problemId: demo.problemId,
     requiredStepIds: demo.requiredStepIds,
+    resultHash: demo.resultHash,
     revisionId: demo.revisionId,
     seed: demo.seed,
+    sourceIds: demo.sourceIds,
     steps: demo.steps,
     title: demo.title,
+    visualFixture: demo.visualFixture,
     visualization: demo.visualization,
   });
 }
@@ -194,7 +201,7 @@ function createPostSeed(input: {
       title: fullPost.title,
       validationManifest: {
         blockCount: fullPost.blocks.length,
-        taskFingerprints: [`tf-${input.post.postId}-example-v1`],
+        taskFingerprints: [fullPost.taskFingerprint],
       },
     }),
     learnerContent,
@@ -232,7 +239,10 @@ function createDemoSeed(input: {
       publishedRevisionId: demo.revisionId,
       sourceReview,
       title: demo.title,
-      validationManifest: { problemId: demo.problemId },
+      validationManifest: {
+        problemId: demo.problemId,
+        taskFingerprints: [demo.taskFingerprint],
+      },
     }),
     learnerContent: {
       contentType: 'demo',
@@ -246,7 +256,12 @@ function createModuleQuizSeed(input: {
   module: ReleaseLearningModule;
   sourceReview: AdminContentSourceReview;
 }): FirestoreAdminContentSeed {
-  const questionCount = input.module.moduleQuizQuestionCount;
+  const quiz = getQuizManifest(input.module.moduleQuizId);
+  const questionCount = quiz.questions.length;
+
+  if (questionCount !== input.module.moduleQuizQuestionCount) {
+    throw new Error(`Module quiz ${quiz.quizId} does not match the locked question count.`);
+  }
 
   return {
     content: createSummary({
@@ -266,10 +281,7 @@ function createModuleQuizSeed(input: {
       },
       validationManifest: {
         questionCount,
-        taskFingerprints: Array.from(
-          { length: questionCount },
-          (_, index) => `tf-${input.module.moduleQuizId}-${index + 1}-v1`,
-        ),
+        taskFingerprints: quiz.questions.map((question) => question.taskFingerprint),
       },
     }),
   };
@@ -281,7 +293,12 @@ function createPostQuizSeed(input: {
   post: ReleaseLearningPost;
   sourceReview: AdminContentSourceReview;
 }): FirestoreAdminContentSeed {
-  const questionCount = 3;
+  const quiz = getQuizManifest(input.post.postQuizId);
+  const questionCount = quiz.questions.length;
+
+  if (questionCount !== 3) {
+    throw new Error(`Post quiz ${quiz.quizId} must contain exactly three questions.`);
+  }
 
   return {
     content: createSummary({
@@ -302,10 +319,7 @@ function createPostQuizSeed(input: {
       },
       validationManifest: {
         questionCount,
-        taskFingerprints: Array.from(
-          { length: questionCount },
-          (_, index) => `tf-${input.post.postQuizId}-${index + 1}-v1`,
-        ),
+        taskFingerprints: quiz.questions.map((question) => question.taskFingerprint),
       },
     }),
   };
@@ -334,6 +348,7 @@ export function createReleaseOneFirestoreAdminContentSeed(): readonly FirestoreA
         publishedRevisionId: course.courseRevisionId,
         sourceReview: courseSourceReview,
         title: course.title,
+        trialPostId: course.trialPostId,
       }),
     });
 

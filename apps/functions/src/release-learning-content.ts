@@ -1,4 +1,6 @@
-import { getReleaseLearningCatalog, type LocalizedText } from './release-learning-catalog.js';
+import { createHash } from 'node:crypto';
+
+import { type LocalizedText } from './release-learning-catalog.js';
 import {
   cmlM01SourceTrace,
   cmlM02SourceTrace,
@@ -4724,336 +4726,130 @@ const fullLessonPosts: readonly TrialPost[] = [
   },
 ];
 
-interface PostDraftDefinition {
-  concept: LocalizedText;
-  examplePrompt: LocalizedText;
-  learningObjective: LocalizedText;
-  taskFingerprint: string;
-  title: LocalizedText;
+export const vietnameseFirstUseTerminology = [
+  { english: 'learning rate', vietnamese: 'tốc độ học' },
+  { english: 'underfitting', vietnamese: 'thiếu khớp' },
+  { english: 'overfitting', vietnamese: 'quá khớp' },
+  { english: 'regularization', vietnamese: 'điều chuẩn' },
+  { english: 'classification', vietnamese: 'phân loại' },
+  { english: 'clustering', vietnamese: 'phân cụm' },
+  { english: 'regression', vietnamese: 'hồi quy' },
+  { english: 'validation', vietnamese: 'xác thực' },
+  { english: 'activation', vietnamese: 'hàm kích hoạt' },
+  { english: 'precision', vietnamese: 'độ chính xác dương' },
+  { english: 'threshold', vietnamese: 'ngưỡng' },
+  { english: 'residual', vietnamese: 'phần dư' },
+  { english: 'accuracy', vietnamese: 'độ chính xác' },
+  { english: 'gradient', vietnamese: 'độ dốc' },
+  { english: 'dataset', vietnamese: 'tập dữ liệu' },
+  { english: 'feature', vietnamese: 'đặc trưng' },
+  { english: 'metric', vietnamese: 'chỉ số đánh giá' },
+  { english: 'recall', vietnamese: 'độ bao phủ' },
+  { english: 'epoch', vietnamese: 'chu kỳ huấn luyện' },
+  { english: 'train', vietnamese: 'huấn luyện' },
+  { english: 'test', vietnamese: 'kiểm tra' },
+  { english: 'loss', vietnamese: 'hàm mất mát' },
+] as const;
+
+function escapeRegularExpression(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const postDraftDefinitions: Readonly<Record<string, PostDraftDefinition>> = {};
+function annotateFirstVietnameseTerminology(text: string, usedTerms: Set<string>): string {
+  let annotatedText = text;
 
-function getPostDraftDefinition(postId: string): PostDraftDefinition {
-  const definition = postDraftDefinitions[postId];
+  for (const term of vietnameseFirstUseTerminology) {
+    if (usedTerms.has(term.english)) {
+      continue;
+    }
 
-  if (!definition) {
-    throw new Error(`Missing draft content definition for ${postId}.`);
+    const expression = new RegExp(`\\b${escapeRegularExpression(term.english)}\\b`, 'i');
+    const match = expression.exec(annotatedText);
+
+    if (!match) {
+      continue;
+    }
+
+    const matchedTerm = match[0];
+    const translatedTerm =
+      match.index === 0
+        ? `${term.vietnamese[0]?.toLocaleUpperCase('vi-VN') ?? ''}${term.vietnamese.slice(1)}`
+        : term.vietnamese;
+    annotatedText = `${annotatedText.slice(0, match.index)}${translatedTerm} (${matchedTerm})${annotatedText.slice(match.index + matchedTerm.length)}`;
+    usedTerms.add(term.english);
   }
 
-  return definition;
+  return annotatedText;
 }
 
-function createPostQuizId(postId: string) {
-  const stablePrefix = /^(cml|dl)-p\d{2}/.exec(postId)?.[0];
-
-  return stablePrefix ? `quiz-post-${stablePrefix}` : `quiz-post-${postId}`;
-}
-
-function createGenericBlocks(input: {
-  moduleTitle: LocalizedText;
-  postId: string;
-  title: LocalizedText;
-}): readonly LearningContentBlock[] {
-  const defaults = {
-    accessibility: { en: null, vi: null },
-    activityId: null,
-    assetIds: [],
-    postId: input.postId,
-    required: true,
-    schemaVersion: 1,
-    sourceIds: [],
-  } as const;
-
-  return [
-    {
-      ...defaults,
-      id: `${input.postId}-goal`,
-      locales: {
-        en: {
-          lede:
-            'This draft lesson focuses on one inspectable modelling decision before the ' +
-            'Playground task.',
-          navigationTitle: 'Learning goal',
-          title: input.title.en,
-        },
-        vi: {
-          lede:
-            'Bài học draft này tập trung vào một quyết định mô hình hóa có thể kiểm tra ' +
-            'trước nhiệm vụ Playground.',
-          navigationTitle: 'Mục tiêu học',
-          title: input.title.vi,
-        },
-      },
-      order: 1,
-      type: 'heading',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-model-check`,
-      locales: {
-        en: {
-          markdown:
-            `In **${input.moduleTitle.en}**, start from the data question, name the feature ` +
-            'signal, then choose the metric before reading the model output.',
-        },
-        vi: {
-          markdown:
-            `Trong **${input.moduleTitle.vi}**, hãy bắt đầu từ câu hỏi dữ liệu, nêu tín hiệu ` +
-            'feature, rồi chọn metric trước khi đọc đầu ra mô hình.',
-        },
-      },
-      order: 2,
-      type: 'markdown',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-draft-status`,
-      locales: {
-        en: {
-          body:
-            'This submission unit is draft learning content. External source, license and ' +
-            'instructor review evidence is still pending operator review.',
-          title: 'Draft status',
-        },
-        vi: {
-          body:
-            'Learning unit cho bản nộp này đang ở trạng thái draft. Bằng chứng nguồn, ' +
-            'license và review học thuật vẫn chờ operator xác nhận.',
-          title: 'Trạng thái draft',
-        },
-      },
-      order: 3,
-      type: 'callout',
-      variant: 'insight',
-    },
-    {
-      ...defaults,
-      activityId: `act-${input.postId}-example`,
-      id: `${input.postId}-example`,
-      locales: {
-        en: { navigationTitle: 'Inspect a small example' },
-        vi: { navigationTitle: 'Quan sát ví dụ nhỏ' },
-      },
-      order: 4,
-      type: 'example',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-quiz-prep`,
-      locales: {
-        en: {
-          markdown:
-            'Before the quiz, explain cause and effect in one sentence: what input signal ' +
-            'changes, what model decision follows, and which metric would reveal a mistake.',
-        },
-        vi: {
-          markdown:
-            'Trước quiz, hãy giải thích nhân quả bằng một câu: tín hiệu đầu vào nào đổi, ' +
-            'quyết định mô hình nào theo sau, và metric nào sẽ phát hiện lỗi.',
-        },
-      },
-      order: 5,
-      type: 'markdown',
-    },
-  ] satisfies readonly LearningContentBlock[];
-}
-
-function createDraftBlocks(input: {
-  definition: PostDraftDefinition;
-  moduleTitle: LocalizedText;
-  postId: string;
-  provenance: DraftProvenance;
-}): readonly LearningContentBlock[] {
-  const defaults = {
-    accessibility: { en: null, vi: null },
-    activityId: null,
-    assetIds: [],
-    postId: input.postId,
-    required: true,
-    schemaVersion: 1,
-    sourceIds: [],
-  } as const;
-  const example = createGenericBlocks({
-    moduleTitle: input.moduleTitle,
-    postId: input.postId,
-    title: input.definition.title,
-  }).find((block) => block.type === 'example');
-
-  if (!example) {
-    throw new Error(`Missing stable example block for ${input.postId}.`);
+function annotateVietnameseLocaleValue(value: unknown, usedTerms: Set<string>): unknown {
+  if (typeof value === 'string') {
+    return annotateFirstVietnameseTerminology(value, usedTerms);
   }
 
-  return [
-    {
-      ...defaults,
-      id: `${input.postId}-goal`,
-      locales: {
-        en: {
-          lede: input.definition.learningObjective.en,
-          navigationTitle: 'Learning goal',
-          title: input.definition.title.en,
-        },
-        vi: {
-          lede: input.definition.learningObjective.vi,
-          navigationTitle: 'Mục tiêu học',
-          title: input.definition.title.vi,
-        },
-      },
-      order: 1,
-      type: 'heading',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-concept`,
-      locales: {
-        en: { markdown: input.definition.concept.en },
-        vi: { markdown: input.definition.concept.vi },
-      },
-      order: 2,
-      type: 'markdown',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-cause-effect`,
-      locales: {
-        en: {
-          body: 'State the changed evidence, the resulting model behaviour, and the observation that would challenge that behaviour.',
-          title: 'Reason from cause to effect',
-        },
-        vi: {
-          body: 'Hãy nêu bằng chứng thay đổi, hành vi mô hình theo sau và quan sát nào sẽ thách thức hành vi đó.',
-          title: 'Suy luận từ nguyên nhân đến kết quả',
-        },
-      },
-      order: 3,
-      type: 'callout',
-      variant: 'insight',
-    },
-    { ...example, order: 4 },
-    {
-      ...defaults,
-      id: `${input.postId}-example-prompt`,
-      locales: {
-        en: { markdown: input.definition.examplePrompt.en },
-        vi: { markdown: input.definition.examplePrompt.vi },
-      },
-      order: 5,
-      type: 'markdown',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-provenance`,
-      locales: {
-        en: {
-          body:
-            `Candidate source IDs: ${input.provenance.candidateSourceIds.join(', ')}. ` +
-            'This is draft-only content; license, provenance, and content-review evidence have not been collected or approved.',
-          title: 'Draft provenance status',
-        },
-        vi: {
-          body:
-            `ID nguồn ứng viên: ${input.provenance.candidateSourceIds.join(', ')}. ` +
-            'Đây chỉ là nội dung draft; bằng chứng license, provenance và review nội dung chưa được thu thập hoặc phê duyệt.',
-          title: 'Trạng thái provenance của draft',
-        },
-      },
-      order: 6,
-      sourceIds: input.provenance.candidateSourceIds,
-      type: 'callout',
-      variant: 'insight',
-    },
-    {
-      ...defaults,
-      id: `${input.postId}-quiz-prep`,
-      locales: {
-        en: {
-          markdown: `Before the quiz, explain one decision from **${input.definition.title.en}** without copying a Playground configuration or claiming an externally reviewed source.`,
-        },
-        vi: {
-          markdown: `Trước quiz, hãy giải thích một quyết định từ **${input.definition.title.vi}** mà không sao chép cấu hình Playground hoặc tuyên bố có nguồn đã được review bên ngoài.`,
-        },
-      },
-      order: 7,
-      type: 'markdown',
-    },
-  ] satisfies readonly LearningContentBlock[];
+  if (Array.isArray(value)) {
+    return value.map((item) => annotateVietnameseLocaleValue(item, usedTerms));
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        annotateVietnameseLocaleValue(nestedValue, usedTerms),
+      ]),
+    );
+  }
+
+  return value;
 }
 
-function createGeneratedPost(input: {
-  accessLevel: 'full' | 'trial';
-  courseId: string;
-  durationMinutes: number;
-  moduleId: string;
-  moduleTitle: LocalizedText;
-  postId: string;
-}): TrialPost {
-  const definition = getPostDraftDefinition(input.postId);
-  const provenance = createDraftProvenance(input.courseId);
-  const title = definition.title;
+function createPostTaskFingerprint(post: TrialPost): string {
+  const canonicalPayload = {
+    fingerprintSchemaVersion: 1,
+    contextId: `${post.courseId}:${post.moduleId}:${post.id}`,
+    datasetId: null,
+    taskType: 'lesson-post',
+    learningObjectiveId: post.taskFingerprint.trim(),
+    expectedReasoningType: `post-quiz:${post.postQuizId}`,
+  };
+
+  return createHash('sha256').update(JSON.stringify(canonicalPayload)).digest('hex');
+}
+
+function localizeFirstUseTerminology(post: TrialPost): TrialPost {
+  const usedTerms = new Set<string>();
+  const title = {
+    ...post.title,
+    vi: annotateFirstVietnameseTerminology(post.title.vi, usedTerms),
+  };
+  const description = {
+    ...post.description,
+    vi: annotateFirstVietnameseTerminology(post.description.vi, usedTerms),
+  };
+  const learningObjective = {
+    ...post.learningObjective,
+    vi: annotateFirstVietnameseTerminology(post.learningObjective.vi, usedTerms),
+  };
+  const blocks = post.blocks.map((block) => ({
+    ...block,
+    locales: {
+      ...block.locales,
+      vi: annotateVietnameseLocaleValue(block.locales.vi, usedTerms) as Record<string, unknown>,
+    },
+  }));
 
   return {
-    accessLevel: input.accessLevel,
-    blocks: createDraftBlocks({
-      definition,
-      moduleTitle: input.moduleTitle,
-      postId: input.postId,
-      provenance,
-    }),
-    courseId: input.courseId,
-    description: definition.learningObjective,
-    durationMinutes: input.durationMinutes,
-    id: input.postId,
-    learningObjective: definition.learningObjective,
-    moduleId: input.moduleId,
-    postQuizId: createPostQuizId(input.postId),
-    provenance,
-    sourceReviewStatus: 'pending-operator-review',
-    taskFingerprint: definition.taskFingerprint,
+    ...post,
+    blocks,
+    description,
+    learningObjective,
+    taskFingerprint: createPostTaskFingerprint(post),
     title,
   };
 }
 
-const handAuthoredFullPostIds = new Set(fullLessonPosts.map((post) => post.id));
-const trialPostIdByCourseId = new Map([
-  ['course-classical-ml', 'cml-p01-problem-data-types'],
-  ['course-deep-learning-basic', TRIAL_POST_ID],
-]);
-const generatedFullLessonPosts = getReleaseLearningCatalog().courses.flatMap((course) =>
-  course.modules.flatMap((module) =>
-    module.posts
-      .filter((post) => !handAuthoredFullPostIds.has(post.postId))
-      .map((post) =>
-        createGeneratedPost({
-          accessLevel: 'full',
-          courseId: course.courseId,
-          durationMinutes: post.estimatedMinutes,
-          moduleId: module.moduleId,
-          moduleTitle: module.title,
-          postId: post.postId,
-        }),
-      ),
-  ),
-);
-const generatedTrialPosts = getReleaseLearningCatalog().courses.flatMap((course) =>
-  course.modules.flatMap((module) =>
-    module.posts
-      .filter((post) => trialPostIdByCourseId.get(course.courseId) === post.postId)
-      .filter((post) => !trialPosts.some((trialPost) => trialPost.id === post.postId))
-      .map((post) =>
-        createGeneratedPost({
-          accessLevel: 'trial',
-          courseId: course.courseId,
-          durationMinutes: Math.min(10, post.estimatedMinutes),
-          moduleId: module.moduleId,
-          moduleTitle: module.title,
-          postId: post.postId,
-        }),
-      ),
-  ),
-);
-const releaseTrialPosts = [...trialPosts, ...generatedTrialPosts] as const;
-const releaseFullLessonPosts = [...fullLessonPosts, ...generatedFullLessonPosts] as const;
+const releaseTrialPosts = trialPosts.map(localizeFirstUseTerminology);
+const releaseFullLessonPosts = fullLessonPosts.map(localizeFirstUseTerminology);
 
 export function getTrialPost(courseId: string | undefined, postId: string | undefined) {
   return releaseTrialPosts.find((post) => post.courseId === courseId && post.id === postId);

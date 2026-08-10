@@ -1,8 +1,6 @@
-import {
-  getReleaseLearningCatalog,
-  type LocalizedText,
-  type ReleaseLearningModule,
-} from './release-learning-catalog.js';
+import { createHash } from 'node:crypto';
+
+import { type LocalizedText } from './release-learning-catalog.js';
 import {
   cmlM02SourceTrace,
   cmlM03SourceTrace,
@@ -103,6 +101,7 @@ const cmlM09PcaDemoDraftProvenance = {
 } as const satisfies DraftProvenance;
 
 export interface DemoStep {
+  durationMs: number;
   id: string;
   narration: LocalizedText;
   required: boolean;
@@ -139,6 +138,7 @@ export interface FixedDemoRun {
 }
 
 export interface FixedDemoManifest {
+  adapterVersion: string;
   algorithmId: string;
   courseId: string;
   demoId: string;
@@ -148,15 +148,29 @@ export interface FixedDemoManifest {
   moduleId: string;
   problemId: string;
   requiredStepIds: readonly string[];
+  resultHash: string;
   revisionId: string;
   seed: number;
+  sourceIds: readonly string[];
   steps: readonly DemoStep[];
-  taskFingerprint?: string;
+  taskFingerprint: string;
   title: LocalizedText;
+  visualFixture: {
+    hash: string;
+    totalDurationMs: number;
+    version: 'release-fixed-demo-visual-v1';
+  };
   visualization: FixedDemoVisualization;
 }
 
-export const andGateDemo: FixedDemoManifest = {
+type FixedDemoDraft = Omit<
+  FixedDemoManifest,
+  'adapterVersion' | 'resultHash' | 'sourceIds' | 'steps' | 'visualFixture'
+> & {
+  steps: readonly Omit<DemoStep, 'durationMs'>[];
+};
+
+const andGateDemo: FixedDemoDraft = {
   algorithmId: 'perceptron',
   courseId: 'course-deep-learning-basic',
   demoId: 'demo-perceptron-and-gate',
@@ -275,7 +289,7 @@ export const andGateDemo: FixedDemoManifest = {
   ],
 };
 
-export const mlpCheckerboardDemo: FixedDemoManifest = {
+const mlpCheckerboardDemo: FixedDemoDraft = {
   algorithmId: 'mlp',
   courseId: 'course-deep-learning-basic',
   demoId: 'demo-mlp-checkerboard',
@@ -403,7 +417,7 @@ export const mlpCheckerboardDemo: FixedDemoManifest = {
   },
 };
 
-export const linearCalibrationDemo: FixedDemoManifest = {
+const linearCalibrationDemo: FixedDemoDraft = {
   algorithmId: 'linear-regression',
   courseId: 'course-classical-ml',
   demoId: 'demo-linear-calibration',
@@ -519,7 +533,7 @@ export const linearCalibrationDemo: FixedDemoManifest = {
   },
 };
 
-export const regularizationNoisySignalDemo: FixedDemoManifest = {
+const regularizationNoisySignalDemo: FixedDemoDraft = {
   algorithmId: 'ridge-regression',
   courseId: 'course-classical-ml',
   demoId: 'demo-regularization-noisy-signal',
@@ -646,7 +660,7 @@ export const regularizationNoisySignalDemo: FixedDemoManifest = {
   },
 };
 
-export const logisticAdmissionDemo: FixedDemoManifest = {
+const logisticAdmissionDemo: FixedDemoDraft = {
   algorithmId: 'logistic-regression',
   courseId: 'course-classical-ml',
   demoId: 'demo-logistic-admission',
@@ -770,7 +784,7 @@ export const logisticAdmissionDemo: FixedDemoManifest = {
   },
 };
 
-export const neighborFlowerDemo: FixedDemoManifest = {
+const neighborFlowerDemo: FixedDemoDraft = {
   algorithmId: 'knn',
   courseId: 'course-classical-ml',
   demoId: 'demo-neighbor-flower',
@@ -889,7 +903,7 @@ export const neighborFlowerDemo: FixedDemoManifest = {
   },
 };
 
-export const treeForestHabitatDemo: FixedDemoManifest = {
+const treeForestHabitatDemo: FixedDemoDraft = {
   algorithmId: 'decision-tree',
   courseId: 'course-classical-ml',
   demoId: 'demo-tree-forest-habitat',
@@ -1011,7 +1025,7 @@ export const treeForestHabitatDemo: FixedDemoManifest = {
   },
 };
 
-export const svmMarginDemo: FixedDemoManifest = {
+const svmMarginDemo: FixedDemoDraft = {
   algorithmId: 'svm',
   courseId: 'course-classical-ml',
   demoId: 'demo-svm-margin',
@@ -1142,7 +1156,7 @@ export const svmMarginDemo: FixedDemoManifest = {
   },
 };
 
-export const stellarClustersDemo: FixedDemoManifest = {
+const stellarClustersDemo: FixedDemoDraft = {
   algorithmId: 'kmeans',
   courseId: 'course-classical-ml',
   demoId: 'demo-stellar-clusters',
@@ -1261,7 +1275,7 @@ export const stellarClustersDemo: FixedDemoManifest = {
   },
 };
 
-export const pcaSensorCompressionDemo: FixedDemoManifest = {
+const pcaSensorCompressionDemo: FixedDemoDraft = {
   algorithmId: 'pca',
   courseId: 'course-classical-ml',
   demoId: 'demo-pca-sensor-compression',
@@ -1374,216 +1388,150 @@ export const pcaSensorCompressionDemo: FixedDemoManifest = {
   },
 };
 
-const demoProblemIdByDemoId: Readonly<Record<string, string>> = {
-  'demo-linear-calibration': 'problem-demo-linear-calibration',
-  'demo-regularization-noisy-signal': 'problem-demo-regularization-noisy-signal',
-  'demo-logistic-admission': 'problem-demo-logistic-admission',
-  'demo-neighbor-flower': 'problem-demo-neighbor-flower',
-  'demo-tree-forest-habitat': 'problem-demo-tree-forest-habitat',
-  'demo-svm-margin': 'problem-demo-svm-margin',
-  'demo-stellar-clusters': 'problem-demo-stellar-clusters',
-  'demo-pca-sensor-compression': 'problem-demo-pca-sensor-compression',
-  'demo-mlp-checkerboard': 'problem-demo-mlp-checkerboard',
+const DEFAULT_STEP_DURATION_MS = 3_000;
+
+const adapterVersionByAlgorithmId: Readonly<Record<string, string>> = {
+  'decision-tree': 'decision-tree-js-v1',
+  kmeans: 'kmeans-js-v1',
+  knn: 'knn-js-v1',
+  'linear-regression': 'linear-regression-js-v1',
+  'logistic-regression': 'logistic-regression-js-v1',
+  mlp: 'mlp-js-v1',
+  pca: 'pca-js-v1',
+  perceptron: 'perceptron-js-v1',
+  'ridge-regression': 'ridge-regression-js-v1',
+  svm: 'svm-js-v1',
 };
 
-interface DemoDraftDefinition {
-  decision: LocalizedText;
-  evidence: LocalizedText;
-  learningObjective: LocalizedText;
-  result: LocalizedText;
-  taskFingerprint: string;
-  topic: LocalizedText;
-}
-
-const demoDraftDefinitions: Readonly<Record<string, DemoDraftDefinition>> = {};
-
-function getDemoDraftDefinition(demoId: string): DemoDraftDefinition {
-  const definition = demoDraftDefinitions[demoId];
-
-  if (!definition) {
-    throw new Error(`Missing draft demo definition for ${demoId}.`);
+function canonicalizeForHash(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeForHash);
   }
 
-  return definition;
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value as Readonly<Record<string, unknown>>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nestedValue]) => [key, canonicalizeForHash(nestedValue)]),
+    );
+  }
+
+  return value;
 }
 
-function createDemoDraftProvenance(courseId: string): DraftProvenance {
-  const candidateSourceIds =
-    courseId === 'course-classical-ml'
-      ? ['microsoft-ml-for-beginners', 'google-ml-crash-course', 'mit-ocw', 'sklearn-docs']
-      : ['d2l-vi', 'microsoft-ai-for-beginners', 'google-ml-crash-course', 'tensorflow-tutorials'];
+function createSha256(value: unknown): string {
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalizeForHash(value)))
+    .digest('hex');
+}
 
-  return {
-    candidateSourceIds,
-    contentReviewStatus: 'pending-operator-review' as const,
-    externalEvidenceStatus: 'not-collected' as const,
-    importStatus: 'draft-only' as const,
+function createSemanticTaskFingerprint(input: {
+  contextId: string;
+  datasetId: string | null;
+  expectedReasoningType: string;
+  learningObjectiveId: string;
+  taskType: string;
+}): string {
+  const canonicalPayload = {
+    fingerprintSchemaVersion: 1,
+    contextId: input.contextId.trim(),
+    datasetId: input.datasetId?.trim() || null,
+    taskType: input.taskType.trim(),
+    learningObjectiveId: input.learningObjectiveId.trim(),
+    expectedReasoningType: input.expectedReasoningType.trim(),
   };
+
+  return createHash('sha256').update(JSON.stringify(canonicalPayload)).digest('hex');
 }
 
-function createGenericDemo(input: {
-  courseId: string;
-  demoId: string;
-  module: ReleaseLearningModule;
-}): FixedDemoManifest {
-  const algorithmId = input.module.unlockAlgorithmIds[0] ?? 'learning-review';
-  const problemId = demoProblemIdByDemoId[input.demoId] ?? `problem-${input.demoId}`;
-  const stepIds = ['problem', 'data', 'decision', 'result'] as const;
+function getDraftSourceIds(demo: FixedDemoDraft): readonly string[] {
+  const sourceIds =
+    demo.draftProvenance?.sourceTrace?.kind === 'snapshot-pinned'
+      ? demo.draftProvenance.sourceTrace.sourceSnapshots.map((source) => source.sourceId)
+      : (demo.draftProvenance?.candidateSourceIds ?? []);
+  const uniqueSourceIds = [...new Set(sourceIds)];
 
-  return {
-    algorithmId,
-    courseId: input.courseId,
-    demoId: input.demoId,
-    moduleId: input.module.moduleId,
-    problemId,
-    requiredStepIds: stepIds,
-    revisionId: `${input.demoId}-rev-r1`,
-    seed: 42,
-    visualization: {
-      boundary: [
-        { x: 52, y: 168 },
-        { x: 92, y: 132 },
-        { x: 132, y: 112 },
-        { x: 172, y: 78 },
-        { x: 204, y: 62 },
-      ],
-      points: [
-        { label: 'D1', positiveFromStep: 2, x: 92, y: 132 },
-        { label: 'D2', positiveFromStep: 3, x: 172, y: 78 },
-      ],
-    },
-    title: {
-      en: `${algorithmId}: ${problemId}`,
-      vi: `${algorithmId}: ${problemId}`,
-    },
-    steps: [
-      {
-        id: 'problem',
-        narration: {
-          en: `Define the fixed task for ${input.module.title.en}.`,
-          vi: `Xác định nhiệm vụ cố định cho ${input.module.title.vi}.`,
-        },
-        required: true,
-        textAlternative: {
-          en: `A fixed problem card for ${problemId}.`,
-          vi: `Một thẻ bài toán cố định cho ${problemId}.`,
-        },
-        title: {
-          en: 'Define the task',
-          vi: 'Xác định nhiệm vụ',
-        },
-      },
-      {
-        id: 'data',
-        narration: {
-          en: 'Inspect the fixed input signal before reading the model result.',
-          vi: 'Quan sát tín hiệu đầu vào cố định trước khi đọc kết quả mô hình.',
-        },
-        required: true,
-        textAlternative: {
-          en: 'A small static data summary is shown; no live training controls are present.',
-          vi: 'Một tóm tắt dữ liệu tĩnh được hiển thị; không có điều khiển train live.',
-        },
-        title: {
-          en: 'Inspect fixed data',
-          vi: 'Quan sát dữ liệu cố định',
-        },
-      },
-      {
-        id: 'decision',
-        narration: {
-          en: `Read how ${algorithmId} turns the signal into a model decision.`,
-          vi: `Đọc cách ${algorithmId} biến tín hiệu thành quyết định mô hình.`,
-        },
-        required: true,
-        textAlternative: {
-          en: 'The decision step highlights the model output and its metric.',
-          vi: 'Bước quyết định làm nổi bật đầu ra mô hình và metric.',
-        },
-        title: {
-          en: 'Read the decision',
-          vi: 'Đọc quyết định',
-        },
-      },
-      {
-        id: 'result',
-        narration: {
-          en: 'Confirm the fixed result before the module quiz opens.',
-          vi: 'Xác nhận kết quả cố định trước khi quiz module mở.',
-        },
-        required: true,
-        textAlternative: {
-          en: 'The final frame summarises the metric and the limitation to remember.',
-          vi: 'Frame cuối tóm tắt metric và giới hạn cần nhớ.',
-        },
-        title: {
-          en: 'Confirm the result',
-          vi: 'Xác nhận kết quả',
-        },
-      },
-    ],
-  };
+  if (uniqueSourceIds.length === 0) {
+    throw new Error(`Demo ${demo.demoId} must reference at least one pinned source.`);
+  }
+
+  return uniqueSourceIds;
 }
 
-function createExpandedDemo(input: {
-  courseId: string;
-  demoId: string;
-  module: ReleaseLearningModule;
-}): FixedDemoManifest {
-  const genericDemo = createGenericDemo(input);
-  const definition = getDemoDraftDefinition(input.demoId);
-  const stepDrafts = [
-    {
-      narration: {
-        en: `This fixed demo frames ${definition.topic.en} as one inspectable learning decision.`,
-        vi: `Demo cố định này đặt ${definition.topic.vi} thành một quyết định học tập có thể quan sát.`,
-      },
-      textAlternative: {
-        en: `A fixed problem card introduces ${definition.topic.en}.`,
-        vi: `Một thẻ bài toán cố định giới thiệu ${definition.topic.vi}.`,
-      },
-      title: { en: `Frame ${definition.topic.en}`, vi: `Đặt khung ${definition.topic.vi}` },
-    },
-    {
-      narration: definition.evidence,
-      textAlternative: {
-        en: 'A static evidence summary is shown without parameter or dataset controls.',
-        vi: 'Một tóm tắt bằng chứng tĩnh được hiển thị, không có điều khiển tham số hoặc dataset.',
-      },
-      title: { en: 'Inspect fixed evidence', vi: 'Quan sát bằng chứng cố định' },
-    },
-    {
-      narration: definition.decision,
-      textAlternative: {
-        en: 'The fixed model decision is shown with its relevant metric or rule.',
-        vi: 'Quyết định mô hình cố định được hiển thị cùng metric hoặc quy tắc liên quan.',
-      },
-      title: { en: 'Read the fixed decision', vi: 'Đọc quyết định cố định' },
-    },
-    {
-      narration: definition.result,
-      textAlternative: {
-        en: 'The final frame reports the fixed result and one limitation to remember.',
-        vi: 'Frame cuối báo kết quả cố định và một giới hạn cần ghi nhớ.',
-      },
-      title: { en: 'Interpret the result', vi: 'Diễn giải kết quả' },
-    },
-  ] as const;
-
-  return {
-    ...genericDemo,
-    draftProvenance: createDemoDraftProvenance(input.courseId),
-    learningObjective: definition.learningObjective,
-    steps: genericDemo.steps.map((step, index) => {
-      const draftStep = stepDrafts[index];
-
-      if (!draftStep) {
-        throw new Error(`Missing fixed demo step ${index + 1} for ${input.demoId}.`);
-      }
-
-      return { ...step, ...draftStep };
+export function getFixedDemoDeterministicProof(
+  demo: Pick<
+    FixedDemoManifest,
+    | 'adapterVersion'
+    | 'algorithmId'
+    | 'demoId'
+    | 'fixedRun'
+    | 'problemId'
+    | 'seed'
+    | 'steps'
+    | 'visualization'
+  >,
+): Pick<FixedDemoManifest, 'resultHash' | 'visualFixture'> {
+  const visualFixture = {
+    hash: createSha256({
+      demoId: demo.demoId,
+      steps: demo.steps.map((step) => ({
+        durationMs: step.durationMs,
+        id: step.id,
+        textAlternative: step.textAlternative,
+        title: step.title,
+      })),
+      visualization: demo.visualization,
     }),
-    taskFingerprint: definition.taskFingerprint,
+    totalDurationMs: demo.steps.reduce((total, step) => total + step.durationMs, 0),
+    version: 'release-fixed-demo-visual-v1' as const,
+  };
+
+  return {
+    resultHash: createSha256({
+      adapterVersion: demo.adapterVersion,
+      algorithmId: demo.algorithmId,
+      fixedRun: demo.fixedRun ?? null,
+      problemId: demo.problemId,
+      seed: demo.seed,
+      visualization: demo.visualization,
+    }),
+    visualFixture,
+  };
+}
+
+function finalizeFixedDemo(demo: FixedDemoDraft): FixedDemoManifest {
+  const adapterVersion = adapterVersionByAlgorithmId[demo.algorithmId];
+
+  if (!adapterVersion) {
+    throw new Error(`Demo ${demo.demoId} has no deterministic adapter version.`);
+  }
+
+  const sourceIds = getDraftSourceIds(demo);
+  const steps = demo.steps.map((step) => ({ ...step, durationMs: DEFAULT_STEP_DURATION_MS }));
+  const deterministicProof = getFixedDemoDeterministicProof({
+    adapterVersion,
+    algorithmId: demo.algorithmId,
+    demoId: demo.demoId,
+    ...(demo.fixedRun ? { fixedRun: demo.fixedRun } : {}),
+    problemId: demo.problemId,
+    seed: demo.seed,
+    steps,
+    visualization: demo.visualization,
+  });
+
+  return {
+    ...demo,
+    adapterVersion,
+    ...deterministicProof,
+    sourceIds,
+    steps,
+    taskFingerprint: createSemanticTaskFingerprint({
+      contextId: `${demo.courseId}:${demo.moduleId}:${demo.demoId}`,
+      datasetId: demo.fixedRun?.datasetVersionId ?? null,
+      expectedReasoningType: `problem:${demo.problemId}`,
+      learningObjectiveId: demo.taskFingerprint,
+      taskType: 'fixed-demo',
+    }),
   };
 }
 
@@ -1599,20 +1547,7 @@ const handAuthoredDemos = [
   stellarClustersDemo,
   pcaSensorCompressionDemo,
 ] as const;
-const handAuthoredDemoIds = new Set(handAuthoredDemos.map((demo) => demo.demoId));
-
-const generatedDemos = getReleaseLearningCatalog().courses.flatMap((course) =>
-  course.modules
-    .filter((module) => module.demoId !== null && !handAuthoredDemoIds.has(module.demoId))
-    .map((module) =>
-      createExpandedDemo({
-        courseId: course.courseId,
-        demoId: module.demoId!,
-        module,
-      }),
-    ),
-);
-const fixedDemos = [...handAuthoredDemos, ...generatedDemos] as const;
+const fixedDemos = handAuthoredDemos.map(finalizeFixedDemo);
 
 export function getFixedDemo(demoId: string | undefined) {
   return fixedDemos.find((demo) => demo.demoId === demoId);
