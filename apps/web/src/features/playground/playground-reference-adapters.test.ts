@@ -1,6 +1,64 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const libsvmMock = vi.hoisted(() => ({
+  free: vi.fn(),
+}));
+
+vi.mock('./libsvm-runtime', () => {
+  class FixtureSvm {
+    static KERNEL_TYPES = { RBF: '2' };
+    static SVM_TYPES = { C_SVC: '0' };
+    private trainingRows: Array<{ features: readonly number[]; label: number }> = [];
+
+    free(): void {
+      libsvmMock.free();
+    }
+
+    getSVIndices(): number[] {
+      return [0, 1, 2, 3, 4, 5];
+    }
+
+    predict(features: readonly (readonly number[])[]): number[] {
+      return features.map((candidate) => {
+        const nearest = this.trainingRows.reduce<{
+          features: readonly number[];
+          label: number;
+        } | null>((closest, row) => {
+          if (!closest) {
+            return row;
+          }
+
+          const candidateDistance = candidate.reduce(
+            (total, value, index) => total + (value - (row.features[index] ?? 0)) ** 2,
+            0,
+          );
+          const closestDistance = candidate.reduce(
+            (total, value, index) => total + (value - (closest.features[index] ?? 0)) ** 2,
+            0,
+          );
+
+          return candidateDistance < closestDistance ? row : closest;
+        }, null);
+
+        return nearest?.label ?? 0;
+      });
+    }
+
+    train(features: readonly (readonly number[])[], labels: readonly number[]): void {
+      this.trainingRows = features.map((row, index) => ({
+        features: row,
+        label: labels[index] ?? 0,
+      }));
+    }
+  }
+
+  return {
+    loadLibsvmConstructor: async () => FixtureSvm,
+  };
+});
 
 import { resolveAlgorithmAdapter } from './playground-adapter-registry';
+import { assertGoldenFixture } from './playground-golden-fixture';
 import creditTreeFixture from './fixtures/credit-tree-v1.json';
 import creditLogisticFixture from './fixtures/credit-logistic-v1.json';
 import creditSvmFixture from './fixtures/credit-svm-v1.json';
@@ -19,6 +77,8 @@ import wineNaiveBayesFixture from './fixtures/wine-naive-bayes-v1.json';
 import spamLogisticFixture from './fixtures/spam-logistic-v1.json';
 import xorPerceptronFixture from './fixtures/xor-perceptron-v1.json';
 import xorMlpFixture from './fixtures/xor-mlp-v1.json';
+
+const TENSORFLOW_GOLDEN_FIXTURE_TIMEOUT_MS = 15_000;
 
 const fixtureCases = [
   {
@@ -131,6 +191,15 @@ const fixtureCases = [
   },
 ] as const;
 
+function expectGoldenFixture(
+  result: { runId: string },
+  runId: string,
+  fixture: { result: unknown; tolerance: number },
+): void {
+  expect(result.runId).toBe(runId);
+  assertGoldenFixture(result, fixture.result, fixture.tolerance);
+}
+
 describe('Playground reference adapters', () => {
   it('registers runnable adapters for every implemented Must fixture pair', () => {
     for (const fixtureCase of fixtureCases) {
@@ -185,7 +254,7 @@ describe('Playground reference adapters', () => {
       expect(firstResult.textAlternative?.en).toEqual(expect.any(String));
       expect(firstResult.textAlternative?.vi).toEqual(expect.any(String));
     }
-  }, 15_000);
+  }, 45_000);
 
   it('cooperatively cancels every locked adapter before producing a result', async () => {
     for (const fixtureCase of fixtureCases) {
@@ -221,39 +290,40 @@ describe('Playground reference adapters', () => {
     }
   });
 
-  it('runs pg-nonlinear-2d MLP through the registry and matches the golden fixture', async () => {
-    const adapter = resolveAlgorithmAdapter({
-      scenarioId: 'pg-nonlinear-2d',
-      algorithmId: 'mlp',
-      datasetVersionId: 'ds-moons-2d-v1',
-    });
-
-    if (!adapter) {
-      throw new Error('Expected pg-nonlinear-2d/mlp adapter to be registered.');
-    }
-
-    const result = await adapter.run(
-      {
-        runId: 'run-moons-mlp',
-        sessionId: 'session-moons-mlp',
+  it(
+    'runs pg-nonlinear-2d MLP through the registry and matches the golden fixture',
+    async () => {
+      const adapter = resolveAlgorithmAdapter({
         scenarioId: 'pg-nonlinear-2d',
         algorithmId: 'mlp',
         datasetVersionId: 'ds-moons-2d-v1',
-        configHash: '8'.repeat(64),
-        config: moonsMlpFixture.config,
-      },
-      {
-        onProgress: () => undefined,
-        shouldCancel: () => false,
-      },
-    );
+      });
 
-    expect(result).toMatchObject({
-      runId: 'run-moons-mlp',
-      ...moonsMlpFixture.result,
-    });
-    expect(result.textAlternative?.vi).toEqual(expect.stringContaining('accuracy'));
-  });
+      if (!adapter) {
+        throw new Error('Expected pg-nonlinear-2d/mlp adapter to be registered.');
+      }
+
+      const result = await adapter.run(
+        {
+          runId: 'run-moons-mlp',
+          sessionId: 'session-moons-mlp',
+          scenarioId: 'pg-nonlinear-2d',
+          algorithmId: 'mlp',
+          datasetVersionId: 'ds-moons-2d-v1',
+          configHash: '8'.repeat(64),
+          config: moonsMlpFixture.config,
+        },
+        {
+          onProgress: () => undefined,
+          shouldCancel: () => false,
+        },
+      );
+
+      expectGoldenFixture(result, 'run-moons-mlp', moonsMlpFixture);
+      expect(result.textAlternative?.vi).toEqual(expect.stringContaining('accuracy'));
+    },
+    TENSORFLOW_GOLDEN_FIXTURE_TIMEOUT_MS,
+  );
 
   it('runs pg-house-price linear regression through the registry and matches the golden fixture', async () => {
     const adapter = resolveAlgorithmAdapter({
@@ -282,10 +352,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-house-linear',
-      ...houseLinearFixture.result,
-    });
+    expectGoldenFixture(result, 'run-house-linear', houseLinearFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('RMSE'));
   });
 
@@ -316,10 +383,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-house-ridge',
-      ...houseRidgeFixture.result,
-    });
+    expectGoldenFixture(result, 'run-house-ridge', houseRidgeFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('RMSE'));
   });
 
@@ -350,10 +414,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-insurance-polynomial',
-      ...insurancePolynomialFixture.result,
-    });
+    expectGoldenFixture(result, 'run-insurance-polynomial', insurancePolynomialFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('MAE'));
   });
 
@@ -384,10 +445,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-insurance-lasso',
-      ...insuranceLassoFixture.result,
-    });
+    expectGoldenFixture(result, 'run-insurance-lasso', insuranceLassoFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('MAE'));
   });
 
@@ -418,10 +476,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-spam-logistic',
-      ...spamLogisticFixture.result,
-    });
+    expectGoldenFixture(result, 'run-spam-logistic', spamLogisticFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
   });
 
@@ -452,10 +507,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-spam-naive-bayes',
-      ...spamNaiveBayesFixture.result,
-    });
+    expectGoldenFixture(result, 'run-spam-naive-bayes', spamNaiveBayesFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
   });
 
@@ -486,10 +538,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-churn-knn',
-      ...churnKnnFixture.result,
-    });
+    expectGoldenFixture(result, 'run-churn-knn', churnKnnFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
   });
 
@@ -520,10 +569,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-churn-forest',
-      ...churnForestFixture.result,
-    });
+    expectGoldenFixture(result, 'run-churn-forest', churnForestFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('F1'));
   });
 
@@ -554,10 +600,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-credit-logistic',
-      ...creditLogisticFixture.result,
-    });
+    expectGoldenFixture(result, 'run-credit-logistic', creditLogisticFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('recall'));
   });
 
@@ -588,14 +631,12 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-wine-naive-bayes',
-      ...wineNaiveBayesFixture.result,
-    });
+    expectGoldenFixture(result, 'run-wine-naive-bayes', wineNaiveBayesFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('macro-F1'));
   });
 
   it('runs pg-credit-risk SVM through the registry and matches the golden fixture', async () => {
+    libsvmMock.free.mockClear();
     const adapter = resolveAlgorithmAdapter({
       scenarioId: 'pg-credit-risk',
       algorithmId: 'svm',
@@ -622,10 +663,8 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-credit-svm',
-      ...creditSvmFixture.result,
-    });
+    expectGoldenFixture(result, 'run-credit-svm', creditSvmFixture);
+    expect(libsvmMock.free).toHaveBeenCalledTimes(1);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('recall'));
   });
 
@@ -656,10 +695,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-credit-tree',
-      ...creditTreeFixture.result,
-    });
+    expectGoldenFixture(result, 'run-credit-tree', creditTreeFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('recall'));
   });
 
@@ -690,10 +726,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-retail-kmeans',
-      ...retailKMeansFixture.result,
-    });
+    expectGoldenFixture(result, 'run-retail-kmeans', retailKMeansFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('silhouette'));
   });
 
@@ -726,10 +759,7 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-retail-hierarchical',
-      ...retailHierarchicalFixture.result,
-    });
+    expectGoldenFixture(result, 'run-retail-hierarchical', retailHierarchicalFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('silhouette'));
   });
 
@@ -760,50 +790,48 @@ describe('Playground reference adapters', () => {
       },
     );
 
-    expect(result).toMatchObject({
-      runId: 'run-country-pca',
-      ...countryPcaFixture.result,
-    });
+    expectGoldenFixture(result, 'run-country-pca', countryPcaFixture);
     expect(result.textAlternative?.vi).toEqual(expect.stringContaining('phương sai'));
   });
 
-  it('runs pg-xor MLP through the registry and matches the golden fixture', async () => {
-    const adapter = resolveAlgorithmAdapter({
-      scenarioId: 'pg-xor',
-      algorithmId: 'mlp',
-      datasetVersionId: 'ds-xor-noisy-v1',
-    });
-
-    if (!adapter) {
-      throw new Error('Expected pg-xor/mlp adapter to be registered.');
-    }
-
-    const progressEpochs: number[] = [];
-    const result = await adapter.run(
-      {
-        runId: 'run-xor-mlp',
-        sessionId: 'session-xor-mlp',
+  it(
+    'runs pg-xor MLP through the registry and matches the golden fixture',
+    async () => {
+      const adapter = resolveAlgorithmAdapter({
         scenarioId: 'pg-xor',
         algorithmId: 'mlp',
         datasetVersionId: 'ds-xor-noisy-v1',
-        configHash: '8'.repeat(64),
-        config: xorMlpFixture.config,
-      },
-      {
-        onProgress: (event) => {
-          if (typeof event.epoch === 'number') {
-            progressEpochs.push(event.epoch);
-          }
-        },
-        shouldCancel: () => false,
-      },
-    );
+      });
 
-    expect(result).toMatchObject({
-      runId: 'run-xor-mlp',
-      ...xorMlpFixture.result,
-    });
-    expect(progressEpochs[0]).toBe(1);
-    expect(progressEpochs.at(-1)).toBe(300);
-  });
+      if (!adapter) {
+        throw new Error('Expected pg-xor/mlp adapter to be registered.');
+      }
+
+      const progressEpochs: number[] = [];
+      const result = await adapter.run(
+        {
+          runId: 'run-xor-mlp',
+          sessionId: 'session-xor-mlp',
+          scenarioId: 'pg-xor',
+          algorithmId: 'mlp',
+          datasetVersionId: 'ds-xor-noisy-v1',
+          configHash: '8'.repeat(64),
+          config: xorMlpFixture.config,
+        },
+        {
+          onProgress: (event) => {
+            if (typeof event.epoch === 'number') {
+              progressEpochs.push(event.epoch);
+            }
+          },
+          shouldCancel: () => false,
+        },
+      );
+
+      expectGoldenFixture(result, 'run-xor-mlp', xorMlpFixture);
+      expect(progressEpochs[0]).toBe(1);
+      expect(progressEpochs.at(-1)).toBe(300);
+    },
+    TENSORFLOW_GOLDEN_FIXTURE_TIMEOUT_MS,
+  );
 });

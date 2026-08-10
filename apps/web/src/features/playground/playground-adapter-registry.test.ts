@@ -90,8 +90,8 @@ describe('Playground adapter registry', () => {
       datasetVersionId: 'ds-xor-noisy-v1',
       determinism: 'exact',
       metrics: {
-        accuracy: 0.5,
-        loss: 0.5,
+        accuracy: 0.49,
+        loss: 0.51,
       },
     });
     expect(progressEpochs[0]).toBe(1);

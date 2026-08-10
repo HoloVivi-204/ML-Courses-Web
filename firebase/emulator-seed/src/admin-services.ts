@@ -3,7 +3,11 @@ import { type Auth, getAuth } from 'firebase-admin/auth';
 import { type Firestore, getFirestore } from 'firebase-admin/firestore';
 import { type Storage, getStorage } from 'firebase-admin/storage';
 
-import { LOCAL_FIREBASE_PROJECT_ID, assertRunningEmulatorEnvironment } from './environment.js';
+import {
+  LOCAL_FIREBASE_PROJECT_ID,
+  applyLocalEmulatorEnvironment,
+  assertRunningEmulatorEnvironment,
+} from './environment.js';
 
 export const LOCAL_STORAGE_BUCKET = `${LOCAL_FIREBASE_PROJECT_ID}.appspot.com`;
 export type LocalBucket = ReturnType<Storage['bucket']>;
@@ -18,7 +22,8 @@ export interface LocalAdminServices {
 export function createLocalAdminServices(
   environment: NodeJS.ProcessEnv = process.env,
 ): LocalAdminServices {
-  const { projectId } = assertRunningEmulatorEnvironment(environment);
+  const appliedEnvironment = applyLocalEmulatorEnvironment(environment);
+  const { projectId } = assertRunningEmulatorEnvironment(appliedEnvironment);
   const app = initializeApp(
     {
       projectId,

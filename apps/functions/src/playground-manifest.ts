@@ -52,7 +52,7 @@ interface HashPlaygroundConfigInput {
 
 const SUBMISSION_PAIR_MANIFESTS = [
   {
-    adapterVersion: 'perceptron-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     algorithmId: 'perceptron',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-xor-noisy-v1',
@@ -75,7 +75,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['decision-boundary', 'loss'],
   },
   {
-    adapterVersion: 'mlp-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     algorithmId: 'mlp',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-xor-noisy-v1',
@@ -99,7 +99,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['decision-boundary', 'loss'],
   },
   {
-    adapterVersion: 'mlp-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     algorithmId: 'mlp',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-moons-2d-v1',
@@ -123,7 +123,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['decision-boundary', 'loss'],
   },
   {
-    adapterVersion: 'linear-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     algorithmId: 'linear-regression',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-house-price-v1',
@@ -144,7 +144,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['actual-vs-predicted', 'residual'],
   },
   {
-    adapterVersion: 'ridge-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     algorithmId: 'ridge-regression',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-house-price-v1',
@@ -165,7 +165,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['residual', 'coefficient'],
   },
   {
-    adapterVersion: 'polynomial-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     algorithmId: 'polynomial-regression',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-insurance-cost-v1',
@@ -186,7 +186,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['feature-slice', 'actual-vs-predicted', 'residual'],
   },
   {
-    adapterVersion: 'lasso-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     algorithmId: 'lasso-regression',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-insurance-cost-v1',
@@ -207,7 +207,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['residual', 'coefficient'],
   },
   {
-    adapterVersion: 'logistic-regression-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     algorithmId: 'logistic-regression',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-sms-spam-v1',
@@ -230,7 +230,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'loss'],
   },
   {
-    adapterVersion: 'naive-bayes-js-v1',
+    adapterVersion: 'ml-naivebayes-v1',
     algorithmId: 'naive-bayes',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-sms-spam-v1',
@@ -251,7 +251,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'class-error'],
   },
   {
-    adapterVersion: 'decision-tree-js-v1',
+    adapterVersion: 'ml-cart-v1',
     algorithmId: 'decision-tree',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-credit-risk-v1',
@@ -273,7 +273,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'tree'],
   },
   {
-    adapterVersion: 'logistic-regression-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     algorithmId: 'logistic-regression',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-credit-risk-v1',
@@ -296,7 +296,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'roc'],
   },
   {
-    adapterVersion: 'svm-js-v1',
+    adapterVersion: 'libsvm-js-v1',
     algorithmId: 'svm',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-credit-risk-v1',
@@ -319,7 +319,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix'],
   },
   {
-    adapterVersion: 'naive-bayes-js-v1',
+    adapterVersion: 'ml-naivebayes-v1',
     algorithmId: 'naive-bayes',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-wine-cultivar-v1',
@@ -340,7 +340,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'class-error'],
   },
   {
-    adapterVersion: 'knn-js-v1',
+    adapterVersion: 'ml-knn-v1',
     algorithmId: 'knn',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-customer-churn-v1',
@@ -362,7 +362,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'k-curve'],
   },
   {
-    adapterVersion: 'random-forest-js-v1',
+    adapterVersion: 'ml-random-forest-v1',
     algorithmId: 'random-forest',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-customer-churn-v1',
@@ -384,7 +384,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['confusion-matrix', 'importance'],
   },
   {
-    adapterVersion: 'kmeans-js-v1',
+    adapterVersion: 'ml-kmeans-v1',
     algorithmId: 'kmeans',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-retail-segments-v1',
@@ -405,7 +405,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['cluster-plot', 'elbow'],
   },
   {
-    adapterVersion: 'hierarchical-clustering-js-v1',
+    adapterVersion: 'ml-hclust-v1',
     algorithmId: 'hierarchical-clustering',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-retail-segments-v1',
@@ -426,7 +426,7 @@ const SUBMISSION_PAIR_MANIFESTS = [
     visualizations: ['dendrogram', 'cluster-plot'],
   },
   {
-    adapterVersion: 'pca-js-v1',
+    adapterVersion: 'ml-pca-v1',
     algorithmId: 'pca',
     configSchemaVersion: 1,
     datasetVersionId: 'ds-country-indicators-v1',

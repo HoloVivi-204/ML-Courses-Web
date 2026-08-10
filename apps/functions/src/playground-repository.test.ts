@@ -395,7 +395,7 @@ describe('Firestore playground repository run sessions', () => {
         components: 2,
         scale: true,
       },
-      adapterVersion: 'pca-js-v1',
+      adapterVersion: 'ml-pca-v1',
       configSchemaVersion: 1,
       workerProtocolVersion: 'ml-worker-v1',
     });
@@ -403,7 +403,7 @@ describe('Firestore playground repository run sessions', () => {
       scenarioId: 'pg-country-indicators',
       algorithmId: 'pca',
       datasetVersionId: 'ds-country-indicators-v1',
-      adapterVersion: 'pca-js-v1',
+      adapterVersion: 'ml-pca-v1',
       configSchemaVersion: 1,
       metrics: {
         'explained-variance': 0.82,
@@ -417,7 +417,7 @@ describe('Firestore playground repository run sessions', () => {
       scenarioId: 'pg-country-indicators',
       algorithmId: 'pca',
       datasetVersionId: 'ds-country-indicators-v1',
-      adapterVersion: 'pca-js-v1',
+      adapterVersion: 'ml-pca-v1',
       configSchemaVersion: 1,
       compatibilityStatus: 'compatible',
     });

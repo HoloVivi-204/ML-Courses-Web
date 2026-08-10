@@ -55,7 +55,11 @@ async function seedFirestore(firestore: Firestore, manifest: LocalSeedManifest):
 async function seedStorage(bucket: LocalBucket, manifest: LocalSeedManifest): Promise<void> {
   for (const object of manifest.storageObjects) {
     await bucket.file(object.path).save(object.content, {
-      metadata: { contentType: object.contentType },
+      metadata: {
+        contentType: object.contentType,
+        ...(object.contentEncoding ? { contentEncoding: object.contentEncoding } : {}),
+        ...(object.metadata ? { metadata: object.metadata } : {}),
+      },
       resumable: false,
     });
   }

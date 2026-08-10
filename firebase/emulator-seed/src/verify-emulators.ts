@@ -443,6 +443,57 @@ async function assertClientAccessDenied(): Promise<void> {
   }
 }
 
+async function requestDatasetStorageObject(input: {
+  idToken?: string | undefined;
+  path: string;
+}): Promise<Response> {
+  const storageObject = encodeURIComponent(input.path);
+
+  return fetch(`http://127.0.0.1:9199/v0/b/${LOCAL_STORAGE_BUCKET}/o/${storageObject}?alt=media`, {
+    ...(input.idToken ? { headers: { Authorization: `Firebase ${input.idToken}` } } : {}),
+  });
+}
+
+async function assertPlaygroundDatasetStorageRules(): Promise<void> {
+  const services = createLocalAdminServices();
+  const datasetVersionId = 'ds-credit-risk-v1';
+  const manifestPath = `datasets/${datasetVersionId}/manifest.json`;
+  const datasetPath = `datasets/${datasetVersionId}/dataset.json.gz`;
+  const email = `dataset-reader-${randomUUID()}@example.test`;
+  const password = `test-${randomUUID()}`;
+
+  try {
+    const unauthenticatedResponse = await requestDatasetStorageObject({ path: manifestPath });
+    assert.equal(unauthenticatedResponse.status, 403);
+
+    const idToken = await registerWithEmailPassword(email, password);
+    const manifestResponse = await requestDatasetStorageObject({ idToken, path: manifestPath });
+    assert.equal(manifestResponse.status, 200);
+    const manifest = await readJsonObject(manifestResponse);
+    assert.equal(manifest.datasetVersionId, datasetVersionId);
+    assert.equal(manifest.datasetPath, datasetPath);
+
+    const datasetResponse = await requestDatasetStorageObject({ idToken, path: datasetPath });
+    assert.equal(datasetResponse.status, 200);
+    assert.ok((await datasetResponse.arrayBuffer()).byteLength > 0);
+
+    const [metadata] = await services.bucket.file(datasetPath).getMetadata();
+    assert.equal(metadata.contentEncoding, undefined);
+    assert.equal(metadata.contentType, 'application/gzip');
+    assert.equal(metadata.metadata?.schemaVersion, '1');
+    assert.equal(metadata.metadata?.sourceId, 'generated-playground-baseline');
+    const sha256 = metadata.metadata?.sha256;
+
+    if (typeof sha256 !== 'string') {
+      assert.fail('Dataset object metadata must include a SHA-256 string.');
+    }
+
+    assert.match(sha256, /^[a-f0-9]{64}$/);
+  } finally {
+    await deleteApp(services.app);
+  }
+}
+
 async function assertDirectProgressMutationDenied(): Promise<void> {
   const baseUrl = `http://127.0.0.1:8080/v1/projects/${LOCAL_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
   const protectedDocumentPaths = [
@@ -1553,6 +1604,7 @@ await assertDirectLearnerContentRules();
 await assertAdminContentLifecycleApi();
 await assertFirestoreAdminContentPersistence();
 await assertClientAccessDenied();
+await assertPlaygroundDatasetStorageRules();
 await assertDirectProgressMutationDenied();
 await assertDraftContentImport();
 
@@ -1564,6 +1616,7 @@ console.log(
     deterministicSeed: true,
     draftContentImport: 'idempotent-draft-only',
     clientAccess: 'deny-by-default',
+    playgroundDatasetStorage: 'authenticated-read-and-integrity-metadata-verified',
     directProgressWrites: 'denied',
     adminContentLifecycle: 'verified',
     emergencyWithdraw: 'verified',

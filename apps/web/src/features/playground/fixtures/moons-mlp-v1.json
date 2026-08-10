@@ -15,8 +15,8 @@
     "determinism": "exact",
     "feedback": [],
     "metrics": {
-      "accuracy": 1,
-      "loss": 0.0097
+      "accuracy": 0.9688,
+      "loss": 0.027
     },
     "chartSummary": {
       "kind": "decision-boundary",
@@ -25,8 +25,8 @@
       "trainAccuracy": 1
     },
     "textAlternative": {
-      "en": "The MLP solves the nonlinear moons split with accuracy 100% and loss 0.0097.",
-      "vi": "MLP giai duoc tap moons phi tuyen voi accuracy 100% va loss 0.0097."
+      "en": "The MLP solves the nonlinear moons split with accuracy 97% and loss 0.027.",
+      "vi": "MLP giai duoc tap moons phi tuyen voi accuracy 97% va loss 0.027."
     }
   }
 }

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const runAuthEmulatorE2e = process.env.RUN_AUTH_EMULATOR_E2E === 'true';
 const AUTH_SIGN_UP_URL =
@@ -19,6 +19,46 @@ const REPRESENTATIVE_FAMILIES = [
   { chartKind: 'cluster-plot', scenarioId: 'pg-retail-segments' },
   { chartKind: 'projection-2d', scenarioId: 'pg-country-indicators' },
   { chartKind: 'decision-boundary', scenarioId: 'pg-nonlinear-2d', expectsLoss: true },
+  {
+    algorithmLabel: 'Support vector machine',
+    chartKind: 'confusion-matrix',
+    scenarioId: 'pg-credit-risk',
+  },
+] as const;
+
+const REPRESENTATIVE_ALGORITHM_UNLOCKS = [
+  ['linear-regression', 'cml-m02-linear-polynomial'],
+  ['logistic-regression', 'cml-m04-logistic-classification'],
+  ['kmeans', 'cml-m08-clustering'],
+  ['pca', 'cml-m09-pca'],
+  ['mlp', 'dl-m02-mlp'],
+  ['svm', 'cml-m07-svm'],
+] as const;
+
+const DEFAULT_SCENARIOS = [
+  { algorithmId: 'linear-regression', scenarioId: 'pg-house-price' },
+  { algorithmId: 'polynomial-regression', scenarioId: 'pg-insurance-cost' },
+  { algorithmId: 'logistic-regression', scenarioId: 'pg-spam-detection' },
+  { algorithmId: 'knn', scenarioId: 'pg-customer-churn' },
+  { algorithmId: 'decision-tree', scenarioId: 'pg-credit-risk' },
+  { algorithmId: 'naive-bayes', scenarioId: 'pg-wine-cultivar' },
+  { algorithmId: 'kmeans', scenarioId: 'pg-retail-segments' },
+  { algorithmId: 'pca', scenarioId: 'pg-country-indicators' },
+  { algorithmId: 'perceptron', scenarioId: 'pg-xor' },
+  { algorithmId: 'mlp', scenarioId: 'pg-nonlinear-2d' },
+] as const;
+
+const DEFAULT_ALGORITHM_UNLOCKS = [
+  ['linear-regression', 'cml-m02-linear-polynomial'],
+  ['polynomial-regression', 'cml-m02-linear-polynomial'],
+  ['logistic-regression', 'cml-m04-logistic-classification'],
+  ['knn', 'cml-m05-knn-naive-bayes'],
+  ['decision-tree', 'cml-m06-trees-forest'],
+  ['naive-bayes', 'cml-m05-knn-naive-bayes'],
+  ['kmeans', 'cml-m08-clustering'],
+  ['pca', 'cml-m09-pca'],
+  ['perceptron', 'dl-m01-neuron-perceptron'],
+  ['mlp', 'dl-m02-mlp'],
 ] as const;
 
 test.describe('Playground representative browser journeys', () => {
@@ -61,6 +101,10 @@ test.describe('Playground representative browser journeys', () => {
     for (const family of REPRESENTATIVE_FAMILIES) {
       await page.goto(`/playground/${family.scenarioId}`);
       await expect(page.getByTestId('playground-dataset-tray')).toBeVisible();
+
+      if ('algorithmLabel' in family) {
+        await page.getByRole('combobox').selectOption({ label: family.algorithmLabel });
+      }
       await expect(page.getByRole('button', { name: 'Chạy', exact: true })).toBeEnabled({
         timeout: 30_000,
       });
@@ -76,7 +120,11 @@ test.describe('Playground representative browser journeys', () => {
       await expect(page.getByText('Đã chạy xong', { exact: true })).toBeVisible({
         timeout: 45_000,
       });
-      await expect(page.getByTestId(`playground-chart-${family.chartKind}`)).toBeVisible();
+      await expectPlotlyChartReady(page.getByTestId(`playground-chart-${family.chartKind}`));
+
+      if ('algorithmLabel' in family) {
+        await expect(page.getByTestId('playground-result')).toContainText('100%');
+      }
 
       if (family.expectsLoss) {
         await expect(page.getByTestId('playground-loss-chart')).toBeVisible();
@@ -86,6 +134,156 @@ test.describe('Playground representative browser journeys', () => {
       await expectNoHorizontalOverflow(page);
       await expectNoWcagViolations(page);
     }
+  });
+
+  test('runs verified credit-risk SVM bytes in the browser Worker', async ({ page }) => {
+    test.setTimeout(90_000);
+
+    const credentials = await createUnlockedLearner();
+
+    await page.goto('/login?returnTo=%2Fplayground%2Fpg-credit-risk');
+    await page.locator("input[type='email']").fill(credentials.email);
+    await page.locator("input[type='password']").fill(credentials.password);
+    await page.locator("form button[type='submit']").click();
+    await expect(page).toHaveURL('/playground/pg-credit-risk');
+
+    await page.getByRole('combobox').selectOption({ label: 'Support vector machine' });
+    const runButton = page.locator('.playground-run-actions > button').first();
+
+    await expect(runButton).toBeEnabled({ timeout: 30_000 });
+    await runButton.click();
+    await expect(page.locator('.status-completed')).toBeVisible({ timeout: 15_000 });
+    await expectPlotlyChartReady(page.getByTestId('playground-chart-confusion-matrix'));
+  });
+
+  test('evicts corrupt browser dataset cache bytes before a verified rerun', async ({ page }) => {
+    const credentials = await createUnlockedLearner();
+
+    await page.goto('/login?returnTo=%2Fplayground%2Fpg-house-price');
+    await page.locator("input[type='email']").fill(credentials.email);
+    await page.locator("input[type='password']").fill(credentials.password);
+    await page.locator("form button[type='submit']").click();
+    await expect(page).toHaveURL('/playground/pg-house-price');
+
+    const runButton = page.locator('.playground-run-actions > button').first();
+    await expect(runButton).toBeEnabled({ timeout: 30_000 });
+
+    const corruptedEntryCount = await page.evaluate(async () => {
+      const cache = await caches.open('ml-playground-datasets-v1');
+      const requests = await cache.keys();
+
+      await Promise.all(
+        requests.map((request) =>
+          cache.put(
+            request,
+            new Response(new Uint8Array([1, 2, 3]), {
+              headers: { 'content-type': 'application/octet-stream' },
+            }),
+          ),
+        ),
+      );
+
+      return requests.length;
+    });
+    expect(corruptedEntryCount).toBeGreaterThan(0);
+
+    await page.reload();
+    await expect(page.getByTestId('playground-dataset-tray')).toBeVisible();
+    await expect(runButton).toBeEnabled({ timeout: 30_000 });
+
+    const cachedByteLengths = await page.evaluate(async () => {
+      const cache = await caches.open('ml-playground-datasets-v1');
+      const requests = await cache.keys();
+
+      return Promise.all(
+        requests.map(async (request) =>
+          (await cache.match(request))?.arrayBuffer().then((bytes) => bytes.byteLength),
+        ),
+      );
+    });
+    expect(
+      cachedByteLengths.every((byteLength) => typeof byteLength === 'number' && byteLength > 3),
+    ).toBe(true);
+
+    await runButton.click();
+    await expect(page.locator('.status-completed')).toBeVisible({ timeout: 30_000 });
+    await expectPlotlyChartReady(page.getByTestId('playground-chart-actual-vs-predicted'));
+  });
+
+  test('stops an active Worker run without saving success and can rerun', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+
+    const savedRunRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+
+      if (request.method() === 'POST' && url.pathname === '/api/v1/playground-runs') {
+        savedRunRequests.push(request.url());
+      }
+    });
+
+    const credentials = await createUnlockedLearner();
+
+    await page.goto('/login?returnTo=%2Fplayground%2Fpg-nonlinear-2d');
+    await page.locator("input[type='email']").fill(credentials.email);
+    await page.locator("input[type='password']").fill(credentials.password);
+    await page.locator("form button[type='submit']").click();
+    await expect(page).toHaveURL('/playground/pg-nonlinear-2d');
+
+    const runButton = page.locator('.playground-run-actions > button').first();
+    const stopButton = page.locator('.playground-run-actions > button').nth(1);
+    const epochs = testInfo.project.name === 'chromium-mobile-360' ? 500 : 1_000;
+    await page.getByRole('spinbutton', { name: 'Epochs' }).fill(String(epochs));
+    await expect(runButton).toBeEnabled({ timeout: 30_000 });
+    await runButton.click();
+    await expect(stopButton).toBeEnabled();
+    await expect(page.getByText(new RegExp(`^Epoch \\d+/${epochs}`))).toBeVisible({
+      timeout: 30_000,
+    });
+    await stopButton.click();
+    await expect(page.locator('.status-cancelled')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('playground-result')).toHaveCount(0);
+    await page.waitForTimeout(500);
+    expect(savedRunRequests).toEqual([]);
+
+    await expect(runButton).toBeEnabled();
+    await runButton.click();
+    await expect(page.locator('.status-completed')).toBeVisible({ timeout: 60_000 });
+    await expectPlotlyChartReady(page.getByTestId('playground-chart-decision-boundary'));
+    expect(savedRunRequests).toHaveLength(1);
+  });
+
+  test('runs all ten default scenarios with verified dataset bytes', async ({ page }) => {
+    test.setTimeout(300_000);
+
+    const credentials = await createUnlockedLearner(DEFAULT_ALGORITHM_UNLOCKS);
+
+    await page.goto('/login?returnTo=%2Fplayground%2Fpg-house-price');
+    await page.locator("input[type='email']").fill(credentials.email);
+    await page.locator("input[type='password']").fill(credentials.password);
+    await page.locator("form button[type='submit']").click();
+    await expect(page).toHaveURL('/playground/pg-house-price');
+
+    for (const scenario of DEFAULT_SCENARIOS) {
+      await page.goto(`/playground/${scenario.scenarioId}`);
+      await expect(page.getByTestId('playground-dataset-tray')).toBeVisible();
+      await expect(page.locator('.playground-identity code')).toHaveText(
+        `${scenario.scenarioId} / ${scenario.algorithmId}`,
+      );
+
+      const runButton = page.locator('.playground-run-actions > button').first();
+
+      await expect(runButton).toBeEnabled({ timeout: 30_000 });
+      await runButton.click();
+      await expect(page.locator('.status-completed')).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId('playground-result')).toBeVisible();
+      await expectPlotlyChartReady(page.locator('[data-testid^="playground-chart-"]').first());
+      await expectNoHorizontalOverflow(page);
+    }
+
+    await expectNoWcagViolations(page);
   });
 });
 
@@ -102,7 +300,9 @@ async function areLocalAuthDependenciesReady(): Promise<boolean> {
   }
 }
 
-async function createUnlockedLearner(): Promise<{ email: string; password: string }> {
+async function createUnlockedLearner(
+  unlocks: readonly (readonly [string, string])[] = REPRESENTATIVE_ALGORITHM_UNLOCKS,
+): Promise<{ email: string; password: string }> {
   const email = `playground-${randomUUID()}@example.test`;
   const password = `Test-playground-${randomUUID()}!`;
   const authResponse = await fetch(AUTH_SIGN_UP_URL, {
@@ -115,14 +315,6 @@ async function createUnlockedLearner(): Promise<{ email: string; password: strin
   const authPayload = (await authResponse.json()) as { localId?: string };
 
   expect(authPayload.localId).toBeTruthy();
-
-  const unlocks = [
-    ['linear-regression', 'cml-m02-linear-polynomial'],
-    ['logistic-regression', 'cml-m04-logistic'],
-    ['kmeans', 'cml-m08-clustering'],
-    ['pca', 'cml-m09-pca'],
-    ['mlp', 'dl-m02-mlp'],
-  ] as const;
 
   for (const [algorithmId, moduleId] of unlocks) {
     const unlockResponse = await fetch(
@@ -174,6 +366,12 @@ async function expectNoHorizontalOverflow(page: Page) {
   });
 
   expect(layout).toEqual({ offenders: [], overflow: 0 });
+}
+
+async function expectPlotlyChartReady(chart: Locator) {
+  await expect(chart).toHaveAttribute('data-plotly-state', 'ready', { timeout: 30_000 });
+  await expect(chart).toHaveClass(/js-plotly-plot/, { timeout: 30_000 });
+  await expect(chart.locator('.plot-container.plotly')).toBeVisible({ timeout: 30_000 });
 }
 
 async function expectNoWcagViolations(page: Page) {

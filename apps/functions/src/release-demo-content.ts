@@ -1391,16 +1391,16 @@ const pcaSensorCompressionDemo: FixedDemoDraft = {
 const DEFAULT_STEP_DURATION_MS = 3_000;
 
 const adapterVersionByAlgorithmId: Readonly<Record<string, string>> = {
-  'decision-tree': 'decision-tree-js-v1',
-  kmeans: 'kmeans-js-v1',
-  knn: 'knn-js-v1',
-  'linear-regression': 'linear-regression-js-v1',
-  'logistic-regression': 'logistic-regression-js-v1',
-  mlp: 'mlp-js-v1',
-  pca: 'pca-js-v1',
-  perceptron: 'perceptron-js-v1',
-  'ridge-regression': 'ridge-regression-js-v1',
-  svm: 'svm-js-v1',
+  'decision-tree': 'ml-cart-v1',
+  kmeans: 'ml-kmeans-v1',
+  knn: 'ml-knn-v1',
+  'linear-regression': 'tfjs-core-v1',
+  'logistic-regression': 'tfjs-layers-v1',
+  mlp: 'tfjs-layers-v1',
+  pca: 'ml-pca-v1',
+  perceptron: 'tfjs-core-v1',
+  'ridge-regression': 'tfjs-core-v1',
+  svm: 'libsvm-js-v1',
 };
 
 function canonicalizeForHash(value: unknown): unknown {

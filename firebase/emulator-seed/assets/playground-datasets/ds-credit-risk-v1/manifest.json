@@ -1,0 +1,33 @@
+{
+  "byteSize": 372,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-credit-risk-v1/dataset.json.gz",
+  "datasetVersionId": "ds-credit-risk-v1",
+  "featureColumns": ["incomeScore", "debtRatio", "missedPayments", "collateralScore"],
+  "labelColumn": "isHighRisk",
+  "schemaVersion": 1,
+  "sha256": "65a6226f557f1a32099ab64dee4230fe1b8f51a94aaedcde80e9f3022b70e52c",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-credit-risk-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "binary-classification",
+  "textAlternative": {
+    "en": "Synthetic credit rows with income, debt ratio, missed payments, and collateral score.",
+    "vi": "Dữ liệu tín dụng tổng hợp với thu nhập, tỷ lệ nợ, lần trễ hạn và điểm tài sản đảm bảo."
+  }
+}

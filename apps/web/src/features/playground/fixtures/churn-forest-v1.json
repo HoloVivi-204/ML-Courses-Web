@@ -22,10 +22,10 @@
       "kind": "importance",
       "trees": 50,
       "featureUsage": {
-        "tenureMonths": 28,
-        "monthlyChargeIndex": 14,
+        "tenureMonths": 19,
+        "monthlyChargeIndex": 10,
         "supportContactIndex": 8,
-        "contractIndex": 0
+        "contractIndex": 13
       },
       "truePositive": 5,
       "falsePositive": 0,

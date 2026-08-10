@@ -1,0 +1,33 @@
+{
+  "byteSize": 364,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-sms-spam-v1/dataset.json.gz",
+  "datasetVersionId": "ds-sms-spam-v1",
+  "featureColumns": ["offerTerms", "moneyTerms", "linkTerms", "meetingTerms", "personalTerms"],
+  "labelColumn": "isSpam",
+  "schemaVersion": 1,
+  "sha256": "7ef4841f95aa9b9c28dde1f7e2790c976991a222c27e086b8dc43a98411a025b",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-sms-spam-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "binary-classification",
+  "textAlternative": {
+    "en": "Offline numeric SMS features representing promotional, money, link, and ham context terms.",
+    "vi": "Đặc trưng SMS dạng số đã tạo sẵn cho nhóm từ khuyến mãi, tiền, liên kết và ngữ cảnh thường."
+  }
+}

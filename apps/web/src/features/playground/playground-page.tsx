@@ -31,9 +31,15 @@ import type {
 } from '../learning/learning-api';
 import type { PlaygroundPairRegistration, PlaygroundParameterField } from './algorithm-adapter';
 import type { MlConfig, MlMetricValue, MlProgressEvent, MlRunResult } from './ml-engine-contract';
+import { createFirebasePlaygroundDatasetLoader } from './firebase-playground-dataset-gateway';
 import { createMlWorkerController } from './ml-worker-controller';
+import type { PlaygroundDatasetLoader } from './playground-dataset-loader';
 import { getPlaygroundPairRegistry } from './playground-adapter-registry';
-import { createSeededRandom, getPlaygroundDataset } from './playground-datasets';
+import {
+  createSeededRandom,
+  getPlaygroundDataset,
+  type PlaygroundDataset,
+} from './playground-datasets';
 import { PlaygroundVisualization } from './playground-visualizations';
 
 interface PlaygroundPageProps {
@@ -218,6 +224,18 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   );
   const { getIdToken, user } = useAuth();
   const controller = useMemo(() => createMlWorkerController(), []);
+  const datasetLoader = useMemo<PlaygroundDatasetLoader>(() => {
+    if (import.meta.env.MODE === 'test' || import.meta.env.VITEST) {
+      return {
+        getCacheKey: () => 'test-dataset-cache-key',
+        async load(datasetVersionId) {
+          return getPlaygroundDataset(datasetVersionId);
+        },
+      };
+    }
+
+    return createFirebasePlaygroundDatasetLoader();
+  }, []);
   const deviceProfile = useMemo(() => getDeviceProfile(), []);
   const [unlockedAlgorithmIds, setUnlockedAlgorithmIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -237,6 +255,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     cloneConfig(initialRegistration?.defaultConfig ?? {}),
   );
   const [status, setStatus] = useState<RunStatus>('idle');
+  const [loadedDataset, setLoadedDataset] = useState<PlaygroundDataset | null>(null);
   const [progress, setProgress] = useState<MlProgressEvent | null>(null);
   const [result, setResult] = useState<MlRunResult | null>(null);
   const [savedRuns, setSavedRuns] = useState<PlaygroundRunRecord[]>([]);
@@ -260,6 +279,33 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
     return idToken;
   }, [getIdToken, t]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!selectedDatasetVersionId || !user) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void datasetLoader.load(selectedDatasetVersionId).then(
+      (dataset) => {
+        if (isMounted) {
+          setLoadedDataset(dataset);
+        }
+      },
+      () => {
+        if (isMounted) {
+          setSafeError(t('playground.error.run'));
+        }
+      },
+    );
+
+    return () => {
+      isMounted = false;
+    };
+  }, [datasetLoader, selectedDatasetVersionId, t, user]);
 
   const loadSavedArtifacts = useCallback(
     async (idToken: string, currentScenarioId: string) => {
@@ -433,9 +479,8 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
   const activePairKey = getRegistrationKey(selectedRegistration);
   const isRunBusy = status === 'running' || status === 'stopping';
-  const selectedDataset = selectedDatasetVersionId
-    ? getPlaygroundDataset(selectedDatasetVersionId)
-    : null;
+  const selectedDataset =
+    user && loadedDataset?.datasetVersionId === selectedDatasetVersionId ? loadedDataset : null;
 
   function handleDatasetSelect(nextDatasetVersionId: string) {
     if (isRunBusy || !scenarioDatasetIds.includes(nextDatasetVersionId)) {
@@ -475,7 +520,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   }
 
   async function handleRun() {
-    if (!user || isRunBusy || !selectedRegistration) {
+    if (!user || isRunBusy || !selectedRegistration || !selectedDataset) {
+      if (!isRunBusy && selectedRegistration && !selectedDataset) {
+        setSafeError(t('playground.error.run'));
+      }
+
       return;
     }
 
@@ -514,6 +563,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
             session.configSchemaVersion ?? selectedRegistration.configSchemaVersion,
           config: session.config as Record<string, unknown>,
           configHash: session.configHash,
+          dataset: selectedDataset,
         },
         setProgress,
       );
@@ -566,15 +616,17 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     setStatus('stopping');
     isStoppingRef.current = true;
     const resetSequence = resetSequenceRef.current;
-    const idToken = await readRequiredIdToken();
+    const workerStop = controller.stop(activeRun.runId);
+    const sessionCancellation = (async () => {
+      const idToken = await readRequiredIdToken();
 
-    await Promise.allSettled([
-      controller.stop(activeRun.runId),
-      learningApiClient.cancelPlaygroundRunSession({
+      return learningApiClient.cancelPlaygroundRunSession({
         idToken,
         sessionId: activeRun.sessionId,
-      }),
-    ]);
+      });
+    })();
+
+    await Promise.allSettled([workerStop, sessionCancellation]);
 
     if (resetSequenceRef.current !== resetSequence) {
       isStoppingRef.current = false;
@@ -793,15 +845,13 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         </div>
       </section>
 
-      {selectedDataset ? (
-        <DatasetTray
-          disabled={isRunBusy}
-          locale={locale}
-          onSelect={handleDatasetSelect}
-          selectedDatasetVersionId={selectedDatasetVersionId}
-          scenarioDatasetIds={scenarioDatasetIds}
-        />
-      ) : null}
+      <DatasetTray
+        disabled={isRunBusy}
+        locale={locale}
+        onSelect={handleDatasetSelect}
+        selectedDatasetVersionId={selectedDatasetVersionId}
+        scenarioDatasetIds={scenarioDatasetIds}
+      />
 
       <section className="playground-workspace">
         <form className="playground-controls" onSubmit={(event) => event.preventDefault()}>
@@ -854,7 +904,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
             {formatLimitSummary(selectedRegistration.parameterFields, deviceProfile, locale)}
           </p>
           <div className="playground-run-actions">
-            <button disabled={isRunBusy} onClick={handleRun}>
+            <button disabled={isRunBusy || !selectedDataset} onClick={handleRun}>
               <Zap aria-hidden="true" size={16} />
               {t('playground.run')}
             </button>

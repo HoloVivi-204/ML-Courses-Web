@@ -2,6 +2,11 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    match /datasets/{datasetVersionId}/{objectPath=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     match /user-avatars/{uid}/{objectId} {
       // Avatar URLs contain server-issued UUID paths and download tokens.
       allow read: if true;

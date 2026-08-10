@@ -1,0 +1,33 @@
+{
+  "byteSize": 365,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-house-price-v1/dataset.json.gz",
+  "datasetVersionId": "ds-house-price-v1",
+  "featureColumns": ["areaSqm", "rooms", "distanceKm", "ageYears"],
+  "labelColumn": "priceIndex",
+  "schemaVersion": 1,
+  "sha256": "778ea90e86aa73deaac31fc7626efa07b69046ce69912ac2f7c094349e696033",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-house-price-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "regression",
+  "textAlternative": {
+    "en": "Synthetic house-price rows generated from area, rooms, distance, and age.",
+    "vi": "Dữ liệu giá nhà tổng hợp từ diện tích, số phòng, khoảng cách và tuổi nhà."
+  }
+}

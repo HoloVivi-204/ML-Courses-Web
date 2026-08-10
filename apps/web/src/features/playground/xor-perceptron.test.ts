@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { runXorPerceptron, validateXorPerceptronConfig } from './xor-perceptron';
 import xorPerceptronGoldenFixture from './fixtures/xor-perceptron-v1.json';
+import { assertGoldenFixture } from './playground-golden-fixture';
 
 const defaultConfig = {
   learningRate: 0.1,
@@ -26,10 +27,12 @@ describe('XOR Perceptron engine', () => {
       runId: 'run-golden',
     });
 
-    expect(result).toMatchObject({
-      runId: 'run-golden',
-      ...xorPerceptronGoldenFixture.result,
-    });
+    expect(result.runId).toBe('run-golden');
+    assertGoldenFixture(
+      result,
+      xorPerceptronGoldenFixture.result,
+      xorPerceptronGoldenFixture.tolerance,
+    );
   });
 
   it('emits monotonic progress events without changing the deterministic result', async () => {

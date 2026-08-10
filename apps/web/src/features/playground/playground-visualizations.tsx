@@ -1,6 +1,10 @@
+import { useEffect, useMemo, useRef } from 'react';
+import type { PlotlyLayout, PlotlyModule, PlotlyTrace } from 'plotly.js-cartesian-dist-min';
+
 import type { Locale } from '../catalog/course-data';
 import type { PlaygroundDataset } from './playground-datasets';
 import type { MlRunResult } from './ml-engine-contract';
+import { loadPlotly } from './plotly-loader';
 
 interface PlaygroundVisualizationProps {
   dataset: PlaygroundDataset | null;
@@ -8,39 +12,121 @@ interface PlaygroundVisualizationProps {
   result: MlRunResult;
 }
 
-const CHART_WIDTH = 520;
-const CHART_HEIGHT = 300;
-const PLOT_LEFT = 44;
-const PLOT_RIGHT = 494;
-const PLOT_TOP = 20;
-const PLOT_BOTTOM = 252;
-const CLASS_COLORS = ['class-zero', 'class-one', 'class-two', 'class-three'] as const;
+interface PlotlyChartSpec {
+  data: readonly PlotlyTrace[];
+  layout: PlotlyLayout;
+}
+
+interface PlotlyTheme {
+  ink: string;
+  line: string;
+  paper: string;
+  surface: string;
+  teal: string;
+}
+
+const PLOTLY_CONFIG = {
+  displayModeBar: false,
+  responsive: true,
+  scrollZoom: false,
+};
+
+const PLOTLY_MARKERS = ['circle', 'square', 'diamond', 'cross'] as const;
+const PLOTLY_COLORS = ['#f97316', '#14b8a6', '#8b5cf6', '#eab308'] as const;
 
 export function PlaygroundVisualization({ dataset, locale, result }: PlaygroundVisualizationProps) {
   const chartKind = getChartKind(result);
   const chartTitle = formatChartTitle(chartKind, locale);
+  const chartDescription = formatChartDescription(chartKind, locale);
+  const chartSpec = useMemo(
+    () => createChartSpec({ chartKind, dataset, result }),
+    [chartKind, dataset, result],
+  );
 
   return (
     <div className="playground-visualization" data-testid="playground-visualization">
       <figure className="playground-chart-figure">
-        <svg
-          aria-labelledby="playground-chart-title playground-chart-description"
-          className="playground-chart"
-          data-chart-kind={chartKind}
-          data-testid={`playground-chart-${chartKind}`}
-          role="img"
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        >
-          <title id="playground-chart-title">{chartTitle}</title>
-          <desc id="playground-chart-description">{formatChartDescription(chartKind, locale)}</desc>
-          {renderChart({ chartKind, dataset, result })}
-        </svg>
+        <PlotlyChart
+          description={chartDescription}
+          spec={chartSpec}
+          testId={`playground-chart-${chartKind}`}
+          title={chartTitle}
+        />
         <figcaption>{chartTitle}</figcaption>
       </figure>
       {result.lossCurve && result.lossCurve.length > 0 ? (
         <LossCurveChart locale={locale} points={result.lossCurve} />
       ) : null}
     </div>
+  );
+}
+
+function PlotlyChart({
+  description,
+  spec,
+  testId,
+  title,
+}: {
+  description: string;
+  spec: PlotlyChartSpec;
+  testId: string;
+  title: string;
+}) {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const descriptionId = `${testId}-description`;
+
+  useEffect(() => {
+    const chartElement = chartRef.current;
+
+    if (!chartElement) {
+      return undefined;
+    }
+
+    let disposed = false;
+    let activePlotly: PlotlyModule | null = null;
+    chartElement.dataset.plotlyState = 'loading';
+
+    void loadPlotly()
+      .then((plotly) => {
+        if (disposed) {
+          return undefined;
+        }
+
+        activePlotly = plotly;
+
+        return plotly.newPlot(chartElement, spec.data, spec.layout, PLOTLY_CONFIG);
+      })
+      .then(() => {
+        if (!disposed) {
+          chartElement.dataset.plotlyState = 'ready';
+        }
+      })
+      .catch(() => {
+        if (!disposed) {
+          chartElement.dataset.plotlyState = 'error';
+        }
+      });
+
+    return () => {
+      disposed = true;
+      activePlotly?.purge(chartElement);
+    };
+  }, [spec]);
+
+  return (
+    <>
+      <div
+        aria-describedby={descriptionId}
+        aria-label={title}
+        className="playground-chart"
+        data-testid={testId}
+        ref={chartRef}
+        role="img"
+      />
+      <span className="visually-hidden" id={descriptionId}>
+        {description}
+      </span>
+    </>
   );
 }
 
@@ -62,79 +148,27 @@ function LossCurveChart({
     return null;
   }
 
-  const epochMax = Math.max(...curve.map((point) => point.epoch), 1);
-  const lossMax = Math.max(...curve.map((point) => point.loss), 0.0001);
-  const path = curve
-    .map(
-      (point) =>
-        `${projectLinear(point.epoch, 1, epochMax, PLOT_LEFT, PLOT_RIGHT)},${projectLinear(
-          point.loss,
-          0,
-          lossMax,
-          PLOT_BOTTOM,
-          PLOT_TOP,
-        )}`,
-    )
-    .join(' ');
+  const title = locale === 'vi' ? 'Đường cong loss' : 'Loss curve';
+  const description =
+    locale === 'vi'
+      ? 'Loss theo từng epoch trong quá trình huấn luyện.'
+      : 'Loss measured at each training epoch.';
+  const spec = createLossCurveSpec(curve);
 
   return (
     <figure className="playground-chart-figure playground-loss-figure">
-      <svg
-        aria-labelledby="playground-loss-title playground-loss-description"
-        className="playground-chart playground-loss-chart"
-        data-testid="playground-loss-chart"
-        role="img"
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-      >
-        <title id="playground-loss-title">
-          {locale === 'vi' ? 'Đường cong loss' : 'Loss curve'}
-        </title>
-        <desc id="playground-loss-description">
-          {locale === 'vi'
-            ? 'Loss theo từng epoch trong quá trình huấn luyện.'
-            : 'Loss measured at each training epoch.'}
-        </desc>
-        <line
-          className="chart-axis"
-          x1={PLOT_LEFT}
-          x2={PLOT_RIGHT}
-          y1={PLOT_BOTTOM}
-          y2={PLOT_BOTTOM}
-        />
-        <line className="chart-axis" x1={PLOT_LEFT} x2={PLOT_LEFT} y1={PLOT_TOP} y2={PLOT_BOTTOM} />
-        <polyline className="chart-series loss-series" points={path} />
-        {curve.map((point, index) => (
-          <circle
-            className="chart-point"
-            cx={projectLinear(point.epoch, 1, epochMax, PLOT_LEFT, PLOT_RIGHT)}
-            cy={projectLinear(point.loss, 0, lossMax, PLOT_BOTTOM, PLOT_TOP)}
-            data-point-index={index}
-            key={`${point.epoch}-${index}`}
-            r="3.5"
-          >
-            <title>
-              {locale === 'vi' ? 'Epoch' : 'Epoch'} {point.epoch}: {point.loss}
-            </title>
-          </circle>
-        ))}
-        <text className="chart-label" x={PLOT_LEFT} y={CHART_HEIGHT - 12}>
-          {locale === 'vi' ? 'Epoch' : 'Epoch'}
-        </text>
-        <text
-          className="chart-label"
-          transform={`rotate(-90 14 ${PLOT_BOTTOM / 2})`}
-          x="14"
-          y={PLOT_BOTTOM / 2}
-        >
-          Loss
-        </text>
-      </svg>
+      <PlotlyChart
+        description={description}
+        spec={spec}
+        testId="playground-loss-chart"
+        title={title}
+      />
       <figcaption>{locale === 'vi' ? 'Loss theo epoch' : 'Loss over epochs'}</figcaption>
     </figure>
   );
 }
 
-function renderChart({
+function createChartSpec({
   chartKind,
   dataset,
   result,
@@ -142,174 +176,139 @@ function renderChart({
   chartKind: string;
   dataset: PlaygroundDataset | null;
   result: MlRunResult;
-}) {
+}): PlotlyChartSpec {
+  const theme = getPlotlyTheme();
   const summary = result.chartSummary ?? {};
 
   if (chartKind === 'confusion-matrix') {
-    return <ConfusionMatrixChart summary={summary} />;
+    return createConfusionMatrixSpec(summary, theme);
   }
 
   if (chartKind === 'actual-vs-predicted' || chartKind === 'polynomial-residual') {
-    return <ResidualChart summary={summary} />;
+    return createResidualSpec(summary, theme);
   }
 
   if (chartKind === 'residual-coefficient' || chartKind === 'importance') {
-    return <BarChart summary={summary} />;
+    return createBarSpec(summary, theme);
   }
 
   if (chartKind === 'tree') {
-    return <TreeChart summary={summary} />;
+    return createTreeSpec(summary, theme);
   }
 
   if (chartKind === 'dendrogram') {
-    return <DendrogramChart summary={summary} />;
+    return createDendrogramSpec(summary, theme);
   }
 
-  if (
-    chartKind === 'cluster-plot' ||
-    chartKind === 'projection-2d' ||
-    chartKind === 'decision-boundary'
-  ) {
-    return <ScatterChart dataset={dataset} result={result} />;
-  }
-
-  return <ScatterChart dataset={dataset} result={result} />;
+  return createScatterSpec(dataset, result, theme);
 }
 
-function ScatterChart({
-  dataset,
-  result,
-}: {
-  dataset: PlaygroundDataset | null;
-  result: MlRunResult;
-}) {
+function createScatterSpec(
+  dataset: PlaygroundDataset | null,
+  result: MlRunResult,
+  theme: PlotlyTheme,
+): PlotlyChartSpec {
   const rows = dataset?.rows.slice(0, 180) ?? [];
-  const bounds = getScatterBounds(rows);
-  const boundary = readBoundary(result.boundary);
   const summary = result.chartSummary ?? {};
   const clusterCount = readNumberArray(summary.clusterSizes).length;
-  const pointClassCount = Math.max(clusterCount, 2);
+  const groupCount = Math.max(clusterCount, 2);
+  const traces: PlotlyTrace[] = Array.from({ length: groupCount }, (_, groupIndex) => {
+    const groupRows = rows.filter((_, index) => index % groupCount === groupIndex);
 
-  return (
-    <g className="scatter-chart">
-      <line
-        className="chart-axis"
-        x1={PLOT_LEFT}
-        x2={PLOT_RIGHT}
-        y1={PLOT_BOTTOM}
-        y2={PLOT_BOTTOM}
-      />
-      <line className="chart-axis" x1={PLOT_LEFT} x2={PLOT_LEFT} y1={PLOT_TOP} y2={PLOT_BOTTOM} />
-      {rows.map((row, index) => {
-        const [x, y] = row.features;
+    return {
+      hovertemplate: '%{text}<extra></extra>',
+      marker: {
+        color: PLOTLY_COLORS[groupIndex % PLOTLY_COLORS.length],
+        size: 8,
+        symbol: PLOTLY_MARKERS[groupIndex % PLOTLY_MARKERS.length],
+      },
+      mode: 'markers',
+      name: `Group ${groupIndex + 1}`,
+      text: groupRows.map((row) => `${row.rowId}: ${formatRowLabel(row.label)}`),
+      type: 'scatter',
+      x: groupRows.map((row) => row.features[0] ?? 0),
+      y: groupRows.map((row) => row.features[1] ?? 0),
+    } satisfies PlotlyTrace;
+  }).filter((trace) => Array.isArray(trace.x) && trace.x.length > 0);
+  const boundary = readBoundary(result.boundary);
 
-        return (
-          <circle
-            className={`chart-point ${CLASS_COLORS[index % pointClassCount] ?? 'class-zero'}`}
-            cx={projectFeature(x ?? 0, bounds.xMin, bounds.xMax, PLOT_LEFT, PLOT_RIGHT)}
-            cy={projectFeature(y ?? 0, bounds.yMin, bounds.yMax, PLOT_BOTTOM, PLOT_TOP)}
-            data-row-id={row.rowId}
-            key={row.rowId}
-            r="3.4"
-          >
-            <title>
-              {row.rowId}: {row.label === undefined ? 'unlabeled' : `class ${row.label}`}
-            </title>
-          </circle>
-        );
-      })}
-      {boundary ? (
-        <line
-          className="boundary"
-          data-testid="playground-boundary-line"
-          x1={PLOT_LEFT}
-          x2={PLOT_RIGHT}
-          y1={projectBoundaryY(bounds.xMin, boundary, bounds, PLOT_BOTTOM, PLOT_TOP)}
-          y2={projectBoundaryY(bounds.xMax, boundary, bounds, PLOT_BOTTOM, PLOT_TOP)}
-        />
-      ) : (
-        <line
-          className="boundary boundary-placeholder"
-          data-testid="playground-boundary-placeholder"
-          x1={PLOT_LEFT + 12}
-          x2={PLOT_RIGHT - 12}
-          y1={PLOT_BOTTOM - 18}
-          y2={PLOT_TOP + 18}
-        />
-      )}
-      <text className="chart-label" x={PLOT_LEFT} y={CHART_HEIGHT - 12}>
-        {dataset?.featureColumns[0] ?? 'feature 1'}
-      </text>
-      <text
-        className="chart-label"
-        transform={`rotate(-90 14 ${PLOT_BOTTOM / 2})`}
-        x="14"
-        y={PLOT_BOTTOM / 2}
-      >
-        {dataset?.featureColumns[1] ?? 'feature 2'}
-      </text>
-    </g>
-  );
+  if (boundary) {
+    const bounds = getScatterBounds(rows);
+    traces.push({
+      hoverinfo: 'skip',
+      line: { color: theme.teal, dash: 'dash', width: 3 },
+      mode: 'lines',
+      name: 'Decision boundary',
+      type: 'scatter',
+      x: [bounds.xMin, bounds.xMax],
+      y: [
+        calculateBoundaryY(bounds.xMin, boundary, bounds),
+        calculateBoundaryY(bounds.xMax, boundary, bounds),
+      ],
+    });
+  }
+
+  return {
+    data: traces,
+    layout: {
+      ...createBaseLayout(theme),
+      showlegend: traces.length > 1,
+      xaxis: {
+        ...createAxis(theme),
+        title: { text: dataset?.featureColumns[0] ?? 'feature 1' },
+      },
+      yaxis: {
+        ...createAxis(theme),
+        title: { text: dataset?.featureColumns[1] ?? 'feature 2' },
+      },
+    },
+  };
 }
 
-function ConfusionMatrixChart({ summary }: { summary: Record<string, unknown> }) {
+function createConfusionMatrixSpec(
+  summary: Record<string, unknown>,
+  theme: PlotlyTheme,
+): PlotlyChartSpec {
   const matrix = getConfusionMatrix(summary);
-  const cellSize = Math.min(92, 250 / matrix.length);
-  const originX = 132;
-  const originY = 38;
-  const maxValue = Math.max(...matrix.flat(), 1);
+  const labels = matrix.map((_, index) => `Class ${index}`);
 
-  return (
-    <g className="confusion-matrix-chart">
-      <text className="chart-label" x={originX + (matrix.length * cellSize) / 2} y="18">
-        Predicted
-      </text>
-      <text className="chart-label" transform="rotate(-90 18 150)" x="18" y="150">
-        Actual
-      </text>
-      {matrix.map((row, rowIndex) =>
-        row.map((value, columnIndex) => {
-          const x = originX + columnIndex * cellSize;
-          const y = originY + rowIndex * cellSize;
-
-          return (
-            <g key={`${rowIndex}-${columnIndex}`}>
-              <rect
-                className="confusion-cell"
-                data-cell-value={value}
-                height={cellSize - 4}
-                opacity={0.18 + (value / maxValue) * 0.72}
-                width={cellSize - 4}
-                x={x}
-                y={y}
-              />
-              <text
-                className="chart-cell-label"
-                x={x + (cellSize - 4) / 2}
-                y={y + (cellSize - 4) / 2 + 5}
-              >
-                {value}
-              </text>
-            </g>
-          );
-        }),
-      )}
-    </g>
-  );
+  return {
+    data: [
+      {
+        colorbar: { title: { text: 'Count' } },
+        colorscale: [
+          [0, theme.paper],
+          [1, theme.teal],
+        ],
+        hovertemplate: 'Actual %{y}<br>Predicted %{x}<br>Count %{z}<extra></extra>',
+        text: matrix,
+        texttemplate: '%{text}',
+        type: 'heatmap',
+        x: labels,
+        y: labels,
+        z: matrix,
+      },
+    ],
+    layout: {
+      ...createBaseLayout(theme),
+      xaxis: { ...createAxis(theme), title: { text: 'Predicted' } },
+      yaxis: { ...createAxis(theme), title: { text: 'Actual' } },
+    },
+  };
 }
 
-function ResidualChart({ summary }: { summary: Record<string, unknown> }) {
+function createResidualSpec(summary: Record<string, unknown>, theme: PlotlyTheme): PlotlyChartSpec {
   const residualMean = readFiniteNumber(summary.residualMean) ?? 0;
   const residualMaxAbs = Math.abs(readFiniteNumber(summary.residualMaxAbs) ?? 0);
-  const values = [residualMean, residualMaxAbs, -residualMaxAbs];
-  const max = Math.max(...values.map(Math.abs), 1);
 
-  return (
-    <VerticalBarChart labels={['mean', 'max abs', 'negative max']} values={values} max={max} />
+  return createBarChartSpec(
+    ['Mean', 'Max abs', 'Negative max'],
+    [residualMean, residualMaxAbs, -residualMaxAbs],
+    theme,
   );
 }
 
-function BarChart({ summary }: { summary: Record<string, unknown> }) {
+function createBarSpec(summary: Record<string, unknown>, theme: PlotlyTheme): PlotlyChartSpec {
   const featureUsage = readNumberRecord(summary.featureUsage);
   const coefficientMagnitudes = readNumberArray(summary.coefficientMagnitudes);
   const values =
@@ -317,133 +316,164 @@ function BarChart({ summary }: { summary: Record<string, unknown> }) {
   const labels =
     Object.keys(featureUsage).length > 0
       ? Object.keys(featureUsage)
-      : values.map((_, index) => `feature ${index + 1}`);
-  const max = Math.max(...values, 1);
+      : values.map((_, index) => `Feature ${index + 1}`);
 
-  return <VerticalBarChart labels={labels} values={values} max={max} />;
+  return createBarChartSpec(labels, values, theme);
 }
 
-function VerticalBarChart({
-  labels,
-  max,
-  values,
-}: {
-  labels: readonly string[];
-  max: number;
-  values: readonly number[];
-}) {
-  const barWidth = Math.max(20, Math.min(70, 360 / Math.max(values.length, 1)));
-  const gap = values.length > 1 ? (360 - values.length * barWidth) / (values.length - 1) : 0;
-
-  return (
-    <g className="bar-chart">
-      <line
-        className="chart-axis"
-        x1={PLOT_LEFT}
-        x2={PLOT_RIGHT}
-        y1={PLOT_BOTTOM}
-        y2={PLOT_BOTTOM}
-      />
-      {values.map((value, index) => {
-        const x = PLOT_LEFT + 18 + index * (barWidth + gap);
-        const height = (Math.abs(value) / max) * 172;
-        const y = value < 0 ? PLOT_BOTTOM : PLOT_BOTTOM - height;
-
-        return (
-          <g key={`${labels[index] ?? 'value'}-${index}`}>
-            <rect
-              className="chart-bar"
-              data-value={value}
-              height={height}
-              width={barWidth}
-              x={x}
-              y={y}
-            />
-            <text
-              className="chart-label chart-bar-label"
-              textAnchor="middle"
-              x={x + barWidth / 2}
-              y={PLOT_BOTTOM + 18}
-            >
-              {truncateLabel(labels[index] ?? `value ${index + 1}`)}
-            </text>
-            <text
-              className="chart-value"
-              textAnchor="middle"
-              x={x + barWidth / 2}
-              y={Math.max(PLOT_TOP + 12, y - 5)}
-            >
-              {formatNumber(value)}
-            </text>
-          </g>
-        );
-      })}
-    </g>
-  );
+function createBarChartSpec(
+  labels: readonly string[],
+  values: readonly number[],
+  theme: PlotlyTheme,
+): PlotlyChartSpec {
+  return {
+    data: [
+      {
+        hovertemplate: '%{x}: %{y}<extra></extra>',
+        marker: { color: theme.teal },
+        text: values.map(formatNumber),
+        textposition: 'auto',
+        type: 'bar',
+        x: labels,
+        y: values,
+      },
+    ],
+    layout: {
+      ...createBaseLayout(theme),
+      xaxis: createAxis(theme),
+      yaxis: { ...createAxis(theme), title: { text: 'Value' } },
+    },
+  };
 }
 
-function TreeChart({ summary }: { summary: Record<string, unknown> }) {
+function createTreeSpec(summary: Record<string, unknown>, theme: PlotlyTheme): PlotlyChartSpec {
   const rootFeature = typeof summary.rootFeature === 'string' ? summary.rootFeature : 'feature';
   const threshold = readFiniteNumber(summary.rootThreshold);
 
-  return (
-    <g className="tree-chart">
-      <line className="tree-branch" x1="260" x2="150" y1="112" y2="190" />
-      <line className="tree-branch" x1="260" x2="370" y1="112" y2="190" />
-      <rect className="tree-node tree-root" height="60" rx="8" width="156" x="182" y="52" />
-      <text className="chart-cell-label" textAnchor="middle" x="260" y="78">
-        {truncateLabel(rootFeature)}
-      </text>
-      <text className="chart-cell-label" textAnchor="middle" x="260" y="98">
-        {threshold === null ? 'split' : `≤ ${formatNumber(threshold)}`}
-      </text>
-      <rect className="tree-node" height="48" rx="8" width="110" x="95" y="190" />
-      <rect className="tree-node" height="48" rx="8" width="110" x="315" y="190" />
-      <text className="chart-cell-label" textAnchor="middle" x="150" y="218">
-        class 0
-      </text>
-      <text className="chart-cell-label" textAnchor="middle" x="370" y="218">
-        class 1
-      </text>
-    </g>
-  );
+  return {
+    data: [
+      {
+        hoverinfo: 'skip',
+        line: { color: theme.line, width: 2 },
+        mode: 'lines',
+        type: 'scatter',
+        x: [0, -1, null, 0, 1],
+        y: [1, 0, null, 1, 0],
+      },
+      {
+        hovertemplate: '%{text}<extra></extra>',
+        marker: { color: [theme.teal, PLOTLY_COLORS[0], PLOTLY_COLORS[1]], size: [26, 20, 20] },
+        mode: 'markers+text',
+        text: [
+          `${truncateLabel(rootFeature)}<br>${threshold === null ? 'split' : `≤ ${formatNumber(threshold)}`}`,
+          'class 0',
+          'class 1',
+        ],
+        textposition: 'top center',
+        type: 'scatter',
+        x: [0, -1, 1],
+        y: [1, 0, 0],
+      },
+    ],
+    layout: {
+      ...createBaseLayout(theme),
+      showlegend: false,
+      xaxis: { ...createAxis(theme), range: [-1.5, 1.5], showgrid: false, visible: false },
+      yaxis: { ...createAxis(theme), range: [-0.5, 1.5], showgrid: false, visible: false },
+    },
+  };
 }
 
-function DendrogramChart({ summary }: { summary: Record<string, unknown> }) {
+function createDendrogramSpec(
+  summary: Record<string, unknown>,
+  theme: PlotlyTheme,
+): PlotlyChartSpec {
   const heights = readNumberArray(summary.mergeHeights);
-  const max = Math.max(...heights, 0.0001);
-  const step = heights.length > 0 ? 390 / heights.length : 390;
+  const x = heights.flatMap((_, index) => [index, index + 1, null]);
+  const y = heights.flatMap((height) => [height, height, null]);
 
-  return (
-    <g className="dendrogram-chart">
-      <line
-        className="chart-axis"
-        x1={PLOT_LEFT}
-        x2={PLOT_RIGHT}
-        y1={PLOT_BOTTOM}
-        y2={PLOT_BOTTOM}
-      />
-      {heights.map((height, index) => {
-        const x = PLOT_LEFT + 12 + index * step;
-        const y = PLOT_BOTTOM - (height / max) * 188;
+  return {
+    data: [
+      {
+        hovertemplate: 'Merge height %{y}<extra></extra>',
+        line: { color: theme.teal, width: 3 },
+        mode: 'lines+markers',
+        type: 'scatter',
+        x,
+        y,
+      },
+    ],
+    layout: {
+      ...createBaseLayout(theme),
+      showlegend: false,
+      xaxis: { ...createAxis(theme), title: { text: 'Merge order' } },
+      yaxis: { ...createAxis(theme), title: { text: 'Height' } },
+    },
+  };
+}
 
-        return (
-          <line
-            className="dendrogram-merge"
-            data-height={height}
-            key={`${height}-${index}`}
-            x1={x}
-            x2={x + step}
-            y1={y}
-            y2={y}
-          />
-        );
-      })}
-      <text className="chart-label" x={PLOT_LEFT} y={CHART_HEIGHT - 12}>
-        Merge order
-      </text>
-    </g>
-  );
+function createLossCurveSpec(curve: readonly { epoch: number; loss: number }[]): PlotlyChartSpec {
+  const theme = getPlotlyTheme();
+
+  return {
+    data: [
+      {
+        hovertemplate: 'Epoch %{x}: %{y}<extra></extra>',
+        line: { color: theme.teal, width: 3 },
+        marker: { color: theme.teal, size: 6 },
+        mode: 'lines+markers',
+        type: 'scatter',
+        x: curve.map((point) => point.epoch),
+        y: curve.map((point) => point.loss),
+      },
+    ],
+    layout: {
+      ...createBaseLayout(theme),
+      showlegend: false,
+      xaxis: { ...createAxis(theme), title: { text: 'Epoch' } },
+      yaxis: { ...createAxis(theme), title: { text: 'Loss' } },
+    },
+  };
+}
+
+function createBaseLayout(theme: PlotlyTheme): PlotlyLayout {
+  return {
+    autosize: true,
+    font: { color: theme.ink, family: 'Be Vietnam Pro, sans-serif', size: 12 },
+    height: 300,
+    hoverlabel: { bgcolor: theme.surface, font: { color: theme.ink } },
+    margin: { b: 54, l: 58, r: 24, t: 24 },
+    paper_bgcolor: theme.paper,
+    plot_bgcolor: theme.paper,
+  };
+}
+
+function createAxis(theme: PlotlyTheme): PlotlyLayout {
+  return {
+    automargin: true,
+    gridcolor: theme.line,
+    linecolor: theme.line,
+    tickfont: { color: theme.ink },
+    zerolinecolor: theme.line,
+  };
+}
+
+function getPlotlyTheme(): PlotlyTheme {
+  return {
+    ink: readThemeToken('--ink', '#1f2937'),
+    line: readThemeToken('--line', '#d1d5db'),
+    paper: readThemeToken('--paper', '#f8fafc'),
+    surface: readThemeToken('--surface', '#ffffff'),
+    teal: readThemeToken('--teal', '#0f766e'),
+  };
+}
+
+function readThemeToken(token: string, fallback: string): string {
+  if (typeof document === 'undefined') {
+    return fallback;
+  }
+
+  return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || fallback;
 }
 
 function getChartKind(result: MlRunResult): string {
@@ -489,17 +519,10 @@ function formatChartDescription(kind: string, locale: Locale): string {
 function getScatterBounds(rows: readonly { features: readonly number[] }[]) {
   const xValues = rows.map((row) => row.features[0] ?? 0);
   const yValues = rows.map((row) => row.features[1] ?? 0);
-  const xMin = Math.min(...xValues, 0);
-  const xMax = Math.max(...xValues, 1);
-  const yMin = Math.min(...yValues, 0);
-  const yMax = Math.max(...yValues, 1);
+  const x = withRangePadding(Math.min(...xValues, 0), Math.max(...xValues, 1));
+  const y = withRangePadding(Math.min(...yValues, 0), Math.max(...yValues, 1));
 
-  return {
-    xMax: withRangePadding(xMin, xMax).max,
-    xMin: withRangePadding(xMin, xMax).min,
-    yMax: withRangePadding(yMin, yMax).max,
-    yMin: withRangePadding(yMin, yMax).min,
-  };
+  return { xMax: x.max, xMin: x.min, yMax: y.max, yMin: y.min };
 }
 
 function withRangePadding(min: number, max: number): { max: number; min: number } {
@@ -507,32 +530,6 @@ function withRangePadding(min: number, max: number): { max: number; min: number 
   const padding = range * 0.08;
 
   return { max: max + padding, min: min - padding };
-}
-
-function projectFeature(
-  value: number,
-  min: number,
-  max: number,
-  start: number,
-  end: number,
-): number {
-  return projectLinear(value, min, max, start, end);
-}
-
-function projectLinear(
-  value: number,
-  min: number,
-  max: number,
-  start: number,
-  end: number,
-): number {
-  if (max === min) {
-    return (start + end) / 2;
-  }
-
-  const ratio = Math.min(1, Math.max(0, (value - min) / (max - min)));
-
-  return start + ratio * (end - start);
 }
 
 function readBoundary(
@@ -548,12 +545,10 @@ function readBoundary(
   return weights.length >= 2 && bias !== null ? { bias, weights } : null;
 }
 
-function projectBoundaryY(
+function calculateBoundaryY(
   x: number,
   boundary: { bias: number; weights: number[] },
   bounds: { yMax: number; yMin: number },
-  start: number,
-  end: number,
 ): number {
   const denominator = boundary.weights[1] ?? 0;
   const modelY =
@@ -561,7 +556,7 @@ function projectBoundaryY(
       ? bounds.yMax
       : -(boundary.bias + (boundary.weights[0] ?? 0) * x) / denominator;
 
-  return projectFeature(modelY, bounds.yMin, bounds.yMax, start, end);
+  return Math.min(bounds.yMax, Math.max(bounds.yMin, modelY));
 }
 
 function getConfusionMatrix(summary: Record<string, unknown>): number[][] {
@@ -609,4 +604,8 @@ function formatNumber(value: number): string {
 
 function truncateLabel(value: string): string {
   return value.length > 12 ? `${value.slice(0, 11)}…` : value;
+}
+
+function formatRowLabel(label: number | undefined): string {
+  return label === undefined ? 'unlabeled' : `class ${label}`;
 }

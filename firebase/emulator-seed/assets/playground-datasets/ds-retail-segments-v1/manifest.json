@@ -1,0 +1,32 @@
+{
+  "byteSize": 221,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-retail-segments-v1/dataset.json.gz",
+  "datasetVersionId": "ds-retail-segments-v1",
+  "featureColumns": ["annualSpendIndex", "visitFrequencyIndex"],
+  "schemaVersion": 1,
+  "sha256": "11f5fe88f52fdc39670b95680ea44769494e18e794593c9e268fbd1c0b1c1028",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-retail-segments-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "clustering",
+  "textAlternative": {
+    "en": "Synthetic retail customers arranged into four spend/frequency segments.",
+    "vi": "Khách hàng bán lẻ tổng hợp thành bốn nhóm theo mức chi tiêu và tần suất ghé mua."
+  }
+}

@@ -2,6 +2,7 @@ import type { MlRunRequest, MlWorkerRequest, MlWorkerResponse } from './ml-worke
 import type { MlProgressEvent, MlRunResult } from './ml-engine-contract';
 
 interface MlWorkerControllerOptions {
+  backendPreference?: 'cpu' | 'wasm' | 'webgl' | undefined;
   createWorker?: (() => Worker) | undefined;
   stopTimeoutMs?: number | undefined;
 }
@@ -11,6 +12,12 @@ interface PendingRun {
   reject: (reason?: unknown) => void;
   resolve: (result: MlRunResult) => void;
   runId: string;
+}
+
+interface PendingStop {
+  resolve: (result: { mode: 'cooperative' | 'terminated'; runId: string }) => void;
+  runId: string;
+  timeoutId: ReturnType<typeof setTimeout>;
 }
 
 export interface MlWorkerController {
@@ -23,12 +30,12 @@ export function createMlWorkerController(
   options: MlWorkerControllerOptions = {},
 ): MlWorkerController {
   let worker: Worker | null = null;
+  let workerReady: Promise<void> | null = null;
+  let resolveWorkerReady: (() => void) | null = null;
+  let rejectWorkerReady: ((reason?: unknown) => void) | null = null;
   let pendingRun: PendingRun | null = null;
-  let pendingStop: {
-    resolve: (result: { mode: 'cooperative' | 'terminated'; runId: string }) => void;
-    runId: string;
-    timeoutId: ReturnType<typeof setTimeout>;
-  } | null = null;
+  let pendingStop: PendingStop | null = null;
+  const backendPreference = options.backendPreference ?? 'wasm';
   const stopTimeoutMs = options.stopTimeoutMs ?? 250;
   const createWorker = options.createWorker ?? createDefaultWorker;
 
@@ -37,26 +44,51 @@ export function createMlWorkerController(
       return worker;
     }
 
-    worker = createWorker();
-    worker.onmessage = (event: MessageEvent<MlWorkerResponse>) => handleWorkerResponse(event.data);
-    worker.postMessage({ type: 'INIT', backendPreference: 'cpu' } satisfies MlWorkerRequest);
+    const nextWorker = createWorker();
+    worker = nextWorker;
+    workerReady = new Promise<void>((resolve, reject) => {
+      resolveWorkerReady = resolve;
+      rejectWorkerReady = reject;
+    });
+    void workerReady.catch(() => undefined);
+    nextWorker.onmessage = (event: MessageEvent<MlWorkerResponse>) =>
+      handleWorkerResponse(event.data);
+    nextWorker.onerror = () => {
+      failWorkerReadiness(new Error('The playground worker stopped unexpectedly.'));
+      rejectPendingRun(new Error('The playground worker stopped unexpectedly.'));
+      terminateWorker(nextWorker);
+    };
+    nextWorker.postMessage({ type: 'INIT', backendPreference } satisfies MlWorkerRequest);
 
-    return worker;
+    return nextWorker;
   }
 
   function handleWorkerResponse(message: MlWorkerResponse): void {
     if (message.type === 'READY') {
+      resolveWorkerReady?.();
+      resolveWorkerReady = null;
+      rejectWorkerReady = null;
+      return;
+    }
+
+    if (message.type === 'STOP_ACK') {
+      rejectPendingRunAsStopped(message.runId);
+      acknowledgeStop(message.runId, 'cooperative');
       return;
     }
 
     if (message.type === 'PROGRESS') {
-      if (pendingRun?.runId === message.event.runId) {
+      if (!isStopRequested(message.event.runId) && pendingRun?.runId === message.event.runId) {
         pendingRun.onProgress(message.event);
       }
       return;
     }
 
     if (message.type === 'RESULT') {
+      if (isStopRequested(message.result.runId)) {
+        return;
+      }
+
       if (pendingRun?.runId === message.result.runId) {
         const run = pendingRun;
 
@@ -67,17 +99,21 @@ export function createMlWorkerController(
     }
 
     if (message.type === 'CANCELLED') {
-      if (pendingRun?.runId === message.runId) {
-        const run = pendingRun;
-
-        pendingRun = null;
-        run.reject(new Error('Playground run was stopped.'));
-      }
+      rejectPendingRunAsStopped(message.runId);
       acknowledgeStop(message.runId, 'cooperative');
       return;
     }
 
     if (message.type === 'ERROR') {
+      if (!message.runId) {
+        failWorkerReadiness(new Error(message.safeMessage));
+        const activeWorker = worker;
+
+        if (activeWorker) {
+          terminateWorker(activeWorker);
+        }
+      }
+
       if (pendingRun && (!message.runId || pendingRun.runId === message.runId)) {
         const run = pendingRun;
 
@@ -85,6 +121,12 @@ export function createMlWorkerController(
         run.reject(new Error(message.safeMessage));
       }
     }
+  }
+
+  function failWorkerReadiness(error: Error): void {
+    rejectWorkerReady?.(error);
+    resolveWorkerReady = null;
+    rejectWorkerReady = null;
   }
 
   function acknowledgeStop(runId: string, mode: 'cooperative' | 'terminated'): void {
@@ -99,16 +141,53 @@ export function createMlWorkerController(
     stop.resolve({ runId, mode });
   }
 
+  function isStopRequested(runId: string): boolean {
+    return pendingStop?.runId === runId;
+  }
+
+  function rejectPendingRun(reason: Error): void {
+    if (!pendingRun) {
+      return;
+    }
+
+    const run = pendingRun;
+
+    pendingRun = null;
+    run.reject(reason);
+  }
+
+  function rejectPendingRunAsStopped(runId: string): void {
+    if (pendingRun?.runId !== runId) {
+      return;
+    }
+
+    rejectPendingRun(new Error('Playground run was stopped.'));
+  }
+
+  function terminateWorker(activeWorker: Worker): void {
+    if (worker === activeWorker) {
+      worker = null;
+      workerReady = null;
+      failWorkerReadiness(new Error('The playground worker was terminated.'));
+    }
+
+    activeWorker.terminate();
+  }
+
   return {
     dispose() {
-      if (worker) {
-        worker.postMessage({ type: 'DISPOSE' } satisfies MlWorkerRequest);
-        worker.terminate();
+      if (pendingStop) {
+        clearTimeout(pendingStop.timeoutId);
+        pendingStop.resolve({ mode: 'terminated', runId: pendingStop.runId });
+        pendingStop = null;
       }
 
-      worker = null;
-      pendingRun = null;
-      pendingStop = null;
+      rejectPendingRun(new Error('The playground worker was disposed.'));
+
+      if (worker) {
+        worker.postMessage({ type: 'DISPOSE' } satisfies MlWorkerRequest);
+        terminateWorker(worker);
+      }
     },
     run(request, onProgress) {
       if (pendingRun) {
@@ -116,6 +195,11 @@ export function createMlWorkerController(
       }
 
       const activeWorker = ensureWorker();
+      const ready = workerReady;
+
+      if (!ready) {
+        return Promise.reject(new Error('The playground worker could not initialize.'));
+      }
 
       return new Promise<MlRunResult>((resolve, reject) => {
         pendingRun = {
@@ -124,7 +208,31 @@ export function createMlWorkerController(
           resolve,
           reject,
         };
-        activeWorker.postMessage({ type: 'RUN', request } satisfies MlWorkerRequest);
+
+        void ready
+          .then(() => {
+            if (
+              worker !== activeWorker ||
+              pendingRun?.runId !== request.runId ||
+              isStopRequested(request.runId)
+            ) {
+              return;
+            }
+
+            activeWorker.postMessage({ type: 'RUN', request } satisfies MlWorkerRequest);
+          })
+          .catch((error: unknown) => {
+            if (pendingRun?.runId === request.runId) {
+              const run = pendingRun;
+
+              pendingRun = null;
+              run.reject(
+                error instanceof Error
+                  ? error
+                  : new Error('The playground worker could not initialize.'),
+              );
+            }
+          });
       });
     },
     stop(runId) {
@@ -134,18 +242,27 @@ export function createMlWorkerController(
         return Promise.resolve({ runId, mode: 'cooperative' });
       }
 
-      activeWorker.postMessage({ type: 'STOP', runId } satisfies MlWorkerRequest);
+      if (pendingStop?.runId === runId) {
+        return new Promise((resolve) => {
+          const existingStop = pendingStop;
+
+          if (!existingStop) {
+            resolve({ runId, mode: 'cooperative' });
+            return;
+          }
+
+          const originalResolve = existingStop.resolve;
+          existingStop.resolve = (result) => {
+            originalResolve(result);
+            resolve(result);
+          };
+        });
+      }
 
       return new Promise((resolve) => {
         const timeoutId = setTimeout(() => {
-          activeWorker.terminate();
-          if (pendingRun?.runId === runId) {
-            const run = pendingRun;
-
-            pendingRun = null;
-            run.reject(new Error('Playground run was stopped.'));
-          }
-          worker = null;
+          terminateWorker(activeWorker);
+          rejectPendingRunAsStopped(runId);
           pendingStop = null;
           resolve({ runId, mode: 'terminated' });
         }, stopTimeoutMs);
@@ -155,6 +272,7 @@ export function createMlWorkerController(
           resolve,
           timeoutId,
         };
+        activeWorker.postMessage({ type: 'STOP', runId } satisfies MlWorkerRequest);
       });
     },
   };

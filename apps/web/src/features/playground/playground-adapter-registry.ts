@@ -29,7 +29,7 @@ import {
 } from './reference-adapters';
 
 const xorPerceptronAdapter: AlgorithmAdapter = {
-  adapterVersion: 'perceptron-js-v1',
+  adapterVersion: 'tfjs-core-v1',
   algorithmId: 'perceptron',
   configSchemaVersion: 1,
   datasetVersionId: 'ds-xor-noisy-v1',
@@ -47,6 +47,7 @@ const xorPerceptronAdapter: AlgorithmAdapter = {
     ) as unknown as XorPerceptronConfig;
 
     return runXorPerceptron(config, {
+      dataset: request.dataset,
       runId: request.runId,
       onProgress: (event) => options.onProgress(event),
       shouldCancel: options.shouldCancel,
@@ -105,7 +106,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-xor',
     algorithmId: 'perceptron',
     datasetVersionId: 'ds-xor-noisy-v1',
-    adapterVersion: 'perceptron-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       learningRate: 0.1,
@@ -132,7 +133,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-xor',
     algorithmId: 'mlp',
     datasetVersionId: 'ds-xor-noisy-v1',
-    adapterVersion: 'mlp-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       hiddenLayers: [4],
@@ -181,7 +182,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-nonlinear-2d',
     algorithmId: 'mlp',
     datasetVersionId: 'ds-moons-2d-v1',
-    adapterVersion: 'mlp-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       hiddenLayers: [8, 8],
@@ -237,7 +238,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-house-price',
     algorithmId: 'linear-regression',
     datasetVersionId: 'ds-house-price-v1',
-    adapterVersion: 'linear-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       fitIntercept: true,
@@ -269,7 +270,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-house-price',
     algorithmId: 'ridge-regression',
     datasetVersionId: 'ds-house-price-v1',
-    adapterVersion: 'ridge-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       alpha: 1,
@@ -304,7 +305,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-insurance-cost',
     algorithmId: 'polynomial-regression',
     datasetVersionId: 'ds-insurance-cost-v1',
-    adapterVersion: 'polynomial-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       degree: 2,
@@ -341,7 +342,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-insurance-cost',
     algorithmId: 'lasso-regression',
     datasetVersionId: 'ds-insurance-cost-v1',
-    adapterVersion: 'lasso-regression-js-v1',
+    adapterVersion: 'tfjs-core-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       alpha: 0.1,
@@ -376,7 +377,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-spam-detection',
     algorithmId: 'logistic-regression',
     datasetVersionId: 'ds-sms-spam-v1',
-    adapterVersion: 'logistic-regression-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       learningRate: 0.05,
@@ -415,7 +416,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-spam-detection',
     algorithmId: 'naive-bayes',
     datasetVersionId: 'ds-sms-spam-v1',
-    adapterVersion: 'naive-bayes-js-v1',
+    adapterVersion: 'ml-naivebayes-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       alpha: 1,
@@ -450,7 +451,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-customer-churn',
     algorithmId: 'knn',
     datasetVersionId: 'ds-customer-churn-v1',
-    adapterVersion: 'knn-js-v1',
+    adapterVersion: 'ml-knn-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       k: 7,
@@ -494,7 +495,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-customer-churn',
     algorithmId: 'random-forest',
     datasetVersionId: 'ds-customer-churn-v1',
-    adapterVersion: 'random-forest-js-v1',
+    adapterVersion: 'ml-random-forest-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       trees: 50,
@@ -542,7 +543,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-credit-risk',
     algorithmId: 'decision-tree',
     datasetVersionId: 'ds-credit-risk-v1',
-    adapterVersion: 'decision-tree-js-v1',
+    adapterVersion: 'ml-cart-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       maxDepth: 5,
@@ -589,7 +590,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-credit-risk',
     algorithmId: 'logistic-regression',
     datasetVersionId: 'ds-credit-risk-v1',
-    adapterVersion: 'logistic-regression-js-v1',
+    adapterVersion: 'tfjs-layers-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       learningRate: 0.05,
@@ -633,7 +634,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-credit-risk',
     algorithmId: 'svm',
     datasetVersionId: 'ds-credit-risk-v1',
-    adapterVersion: 'svm-js-v1',
+    adapterVersion: 'libsvm-js-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       kernel: 'rbf',
@@ -682,7 +683,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-wine-cultivar',
     algorithmId: 'naive-bayes',
     datasetVersionId: 'ds-wine-cultivar-v1',
-    adapterVersion: 'naive-bayes-js-v1',
+    adapterVersion: 'ml-naivebayes-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       smoothing: 0.000000001,
@@ -722,7 +723,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-retail-segments',
     algorithmId: 'kmeans',
     datasetVersionId: 'ds-retail-segments-v1',
-    adapterVersion: 'kmeans-js-v1',
+    adapterVersion: 'ml-kmeans-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       k: 4,
@@ -767,7 +768,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-retail-segments',
     algorithmId: 'hierarchical-clustering',
     datasetVersionId: 'ds-retail-segments-v1',
-    adapterVersion: 'hierarchical-clustering-js-v1',
+    adapterVersion: 'ml-hclust-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       linkage: 'ward',
@@ -814,7 +815,7 @@ const playgroundPairRegistry = [
     scenarioId: 'pg-country-indicators',
     algorithmId: 'pca',
     datasetVersionId: 'ds-country-indicators-v1',
-    adapterVersion: 'pca-js-v1',
+    adapterVersion: 'ml-pca-v1',
     configSchemaVersion: 1,
     defaultConfig: {
       components: 2,

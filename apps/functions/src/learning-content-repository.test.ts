@@ -155,7 +155,7 @@ describe('learning content repository', () => {
       ],
     });
     expect(demo.data).toMatchObject({
-      adapterVersion: 'perceptron-js-v1',
+      adapterVersion: 'tfjs-core-v1',
       resultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       sourceIds: ['microsoft-ai-for-beginners', 'd2l-vi'],
       visualFixture: {

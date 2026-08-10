@@ -3176,6 +3176,7 @@ a {
 .playground-catalog,
 .playground-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   padding-bottom: 64px;
   padding-top: 32px;
@@ -3654,6 +3655,7 @@ a {
 }
 
 .playground-chart {
+  min-width: 0;
   max-width: 420px;
   width: 100%;
 }
@@ -3667,6 +3669,7 @@ a {
   display: grid;
   margin: 0;
   max-width: 560px;
+  min-width: 0;
   gap: 7px;
 }
 
@@ -3678,117 +3681,34 @@ a {
 
 .playground-chart-figure .playground-chart {
   max-width: none;
-  min-height: 190px;
+  min-width: 0;
+  min-height: 300px;
+  height: 300px;
   border: 1px solid var(--line);
   background: var(--paper);
-  overflow: visible;
-}
-
-.playground-chart .chart-axis {
-  stroke: color-mix(in srgb, var(--ink-soft) 42%, transparent);
-  stroke-width: 1.5;
-}
-
-.playground-chart .chart-label,
-.playground-chart .chart-value,
-.playground-chart .chart-cell-label {
-  fill: var(--ink-soft);
-  font-family: 'Be Vietnam Pro', sans-serif;
-  font-size: 10px;
-}
-
-.playground-chart .chart-cell-label {
-  fill: var(--ink);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.playground-chart .chart-point {
-  stroke: var(--surface);
-  stroke-width: 1.5;
-}
-
-.playground-chart .chart-series {
-  fill: none;
-  stroke: var(--teal);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
-}
-
-.playground-chart .loss-series {
-  stroke: var(--amber);
-}
-
-.playground-chart .chart-bar {
-  fill: color-mix(in srgb, var(--teal) 75%, var(--surface));
-}
-
-.playground-chart .chart-value {
-  fill: var(--ink);
-  font-weight: 900;
-}
-
-.playground-chart .confusion-cell {
-  fill: var(--teal);
-  stroke: var(--surface);
-  stroke-width: 2;
-}
-
-.playground-chart .tree-branch,
-.playground-chart .dendrogram-merge {
-  stroke: var(--ink-soft);
-  stroke-width: 2;
-}
-
-.playground-chart .tree-node {
-  fill: color-mix(in srgb, var(--teal) 14%, var(--paper));
-  stroke: var(--teal);
-  stroke-width: 2;
-}
-
-.playground-chart .boundary-placeholder {
-  stroke-dasharray: 7 7;
-  opacity: 0.6;
+  overflow: hidden;
 }
 
 .playground-loss-figure {
   max-width: 560px;
 }
 
-.playground-chart rect {
-  fill: var(--paper);
+.playground-chart .plot-container,
+.playground-chart .svg-container {
+  width: 100% !important;
+  height: 100% !important;
 }
 
-.playground-chart line {
-  stroke: color-mix(in srgb, var(--ink-soft) 35%, transparent);
-  stroke-width: 2;
-}
-
-.playground-chart .boundary {
-  stroke: var(--teal);
-  stroke-width: 4;
-}
-
-.playground-chart circle {
-  stroke: var(--surface);
-  stroke-width: 3;
-}
-
-.playground-chart .class-zero {
-  fill: #f97316;
-}
-
-.playground-chart .class-one {
-  fill: #14b8a6;
-}
-
-.playground-chart .class-two {
-  fill: #8b5cf6;
-}
-
-.playground-chart .class-three {
-  fill: #eab308;
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin: -1px;
+  padding: 0;
+  clip: rect(0 0 0 0);
+  white-space: normal;
+  border: 0;
 }
 
 .playground-feedback {
@@ -3932,7 +3852,7 @@ a {
   .playground-hero,
   .playground-workspace,
   .playground-persistence {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .playground-catalog-grid {

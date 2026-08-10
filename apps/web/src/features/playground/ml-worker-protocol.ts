@@ -1,4 +1,5 @@
 import type { MlConfig, MlProgressEvent, MlRunResult } from './ml-engine-contract';
+import type { PlaygroundDataset } from './playground-datasets';
 
 export interface MlRunRequest {
   adapterVersion?: string | undefined;
@@ -6,6 +7,7 @@ export interface MlRunRequest {
   config: MlConfig;
   configHash: string;
   configSchemaVersion?: 1 | undefined;
+  dataset?: PlaygroundDataset | undefined;
   datasetVersionId: string;
   runId: string;
   scenarioId: string;
@@ -22,5 +24,6 @@ export type MlWorkerResponse =
   | { backend: string; type: 'READY' }
   | { event: MlProgressEvent; type: 'PROGRESS' }
   | { result: MlRunResult; type: 'RESULT' }
+  | { runId: string; type: 'STOP_ACK' }
   | { runId: string; type: 'CANCELLED' }
   | { code: string; runId?: string; safeMessage: string; type: 'ERROR' };

@@ -1,0 +1,33 @@
+{
+  "byteSize": 1200,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-customer-churn-v1/dataset.json.gz",
+  "datasetVersionId": "ds-customer-churn-v1",
+  "featureColumns": ["tenureMonths", "monthlyChargeIndex", "supportContactIndex", "contractIndex"],
+  "labelColumn": "isChurned",
+  "schemaVersion": 1,
+  "sha256": "9164778fbca97a3375e87ab8d6f48fa84f761753809f3ba1d739b164006c7504",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-customer-churn-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "binary-classification",
+  "textAlternative": {
+    "en": "Synthetic customer-churn rows with pre-encoded tenure, charge, support, and contract signals.",
+    "vi": "Du lieu customer churn tong hop voi tenure, chi phi, lien he ho tro va loai hop dong da ma hoa so."
+  }
+}

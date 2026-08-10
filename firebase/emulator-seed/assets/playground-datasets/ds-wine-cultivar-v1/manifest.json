@@ -1,0 +1,33 @@
+{
+  "byteSize": 1094,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-wine-cultivar-v1/dataset.json.gz",
+  "datasetVersionId": "ds-wine-cultivar-v1",
+  "featureColumns": ["flavonoidIndex", "hueIndex", "colorIntensityIndex", "prolineIndex"],
+  "labelColumn": "cultivarClass",
+  "schemaVersion": 1,
+  "sha256": "4507ac12df7484c6e5943498113f9806ebb91a67248d95c248ba41a92409e946",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-wine-cultivar-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "multiclass-classification",
+  "textAlternative": {
+    "en": "Synthetic wine cultivar rows with four standardized numeric chemistry indicators and three classes.",
+    "vi": "Du lieu cultivar ruou vang tong hop voi bon chi bao hoa hoc dang so va ba lop."
+  }
+}

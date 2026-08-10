@@ -1,0 +1,33 @@
+{
+  "byteSize": 2491,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-insurance-cost-v1/dataset.json.gz",
+  "datasetVersionId": "ds-insurance-cost-v1",
+  "featureColumns": ["ageYears", "bodyMassIndex", "smokerRiskIndex", "childrenCount"],
+  "labelColumn": "annualCostIndex",
+  "schemaVersion": 1,
+  "sha256": "a57edb659ed3cbc11f2c239e6581d9e22c2c4d466a9e4fae4d402b3022a9ace0",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-insurance-cost-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "regression",
+  "textAlternative": {
+    "en": "Synthetic insurance-cost rows with numeric values already encoded for age, body mass, smoker risk, and children.",
+    "vi": "Dữ liệu chi phí bảo hiểm tổng hợp với đặc trưng số đã mã hóa cho tuổi, BMI, rủi ro hút thuốc và số con."
+  }
+}

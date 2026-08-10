@@ -4,6 +4,7 @@ import {
   LOCAL_EMULATOR_HOSTS,
   LOCAL_FIREBASE_PROJECT_ID,
   LOCAL_METADATA_SERVER_DETECTION,
+  applyLocalEmulatorEnvironment,
   assertRunningEmulatorEnvironment,
   assertSafeLocalEnvironment,
   createLocalEmulatorEnvironment,
@@ -82,6 +83,19 @@ describe('local Firebase environment guard', () => {
       FIREBASE_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID,
       GCLOUD_PROJECT: LOCAL_FIREBASE_PROJECT_ID,
       GOOGLE_CLOUD_PROJECT: LOCAL_FIREBASE_PROJECT_ID,
+      METADATA_SERVER_DETECTION: LOCAL_METADATA_SERVER_DETECTION,
+      ...LOCAL_EMULATOR_HOSTS,
+    });
+  });
+
+  it('applies the validated local emulator hosts to the Admin SDK process environment', () => {
+    const target = {} as NodeJS.ProcessEnv;
+
+    applyLocalEmulatorEnvironment(createLocalEmulatorEnvironment({}), target);
+
+    expect(target).toMatchObject({
+      FIREBASE_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID,
+      GCLOUD_PROJECT: LOCAL_FIREBASE_PROJECT_ID,
       METADATA_SERVER_DETECTION: LOCAL_METADATA_SERVER_DETECTION,
       ...LOCAL_EMULATOR_HOSTS,
     });

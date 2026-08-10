@@ -13,14 +13,14 @@
     "feedback": [],
     "metrics": {
       "mae": 302.0517,
-      "rmse": 397.6565,
+      "rmse": 397.6566,
       "r2": 0.9949
     },
     "chartSummary": {
       "kind": "residual-coefficient",
       "residualMean": 109.7572,
-      "residualMaxAbs": 815.9758,
-      "coefficientMagnitudes": [1198.9337, 2407.2957, 3551.8803, 362.7026],
+      "residualMaxAbs": 815.9762,
+      "coefficientMagnitudes": [1198.9338, 2407.2957, 3551.8801, 362.7027],
       "zeroCoefficientCount": 0
     },
     "textAlternative": {

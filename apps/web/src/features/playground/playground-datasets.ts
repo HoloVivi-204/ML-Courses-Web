@@ -11,19 +11,32 @@ export interface PlaygroundDatasetRow {
   rowId: string;
 }
 
+export interface PlaygroundDatasetSource {
+  attribution: {
+    en: string;
+    vi: string;
+  };
+  generator: {
+    formula: string;
+    id: 'release-one-playground-generator';
+    parameterManifest: string;
+    version: '1';
+  };
+  kind: 'generated';
+  license: {
+    id: 'LicenseRef-generated-playground-baseline';
+    notice: string;
+  };
+  sourceId: 'generated-playground-baseline';
+}
+
 export interface PlaygroundDataset {
   datasetVersionId: string;
   featureColumns: readonly string[];
   labelColumn?: string | undefined;
   rows: readonly PlaygroundDatasetRow[];
   schemaVersion: 1;
-  source: {
-    attribution: {
-      en: string;
-      vi: string;
-    };
-    kind: 'generated';
-  };
+  source: PlaygroundDatasetSource;
   task: PlaygroundDatasetTask;
   textAlternative: {
     en: string;
@@ -245,13 +258,24 @@ function createDataset(input: {
   task: PlaygroundDatasetTask;
   textAlternative: PlaygroundDataset['textAlternative'];
 }): PlaygroundDataset {
-  const source = {
+  const source: PlaygroundDatasetSource = {
     kind: 'generated',
     attribution: {
       en: 'Generated synthetic dataset for the Release 1 playground baseline.',
       vi: 'Dữ liệu tổng hợp được tạo cho baseline Playground Release 1.',
     },
-  } as const;
+    generator: {
+      formula: 'Versioned deterministic synthetic rows defined by the Release 1 generator.',
+      id: 'release-one-playground-generator',
+      parameterManifest: `${input.datasetVersionId}:generator-v1`,
+      version: '1',
+    },
+    license: {
+      id: 'LicenseRef-generated-playground-baseline',
+      notice: 'Generated internally for the Release 1 Playground baseline.',
+    },
+    sourceId: 'generated-playground-baseline',
+  };
 
   return {
     schemaVersion: 1,

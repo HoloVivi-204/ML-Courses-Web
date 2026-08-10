@@ -1197,6 +1197,13 @@ function installImmediatePlaygroundWorker() {
         type: string;
       };
 
+      if (workerRequest.type === 'INIT') {
+        queueMicrotask(() => {
+          this.onmessage?.({ data: { backend: 'wasm', type: 'READY' } } as MessageEvent);
+        });
+        return;
+      }
+
       if (workerRequest.type !== 'RUN' || !workerRequest.request) {
         return;
       }
@@ -3375,6 +3382,7 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
     ).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Chạy' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Chạy' }));
 
     expect(await screen.findByText('Đã chạy xong')).toBeVisible();

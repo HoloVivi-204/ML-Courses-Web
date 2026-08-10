@@ -1,10 +1,13 @@
 import type { MlMetrics, MlProgressEvent, MlRunResult } from './ml-engine-contract';
+import * as tf from '@tensorflow/tfjs-core';
+import '@tensorflow/tfjs-backend-cpu';
 import {
   getPlaygroundDataset,
   roundMetric,
   shuffleItems,
   splitDatasetRows,
   type PlaygroundDatasetRow,
+  type PlaygroundDataset,
 } from './playground-datasets';
 
 export interface XorPerceptronConfig {
@@ -55,6 +58,7 @@ interface XorSample {
 }
 
 interface RunOptions {
+  dataset?: PlaygroundDataset | undefined;
   onProgress?: ((event: XorPerceptronProgressEvent) => void) | undefined;
   runId: string;
   shouldCancel?: (() => boolean) | undefined;
@@ -66,6 +70,8 @@ export class XorPerceptronCancelledError extends Error {
     this.name = 'XorPerceptronCancelledError';
   }
 }
+
+let tensorflowBackendReady: Promise<void> | null = null;
 
 export function validateXorPerceptronConfig(
   config: XorPerceptronConfig,
@@ -97,7 +103,7 @@ export function validateXorPerceptronConfig(
   }
 }
 
-export async function runXorPerceptron(
+export async function runXorPerceptronLegacy(
   config: XorPerceptronConfig,
   options: RunOptions,
 ): Promise<XorPerceptronResult> {
@@ -172,6 +178,158 @@ export async function runXorPerceptron(
       )}%, cho thấy một ranh giới tuyến tính không giải được XOR.`,
     },
   };
+}
+
+export async function runXorPerceptron(
+  config: XorPerceptronConfig,
+  options: RunOptions,
+): Promise<XorPerceptronResult> {
+  const dataset = options.dataset ?? getPlaygroundDataset('ds-xor-noisy-v1');
+  const split = splitDatasetRows(dataset, config.trainRatio, config.seed);
+  const trainSamples = toXorSamples(split.trainRows);
+  const testSamples = toXorSamples(split.testRows);
+
+  if (options.shouldCancel?.()) {
+    throw new XorPerceptronCancelledError(options.runId);
+  }
+
+  await ensureTensorflowBackend();
+  const trainFeatureTensor = tf.tensor2d(trainSamples.map((sample) => [sample.x1, sample.x2]));
+  const trainLabelTensor = tf.tensor2d(
+    trainSamples.map((sample) => sample.label),
+    [trainSamples.length, 1],
+  );
+  const testFeatureTensor = tf.tensor2d(testSamples.map((sample) => [sample.x1, sample.x2]));
+  const testLabelTensor = tf.tensor2d(
+    testSamples.map((sample) => sample.label),
+    [testSamples.length, 1],
+  );
+  const weights = tf.variable(tf.zeros([2, 1]));
+  const bias = tf.variable(tf.scalar(0));
+  const lossCurve: { epoch: number; loss: number }[] = [];
+
+  try {
+    for (let epoch = 1; epoch <= config.epochs; epoch += 1) {
+      if (options.shouldCancel?.()) {
+        throw new XorPerceptronCancelledError(options.runId);
+      }
+
+      tf.tidy(() => {
+        const scores = tf.add(tf.matMul(trainFeatureTensor, weights), bias);
+        const predictions = tf.cast(tf.greaterEqual(scores, 0), 'float32');
+        const errors = tf.sub(trainLabelTensor, predictions);
+        const weightDelta = tf.mul(
+          tf.matMul(tf.transpose(trainFeatureTensor), errors),
+          config.learningRate / trainSamples.length,
+        );
+        const biasDelta = tf.mul(tf.mean(errors), config.learningRate);
+
+        weights.assign(tf.add(weights, weightDelta));
+        bias.assign(tf.add(bias, biasDelta));
+      });
+
+      if (epoch === 1 || epoch === config.epochs || epoch % 10 === 0) {
+        const trainAccuracy = await calculateTensorflowPerceptronAccuracy(
+          trainFeatureTensor,
+          trainLabelTensor,
+          weights,
+          bias,
+        );
+        const loss = roundMetric(1 - trainAccuracy);
+
+        lossCurve.push({ epoch, loss });
+        options.onProgress?.({
+          runId: options.runId,
+          epoch,
+          totalEpochs: config.epochs,
+          loss,
+        });
+        await yieldToWorkerQueue();
+      }
+    }
+
+    const [trainAccuracy, testAccuracy, weightValues, biasValues] = await Promise.all([
+      calculateTensorflowPerceptronAccuracy(trainFeatureTensor, trainLabelTensor, weights, bias),
+      calculateTensorflowPerceptronAccuracy(testFeatureTensor, testLabelTensor, weights, bias),
+      weights.data(),
+      bias.data(),
+    ]);
+    const roundedTestAccuracy = roundMetric(testAccuracy);
+    const firstWeight = weightValues[0] ?? 0;
+    const secondWeight = weightValues[1] ?? 0;
+    const finalBias = biasValues[0] ?? 0;
+
+    return {
+      runId: options.runId,
+      scenarioId: 'pg-xor',
+      algorithmId: 'perceptron',
+      datasetVersionId: 'ds-xor-noisy-v1',
+      boundary: {
+        weights: [roundMetric(firstWeight), roundMetric(secondWeight)],
+        bias: roundMetric(finalBias),
+      },
+      determinism: 'exact',
+      feedback: roundedTestAccuracy <= 0.75 ? ['linear-limit', 'non-convergence'] : [],
+      lossCurve,
+      metrics: {
+        accuracy: roundedTestAccuracy,
+        testAccuracy: roundedTestAccuracy,
+        trainAccuracy: roundMetric(trainAccuracy),
+        loss: roundMetric(1 - testAccuracy),
+      },
+      textAlternative: {
+        en: `Perceptron reaches ${Math.round(
+          roundedTestAccuracy * 100,
+        )}% accuracy, showing one linear boundary cannot solve XOR.`,
+        vi: `Perceptron đạt accuracy ${Math.round(
+          roundedTestAccuracy * 100,
+        )}%, cho thấy một ranh giới tuyến tính không giải được XOR.`,
+      },
+    };
+  } finally {
+    tf.dispose([
+      trainFeatureTensor,
+      trainLabelTensor,
+      testFeatureTensor,
+      testLabelTensor,
+      weights,
+      bias,
+    ]);
+  }
+}
+
+async function ensureTensorflowBackend(): Promise<void> {
+  tensorflowBackendReady ??= (async () => {
+    if (!tf.getBackend()) {
+      await tf.setBackend('cpu');
+    }
+
+    await tf.ready();
+  })();
+
+  await tensorflowBackendReady;
+}
+
+async function calculateTensorflowPerceptronAccuracy(
+  features: tf.Tensor2D,
+  labels: tf.Tensor2D,
+  weights: tf.Variable,
+  bias: tf.Variable,
+): Promise<number> {
+  const accuracyTensor = tf.tidy(() => {
+    const scores = tf.add(tf.matMul(features, weights), bias);
+    const predictions = tf.cast(tf.greaterEqual(scores, 0), 'float32');
+
+    return tf.mean(tf.cast(tf.equal(predictions, labels), 'float32'));
+  });
+
+  try {
+    const accuracyValues = await accuracyTensor.data();
+
+    return accuracyValues[0] ?? 0;
+  } finally {
+    accuracyTensor.dispose();
+  }
 }
 
 function toXorSamples(rows: readonly PlaygroundDatasetRow[]): XorSample[] {

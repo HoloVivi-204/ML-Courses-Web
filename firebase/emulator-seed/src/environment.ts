@@ -97,3 +97,16 @@ export function createLocalEmulatorEnvironment(environment: Environment): NodeJS
   assertRunningEmulatorEnvironment(localEnvironment);
   return localEnvironment;
 }
+
+export function applyLocalEmulatorEnvironment(
+  environment: NodeJS.ProcessEnv,
+  target: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  for (const [variableName, value] of Object.entries(environment)) {
+    if (typeof value === 'string') {
+      target[variableName] = value;
+    }
+  }
+
+  return target;
+}

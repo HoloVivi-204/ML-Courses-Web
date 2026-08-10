@@ -1,0 +1,32 @@
+{
+  "byteSize": 195,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-country-indicators-v1/dataset.json.gz",
+  "datasetVersionId": "ds-country-indicators-v1",
+  "featureColumns": ["prosperityIndex", "wellbeingIndex"],
+  "schemaVersion": 1,
+  "sha256": "3a44faa86aa867157a6e9b76eeab0c9eb90decb10f13bba40d1f219f5a00f081",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-country-indicators-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "dimensionality-reduction",
+  "textAlternative": {
+    "en": "Synthetic country indicator rows with prosperity and wellbeing indices.",
+    "vi": "Dữ liệu chỉ báo quốc gia tổng hợp với chỉ số thịnh vượng và phúc lợi."
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "byteSize": 1451,
+  "contentEncoding": "gzip",
+  "datasetPath": "datasets/ds-moons-2d-v1/dataset.json.gz",
+  "datasetVersionId": "ds-moons-2d-v1",
+  "featureColumns": ["x1", "x2"],
+  "labelColumn": "moonClass",
+  "schemaVersion": 1,
+  "sha256": "1c789ef85e6d8685da735a84caf0a1bdc868c5fc46411c5a777ec96b4786ed2d",
+  "source": {
+    "kind": "generated",
+    "attribution": {
+      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
+      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+    },
+    "generator": {
+      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "id": "release-one-playground-generator",
+      "parameterManifest": "ds-moons-2d-v1:generator-v1",
+      "version": "1"
+    },
+    "license": {
+      "id": "LicenseRef-generated-playground-baseline",
+      "notice": "Generated internally for the Release 1 Playground baseline."
+    },
+    "sourceId": "generated-playground-baseline"
+  },
+  "task": "binary-classification",
+  "textAlternative": {
+    "en": "Two deterministic noisy moon shapes with two numeric features and a binary label.",
+    "vi": "Hai cung trang khuyet co nhieu xac dinh voi hai dac trung so va nhan nhi phan."
+  }
+}
