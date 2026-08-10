@@ -256,6 +256,59 @@ function createPassingAnswers(quizId: string): QuizAnswer[] {
 }
 
 describe('Firestore learning repository', () => {
+  it('records pseudonymous auth lifecycle events with auth-time idempotency', async () => {
+    const { documents, firestore } = createFakeFirestore();
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await repository.bootstrapLearner({
+      authTime: 1_754_880_000,
+      displayName: 'Local Student',
+      provider: 'password',
+      uid: 'learner-01',
+    });
+    await repository.bootstrapLearner({
+      authTime: 1_754_880_000,
+      displayName: 'Local Student',
+      provider: 'password',
+      uid: 'learner-01',
+    });
+    await repository.bootstrapLearner({
+      authTime: 1_754_880_001,
+      displayName: 'Local Student',
+      provider: 'password',
+      uid: 'learner-01',
+    });
+
+    const events = [...documents.entries()]
+      .filter(([path]) => path.startsWith('learningEvents/'))
+      .map(([, data]) => data)
+      .sort((left, right) => String(left.eventType).localeCompare(String(right.eventType)));
+
+    expect(events).toHaveLength(3);
+    expect(events.map((event) => event.eventType)).toEqual([
+      'user_logged_in',
+      'user_logged_in',
+      'user_registered',
+    ]);
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: 'user_registered',
+          payload: { provider: 'password' },
+          schemaVersion: 1,
+          uidHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+        expect.objectContaining({
+          eventType: 'user_logged_in',
+          payload: { provider: 'password' },
+          schemaVersion: 1,
+          uidHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      ]),
+    );
+    expect(JSON.stringify(events)).not.toMatch(/email|@example|displayName|learner-01/i);
+  });
+
   it('bootstraps a learner profile idempotently without storing email fields', async () => {
     const { documents, firestore } = createFakeFirestore();
     const repository = createFirestoreLearningRepository(firestore);

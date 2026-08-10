@@ -3,6 +3,19 @@ setlocal EnableExtensions DisableDelayedExpansion
 pushd "%~dp0" || exit /b 1
 
 set "ML_PATH_NONINTERACTIVE=true"
+set "FIREBASE_PROJECT_ID=demo-ml-learning-local"
+set "GCLOUD_PROJECT=demo-ml-learning-local"
+set "GOOGLE_CLOUD_PROJECT=demo-ml-learning-local"
+set "METADATA_SERVER_DETECTION=none"
+set "FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099"
+set "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080"
+set "FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199"
+set "CLOUDSDK_AUTH_ACCESS_TOKEN="
+set "FIREBASE_SERVICE_ACCOUNT="
+set "FIREBASE_TOKEN="
+set "GOOGLE_APPLICATION_CREDENTIALS="
+set "GOOGLE_APPLICATION_CREDENTIALS_JSON="
+set "GOOGLE_OAUTH_ACCESS_TOKEN="
 
 echo ML Path local release gate
 echo [1/13] Checking Node.js 22 and pnpm...
@@ -49,7 +62,7 @@ echo [10/13] Performance budget...
 call "ops\windows\_run_pnpm.bat" test:performance
 if errorlevel 1 goto fail
 
-echo [11/13] Emulator verification...
+echo [11/13] Emulator verification and local analytics aggregation producer...
 call "ops\windows\_run_pnpm.bat" firebase:emulators:verify
 if errorlevel 1 goto fail
 

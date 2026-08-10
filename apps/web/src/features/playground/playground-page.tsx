@@ -1,3 +1,4 @@
+import type { LearningEventPayload, LearningEventType } from '@ml-path/contracts';
 import {
   ArrowLeft,
   ArrowRight,
@@ -287,6 +288,38 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     return idToken;
   }, [getIdToken, t]);
 
+  const recordClientLearningEvent = useCallback(
+    (eventType: LearningEventType, payload: LearningEventPayload, idempotencyKey: string) => {
+      void (async () => {
+        try {
+          const idToken = await readRequiredIdToken();
+
+          await learningApiClient.recordLearningEvent({
+            eventType,
+            idToken,
+            idempotencyKey,
+            payload,
+          });
+        } catch {
+          // Analytics failure must not block the learning flow.
+        }
+      })();
+    },
+    [learningApiClient, readRequiredIdToken],
+  );
+
+  useEffect(() => {
+    if (!user || scenarioRegistrations.length === 0) {
+      return;
+    }
+
+    recordClientLearningEvent(
+      'playground_opened',
+      { scenarioId: routeScenarioId },
+      `playground-opened-${routeScenarioId}`,
+    );
+  }, [recordClientLearningEvent, routeScenarioId, scenarioRegistrations.length, user]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -500,6 +533,11 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       datasetVersionId: nextDatasetVersionId,
       scenarioId: routeScenarioId,
     });
+    recordClientLearningEvent(
+      'playground_dataset_selected',
+      { datasetVersionId: nextDatasetVersionId, scenarioId: routeScenarioId },
+      `playground-dataset-selected-${routeScenarioId}-${nextDatasetVersionId}`,
+    );
     setSelectedPairKey(null);
     setProgress(null);
     setResult(null);
@@ -887,6 +925,13 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
         disabled={isRunBusy}
         entries={datasetEntries}
         locale={locale}
+        onDatasetDragged={(datasetScenarioId, datasetVersionId) => {
+          recordClientLearningEvent(
+            'playground_dataset_dragged',
+            { datasetVersionId, scenarioId: datasetScenarioId },
+            `playground-dataset-dragged-${datasetScenarioId}-${datasetVersionId}`,
+          );
+        }}
         onSelect={handleDatasetSelect}
         onNavigate={(nextScenarioId) => navigate(`/playground/${nextScenarioId}`)}
         selectedDatasetVersionId={selectedDatasetVersionId}
@@ -1174,6 +1219,7 @@ function DatasetTray({
   disabled,
   entries,
   locale,
+  onDatasetDragged,
   onSelect,
   onNavigate,
   selectedDatasetVersionId,
@@ -1182,6 +1228,7 @@ function DatasetTray({
   disabled: boolean;
   entries: readonly PlaygroundDatasetEntry[];
   locale: Locale;
+  onDatasetDragged: (scenarioId: string, datasetVersionId: string) => void;
   onSelect: (datasetVersionId: string) => void;
   onNavigate: (scenarioId: string) => void;
   selectedDatasetVersionId: string | null;
@@ -1210,6 +1257,7 @@ function DatasetTray({
 
     if (droppedDataset) {
       setDropMessage(null);
+      onDatasetDragged(droppedDataset.scenarioId, droppedDataset.datasetVersionId);
 
       if (droppedDataset.scenarioId === currentScenarioId) {
         onSelect(droppedDataset.datasetVersionId);

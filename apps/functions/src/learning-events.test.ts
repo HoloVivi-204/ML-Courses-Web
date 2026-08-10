@@ -41,6 +41,20 @@ describe('learning event contract', () => {
     ).toThrow('not allowed');
   });
 
+  it('allows only the required external-resource fields for client attribution', () => {
+    expect(
+      normalizeLearningEventPayload('external_resource_opened', {
+        postId: 'dl-p01-neuron-perceptron',
+        resourceType: 'documentation',
+        sourceId: 'source-microsoft-ml-beginners',
+      }),
+    ).toEqual({
+      postId: 'dl-p01-neuron-perceptron',
+      resourceType: 'documentation',
+      sourceId: 'source-microsoft-ml-beginners',
+    });
+  });
+
   it('creates a deterministic event document with server timestamp sentinels and TTL', () => {
     const eventId = createLearningEventId({
       dedupeKey: 'run-failure-01',

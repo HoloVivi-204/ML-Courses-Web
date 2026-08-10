@@ -117,6 +117,9 @@ const environment = createLocalEmulatorEnvironment(process.env);
 const webDirectory = fileURLToPath(new URL('../../../apps/web/', import.meta.url));
 const webRequire = createRequire(new URL('../../../apps/web/package.json', import.meta.url));
 const playwrightCli = webRequire.resolve('@playwright/test/cli');
+const analyticsAggregationScript = fileURLToPath(
+  new URL('../../../apps/functions/dist/run-local-analytics-aggregation.js', import.meta.url),
+);
 const seededEnvironment = {
   ...environment,
   PATH: [dirname(process.execPath), environment.PATH].filter(Boolean).join(delimiter),
@@ -136,16 +139,44 @@ console.log('Starting a fresh Vite server for authenticated browser checks.');
 const viteServer = startViteServer(webDirectory, browserEnvironment);
 
 console.log('Running authenticated Playwright journeys on desktop and 360px.');
+const playwrightEnvironment = {
+  ...browserEnvironment,
+  RUN_AUTH_EMULATOR_E2E: 'true',
+};
+
 try {
   await waitForViteServer(viteServer);
   await runChildProcess({
-    arguments: [playwrightCli, 'test'],
+    arguments: [
+      playwrightCli,
+      'test',
+      '--grep-invert',
+      'renders an Emulator-backed Admin report for the configured local admin',
+    ],
     command: process.execPath,
     cwd: webDirectory,
-    environment: {
-      ...browserEnvironment,
-      RUN_AUTH_EMULATOR_E2E: 'true',
-    },
+    environment: playwrightEnvironment,
+  });
+
+  console.log('Generating the daily analytics snapshot from the completed learner journey.');
+  await runChildProcess({
+    arguments: [analyticsAggregationScript],
+    command: process.execPath,
+    cwd: process.cwd(),
+    environment: seededEnvironment,
+  });
+
+  console.log('Running the Emulator-backed Admin report journey.');
+  await runChildProcess({
+    arguments: [
+      playwrightCli,
+      'test',
+      '--grep',
+      'renders an Emulator-backed Admin report for the configured local admin',
+    ],
+    command: process.execPath,
+    cwd: webDirectory,
+    environment: playwrightEnvironment,
   });
 } finally {
   await stopViteServer(viteServer);

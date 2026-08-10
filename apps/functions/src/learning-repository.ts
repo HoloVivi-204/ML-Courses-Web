@@ -43,8 +43,10 @@ export type LearnerThemePreference = 'dark' | 'light' | 'system';
 export type LearnerAccountStatus = 'active' | 'anonymized' | 'deletion-pending';
 
 export interface BootstrapLearnerInput {
+  authTime?: number | undefined;
   displayName: string;
   locale?: LearnerLocalePreference | undefined;
+  provider?: string | undefined;
   theme?: LearnerThemePreference | undefined;
   uid: string;
 }
@@ -1683,6 +1685,20 @@ export function createFirestoreLearningRepository(
       return firestore.runTransaction(async (transaction) => {
         const profileRef = firestore.doc(`users/${input.uid}`);
         const profileSnapshot = await transaction.get(profileRef);
+        const provider = input.provider?.trim() || 'unknown';
+        const loginDedupeKey =
+          typeof input.authTime === 'number' && Number.isFinite(input.authTime)
+            ? `user-logged-in:${Math.floor(input.authTime)}`
+            : 'user-logged-in:bootstrap';
+
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: loginDedupeKey,
+          eventType: 'user_logged_in',
+          now: new Date(),
+          payload: { provider },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
 
         if (profileSnapshot.exists) {
           const existingProfile = toProfileResponse(input.uid, profileSnapshot.data() ?? {});
@@ -1721,6 +1737,14 @@ export function createFirestoreLearningRepository(
           status: profile.status,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
+        });
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: 'user-registered',
+          eventType: 'user_registered',
+          now: new Date(),
+          payload: { provider },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
         });
 
         return {

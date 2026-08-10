@@ -911,11 +911,5 @@ export async function runLocalAnalyticsAggregation(
 }
 
 export function createDefaultAdminReportRepository(): AdminReportRepository {
-  const isLocalDemo =
-    typeof process.env.FIRESTORE_EMULATOR_HOST === 'string' ||
-    process.env.LOCAL_CLOUD_AUTH_DEMO === 'true';
-
-  return createFirestoreAdminReportRepository(getFirestore(getFirebaseAdminApp()), {
-    aggregateOnRead: isLocalDemo,
-  });
+  return createFirestoreAdminReportRepository(getFirestore(getFirebaseAdminApp()));
 }

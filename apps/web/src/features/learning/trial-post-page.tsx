@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
+import type { ExternalResource } from './content-block-types';
 import type { LearningApiClient, LearningPostContent, PostViewResult } from './learning-api';
 
 interface TrialPostPageProps {
@@ -116,6 +117,38 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       return null;
     }
   }, [courseId, getIdToken, hasFullAccess, learningApiClient, postId, status, uid]);
+
+  const recordExternalResourceOpen = useCallback(
+    (resource: ExternalResource) => {
+      if (status !== 'authenticated' || !postId) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const idToken = await getIdToken();
+
+          if (!idToken) {
+            return;
+          }
+
+          await learningApiClient.recordLearningEvent({
+            eventType: 'external_resource_opened',
+            idToken,
+            idempotencyKey: `external-resource-opened-${postId}-${resource.sourceId}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`,
+            payload: {
+              postId,
+              resourceType: resource.resourceType,
+              sourceId: resource.sourceId,
+            },
+          });
+        } catch {
+          // Analytics failure must not block opening the resource.
+        }
+      })();
+    },
+    [getIdToken, learningApiClient, postId, status],
+  );
 
   const restoreSavedReadingPosition = useCallback(() => {
     if (!savedReadingPosition || !articleRef.current) {
@@ -478,7 +511,12 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         </aside>
 
         <article className="trial-article" ref={articleRef}>
-          <ContentBlockRenderer blocks={post.blocks} locale={locale} postId={post.id} />
+          <ContentBlockRenderer
+            blocks={post.blocks}
+            locale={locale}
+            onOpenResource={recordExternalResourceOpen}
+            postId={post.id}
+          />
 
           <footer className="trial-lesson-summary">
             <span className="eyebrow">{t('trial.summary.eyebrow')}</span>

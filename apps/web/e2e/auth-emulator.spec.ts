@@ -428,6 +428,32 @@ test.describe('Firebase local Emulator journey', () => {
     });
     await expect(page.getByText(/server-verified/)).toBeVisible();
     await expect(page.getByText('client-computed', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('admin-report-learner-count')).toHaveAttribute(
+      'data-count',
+      '14',
+    );
+    const deepLearningCourse = page.getByTestId('admin-report-course-course-deep-learning-basic');
+    await expect(deepLearningCourse).toHaveAttribute('data-average-progress-percent', '67');
+    await expect(deepLearningCourse).toHaveAttribute('data-completion-rate', '0');
+    await expect(deepLearningCourse).toHaveAttribute('data-enrolled-count', '2');
+    await expect(page.getByTestId('admin-report-quiz-average')).toHaveAttribute(
+      'data-average-score-percent',
+      '100',
+    );
+    const quizAttempts = page.getByTestId('admin-report-quiz-attempts');
+    await expect(quizAttempts).toHaveAttribute('data-passed-attempt-count', '20');
+    await expect(quizAttempts).toHaveAttribute('data-total-attempt-count', '20');
+    await expect(page.getByTestId('admin-report-quiz-pass-rate')).toHaveAttribute(
+      'data-pass-rate',
+      '1',
+    );
+    const playgroundSummary = page.getByTestId('admin-report-playground-summary');
+    await expect(playgroundSummary).toHaveAttribute('data-failed-run-count', '0');
+    await expect(playgroundSummary).toHaveAttribute('data-run-count', '40');
+    await expect(page.getByTestId('admin-report-playground-error-rate')).toHaveAttribute(
+      'data-error-rate',
+      '0',
+    );
     await expectNoHorizontalOverflow(page);
     await expectNoWcagViolations(page);
   });

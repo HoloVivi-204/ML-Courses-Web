@@ -304,10 +304,13 @@ describe('API foundation', () => {
 
   it('bootstraps the authenticated learner profile without copying email into Firestore data', async () => {
     const savedProfiles: unknown[] = [];
+    let bootstrapInput:
+      { authTime?: number | undefined; provider?: string | undefined } | undefined;
     const response = await request(
       createApiApp({
         learningRepository: createLearningRepository({
           bootstrapLearner: async (input) => {
+            bootstrapInput = input;
             const profile = {
               schemaVersion: 1,
               uid: input.uid,
@@ -324,9 +327,11 @@ describe('API foundation', () => {
           },
         }),
         verifyAuthToken: async () => ({
+          authTime: 1_754_880_000,
           uid: 'learner-01',
           displayName: 'Local Student',
           email: 'learner@example.test',
+          provider: 'password',
         }),
       }),
     )
@@ -350,6 +355,10 @@ describe('API foundation', () => {
       requestId: response.headers['x-request-id'],
     });
     expect(JSON.stringify(savedProfiles)).not.toContain('learner@example.test');
+    expect(bootstrapInput).toMatchObject({
+      authTime: 1_754_880_000,
+      provider: 'password',
+    });
   });
 
   it('updates authenticated learner preferences without accepting extra profile fields', async () => {

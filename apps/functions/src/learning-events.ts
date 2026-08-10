@@ -36,6 +36,7 @@ export type LearningEventPayload = Readonly<Record<string, LearningEventPayloadV
 
 const LEARNING_EVENT_TTL_MILLISECONDS = 180 * 24 * 60 * 60 * 1_000;
 const CLIENT_EVENT_TYPES = new Set<LearningEventType>([
+  'external_resource_opened',
   'playground_opened',
   'playground_dataset_dragged',
   'playground_dataset_selected',
@@ -79,6 +80,7 @@ const REQUIRED_EVENT_PAYLOAD_FIELDS: Readonly<
   course_started: ['courseId'],
   demo_completed: ['demoId'],
   demo_started: ['demoId'],
+  external_resource_opened: ['postId', 'resourceType', 'sourceId'],
   module_completed: ['moduleId'],
   module_overview_viewed: ['moduleId'],
   module_quiz_submitted: ['attemptNo', 'passed', 'quizId', 'score'],

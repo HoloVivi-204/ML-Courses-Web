@@ -2,16 +2,22 @@ import { ArrowUpRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { Locale } from '../catalog/course-data';
-import type { SourceListBlock } from './content-block-types';
+import type { ExternalResource, SourceListBlock } from './content-block-types';
 import { getSafeExternalUrl } from './safe-external-url';
 
 interface SourceListBlockViewProps {
   block: SourceListBlock;
   displayIndex: string | null;
   locale: Locale;
+  onOpenResource?: ((resource: ExternalResource) => void) | undefined;
 }
 
-export function SourceListBlockView({ block, displayIndex, locale }: SourceListBlockViewProps) {
+export function SourceListBlockView({
+  block,
+  displayIndex,
+  locale,
+  onOpenResource,
+}: SourceListBlockViewProps) {
   const { t } = useTranslation();
   const content = block.locales[locale];
   const resources = block.resources.flatMap((resource) => {
@@ -29,7 +35,12 @@ export function SourceListBlockView({ block, displayIndex, locale }: SourceListB
       <ul>
         {resources.map(({ resource, safeLicenseUrl, safeResourceUrl }) => (
           <li key={resource.url}>
-            <a href={safeResourceUrl.href} rel="noopener noreferrer" target="_blank">
+            <a
+              href={safeResourceUrl.href}
+              onClick={() => onOpenResource?.(resource)}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
               {resource.title}
               <ArrowUpRight aria-hidden="true" size={17} />
             </a>

@@ -13,20 +13,20 @@ if errorlevel 1 goto invalid_config
 echo ML Path friend demo
 echo Firebase Auth stays in the configured cloud project, so Internet is required to sign in.
 echo.
-echo [1/7] Checking Node.js 22 and pnpm...
+echo [1/8] Checking Node.js 22 and pnpm...
 call "ops\windows\_ensure_pnpm.bat"
 if errorlevel 1 goto fail
 
-echo [2/7] Checking Java 21...
+echo [2/8] Checking Java 21...
 call "ops\windows\_ensure_java_21.bat"
 if errorlevel 1 goto fail
 
 if not exist "node_modules\.pnpm" (
-  echo [3/7] Installing project packages for the first time...
+  echo [3/8] Installing project packages for the first time...
   call "ops\windows\_run_pnpm.bat" install --frozen-lockfile
   if errorlevel 1 goto fail
 ) else (
-  echo [3/7] Project packages are ready.
+  echo [3/8] Project packages are ready.
 )
 
 set "CLOUDSDK_AUTH_ACCESS_TOKEN="
@@ -41,6 +41,9 @@ set "LOCAL_CLOUD_AUTH_DEMO=true"
 set "APP_ENV=local"
 set "APPCHECK_ENFORCEMENT_MODE=disabled"
 set "FIREBASE_AUTH_EMULATOR_HOST="
+set "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080"
+set "FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199"
+set "METADATA_SERVER_DETECTION=none"
 
 if not defined XDG_CONFIG_HOME set "XDG_CONFIG_HOME=%CD%\.runtime\firebase-tools-config"
 
@@ -55,11 +58,11 @@ if defined LOCAL_DEMO_ADMIN_EMAIL (
   set /p "LOCAL_DEMO_ADMIN_EMAIL=Admin email (optional): "
 )
 
-echo [4/7] Building local Functions and demo tooling...
+echo [4/8] Building local Functions and demo tooling...
 call "ops\windows\_run_pnpm.bat" firebase:build
 if errorlevel 1 goto fail
 
-echo [5/7] Checking Node runtime and required demo ports...
+echo [5/8] Checking Node runtime and required demo ports...
 "%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" check-runtime
 if errorlevel 1 goto fail
 "%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" check-ports launch
@@ -74,11 +77,15 @@ if errorlevel 1 goto services_not_ready
 "%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://127.0.0.1:5001/%FIREBASE_PROJECT_ID%/asia-southeast1/api/api/v1/health" 60
 if errorlevel 1 goto services_not_ready
 
-echo [6/7] Resetting and seeding fresh local Firestore and Storage data...
+echo [6/8] Resetting and seeding fresh local Firestore and Storage data...
 call "ops\windows\_run_pnpm.bat" firebase:friend-demo:seed
 if errorlevel 1 goto seed_failed
 
-echo [7/7] Starting the web app in a new window...
+echo [7/8] Generating the local analytics snapshot...
+call "ops\windows\_run_pnpm.bat" analytics:aggregate
+if errorlevel 1 goto aggregation_failed
+
+echo [8/8] Starting the web app in a new window...
 start "ML Path Web" /D "%CD%" cmd.exe /d /k "call ops\windows\_run_pnpm.bat --filter @ml-path/web dev --mode friend-demo --host 127.0.0.1"
 "%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://127.0.0.1:5173" 45
 if errorlevel 1 goto web_not_ready
@@ -115,6 +122,10 @@ goto fail
 
 :seed_failed
 echo ERROR: Fresh local data could not be seeded. Read the ML Path Local Services window, then retry.
+goto fail
+
+:aggregation_failed
+echo ERROR: The local analytics snapshot could not be generated. Read the command output, then retry.
 goto fail
 
 :web_not_ready

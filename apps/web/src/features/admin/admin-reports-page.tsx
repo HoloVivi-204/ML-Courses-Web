@@ -133,7 +133,7 @@ function LearningVerifiedReport({
         <ShieldCheck aria-hidden="true" size={22} />
         <div>
           <h2>{t('admin.reports.learning.title')}</h2>
-          <p>
+          <p data-count={String(learning.learnerCount)} data-testid="admin-report-learner-count">
             {t('admin.reports.learning.learnerCount', {
               count: formatCount(learning.learnerCount, locale),
             })}
@@ -143,7 +143,13 @@ function LearningVerifiedReport({
 
       <ul className="admin-report-list">
         {learning.courseProgress.map((courseProgress) => (
-          <li key={courseProgress.courseId}>
+          <li
+            data-average-progress-percent={String(courseProgress.averageProgressPercent)}
+            data-completion-rate={String(courseProgress.completionRate)}
+            data-enrolled-count={String(courseProgress.enrolledCount)}
+            data-testid={`admin-report-course-${courseProgress.courseId}`}
+            key={courseProgress.courseId}
+          >
             <strong>{getCourseLabel(courseProgress.courseId, locale)}</strong>
             <small>{courseProgress.courseId}</small>
             <span>
@@ -168,18 +174,28 @@ function LearningVerifiedReport({
       </ul>
 
       <div className="admin-report-metric-row">
-        <p>
+        <p
+          data-average-score-percent={String(learning.quizSummary.averageScorePercent)}
+          data-testid="admin-report-quiz-average"
+        >
           {t('admin.reports.learning.quizAverage', {
             percent: formatPercentNumber(learning.quizSummary.averageScorePercent, locale),
           })}
         </p>
-        <p>
+        <p
+          data-testid="admin-report-quiz-attempts"
+          data-total-attempt-count={String(learning.quizSummary.totalAttemptCount)}
+          data-passed-attempt-count={String(learning.quizSummary.passedAttemptCount)}
+        >
           {t('admin.reports.learning.quizAttempts', {
             passedAttemptCount: formatCount(learning.quizSummary.passedAttemptCount, locale),
             totalAttemptCount: formatCount(learning.quizSummary.totalAttemptCount, locale),
           })}
         </p>
-        <p>
+        <p
+          data-pass-rate={String(learning.quizSummary.passRate)}
+          data-testid="admin-report-quiz-pass-rate"
+        >
           {t('admin.reports.learning.quizPassRate', {
             percent: formatRate(learning.quizSummary.passRate, locale),
           })}
@@ -253,7 +269,11 @@ function PlaygroundClientReportedPanel({
         <Activity aria-hidden="true" size={22} />
         <div>
           <h2>{t('admin.reports.playground.title')}</h2>
-          <p>
+          <p
+            data-failed-run-count={String(playground.failedRunCount)}
+            data-run-count={String(playground.runCount)}
+            data-testid="admin-report-playground-summary"
+          >
             {t('admin.reports.playground.runCounts', {
               failedRunCount: formatCount(playground.failedRunCount, locale),
               runCount: formatCount(playground.runCount, locale),
@@ -263,7 +283,10 @@ function PlaygroundClientReportedPanel({
       </div>
 
       <div className="admin-report-metric-row">
-        <p>
+        <p
+          data-error-rate={String(playground.errorRate)}
+          data-testid="admin-report-playground-error-rate"
+        >
           {t('admin.reports.playground.errorRate', {
             percent: formatRate(playground.errorRate, locale),
           })}

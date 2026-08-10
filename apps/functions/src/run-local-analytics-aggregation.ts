@@ -2,7 +2,10 @@ import { deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { assertLocalAnalyticsEnvironment } from './local-analytics-environment.js';
 import { runLocalAnalyticsAggregation } from './admin-report-repository.js';
+
+assertLocalAnalyticsEnvironment(process.env);
 
 const app = getFirebaseAdminApp();
 

@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createAppI18n } from '../../shared/i18n/i18n';
 import { ContentBlockRenderer, type ContentBlock } from './content-block-renderer';
@@ -197,6 +197,7 @@ describe('content block renderer', () => {
   });
 
   it('opens only safe HTTPS resources in an isolated tab', () => {
+    const onOpenResource = vi.fn();
     const blocks: ContentBlock[] = [
       {
         accessibility: { en: null, vi: null },
@@ -257,7 +258,14 @@ describe('content block renderer', () => {
       },
     ];
 
-    render(<ContentBlockRenderer blocks={blocks} locale="vi" postId="post-test" />);
+    render(
+      <ContentBlockRenderer
+        blocks={blocks}
+        locale="vi"
+        onOpenResource={onOpenResource}
+        postId="post-test"
+      />,
+    );
 
     const safeLink = screen.getByRole('link', {
       name: 'Neural networks: Nodes and hidden layers',
@@ -265,6 +273,13 @@ describe('content block renderer', () => {
     expect(safeLink).toHaveAttribute('href', GOOGLE_NEURAL_NODES_URL);
     expect(safeLink).toHaveAttribute('target', '_blank');
     expect(safeLink).toHaveAttribute('rel', 'noopener noreferrer');
+    fireEvent.click(safeLink);
+    expect(onOpenResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resourceType: 'documentation',
+        sourceId: 'source-google-neural-nodes',
+      }),
+    );
     expect(screen.getByText(/Tham khảo: Google for Developers/i)).toBeVisible();
     expect(screen.getByRole('link', { name: 'CC BY 4.0' })).toHaveAttribute(
       'href',

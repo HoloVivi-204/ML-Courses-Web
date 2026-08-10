@@ -6,6 +6,7 @@ import { parseContentBlockCollection } from './content-block-validation';
 import type {
   CalloutBlock,
   ContentBlock,
+  ExternalResource,
   ExampleBlock,
   FormulaBlock,
   HeadingBlock,
@@ -20,6 +21,7 @@ export type { ContentBlock } from './content-block-types';
 interface ContentBlockRendererProps {
   blocks: readonly unknown[];
   locale: Locale;
+  onOpenResource?: ((resource: ExternalResource) => void) | undefined;
   postId: string;
 }
 
@@ -49,7 +51,12 @@ export function ContentBlockNavigation({ blocks, locale, postId }: ContentBlockR
   );
 }
 
-export function ContentBlockRenderer({ blocks, locale, postId }: ContentBlockRendererProps) {
+export function ContentBlockRenderer({
+  blocks,
+  locale,
+  onOpenResource,
+  postId,
+}: ContentBlockRendererProps) {
   const { t } = useTranslation();
   const validBlocks = parseContentBlockCollection(blocks, postId);
 
@@ -69,6 +76,7 @@ export function ContentBlockRenderer({ blocks, locale, postId }: ContentBlockRen
         block={block}
         displayIndex={displayIndexes.get(block.id) ?? null}
         locale={locale}
+        onOpenResource={onOpenResource}
       />
     </div>
   ));
@@ -78,9 +86,10 @@ interface ContentBlockViewProps {
   block: ContentBlock;
   displayIndex: string | null;
   locale: Locale;
+  onOpenResource?: ((resource: ExternalResource) => void) | undefined;
 }
 
-function ContentBlockView({ block, displayIndex, locale }: ContentBlockViewProps) {
+function ContentBlockView({ block, displayIndex, locale, onOpenResource }: ContentBlockViewProps) {
   switch (block.type) {
     case 'heading':
       return <HeadingBlockView block={block} displayIndex={displayIndex} locale={locale} />;
@@ -91,7 +100,14 @@ function ContentBlockView({ block, displayIndex, locale }: ContentBlockViewProps
     case 'example':
       return <ExampleBlockView block={block} displayIndex={displayIndex} locale={locale} />;
     case 'source-list':
-      return <SourceListBlockView block={block} displayIndex={displayIndex} locale={locale} />;
+      return (
+        <SourceListBlockView
+          block={block}
+          displayIndex={displayIndex}
+          locale={locale}
+          onOpenResource={onOpenResource}
+        />
+      );
     case 'callout':
       return <CalloutBlockView block={block} locale={locale} />;
   }

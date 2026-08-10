@@ -87,6 +87,7 @@ export interface VerifiedAuthUser {
   authTime?: number | undefined;
   displayName: string;
   email?: string | undefined;
+  provider?: string | undefined;
   role?: 'admin' | undefined;
   uid: string;
 }
@@ -785,6 +786,10 @@ async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser
         : undefined,
     displayName: typeof decodedToken.name === 'string' ? decodedToken.name : 'Learner',
     email,
+    provider:
+      typeof decodedToken.firebase?.sign_in_provider === 'string'
+        ? decodedToken.firebase.sign_in_provider
+        : 'unknown',
     role:
       decodedToken.role === 'admin' || hasLocalCloudAuthDemoAdminRole(email) ? 'admin' : undefined,
   };
@@ -1112,9 +1117,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         getOptionalObjectBody(request),
       );
       const result = await getLearningRepository().bootstrapLearner({
+        authTime: authUser.authTime,
         uid: authUser.uid,
         displayName: authUser.displayName || 'Learner',
         locale: preferences.locale,
+        provider: authUser.provider,
         theme: preferences.theme,
       });
 
