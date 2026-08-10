@@ -17,6 +17,7 @@ import {
   bootstrapProfileRequestSchema,
   demoViewRequestSchema,
   demoViewResponseSchema,
+  learningEventRequestSchema,
   learnerProfileResponseSchema,
   learningProgressSnapshotSchema,
   moduleOverviewViewResponseSchema,
@@ -55,6 +56,10 @@ import {
 } from './avatar-upload-service.js';
 import { assertRequiredDemoStepsViewed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import {
+  createDefaultLearningEventRepository,
+  type LearningEventRepository,
+} from './learning-event-repository.js';
 import { hasLocalCloudAuthDemoAdminRole } from './local-cloud-auth-demo.js';
 import { createFirestoreAdminContentRepository } from './firestore-admin-content-repository.js';
 import {
@@ -103,6 +108,7 @@ export interface ApiAppOptions {
   avatarUploadService?: AvatarUploadService | undefined;
   deleteAuthUser?: ((uid: string) => Promise<void>) | undefined;
   learningRepository?: LearningRepository | undefined;
+  learningEventRepository?: LearningEventRepository | undefined;
   playgroundRepository?: PlaygroundRepository | undefined;
   rateLimiter?: RateLimiter | undefined;
   revokeAuthTokens?: ((uid: string) => Promise<void>) | undefined;
@@ -884,6 +890,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
   let adminReportRepository = options.adminReportRepository;
   let avatarUploadService = options.avatarUploadService;
   let learningRepository = options.learningRepository;
+  let learningEventRepository = options.learningEventRepository;
   let playgroundRepository = options.playgroundRepository;
   const deleteAuthUser = options.deleteAuthUser ?? defaultDeleteAuthUser;
   const revokeAuthTokens =
@@ -952,6 +959,11 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     rateLimiter,
     rateLimitPolicies.enrollment,
     'enrollment',
+  );
+  const requireLearningEventRateLimit = createRateLimitMiddleware(
+    rateLimiter,
+    rateLimitPolicies.learningEvent,
+    'learning-event',
   );
   const requirePlaygroundConfigRateLimit = createRateLimitMiddleware(
     rateLimiter,
@@ -1023,6 +1035,12 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
     learningRepository ??= createDefaultLearningRepository();
 
     return learningRepository;
+  }
+
+  function getLearningEventRepository(): LearningEventRepository {
+    learningEventRepository ??= createDefaultLearningEventRepository();
+
+    return learningEventRepository;
   }
 
   function getPlaygroundRepository(): PlaygroundRepository {
@@ -1466,6 +1484,38 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
       next(error);
     }
   });
+
+  app.post(
+    '/api/v1/learning-events',
+    requireAuth,
+    requireLearningEventRateLimit,
+    async (request, response, next) => {
+      try {
+        const authUser = getAuthUser(response);
+        const idempotencyKey = getIdempotencyKey(request);
+        const body = parseContractRequest(learningEventRequestSchema, getObjectBody(request));
+
+        assertMustApiRequest('recordLearningEvent', {
+          body,
+          headers: { 'idempotency-key': idempotencyKey },
+        });
+        const result = await getLearningEventRepository().record({
+          dedupeKey: idempotencyKey,
+          eventType: body.eventType,
+          payload: body.payload,
+          uid: authUser.uid,
+        });
+
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.recordLearningEvent.response, result.data),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.get('/api/v1/admin/content', requireAuth, async (request, response, next) => {
     try {

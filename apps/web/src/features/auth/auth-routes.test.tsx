@@ -68,6 +68,11 @@ function createLearningApiClient() {
         },
       }),
     ),
+    recordLearningEvent: vi.fn().mockResolvedValue({
+      accepted: true,
+      eventId: 'event-auth-test-01',
+      verificationLevel: 'client-computed',
+    }),
     recordModuleOverview: vi.fn().mockResolvedValue({
       moduleOverview: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -433,6 +438,7 @@ function createLearningApiClient() {
         quizSummary: {
           averageScorePercent: 0,
           passedAttemptCount: 0,
+          passRate: 0,
           totalAttemptCount: 0,
           commonWrongQuestions: [],
         },

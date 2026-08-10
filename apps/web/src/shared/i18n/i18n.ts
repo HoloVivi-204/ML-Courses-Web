@@ -192,6 +192,11 @@ const resources = {
       'dashboard.verified.unlockLabel': 'Unlocked algorithms',
       'dashboard.verified.algorithmUnlocked': '{{algorithm}} unlocked',
       'dashboard.verified.noUnlocks': 'No algorithms unlocked yet.',
+      'dashboard.verified.activityLabel': 'Playground activity by scenario',
+      'dashboard.verified.activityTitle': 'Playground activity snapshot',
+      'dashboard.verified.activityCounts':
+        '{{algorithm}} · {{runCount}} runs · {{failedRunCount}} failed',
+      'dashboard.verified.missingConditions': 'Next conditions: {{conditions}}',
       'dashboard.client.title': 'Client-computed Playground activity',
       'dashboard.client.runCount': 'Saved runs: {{count}}',
       'dashboard.client.accuracy': 'Accuracy {{accuracy}}',
@@ -274,7 +279,9 @@ const resources = {
       'admin.reports.learning.courseCounts':
         '{{enrolledCount}} enrolled · {{startedCount}} started · {{completedCount}} completed',
       'admin.reports.learning.averageProgress': 'Average progress {{percent}}%',
+      'admin.reports.learning.courseCompletion': 'Course completion rate {{percent}}%',
       'admin.reports.learning.quizAverage': 'Average quiz score {{percent}}%',
+      'admin.reports.learning.quizPassRate': 'Quiz pass rate {{percent}}%',
       'admin.reports.learning.quizAttempts':
         '{{passedAttemptCount}}/{{totalAttemptCount}} passed attempts',
       'admin.reports.learning.wrongQuestion': '{{questionId}} · {{wrongCount}} wrong',
@@ -967,7 +974,7 @@ export function createAppI18n(): i18n {
   const instance = createInstance();
 
   void instance.init({
-    fallbackLng: 'vi',
+    fallbackLng: ['vi', 'en'],
     initAsync: false,
     interpolation: {
       escapeValue: false,

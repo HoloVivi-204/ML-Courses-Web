@@ -11,6 +11,7 @@ import {
 
 import { ApiError } from './api-error.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { setLearningEventInTransaction } from './learning-event-repository.js';
 import {
   assertSupportedPlaygroundPair,
   getAllowedPlaygroundMetricIds,
@@ -1054,6 +1055,27 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           );
         }
 
+        const algorithmId =
+          typeof sessionData.algorithmId === 'string' ? sessionData.algorithmId : null;
+        const scenarioId =
+          typeof sessionData.scenarioId === 'string' ? sessionData.scenarioId : null;
+
+        if (algorithmId && scenarioId) {
+          setLearningEventInTransaction(transaction, firestore, {
+            dedupeKey: `playground-run-cancelled:${input.sessionId}`,
+            eventType: 'playground_run_cancelled',
+            now: new Date(),
+            payload: {
+              algorithmId,
+              cancellationMode: 'server-request',
+              runId: input.sessionId,
+              scenarioId,
+            },
+            uid: input.uid,
+            verificationLevel: 'client-computed',
+          });
+        }
+
         return {
           statusCode: 200 as const,
           data: {
@@ -1179,6 +1201,18 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           issuedAt: FieldValue.serverTimestamp(),
           expiresAt,
           updatedAt: FieldValue.serverTimestamp(),
+        });
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `playground-run-started:${sessionId}`,
+          eventType: 'playground_run_started',
+          now: new Date(),
+          payload: {
+            algorithmId: data.algorithmId,
+            runId: sessionId,
+            scenarioId: data.scenarioId,
+          },
+          uid: input.uid,
+          verificationLevel: 'client-computed',
         });
 
         return {
@@ -1405,6 +1439,19 @@ export function createFirestorePlaygroundRepository(firestore: Firestore): Playg
           note: null,
           createdAt: FieldValue.serverTimestamp(),
           createdAtIso,
+        });
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `playground-run-completed:${runId}`,
+          eventType: 'playground_run_completed',
+          now: new Date(nowMillis),
+          payload: {
+            algorithmId: result.algorithmId,
+            durationMs: result.durationMs,
+            runId,
+            scenarioId: result.scenarioId,
+          },
+          uid: input.uid,
+          verificationLevel: 'client-computed',
         });
         transaction.set(
           sessionRef,

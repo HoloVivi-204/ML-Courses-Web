@@ -158,6 +158,11 @@ function LearningVerifiedReport({
                 percent: formatPercentNumber(courseProgress.averageProgressPercent, locale),
               })}
             </span>
+            <span>
+              {t('admin.reports.learning.courseCompletion', {
+                percent: formatRate(courseProgress.completionRate, locale),
+              })}
+            </span>
           </li>
         ))}
       </ul>
@@ -172,6 +177,11 @@ function LearningVerifiedReport({
           {t('admin.reports.learning.quizAttempts', {
             passedAttemptCount: formatCount(learning.quizSummary.passedAttemptCount, locale),
             totalAttemptCount: formatCount(learning.quizSummary.totalAttemptCount, locale),
+          })}
+        </p>
+        <p>
+          {t('admin.reports.learning.quizPassRate', {
+            percent: formatRate(learning.quizSummary.passRate, locale),
           })}
         </p>
       </div>

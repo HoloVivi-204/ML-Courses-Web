@@ -31,7 +31,8 @@
     "prefirebase:friend-demo:seed": "pnpm firebase:build",
     "firebase:friend-demo:seed": "node firebase/emulator-seed/dist/seed-hybrid-demo.js",
     "prefirebase:emulators:verify": "pnpm firebase:build",
-    "firebase:emulators:verify": "node firebase/emulator-seed/dist/run-emulators.js verify"
+    "firebase:emulators:verify": "node firebase/emulator-seed/dist/run-emulators.js verify",
+    "analytics:aggregate": "pnpm --filter @ml-path/functions analytics:aggregate"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "4.1.10",

@@ -1135,6 +1135,14 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     await seedAdminContentLifecycleRepository(services.firestore);
     const studentToken = await registerWithEmailPassword(studentEmail, studentPassword);
     const studentUid = (await services.auth.getUserByEmail(studentEmail)).uid;
+    await readSuccessData(
+      await requestApiJson('/api/v1/users/me/bootstrap', {
+        body: { locale: 'vi', theme: 'system' },
+        idToken: studentToken,
+        method: 'POST',
+      }),
+      201,
+    );
     const courseId = 'course-deep-learning-basic';
     const demoId = 'demo-perceptron-and-gate';
     const postId = 'dl-p01-neuron-perceptron';
@@ -1142,6 +1150,8 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     const demoAccessPath = `users/${studentUid}/contentAccess/demo_${demoId}`;
     const courseEnrollmentPath = `users/${studentUid}/enrollments/${courseId}`;
     const postProgressPath = `users/${studentUid}/postProgress/${postId}`;
+    const quizProgressPath = `users/${studentUid}/quizProgress/quiz-post-dl-p01`;
+    const playgroundRunPath = `users/${studentUid}/playgroundRuns/analytics-success-run`;
 
     await Promise.all([
       services.firestore.doc(postAccessPath).set({
@@ -1170,6 +1180,34 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
         schemaVersion: 1,
         started: true,
       }),
+      services.firestore.doc(quizProgressPath).set({
+        attemptCount: 2,
+        bestScore: 0.8,
+        passed: true,
+        quizId: 'quiz-post-dl-p01',
+        schemaVersion: 1,
+        wrongCounts: { 'q-neuron': 1 },
+      }),
+      services.firestore.doc(playgroundRunPath).set({
+        algorithmId: 'perceptron',
+        config: {
+          epochs: 100,
+          learningRate: 0.1,
+          seed: 42,
+          trainRatio: 0.75,
+        },
+        createdAt: new Date().toISOString(),
+        datasetVersionId: 'ds-xor-noisy-v1',
+        durationMs: 120,
+        feedback: [],
+        isPinned: false,
+        metrics: { accuracy: 0.8, loss: 0.2 },
+        runId: 'analytics-success-run',
+        scenarioId: 'pg-xor',
+        targetReached: null,
+        targetVersionId: null,
+        verificationLevel: 'client-computed',
+      }),
     ]);
 
     await services.auth.createUser({
@@ -1180,6 +1218,26 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     await services.auth.setCustomUserClaims(adminUid, { role: 'admin' });
 
     const adminToken = await signInWithEmailPassword(adminEmail, adminPassword);
+
+    const failedRunEvent = await readSuccessData(
+      await requestApiJson('/api/v1/learning-events', {
+        body: {
+          eventType: 'playground_run_failed',
+          payload: {
+            algorithmId: 'perceptron',
+            normalizedErrorCode: 'PLAYGROUND_RUN_FAILED',
+            runId: 'analytics-failed-run',
+            scenarioId: 'pg-xor',
+          },
+        },
+        idToken: studentToken,
+        idempotencyKey: `analytics-failed-${randomUUID()}`,
+        method: 'POST',
+      }),
+      201,
+    );
+    assert.equal(failedRunEvent.accepted, true);
+    assert.equal(failedRunEvent.verificationLevel, 'client-computed');
 
     const forbiddenResponse = await requestApiJson('/api/v1/admin/content', {
       idToken: studentToken,
@@ -1577,6 +1635,38 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       false,
     );
 
+    const analyticsModulePath = new URL(
+      '../../../apps/functions/dist/admin-report-repository.js',
+      import.meta.url,
+    ).href;
+    const analyticsModule = (await import(analyticsModulePath)) as {
+      runLocalAnalyticsAggregation: (
+        firestore: typeof services.firestore,
+      ) => Promise<Record<string, unknown>>;
+    };
+    const localAggregate = await analyticsModule.runLocalAnalyticsAggregation(services.firestore);
+    const learningAggregate = getRecordField(localAggregate, 'learningVerified');
+    const courseAggregate = findRecordByField(
+      getArrayField(learningAggregate, 'courseProgress'),
+      'courseId',
+      courseId,
+    );
+    assert.equal(typeof courseAggregate.completionRate, 'number');
+    const quizAggregate = getRecordField(learningAggregate, 'quizSummary');
+    assert.equal(typeof quizAggregate.passRate, 'number');
+    const playgroundAggregate = getRecordField(localAggregate, 'playgroundClientReported');
+    assert.equal(playgroundAggregate.runCount, 2);
+    assert.equal(playgroundAggregate.failedRunCount, 1);
+    assert.equal(playgroundAggregate.errorRate, 0.5);
+    const xorActivity = findRecordByField(
+      getArrayField(playgroundAggregate, 'scenarioActivity'),
+      'algorithmId',
+      'perceptron',
+    );
+    assert.equal(xorActivity.scenarioId, 'pg-xor');
+    assert.equal(xorActivity.runCount, 2);
+    assert.equal(xorActivity.failedRunCount, 1);
+
     const reportData = await readSuccessData(
       await requestApiJson('/api/v1/admin/reports/summary', { idToken: adminToken }),
       200,
@@ -1620,6 +1710,7 @@ console.log(
     directProgressWrites: 'denied',
     adminContentLifecycle: 'verified',
     emergencyWithdraw: 'verified',
+    localAnalyticsAggregation: 'verified',
     profileAvatarAccountLifecycle: 'verified',
     protectedLearningContent: 'verified',
   }),

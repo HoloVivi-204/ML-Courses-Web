@@ -11,12 +11,15 @@ import {
 import { ApiError } from './api-error.js';
 import { getDemoCompletionSeed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
+import { createLearningLearnerHash } from './learning-events.js';
+import { setLearningEventInTransaction } from './learning-event-repository.js';
 import {
   createFirestoreLearningContentAuthority,
   type LearningContentAuthority,
   type LearningContentEntityType,
 } from './learning-content-authority.js';
 import { getPostViewManifest } from './post-view-manifest.js';
+import { getSubmissionPlaygroundPairManifests } from './playground-manifest.js';
 import {
   createQuizAttemptPayload,
   getQuizManifest,
@@ -125,6 +128,7 @@ export interface UpdateLearnerPreferencesInput {
 
 export interface LearningModuleProgress {
   completedStepCount: number;
+  missingConditions?: readonly string[];
   moduleId: string;
   overviewViewed: boolean;
   progressPercent: number;
@@ -168,7 +172,15 @@ export interface LearningCourseProgress {
   status: 'completed' | 'in-progress' | 'not-enrolled';
 }
 
+export interface LearningPlaygroundActivity {
+  algorithmId: string;
+  failedRunCount: number;
+  runCount: number;
+  scenarioId: string;
+}
+
 export interface LearningProgressSnapshot {
+  courseCatalog?: ReadonlyArray<LearningCourseProgress>;
   courses: ReadonlyArray<LearningCourseProgress>;
   algorithmUnlocks: ReadonlyArray<{
     algorithmId: string;
@@ -186,6 +198,7 @@ export interface LearningProgressSnapshot {
   };
   modules: ReadonlyArray<LearningModuleProgress>;
   posts: ReadonlyArray<LearningPostProgress>;
+  playgroundActivity?: ReadonlyArray<LearningPlaygroundActivity>;
   quizzes: ReadonlyArray<LearningQuizProgress>;
 }
 
@@ -620,6 +633,29 @@ async function listLearnerSubcollectionDocumentRefs(
   return documentRefsByCollection.flat();
 }
 
+async function listLearnerEventDocumentRefs(
+  firestore: Firestore,
+  uid: string,
+): Promise<FirebaseFirestore.DocumentReference[]> {
+  const collection = firestore.collection('learningEvents') as unknown as {
+    where?: (
+      fieldPath: string,
+      opStr: '==',
+      value: string,
+    ) => {
+      get(): Promise<{ docs: Array<{ ref: FirebaseFirestore.DocumentReference }> }>;
+    };
+  };
+
+  if (typeof collection.where !== 'function') {
+    return [];
+  }
+
+  const snapshot = await collection.where('uidHash', '==', createLearningLearnerHash(uid)).get();
+
+  return snapshot.docs.map((document) => document.ref);
+}
+
 async function deleteDocumentsInBatches(
   firestore: Firestore,
   documentRefs: readonly FirebaseFirestore.DocumentReference[],
@@ -982,6 +1018,148 @@ interface UserSubcollectionDocumentData {
   id: string;
 }
 
+const LEARNER_ACTIVITY_EVENT_LIMIT = 200;
+const LEARNER_ACTIVITY_RUN_LIMIT = 50;
+
+async function readLearnerLearningEvents(
+  firestore: Firestore,
+  uid: string,
+): Promise<UserSubcollectionDocumentData[]> {
+  const collection = firestore.collection('learningEvents') as unknown as {
+    where?: (
+      fieldPath: string,
+      opStr: '==',
+      value: string,
+    ) => {
+      get(): Promise<{ docs: Array<{ data(): FirebaseFirestore.DocumentData; id: string }> }>;
+      limit?(limit: number): {
+        get(): Promise<{ docs: Array<{ data(): FirebaseFirestore.DocumentData; id: string }> }>;
+      };
+    };
+  };
+
+  if (typeof collection.where !== 'function') {
+    return [];
+  }
+
+  const filteredCollection = collection.where('uidHash', '==', createLearningLearnerHash(uid));
+  const snapshot = filteredCollection.limit
+    ? await filteredCollection.limit(LEARNER_ACTIVITY_EVENT_LIMIT).get()
+    : await filteredCollection.get();
+
+  return snapshot.docs.map((document) => ({ data: document.data(), id: document.id }));
+}
+
+async function readLearnerPlaygroundRuns(
+  firestore: Firestore,
+  uid: string,
+): Promise<UserSubcollectionDocumentData[]> {
+  const collection = firestore.collection(`users/${uid}/playgroundRuns`) as unknown as {
+    limit?: (limit: number) => {
+      get(): Promise<{ docs: Array<{ data(): FirebaseFirestore.DocumentData; id: string }> }>;
+    };
+    orderBy?: (
+      fieldPath: string,
+      direction?: 'asc' | 'desc',
+    ) => {
+      limit(limit: number): {
+        get(): Promise<{ docs: Array<{ data(): FirebaseFirestore.DocumentData; id: string }> }>;
+      };
+    };
+  };
+
+  if (typeof collection.orderBy !== 'function') {
+    return [];
+  }
+
+  const snapshot = await collection
+    .orderBy('createdAt', 'desc')
+    .limit(LEARNER_ACTIVITY_RUN_LIMIT)
+    .get();
+
+  return snapshot.docs.map((document) => ({ data: document.data(), id: document.id }));
+}
+
+function createPlaygroundActivity(input: {
+  learningEvents: readonly UserSubcollectionDocumentData[];
+  playgroundRuns: readonly UserSubcollectionDocumentData[];
+}): readonly LearningPlaygroundActivity[] {
+  const runStates = new Map<string, Map<string, 'completed' | 'failed'>>();
+
+  function setRunState(inputState: {
+    algorithmId: string;
+    runId: string;
+    scenarioId: string;
+    status: 'completed' | 'failed';
+  }): void {
+    const pairKey = `${inputState.scenarioId}:${inputState.algorithmId}`;
+    const pairRuns = runStates.get(pairKey) ?? new Map<string, 'completed' | 'failed'>();
+
+    pairRuns.set(inputState.runId, inputState.status);
+    runStates.set(pairKey, pairRuns);
+  }
+
+  for (const event of input.learningEvents) {
+    if (
+      event.data.verificationLevel !== 'client-computed' ||
+      (event.data.eventType !== 'playground_run_completed' &&
+        event.data.eventType !== 'playground_run_failed')
+    ) {
+      continue;
+    }
+
+    const payload = event.data.payload;
+
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      Array.isArray(payload) ||
+      typeof payload.algorithmId !== 'string' ||
+      typeof payload.runId !== 'string' ||
+      typeof payload.scenarioId !== 'string'
+    ) {
+      continue;
+    }
+
+    setRunState({
+      algorithmId: payload.algorithmId,
+      runId: payload.runId,
+      scenarioId: payload.scenarioId,
+      status: event.data.eventType === 'playground_run_failed' ? 'failed' : 'completed',
+    });
+  }
+
+  for (const run of input.playgroundRuns) {
+    if (
+      run.data.verificationLevel !== 'client-computed' ||
+      typeof run.data.algorithmId !== 'string' ||
+      typeof run.data.runId !== 'string' ||
+      typeof run.data.scenarioId !== 'string'
+    ) {
+      continue;
+    }
+
+    setRunState({
+      algorithmId: run.data.algorithmId,
+      runId: run.data.runId,
+      scenarioId: run.data.scenarioId,
+      status: 'completed',
+    });
+  }
+
+  return getSubmissionPlaygroundPairManifests().map((manifest) => {
+    const pairRuns = runStates.get(`${manifest.scenarioId}:${manifest.algorithmId}`) ?? new Map();
+    const failedRunCount = [...pairRuns.values()].filter((status) => status === 'failed').length;
+
+    return {
+      algorithmId: manifest.algorithmId,
+      failedRunCount,
+      runCount: pairRuns.size,
+      scenarioId: manifest.scenarioId,
+    };
+  });
+}
+
 async function readUserSubcollectionData(
   firestore: Firestore,
   uid: string,
@@ -1094,6 +1272,8 @@ function createCourseProgressSummary(input: {
   postViewsById: ReadonlyMap<string, FirebaseFirestore.DocumentData>;
   quizProgress: readonly UserSubcollectionDocumentData[];
   quizProgressById: ReadonlyMap<string, FirebaseFirestore.DocumentData>;
+  isEnrolled?: boolean;
+  includeMissingConditions?: boolean;
 }): LearningCourseProgress {
   const modules = input.course.modules.map((module) => {
     const completedPostCount = module.posts.filter((post) => {
@@ -1139,8 +1319,27 @@ function createCourseProgressSummary(input: {
           input.demoViewsById.has(module.demoId))) ||
       input.quizProgressById.has(module.moduleQuizId);
 
+    const missingConditions = [
+      ...(overviewViewed ? [] : [`overview:${module.moduleId}`]),
+      ...module.posts
+        .filter((post) => {
+          const quizProgress = input.quizProgressById.get(post.postQuizId);
+
+          return (
+            !input.postCompletions.has(post.postId) && !getBooleanField(quizProgress, 'passed')
+          );
+        })
+        .map((post) => `post:${post.postId}`),
+      ...(demoCompleted || module.demoId === null ? [] : [`demo:${module.demoId}`]),
+      ...(getBooleanField(moduleQuizProgress, 'passed') ? [] : [`quiz:${module.moduleQuizId}`]),
+      ...module.prerequisiteModuleIds
+        .filter((moduleId) => !input.moduleCompletions.has(moduleId))
+        .map((moduleId) => `module:${moduleId}`),
+    ];
+
     return {
       completedStepCount,
+      ...(input.includeMissingConditions ? { missingConditions } : {}),
       moduleId: module.moduleId,
       overviewViewed,
       progressPercent: moduleCompleted
@@ -1207,7 +1406,9 @@ function createCourseProgressSummary(input: {
     status:
       progressPercent >= 100
         ? 'completed'
-        : (getStatusField(input.enrollment.data) ?? 'in-progress'),
+        : input.isEnrolled === false
+          ? 'not-enrolled'
+          : (getStatusField(input.enrollment.data) ?? 'in-progress'),
   };
 }
 
@@ -1221,6 +1422,7 @@ function createLearningProgressSnapshot(input: {
   moduleProgress: readonly UserSubcollectionDocumentData[];
   postCompletions: readonly UserSubcollectionDocumentData[];
   postViews: readonly UserSubcollectionDocumentData[];
+  playgroundActivity?: readonly LearningPlaygroundActivity[];
   quizProgress: readonly UserSubcollectionDocumentData[];
 }): LearningProgressSnapshot {
   const catalog = getReleaseLearningCatalog();
@@ -1309,12 +1511,31 @@ function createLearningProgressSnapshot(input: {
             postViewsById,
             quizProgress: input.quizProgress,
             quizProgressById,
+            isEnrolled: true,
           })
         : null;
     })
     .filter((course): course is LearningCourseProgress => course !== null);
+  const courseCatalog = catalog.courses.map((course) =>
+    createCourseProgressSummary({
+      contentAccessKeys,
+      course,
+      demoCompletions: demoCompletionIds,
+      demoViewsById,
+      enrollment: { courseId: course.courseId, data: {} },
+      includeMissingConditions: true,
+      isEnrolled: false,
+      moduleCompletions: moduleCompletionIds,
+      moduleProgressById,
+      postCompletions: postCompletionIds,
+      postViewsById,
+      quizProgress: input.quizProgress,
+      quizProgressById,
+    }),
+  );
 
   return {
+    courseCatalog,
     courses,
     algorithmUnlocks: input.algorithmUnlocks
       .map((item) => toAlgorithmUnlockItem(item.data))
@@ -1402,6 +1623,7 @@ function createLearningProgressSnapshot(input: {
           };
         }),
     ),
+    ...(input.playgroundActivity ? { playgroundActivity: input.playgroundActivity } : {}),
     quizzes: input.quizProgress
       .map((item) => toQuizProgressItem(item.id, item.data))
       .filter((item): item is LearningProgressSnapshot['quizzes'][number] => item !== null),
@@ -1641,6 +1863,17 @@ export function createFirestoreLearningRepository(
           createdAt: FieldValue.serverTimestamp(),
           expiresAt: Timestamp.fromMillis(Date.now() + IDEMPOTENCY_TTL_MS),
         });
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `demo-completed:${input.demoId}`,
+          eventType: 'demo_completed',
+          now: new Date(),
+          payload: {
+            demoId: input.demoId,
+            moduleId: input.moduleId,
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
 
         return { statusCode: 200 as const, data: responseData };
       });
@@ -1718,6 +1951,17 @@ export function createFirestoreLearningRepository(
           },
           { merge: true },
         );
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `demo-started:${input.demoId}`,
+          eventType: 'demo_started',
+          now: new Date(),
+          payload: {
+            demoId: input.demoId,
+            ...(demoAccessSeed?.moduleId ? { moduleId: demoAccessSeed.moduleId } : {}),
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
 
         return { statusCode: 200 as const, data: responseData };
       });
@@ -1805,6 +2049,28 @@ export function createFirestoreLearningRepository(
           },
           { merge: true },
         );
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `module-overview-viewed:${input.moduleId}`,
+          eventType: 'module_overview_viewed',
+          now: new Date(),
+          payload: {
+            courseId: module.courseId,
+            moduleId: input.moduleId,
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `module-started:${input.moduleId}`,
+          eventType: 'module_started',
+          now: new Date(),
+          payload: {
+            courseId: module.courseId,
+            moduleId: input.moduleId,
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
 
         return { statusCode: 200 as const, data: responseData };
       });
@@ -1894,6 +2160,31 @@ export function createFirestoreLearningRepository(
           },
           { merge: true },
         );
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `post-started:${input.postId}`,
+          eventType: 'post_started',
+          now: new Date(),
+          payload: {
+            ...(module ? { courseId: module.courseId } : {}),
+            postId: input.postId,
+            revisionId: `post-${input.postId}-rev-r1`,
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
+        if (contentViewed && !previousContentViewed) {
+          setLearningEventInTransaction(transaction, firestore, {
+            dedupeKey: `post-content-viewed:${input.postId}`,
+            eventType: 'post_content_viewed',
+            now: new Date(),
+            payload: {
+              postId: input.postId,
+              viewedBlockCount: viewedItemIds.length,
+            },
+            uid: input.uid,
+            verificationLevel: 'server-verified',
+          });
+        }
 
         return { statusCode: 200 as const, data: responseData };
       });
@@ -2068,6 +2359,18 @@ export function createFirestoreLearningRepository(
           createdAt: FieldValue.serverTimestamp(),
           expiresAt: Timestamp.fromMillis(Date.now() + IDEMPOTENCY_TTL_MS),
         });
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `post-completed:${input.postId}`,
+          eventType: 'post_completed',
+          now: new Date(),
+          payload: {
+            ...(module?.courseId ? { courseId: module.courseId } : {}),
+            moduleId,
+            postId: input.postId,
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
 
         return { statusCode: 200 as const, data: responseData };
       });
@@ -2197,9 +2500,12 @@ export function createFirestoreLearningRepository(
       });
     },
     async deleteLearnerAccount(input) {
-      const ownedDocumentRefs = await listLearnerSubcollectionDocumentRefs(firestore, input.uid);
+      const [ownedDocumentRefs, eventDocumentRefs] = await Promise.all([
+        listLearnerSubcollectionDocumentRefs(firestore, input.uid),
+        listLearnerEventDocumentRefs(firestore, input.uid),
+      ]);
 
-      await deleteDocumentsInBatches(firestore, ownedDocumentRefs);
+      await deleteDocumentsInBatches(firestore, [...ownedDocumentRefs, ...eventDocumentRefs]);
       await firestore.runTransaction(async (transaction) => {
         transaction.set(firestore.doc(`users/${input.uid}`), {
           ...createAnonymizedProfilePayload(),
@@ -2309,6 +2615,24 @@ export function createFirestoreLearningRepository(
           createdAt: FieldValue.serverTimestamp(),
           expiresAt: Timestamp.fromMillis(Date.now() + IDEMPOTENCY_TTL_MS),
         });
+        if (!enrollmentSnapshot.exists) {
+          setLearningEventInTransaction(transaction, firestore, {
+            dedupeKey: `course-enrolled:${input.courseId}`,
+            eventType: 'course_enrolled',
+            now: new Date(),
+            payload: { courseId: input.courseId },
+            uid: input.uid,
+            verificationLevel: 'server-verified',
+          });
+          setLearningEventInTransaction(transaction, firestore, {
+            dedupeKey: `course-started:${input.courseId}`,
+            eventType: 'course_started',
+            now: new Date(),
+            payload: { courseId: input.courseId },
+            uid: input.uid,
+            verificationLevel: 'server-verified',
+          });
+        }
 
         return { statusCode, data: responseData };
       });
@@ -2326,6 +2650,8 @@ export function createFirestoreLearningRepository(
         postCompletions,
         postViews,
         quizProgress,
+        learningEvents,
+        playgroundRuns,
       ] = await Promise.all([
         readUserSubcollectionData(
           firestore,
@@ -2377,6 +2703,8 @@ export function createFirestoreLearningRepository(
           'quizProgress',
           knownDocumentIds.quizProgress,
         ),
+        readLearnerLearningEvents(firestore, input.uid),
+        readLearnerPlaygroundRuns(firestore, input.uid),
       ]);
 
       return {
@@ -2391,6 +2719,7 @@ export function createFirestoreLearningRepository(
           moduleProgress,
           postCompletions,
           postViews,
+          playgroundActivity: createPlaygroundActivity({ learningEvents, playgroundRuns }),
           quizProgress,
         }),
       };
@@ -2660,6 +2989,29 @@ export function createFirestoreLearningRepository(
               { merge: true },
             );
 
+            setLearningEventInTransaction(transaction, firestore, {
+              dedupeKey: `module-completed:${moduleSeed.moduleId}`,
+              eventType: 'module_completed',
+              now: new Date(),
+              payload: {
+                courseId: moduleSeed.courseId,
+                moduleId: moduleSeed.moduleId,
+              },
+              uid: input.uid,
+              verificationLevel: 'server-verified',
+            });
+
+            if (enrollmentProgressPercent >= 100) {
+              setLearningEventInTransaction(transaction, firestore, {
+                dedupeKey: `course-completed:${moduleSeed.courseId}`,
+                eventType: 'course_completed',
+                now: new Date(),
+                payload: { courseId: moduleSeed.courseId },
+                uid: input.uid,
+                verificationLevel: 'server-verified',
+              });
+            }
+
             if (moduleSeed.nextModuleId) {
               transaction.set(
                 firestore.doc(`users/${input.uid}/contentAccess/module_${moduleSeed.nextModuleId}`),
@@ -2722,6 +3074,19 @@ export function createFirestoreLearningRepository(
                   { merge: true },
                 );
               }
+
+              setLearningEventInTransaction(transaction, firestore, {
+                dedupeKey: `post-completed:${unlocked.id}`,
+                eventType: 'post_completed',
+                now: new Date(),
+                payload: {
+                  ...(moduleSeed ? { courseId: moduleSeed.courseId } : {}),
+                  moduleId: manifest.moduleId,
+                  postId: unlocked.id,
+                },
+                uid: input.uid,
+                verificationLevel: 'server-verified',
+              });
             }
 
             if (unlocked.type === 'algorithm') {
@@ -2740,9 +3105,37 @@ export function createFirestoreLearningRepository(
                 },
                 { merge: true },
               );
+              setLearningEventInTransaction(transaction, firestore, {
+                dedupeKey: `algorithm-unlocked:${unlocked.id}`,
+                eventType: 'algorithm_unlocked',
+                now: new Date(),
+                payload: {
+                  algorithmId: unlocked.id,
+                  moduleId: moduleSeed?.moduleId ?? manifest.moduleId,
+                },
+                uid: input.uid,
+                verificationLevel: 'server-verified',
+              });
             }
           }
         }
+
+        setLearningEventInTransaction(transaction, firestore, {
+          dedupeKey: `quiz-submitted:${input.attemptId}`,
+          eventType:
+            manifest.quizKind === 'module' ? 'module_quiz_submitted' : 'post_quiz_submitted',
+          now: new Date(),
+          payload: {
+            attemptNo: getNumberField(attemptData, 'attemptNumber'),
+            passed: grade.passed,
+            ...(manifest.postId ? { postId: manifest.postId } : {}),
+            quizId: manifest.quizId,
+            quizRevisionId: manifest.quizRevisionId,
+            score: grade.score,
+          },
+          uid: input.uid,
+          verificationLevel: 'server-verified',
+        });
 
         transaction.set(idempotencyRef, {
           schemaVersion: 1,

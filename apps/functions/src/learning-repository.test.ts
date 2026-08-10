@@ -1,6 +1,7 @@
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 
+import { createLearningLearnerHash } from './learning-events.js';
 import { createFirestoreLearningRepository } from './learning-repository.js';
 import {
   getReleaseLearningCatalog,
@@ -28,6 +29,18 @@ interface FakeCollectionReference {
   doc(documentId: string): FakeDocumentReference;
   listDocuments(): Promise<FakeDocumentReference[]>;
   path: string;
+  where(fieldPath: string, opStr: '==', value: string): FakeQuery;
+}
+
+interface FakeQuery {
+  get(): Promise<{
+    docs: Array<{
+      data(): Record<string, unknown>;
+      id: string;
+      ref: FakeDocumentReference;
+    }>;
+  }>;
+  limit(limit: number): FakeQuery;
 }
 
 interface FakeDocumentSnapshot {
@@ -88,6 +101,45 @@ function createFakeFirestore(
               return documentPath.startsWith(prefix) && suffix.length > 0 && !suffix.includes('/');
             })
             .map((documentPath) => createDocumentReference(documents, documentPath));
+        },
+        where(fieldPath, opStr, value) {
+          if (opStr !== '==') {
+            throw new Error(`Unsupported fake query operator: ${opStr}`);
+          }
+
+          function createQuery(limit?: number): FakeQuery {
+            return {
+              async get() {
+                const prefix = `${path}/`;
+                const matchingPaths = [...documents.entries()]
+                  .filter(([documentPath, data]) => {
+                    const suffix = documentPath.slice(prefix.length);
+
+                    return (
+                      documentPath.startsWith(prefix) &&
+                      suffix.length > 0 &&
+                      !suffix.includes('/') &&
+                      data[fieldPath] === value
+                    );
+                  })
+                  .map(([documentPath]) => documentPath)
+                  .slice(0, limit);
+
+                return {
+                  docs: matchingPaths.map((documentPath) => ({
+                    data: () => documents.get(documentPath) ?? {},
+                    id: documentPath.slice(prefix.length),
+                    ref: createDocumentReference(documents, documentPath),
+                  })),
+                };
+              },
+              limit(nextLimit) {
+                return createQuery(nextLimit);
+              },
+            };
+          }
+
+          return createQuery();
         },
       };
     },
@@ -421,6 +473,14 @@ describe('Firestore learning repository', () => {
       'users/learner-01/idempotencyKeys/delete-key': {
         operation: 'course-enrollment',
       },
+      'learningEvents/event-owner': {
+        eventType: 'quiz_submitted',
+        uidHash: createLearningLearnerHash('learner-01'),
+      },
+      'learningEvents/event-other': {
+        eventType: 'quiz_submitted',
+        uidHash: createLearningLearnerHash('learner-02'),
+      },
       'users/learner-02': {
         schemaVersion: 1,
         displayName: 'Other Student',
@@ -450,6 +510,11 @@ describe('Firestore learning repository', () => {
     expect([...documents.keys()].filter((path) => path.startsWith('users/learner-01/'))).toEqual(
       [],
     );
+    expect(documents.get('learningEvents/event-owner')).toBeUndefined();
+    expect(documents.get('learningEvents/event-other')).toMatchObject({
+      eventType: 'quiz_submitted',
+      uidHash: createLearningLearnerHash('learner-02'),
+    });
     expect(documents.get('users/learner-02')).toMatchObject({
       displayName: 'Other Student',
       status: 'active',
@@ -1819,5 +1884,28 @@ describe('Firestore learning repository', () => {
     const result = await repository.getProgress({ uid: 'learner-01' });
 
     expect(result.data.contentAccess).toEqual([]);
+  });
+
+  it('returns every catalog course with explicit missing module conditions', async () => {
+    const { firestore } = createFakeFirestore();
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.getProgress({ uid: 'learner-01' });
+    const catalogCourse = result.data.courseCatalog?.find(
+      (course) => course.courseId === 'course-deep-learning-basic',
+    );
+    const firstModule = catalogCourse?.modules[0];
+
+    expect(result.data.courseCatalog).toHaveLength(getReleaseLearningCatalog().courses.length);
+    expect(catalogCourse?.status).toBe('not-enrolled');
+    expect(firstModule?.status).toBe('locked');
+    expect(firstModule?.missingConditions).toEqual(
+      expect.arrayContaining([
+        'overview:dl-m01-neuron-perceptron',
+        'post:dl-p01-neuron-perceptron',
+        'demo:demo-perceptron-and-gate',
+        'quiz:quiz-module-dl-m01',
+      ]),
+    );
   });
 });

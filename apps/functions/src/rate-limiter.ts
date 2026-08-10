@@ -17,6 +17,7 @@ export interface ApiRateLimitPolicies {
   adminMutation: RateLimitPolicy;
   completion: RateLimitPolicy;
   enrollment: RateLimitPolicy;
+  learningEvent: RateLimitPolicy;
   playgroundConfig: RateLimitPolicy;
   playgroundRun: RateLimitPolicy;
   playgroundSession: RateLimitPolicy;
@@ -95,6 +96,12 @@ export function getApiRateLimitPolicies(
     ),
     completion: createPolicy(environment, 'API_RATE_LIMIT_COMPLETION_MAX', 20, windowSeconds),
     enrollment: createPolicy(environment, 'API_RATE_LIMIT_ENROLLMENT_MAX', 10, windowSeconds),
+    learningEvent: createPolicy(
+      environment,
+      'API_RATE_LIMIT_LEARNING_EVENT_MAX',
+      60,
+      windowSeconds,
+    ),
     playgroundConfig: createPolicy(
       environment,
       'API_RATE_LIMIT_PLAYGROUND_CONFIG_MAX',

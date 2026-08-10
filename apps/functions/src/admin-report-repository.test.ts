@@ -81,6 +81,7 @@ describe('admin report repository', () => {
               enrolledCount: 3,
               startedCount: 2,
               completedCount: 1,
+              completionRate: 1 / 3,
               averageProgressPercent: 42,
               email: 'nested@example.test',
             },
@@ -104,6 +105,7 @@ describe('admin report repository', () => {
           quizSummary: {
             averageScorePercent: 81,
             passedAttemptCount: 5,
+            passRate: 5 / 6,
             totalAttemptCount: 6,
             commonWrongQuestions: [
               {
@@ -158,6 +160,7 @@ describe('admin report repository', () => {
             enrolledCount: 3,
             startedCount: 2,
             completedCount: 1,
+            completionRate: 1 / 3,
             averageProgressPercent: 42,
           },
         ],
@@ -180,6 +183,7 @@ describe('admin report repository', () => {
         quizSummary: {
           averageScorePercent: 81,
           passedAttemptCount: 5,
+          passRate: 5 / 6,
           totalAttemptCount: 6,
           commonWrongQuestions: [
             {
@@ -317,6 +321,7 @@ describe('admin report repository', () => {
           {
             averageProgressPercent: 20,
             completedCount: 0,
+            completionRate: 0,
             courseId: 'course-classical-ml',
             enrolledCount: 1,
             startedCount: 1,
@@ -324,6 +329,7 @@ describe('admin report repository', () => {
           {
             averageProgressPercent: 100,
             completedCount: 1,
+            completionRate: 1,
             courseId: 'course-deep-learning-basic',
             enrolledCount: 1,
             startedCount: 1,
@@ -351,6 +357,7 @@ describe('admin report repository', () => {
             { questionId: 'q-dl-m01-xor-limit', quizId: 'quiz-module-dl-m01', wrongCount: 2 },
           ],
           passedAttemptCount: 1,
+          passRate: 1 / 3,
           totalAttemptCount: 3,
         },
       },
@@ -358,9 +365,9 @@ describe('admin report repository', () => {
         errorRate: 0,
         failedRunCount: 0,
         runCount: 1,
-        scenarioActivity: [
+        scenarioActivity: expect.arrayContaining([
           { algorithmId: 'perceptron', failedRunCount: 0, runCount: 1, scenarioId: 'pg-xor' },
-        ],
+        ]),
       },
       contentLifecycle: {
         draftCount: 1,
@@ -370,5 +377,83 @@ describe('admin report repository', () => {
       },
     });
     expect(JSON.stringify(result.data)).not.toMatch(/email|@example|answers|rawAnswer/i);
+  });
+
+  it('derives course, quiz, and playground rates from learner state and learning events', async () => {
+    const { firestore } = createFakeFirestore({
+      'users/learner-01': { status: 'active' },
+      'users/learner-01/enrollments/course-deep-learning-basic': {
+        progressPercent: 100,
+        status: 'completed',
+      },
+      'users/learner-01/quizProgress/quiz-module-dl-m01': {
+        attemptCount: 2,
+        bestScore: 100,
+        passed: true,
+      },
+      'users/learner-01/playgroundRuns/run-success': {
+        algorithmId: 'perceptron',
+        runId: 'run-success',
+        scenarioId: 'pg-xor',
+        verificationLevel: 'client-computed',
+      },
+      'users/learner-02': { status: 'active' },
+      'users/learner-02/enrollments/course-deep-learning-basic': {
+        progressPercent: 25,
+        status: 'in-progress',
+      },
+      'users/learner-02/quizProgress/quiz-module-dl-m01': {
+        attemptCount: 1,
+        bestScore: 40,
+        passed: false,
+      },
+      'learningEvents/playground-failure-01': {
+        eventType: 'playground_run_failed',
+        payload: {
+          algorithmId: 'perceptron',
+          normalizedErrorCode: 'PLAYGROUND_RUN_FAILED',
+          runId: 'run-failed',
+          scenarioId: 'pg-xor',
+        },
+        verificationLevel: 'client-computed',
+      },
+    });
+    const repository = createFirestoreAdminReportRepository(firestore, {
+      aggregateOnRead: true,
+      now: () => new Date('2026-07-23T03:00:00.000Z'),
+    });
+
+    const result = await repository.getSummary({ actorUid: 'admin-01' });
+
+    expect(result.data.learningVerified.courseProgress).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          completedCount: 1,
+          completionRate: 0.5,
+          courseId: 'course-deep-learning-basic',
+          enrolledCount: 2,
+        }),
+      ]),
+    );
+    expect(result.data.learningVerified.quizSummary).toMatchObject({
+      passRate: 1 / 3,
+      passedAttemptCount: 1,
+      totalAttemptCount: 3,
+    });
+    expect(result.data.playgroundClientReported).toMatchObject({
+      errorRate: 0.5,
+      failedRunCount: 1,
+      runCount: 2,
+    });
+    expect(result.data.playgroundClientReported.scenarioActivity).toEqual(
+      expect.arrayContaining([
+        {
+          algorithmId: 'perceptron',
+          failedRunCount: 1,
+          runCount: 2,
+          scenarioId: 'pg-xor',
+        },
+      ]),
+    );
   });
 });

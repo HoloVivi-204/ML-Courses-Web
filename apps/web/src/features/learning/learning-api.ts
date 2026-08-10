@@ -9,6 +9,7 @@ import {
   buildApiPath,
   demoViewRequestSchema,
   demoViewResponseSchema,
+  learningEventRequestSchema,
   learnerProfileResponseSchema,
   learningProgressSnapshotSchema,
   MUST_API_CONTRACTS,
@@ -20,6 +21,8 @@ import {
   playgroundConfigUpdateRequestSchema,
   postViewRequestSchema,
   postViewResponseSchema,
+  type LearningEventPayload,
+  type LearningEventType,
   type RuntimeFeatureManifest,
   updatePreferencesRequestSchema,
 } from '@ml-path/contracts';
@@ -340,6 +343,7 @@ export interface QuizSubmissionResult {
 
 export interface LearningModuleProgress {
   completedStepCount: number;
+  missingConditions?: ReadonlyArray<string> | undefined;
   moduleId: string;
   overviewViewed: boolean;
   progressPercent: number;
@@ -383,6 +387,13 @@ export interface LearningCourseProgress {
   status: 'completed' | 'in-progress' | 'not-enrolled';
 }
 
+export interface LearningPlaygroundActivity {
+  algorithmId: string;
+  failedRunCount: number;
+  runCount: number;
+  scenarioId: string;
+}
+
 export interface LearningProgressSnapshot {
   algorithmUnlocks: ReadonlyArray<{
     algorithmId: string;
@@ -392,6 +403,7 @@ export interface LearningProgressSnapshot {
     contentType: 'demo' | 'module' | 'post';
     entityId: string;
   }>;
+  courseCatalog?: ReadonlyArray<LearningCourseProgress> | undefined;
   courses?: ReadonlyArray<LearningCourseProgress> | undefined;
   demos: ReadonlyArray<LearningDemoProgress>;
   enrollment: {
@@ -401,6 +413,7 @@ export interface LearningProgressSnapshot {
   };
   modules: ReadonlyArray<LearningModuleProgress>;
   posts: ReadonlyArray<LearningPostProgress>;
+  playgroundActivity?: ReadonlyArray<LearningPlaygroundActivity> | undefined;
   quizzes: ReadonlyArray<LearningQuizProgress>;
 }
 
@@ -546,6 +559,7 @@ export interface AdminReportSummary {
     courseProgress: ReadonlyArray<{
       averageProgressPercent: number;
       completedCount: number;
+      completionRate: number;
       courseId: string;
       enrolledCount: number;
       startedCount: number;
@@ -571,6 +585,7 @@ export interface AdminReportSummary {
         wrongCount: number;
       }>;
       passedAttemptCount: number;
+      passRate: number;
       totalAttemptCount: number;
     };
     verificationLevel: 'server-verified';
@@ -717,6 +732,12 @@ export interface LearningApiClient {
     idToken: string;
     viewedStepIds: readonly string[];
   }): Promise<DemoViewResult>;
+  recordLearningEvent(input: {
+    eventType: LearningEventType;
+    idToken: string;
+    idempotencyKey: string;
+    payload: LearningEventPayload;
+  }): Promise<LearningEventResponse>;
   recordModuleOverview(input: { idToken: string; moduleId: string }): Promise<ModuleOverviewResult>;
   recordPostView(input: {
     idToken: string;
@@ -834,6 +855,12 @@ export interface LearningApiClient {
     locale?: LearnerLocalePreference | undefined;
     theme?: LearnerThemePreference | undefined;
   }): Promise<LearnerProfile>;
+}
+
+export interface LearningEventResponse {
+  accepted: true;
+  eventId: string;
+  verificationLevel: 'server-verified' | 'client-computed';
 }
 
 interface SuccessEnvelope<TData> {
@@ -1013,6 +1040,22 @@ export function createFetchLearningApiClient(
           method: 'POST',
         }),
         demoViewResponseSchema,
+      );
+    },
+    async recordLearningEvent({ eventType, idToken, idempotencyKey, payload }) {
+      const requestBody = learningEventRequestSchema.parse({ eventType, payload });
+
+      return readSuccessEnvelope<LearningEventResponse>(
+        await fetch(buildApiPath('recordLearningEvent'), {
+          body: JSON.stringify(requestBody),
+          headers: {
+            authorization: `Bearer ${idToken}`,
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          method: 'POST',
+        }),
+        MUST_API_CONTRACTS.recordLearningEvent.response,
       );
     },
     async recordModuleOverview({ idToken, moduleId }) {

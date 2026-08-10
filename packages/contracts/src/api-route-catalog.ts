@@ -84,6 +84,12 @@ export const API_ROUTE_CATALOG = [
   },
   { id: 'getProgress', method: 'GET', path: '/api/v1/users/me/progress', scope: 'must' },
   {
+    id: 'recordLearningEvent',
+    method: 'POST',
+    path: '/api/v1/learning-events',
+    scope: 'must',
+  },
+  {
     id: 'createPlaygroundRunSession',
     method: 'POST',
     path: '/api/v1/playground-run-sessions',

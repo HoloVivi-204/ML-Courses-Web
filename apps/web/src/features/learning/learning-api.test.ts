@@ -766,6 +766,7 @@ describe('fetch learning API client', () => {
             enrolledCount: 3,
             startedCount: 2,
             completedCount: 1,
+            completionRate: 1 / 3,
             averageProgressPercent: 42,
           },
         ],
@@ -774,6 +775,7 @@ describe('fetch learning API client', () => {
         quizSummary: {
           averageScorePercent: 81,
           passedAttemptCount: 5,
+          passRate: 5 / 6,
           totalAttemptCount: 6,
           commonWrongQuestions: [],
         },

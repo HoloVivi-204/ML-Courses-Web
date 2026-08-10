@@ -163,6 +163,7 @@ function VerifiedLearningPanel({
 }) {
   const { t } = useTranslation();
   const courses = getDashboardCourses(progressSnapshot);
+  const playgroundActivity = progressSnapshot.playgroundActivity ?? [];
 
   return (
     <section className="dashboard-panel dashboard-panel-verified">
@@ -199,6 +200,29 @@ function VerifiedLearningPanel({
       ) : (
         <p className="dashboard-muted">{t('dashboard.verified.noUnlocks')}</p>
       )}
+
+      {playgroundActivity.length ? (
+        <section
+          className="dashboard-verified-activity"
+          aria-label={t('dashboard.verified.activityLabel')}
+        >
+          <h3>{t('dashboard.verified.activityTitle')}</h3>
+          <ul className="dashboard-list">
+            {playgroundActivity.map((activity) => (
+              <li key={`${activity.scenarioId}:${activity.algorithmId}`}>
+                <span>{activity.scenarioId}</span>
+                <span>
+                  {t('dashboard.verified.activityCounts', {
+                    algorithm: formatAlgorithmName(activity.algorithmId),
+                    failedRunCount: formatCount(activity.failedRunCount, locale),
+                    runCount: formatCount(activity.runCount, locale),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </section>
   );
 }
@@ -259,6 +283,13 @@ function CourseProgressCard({
                 <span>{module ? localize(module.title, locale) : moduleProgress.moduleId}</span>
                 <strong>{formatProgressPercent(moduleProgress.progressPercent, locale)}</strong>
               </div>
+              {moduleProgress.missingConditions?.length ? (
+                <p className="dashboard-muted">
+                  {t('dashboard.verified.missingConditions', {
+                    conditions: moduleProgress.missingConditions.join(', '),
+                  })}
+                </p>
+              ) : null}
               {modulePosts.length ? (
                 <ul className="dashboard-post-list" aria-label={t('dashboard.verified.postLabel')}>
                   {modulePosts.map((postProgress) => (
@@ -379,6 +410,10 @@ function ClientComputedRunsPanel({
 }
 
 function getDashboardCourses(progressSnapshot: LearningProgressSnapshot): LearningCourseProgress[] {
+  if (progressSnapshot.courseCatalog?.length) {
+    return [...progressSnapshot.courseCatalog];
+  }
+
   if (progressSnapshot.courses?.length) {
     return [...progressSnapshot.courses];
   }

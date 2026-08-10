@@ -5,6 +5,54 @@ export const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 export const learnerLocaleSchema = z.enum(['en', 'vi']);
 export const learnerThemeSchema = z.enum(['dark', 'light', 'system']);
 export const avatarContentTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp']);
+export const learningEventTypeSchema = z.enum([
+  'user_registered',
+  'user_logged_in',
+  'course_enrolled',
+  'course_started',
+  'module_overview_viewed',
+  'module_started',
+  'post_started',
+  'post_content_viewed',
+  'post_quiz_submitted',
+  'post_completed',
+  'demo_started',
+  'demo_completed',
+  'module_quiz_submitted',
+  'module_completed',
+  'algorithm_unlocked',
+  'playground_opened',
+  'playground_dataset_dragged',
+  'playground_dataset_selected',
+  'playground_run_started',
+  'playground_run_completed',
+  'playground_run_cancelled',
+  'playground_run_failed',
+  'course_completed',
+  'external_resource_opened',
+]);
+
+const learningEventPayloadValueSchema = z.union([
+  z.string().trim().min(1).max(160),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+
+export const learningEventRequestSchema = z
+  .object({
+    eventType: learningEventTypeSchema,
+    payload: z.record(z.string().min(1).max(80), learningEventPayloadValueSchema),
+  })
+  .strict();
+
+export const learningEventResponseSchema = z
+  .object({
+    accepted: z.literal(true),
+    eventId: stableIdSchema,
+    verificationLevel: z.enum(['server-verified', 'client-computed']),
+  })
+  .strict();
 export const localizedTextSchema = z
   .object({
     en: z.string().trim().min(1).max(10_000),
@@ -580,6 +628,7 @@ export const progressEnrollmentSchema = z
 export const moduleProgressSchema = z
   .object({
     completedStepCount: z.number().int().min(0),
+    missingConditions: z.array(z.string().trim().min(1).max(160)).max(100).optional(),
     moduleId: stableIdSchema,
     overviewViewed: z.boolean(),
     progressPercent: z.number().int().min(0).max(100),
@@ -616,6 +665,15 @@ export const demoProgressSchema = z
   .object({ completed: z.boolean(), demoId: stableIdSchema, started: z.boolean() })
   .strict();
 
+export const playgroundActivitySchema = z
+  .object({
+    algorithmId: stableIdSchema,
+    failedRunCount: z.number().int().min(0),
+    runCount: z.number().int().min(0),
+    scenarioId: stableIdSchema,
+  })
+  .strict();
+
 export const courseProgressSchema = z
   .object({
     courseId: stableIdSchema,
@@ -641,11 +699,13 @@ export const learningProgressSnapshotSchema = z
         })
         .strict(),
     ),
+    courseCatalog: z.array(courseProgressSchema).optional(),
     courses: z.array(courseProgressSchema).optional(),
     demos: z.array(demoProgressSchema),
     enrollment: progressEnrollmentSchema,
     modules: z.array(moduleProgressSchema),
     posts: z.array(postProgressSchema),
+    playgroundActivity: z.array(playgroundActivitySchema).optional(),
     quizzes: z.array(quizProgressSchema),
   })
   .strict();
@@ -815,6 +875,8 @@ export type LearnerProfile = z.infer<typeof learnerProfileSchema>;
 export type AvatarUploadSessionRequest = z.infer<typeof avatarUploadSessionRequestSchema>;
 export type AvatarUploadSession = z.infer<typeof avatarUploadSessionSchema>;
 export type PlaygroundConfig = z.infer<typeof playgroundConfigSchema>;
+export type LearningEventPayload = z.infer<typeof learningEventRequestSchema>['payload'];
+export type LearningEventType = z.infer<typeof learningEventTypeSchema>;
 export type PlaygroundConfigCreateRequest = z.infer<typeof playgroundConfigCreateRequestSchema>;
 export type PlaygroundConfigUpdateRequest = z.infer<typeof playgroundConfigUpdateRequestSchema>;
 export type PlaygroundConfigRecord = z.infer<typeof playgroundConfigRecordSchema>;

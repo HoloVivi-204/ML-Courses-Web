@@ -1,4 +1,4 @@
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { FieldPath, getFirestore, type Firestore, type Query } from 'firebase-admin/firestore';
 
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import {
@@ -6,6 +6,7 @@ import {
   type ReleaseLearningCourse,
   type ReleaseLearningModule,
 } from './release-learning-catalog.js';
+import { getSubmissionPlaygroundPairManifests } from './playground-manifest.js';
 
 const SUMMARY_METRIC_DOCUMENT_PATH = 'dailyMetrics/latest_global';
 
@@ -25,6 +26,7 @@ export interface AdminReportSummary {
     courseProgress: ReadonlyArray<{
       averageProgressPercent: number;
       completedCount: number;
+      completionRate: number;
       courseId: string;
       enrolledCount: number;
       startedCount: number;
@@ -50,6 +52,7 @@ export interface AdminReportSummary {
         wrongCount: number;
       }>;
       passedAttemptCount: number;
+      passRate: number;
       totalAttemptCount: number;
     };
     verificationLevel: 'server-verified';
@@ -149,6 +152,7 @@ function toCourseProgressSummary(
     enrolledCount: getNumberField(value, 'enrolledCount'),
     startedCount: getNumberField(value, 'startedCount'),
     completedCount: getNumberField(value, 'completedCount'),
+    completionRate: getNumberField(value, 'completionRate'),
     averageProgressPercent: getNumberField(value, 'averageProgressPercent'),
   };
 }
@@ -266,6 +270,63 @@ interface ReportDocument {
   id: string;
 }
 
+const REPORT_QUERY_PAGE_SIZE = 100;
+
+function toReportDocuments(
+  documents: readonly { data(): unknown; id: string }[],
+): ReportDocument[] {
+  return filterPresent(
+    documents.map((document) => {
+      const data = document.data();
+
+      return isRecord(data) ? { data, id: document.id } : null;
+    }),
+  );
+}
+
+async function readCollectionDocuments(
+  firestore: Firestore,
+  collectionPath: string,
+): Promise<ReportDocument[]> {
+  const collection = firestore.collection(collectionPath);
+  const collectionWithPaging = collection as unknown as {
+    limit?: (limit: number) => Query;
+    orderBy?: (fieldPath: unknown, direction?: 'asc' | 'desc') => Query;
+  };
+
+  if (
+    typeof collectionWithPaging.limit !== 'function' ||
+    typeof collectionWithPaging.orderBy !== 'function'
+  ) {
+    const snapshot = await collection.get();
+
+    return toReportDocuments(snapshot.docs);
+  }
+
+  const orderedCollection = collectionWithPaging.orderBy(FieldPath.documentId(), 'asc');
+  const documents: ReportDocument[] = [];
+  let query: Query = orderedCollection.limit(REPORT_QUERY_PAGE_SIZE);
+  let lastDocumentId: string | null = null;
+
+  while (true) {
+    const snapshot = await query.get();
+    documents.push(...toReportDocuments(snapshot.docs));
+
+    if (snapshot.docs.length < REPORT_QUERY_PAGE_SIZE) {
+      return documents;
+    }
+
+    const lastDocument = snapshot.docs.at(-1);
+
+    if (!lastDocument || lastDocument.id === lastDocumentId) {
+      return documents;
+    }
+
+    lastDocumentId = lastDocument.id;
+    query = orderedCollection.startAfter(lastDocument.id).limit(REPORT_QUERY_PAGE_SIZE);
+  }
+}
+
 interface LearnerReportState {
   algorithmUnlocks: ReadonlyMap<string, Record<string, unknown>>;
   demoCompletions: ReadonlySet<string>;
@@ -323,15 +384,7 @@ async function readLearnerCollection(
   uid: string,
   collectionName: string,
 ): Promise<ReportDocument[]> {
-  const snapshot = await firestore.collection(`users/${uid}/${collectionName}`).get();
-
-  return filterPresent(
-    snapshot.docs.map((document) => {
-      const data = document.data();
-
-      return isRecord(data) ? { data, id: document.id } : null;
-    }),
-  );
+  return readCollectionDocuments(firestore, `users/${uid}/${collectionName}`);
 }
 
 async function readLearnerReportState(
@@ -476,6 +529,7 @@ function getCourseProgressPercent(
 
 function createFirestoreReportAggregate(input: {
   contentEntities: readonly ReportDocument[];
+  learningEvents: readonly ReportDocument[];
   learnerStates: readonly LearnerReportState[];
   now: () => Date;
 }): Record<string, unknown> {
@@ -508,6 +562,8 @@ function createFirestoreReportAggregate(input: {
             )
           : 0,
       completedCount: completedStates.length,
+      completionRate:
+        enrolledStates.length > 0 ? completedStates.length / enrolledStates.length : 0,
       courseId: course.courseId,
       enrolledCount: enrolledStates.length,
       startedCount: startedStates.length,
@@ -577,10 +633,27 @@ function createFirestoreReportAggregate(input: {
   const scoreEntries = quizEntries
     .map(({ data }) => getFiniteNumberField(data, 'bestScore'))
     .filter((score): score is number => score !== null);
-  const totalAttemptCount = quizEntries.reduce(
+  const storedTotalAttemptCount = quizEntries.reduce(
     (total, { data }) => total + (getFiniteNumberField(data, 'attemptCount') ?? 0),
     0,
   );
+  const storedPassedAttemptCount = quizEntries.filter(({ data }) =>
+    getBooleanField(data, 'passed'),
+  ).length;
+  const quizSubmissionEvents = input.learningEvents.filter(
+    (event) =>
+      event.data.verificationLevel === 'server-verified' &&
+      (event.data.eventType === 'module_quiz_submitted' ||
+        event.data.eventType === 'post_quiz_submitted'),
+  );
+  const totalAttemptCount =
+    quizSubmissionEvents.length > 0 ? quizSubmissionEvents.length : storedTotalAttemptCount;
+  const passedAttemptCount =
+    quizSubmissionEvents.length > 0
+      ? quizSubmissionEvents.filter((event) =>
+          getBooleanField(getRecordField(event.data, 'payload'), 'passed'),
+        ).length
+      : storedPassedAttemptCount;
   const algorithmUnlocks = [...new Set(modules.flatMap((module) => module.unlockAlgorithmIds))]
     .map((algorithmId) => ({
       algorithmId,
@@ -594,6 +667,15 @@ function createFirestoreReportAggregate(input: {
     { algorithmId: string; failedRunCount: number; runCount: number; scenarioId: string }
   >();
 
+  for (const manifest of getSubmissionPlaygroundPairManifests()) {
+    scenarioActivityMap.set(`${manifest.scenarioId}:${manifest.algorithmId}`, {
+      algorithmId: manifest.algorithmId,
+      failedRunCount: 0,
+      runCount: 0,
+      scenarioId: manifest.scenarioId,
+    });
+  }
+
   for (const state of input.learnerStates) {
     for (const run of state.playgroundRuns) {
       if (
@@ -605,16 +687,46 @@ function createFirestoreReportAggregate(input: {
       }
 
       const key = `${run.data.scenarioId}:${run.data.algorithmId}`;
-      const current = scenarioActivityMap.get(key) ?? {
-        algorithmId: run.data.algorithmId,
-        failedRunCount: 0,
-        runCount: 0,
-        scenarioId: run.data.scenarioId,
-      };
+      const current = scenarioActivityMap.get(key);
+
+      if (!current) {
+        continue;
+      }
+
       current.runCount += 1;
       scenarioActivityMap.set(key, current);
     }
   }
+
+  for (const event of input.learningEvents) {
+    if (
+      event.data.eventType !== 'playground_run_failed' ||
+      event.data.verificationLevel !== 'client-computed'
+    ) {
+      continue;
+    }
+
+    const payload = getRecordField(event.data, 'payload');
+    const scenarioId = getStringField(payload, 'scenarioId');
+    const algorithmId = getStringField(payload, 'algorithmId');
+    const current = scenarioActivityMap.get(`${scenarioId}:${algorithmId}`);
+
+    if (!current) {
+      continue;
+    }
+
+    current.failedRunCount += 1;
+    current.runCount += 1;
+  }
+
+  const runCount = [...scenarioActivityMap.values()].reduce(
+    (total, item) => total + item.runCount,
+    0,
+  );
+  const failedRunCount = [...scenarioActivityMap.values()].reduce(
+    (total, item) => total + item.failedRunCount,
+    0,
+  );
 
   const contentLifecycle = input.contentEntities.reduce(
     (counts, document) => {
@@ -665,16 +777,16 @@ function createFirestoreReportAggregate(input: {
               left.questionId.localeCompare(right.questionId),
           )
           .slice(0, 20),
-        passedAttemptCount: quizEntries.filter(({ data }) => getBooleanField(data, 'passed'))
-          .length,
+        passedAttemptCount,
+        passRate: totalAttemptCount > 0 ? passedAttemptCount / totalAttemptCount : 0,
         totalAttemptCount,
       },
       verificationLevel: 'server-verified',
     },
     playgroundClientReported: {
-      errorRate: 0,
-      failedRunCount: 0,
-      runCount: [...scenarioActivityMap.values()].reduce((total, item) => total + item.runCount, 0),
+      errorRate: runCount > 0 ? failedRunCount / runCount : 0,
+      failedRunCount,
+      runCount,
       scenarioActivity: [...scenarioActivityMap.values()].sort(
         (left, right) =>
           left.scenarioId.localeCompare(right.scenarioId) ||
@@ -711,6 +823,7 @@ function toAdminReportSummary(
       quizSummary: {
         averageScorePercent: getNumberField(quizSummary, 'averageScorePercent'),
         passedAttemptCount: getNumberField(quizSummary, 'passedAttemptCount'),
+        passRate: getNumberField(quizSummary, 'passRate'),
         totalAttemptCount: getNumberField(quizSummary, 'totalAttemptCount'),
         commonWrongQuestions: filterPresent(
           getArrayField(quizSummary, 'commonWrongQuestions').map(toWrongQuestionSummary),
@@ -747,43 +860,11 @@ export function createFirestoreAdminReportRepository(
   return {
     async getSummary() {
       if (options.aggregateOnRead === true) {
-        const [userSnapshot, contentSnapshot] = await Promise.all([
-          firestore.collection('users').get(),
-          firestore.collection('adminContentEntities').get(),
-        ]);
-        const catalog = getReleaseLearningCatalog();
-        const learnerStates = await Promise.all(
-          userSnapshot.docs.flatMap((document) => {
-            const data = document.data();
-
-            if (
-              !isRecord(data) ||
-              data.status === 'anonymized' ||
-              data.status === 'deletion-pending'
-            ) {
-              return [];
-            }
-
-            return [readLearnerReportState(firestore, document.id, catalog)];
-          }),
-        );
-        const aggregate = createFirestoreReportAggregate({
-          contentEntities: filterPresent(
-            contentSnapshot.docs.map((document) => {
-              const data = document.data();
-
-              return isRecord(data) ? { data, id: document.id } : null;
-            }),
-          ),
-          learnerStates,
-          now,
-        });
-
-        await firestore.doc(SUMMARY_METRIC_DOCUMENT_PATH).set(aggregate);
+        const summary = await runLocalAnalyticsAggregation(firestore, { now });
 
         return {
           statusCode: 200 as const,
-          data: toAdminReportSummary(aggregate),
+          data: summary,
         };
       }
 
@@ -795,6 +876,38 @@ export function createFirestoreAdminReportRepository(
       };
     },
   };
+}
+
+export async function runLocalAnalyticsAggregation(
+  firestore: Firestore,
+  options: { now?: (() => Date) | undefined } = {},
+): Promise<AdminReportSummary> {
+  const now = options.now ?? (() => new Date());
+  const [userDocuments, contentEntities, learningEvents] = await Promise.all([
+    readCollectionDocuments(firestore, 'users'),
+    readCollectionDocuments(firestore, 'adminContentEntities'),
+    readCollectionDocuments(firestore, 'learningEvents'),
+  ]);
+  const catalog = getReleaseLearningCatalog();
+  const learnerStates = await Promise.all(
+    userDocuments.flatMap((document) => {
+      if (document.data.status === 'anonymized' || document.data.status === 'deletion-pending') {
+        return [];
+      }
+
+      return [readLearnerReportState(firestore, document.id, catalog)];
+    }),
+  );
+  const aggregate = createFirestoreReportAggregate({
+    contentEntities,
+    learningEvents,
+    learnerStates,
+    now,
+  });
+
+  await firestore.doc(SUMMARY_METRIC_DOCUMENT_PATH).set(aggregate);
+
+  return toAdminReportSummary(aggregate);
 }
 
 export function createDefaultAdminReportRepository(): AdminReportRepository {

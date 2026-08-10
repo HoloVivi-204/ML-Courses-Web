@@ -267,7 +267,12 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   const [configNameDrafts, setConfigNameDrafts] = useState<Record<string, string>>({});
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [safeError, setSafeError] = useState<string | null>(null);
-  const activeRunRef = useRef<{ runId: string; sessionId: string } | null>(null);
+  const activeRunRef = useRef<{
+    algorithmId: string;
+    runId: string;
+    scenarioId: string;
+    sessionId: string;
+  } | null>(null);
   const isStoppingRef = useRef(false);
   const resetSequenceRef = useRef(0);
   const previousActivePairKeyRef = useRef<string | null>(null);
@@ -552,7 +557,12 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       const runId = createRunId();
       const startedAt = Date.now();
 
-      activeRunRef.current = { runId, sessionId: session.sessionId };
+      activeRunRef.current = {
+        algorithmId: session.algorithmId,
+        runId,
+        scenarioId: session.scenarioId,
+        sessionId: session.sessionId,
+      };
 
       const runResult = await controller.run(
         {
@@ -604,6 +614,30 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
       if (!isStoppingRef.current) {
         setStatus('failed');
         setSafeError(error instanceof Error ? error.message : t('playground.error.run'));
+
+        const failedRun = activeRunRef.current;
+
+        if (failedRun) {
+          void (async () => {
+            try {
+              const idToken = await readRequiredIdToken();
+
+              await learningApiClient.recordLearningEvent({
+                eventType: 'playground_run_failed',
+                idToken,
+                idempotencyKey: `playground-run-failed-${failedRun.runId}`,
+                payload: {
+                  algorithmId: failedRun.algorithmId,
+                  normalizedErrorCode: 'PLAYGROUND_RUN_FAILED',
+                  runId: failedRun.runId,
+                  scenarioId: failedRun.scenarioId,
+                },
+              });
+            } catch {
+              // Analytics failure must not block the learning flow.
+            }
+          })();
+        }
       }
       activeRunRef.current = null;
     }

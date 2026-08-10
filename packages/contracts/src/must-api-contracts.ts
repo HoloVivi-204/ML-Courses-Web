@@ -29,6 +29,8 @@ import {
   demoViewResponseSchema,
   jsonObjectSchema,
   learnerProfileResponseSchema,
+  learningEventRequestSchema,
+  learningEventResponseSchema,
   learningProgressSnapshotSchema,
   localizedTextSchema,
   moduleOverviewViewPathParamsSchema,
@@ -103,6 +105,13 @@ export const quizSubmissionRouteRequestSchema = z
     body: quizSubmissionRequestSchema,
     headers: idempotencyHeadersSchema,
     params: quizSubmissionPathParamsSchema,
+  })
+  .strict();
+
+export const learningEventRouteRequestSchema = z
+  .object({
+    body: learningEventRequestSchema,
+    headers: idempotencyHeadersSchema,
   })
   .strict();
 
@@ -448,6 +457,7 @@ export const adminReportSummaryResponseSchema = z
               .object({
                 averageProgressPercent: z.number().min(0).max(100),
                 completedCount: reportCountSchema,
+                completionRate: z.number().min(0).max(1),
                 courseId: stableIdSchema,
                 enrolledCount: reportCountSchema,
                 startedCount: reportCountSchema,
@@ -495,6 +505,7 @@ export const adminReportSummaryResponseSchema = z
               )
               .max(1_000),
             passedAttemptCount: reportCountSchema,
+            passRate: z.number().min(0).max(1),
             totalAttemptCount: reportCountSchema,
           })
           .strict(),
@@ -663,6 +674,10 @@ export const MUST_API_CONTRACTS = {
     response: quizSubmissionResponseSchema,
   },
   getProgress: { request: noRequestSchema, response: learningProgressSnapshotSchema },
+  recordLearningEvent: {
+    request: learningEventRouteRequestSchema,
+    response: learningEventResponseSchema,
+  },
   createPlaygroundRunSession: {
     request: playgroundRunSessionRouteRequestSchema,
     response: playgroundRunSessionResponseSchema,

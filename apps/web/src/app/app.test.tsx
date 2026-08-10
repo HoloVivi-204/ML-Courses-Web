@@ -119,6 +119,11 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         },
       }),
     ),
+    recordLearningEvent: vi.fn().mockResolvedValue({
+      accepted: true,
+      eventId: 'event-test-01',
+      verificationLevel: 'client-computed',
+    }),
     recordModuleOverview: vi.fn().mockResolvedValue({
       moduleOverview: {
         moduleId: 'dl-m01-neuron-perceptron',
@@ -677,6 +682,7 @@ function createAdminReportSummaryFixture() {
           enrolledCount: 3,
           startedCount: 2,
           completedCount: 1,
+          completionRate: 1 / 3,
           averageProgressPercent: 42,
         },
       ],
@@ -699,6 +705,7 @@ function createAdminReportSummaryFixture() {
       quizSummary: {
         averageScorePercent: 81,
         passedAttemptCount: 5,
+        passRate: 5 / 6,
         totalAttemptCount: 6,
         commonWrongQuestions: [
           {

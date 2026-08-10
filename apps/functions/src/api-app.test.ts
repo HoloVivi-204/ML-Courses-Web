@@ -7,6 +7,7 @@ import {
   type AdminContentSummary,
 } from './admin-content-repository.js';
 import type { AvatarUploadService } from './avatar-upload-service.js';
+import type { LearningEventRepository } from './learning-event-repository.js';
 import type { LearningRepository } from './learning-repository.js';
 import type { PlaygroundRepository } from './playground-repository.js';
 
@@ -877,6 +878,65 @@ describe('API foundation', () => {
     expect(cleanedUpLearners).toEqual(['learning:learner-01', 'playground:learner-01']);
   });
 
+  it('records client playground failures with the authenticated learner identity', async () => {
+    const records: Array<Record<string, unknown>> = [];
+    const learningEventRepository: LearningEventRepository = {
+      record: async (input) => {
+        records.push(input as unknown as Record<string, unknown>);
+
+        return {
+          data: {
+            accepted: true,
+            eventId: 'learning-event-01',
+            verificationLevel: 'client-computed',
+          },
+          statusCode: 201,
+        };
+      },
+    };
+    const app = createApiApp({
+      learningEventRepository,
+      verifyAuthToken: async () => ({
+        displayName: 'Local Student',
+        uid: 'learner-01',
+      }),
+    });
+
+    const response = await request(app)
+      .post('/api/v1/learning-events')
+      .set('authorization', 'Bearer local-id-token')
+      .set('idempotency-key', 'playground-failure-01')
+      .send({
+        eventType: 'playground_run_failed',
+        payload: {
+          algorithmId: 'perceptron',
+          normalizedErrorCode: 'PLAYGROUND_RUN_FAILED',
+          runId: 'run-failed-01',
+          scenarioId: 'pg-xor',
+        },
+      })
+      .expect(201);
+
+    expect(response.body.data).toEqual({
+      accepted: true,
+      eventId: 'learning-event-01',
+      verificationLevel: 'client-computed',
+    });
+    expect(records).toEqual([
+      expect.objectContaining({
+        dedupeKey: 'playground-failure-01',
+        eventType: 'playground_run_failed',
+        payload: {
+          algorithmId: 'perceptron',
+          normalizedErrorCode: 'PLAYGROUND_RUN_FAILED',
+          runId: 'run-failed-01',
+          scenarioId: 'pg-xor',
+        },
+        uid: 'learner-01',
+      }),
+    ]);
+  });
+
   it('requires an idempotency key before enrolling a learner', async () => {
     const app = createApiApp({
       learningRepository: createLearningRepository({
@@ -1465,6 +1525,7 @@ describe('API foundation', () => {
                     enrolledCount: 3,
                     startedCount: 2,
                     completedCount: 1,
+                    completionRate: 1 / 3,
                     averageProgressPercent: 42,
                   },
                 ],
@@ -1487,6 +1548,7 @@ describe('API foundation', () => {
                 quizSummary: {
                   averageScorePercent: 81,
                   passedAttemptCount: 5,
+                  passRate: 5 / 6,
                   totalAttemptCount: 6,
                   commonWrongQuestions: [
                     {
@@ -1547,6 +1609,7 @@ describe('API foundation', () => {
         enrolledCount: 3,
         startedCount: 2,
         completedCount: 1,
+        completionRate: 1 / 3,
         averageProgressPercent: 42,
       },
     ]);
