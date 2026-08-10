@@ -850,6 +850,62 @@ describe('Firestore learning repository', () => {
     ).resolves.toMatchObject({ statusCode: 201 });
   });
 
+  it('lets an existing enrollee keep recording progress after a planned course unpublish', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'adminContentEntities/course:course-deep-learning-basic': {
+        currentContent: {
+          emergencyBlocked: false,
+          entityId: 'course-deep-learning-basic',
+          entityType: 'course',
+          publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+          status: 'unpublished',
+        },
+        draftRevisionId: null,
+        entityId: 'course-deep-learning-basic',
+        entityType: 'course',
+        schemaVersion: 1,
+      },
+      'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
+        contentType: 'post',
+        entityId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+      },
+      'users/learner-01/enrollments/course-deep-learning-basic': {
+        courseId: 'course-deep-learning-basic',
+        progressPercent: 33,
+        schemaVersion: 1,
+        status: 'in-progress',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    await expect(
+      repository.recordPostView({
+        postId: 'dl-p01-neuron-perceptron',
+        readingPosition: 'what-is-a-neuron',
+        uid: 'learner-01',
+        viewedItemIds: ['what-is-a-neuron'],
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        postView: {
+          postId: 'dl-p01-neuron-perceptron',
+          started: true,
+        },
+      },
+    });
+
+    expect(documents.get('users/learner-01/enrollments/course-deep-learning-basic')).toMatchObject({
+      courseId: 'course-deep-learning-basic',
+      progressPercent: 33,
+      status: 'in-progress',
+    });
+    expect(documents.get('users/learner-01/postViews/dl-p01-neuron-perceptron')).toMatchObject({
+      postId: 'dl-p01-neuron-perceptron',
+      started: true,
+    });
+  });
+
   it('records a started demo only after the backend grants demo access', async () => {
     const { documents, firestore } = createFakeFirestore({
       'users/learner-01/contentAccess/demo_demo-perceptron-and-gate': {

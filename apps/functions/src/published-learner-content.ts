@@ -52,6 +52,13 @@ export function getPublishedLearnerContentDocumentIdsForEntity(input: {
   entityType: AdminContentEntityType;
 }): readonly string[] {
   switch (input.entityType) {
+    case 'course':
+      return [
+        getPublishedLearnerContentDocumentId({
+          documentKind: 'course-summary',
+          entityId: input.entityId,
+        }),
+      ];
     case 'demo':
       return [
         getPublishedLearnerContentDocumentId({
@@ -70,10 +77,20 @@ export function getPublishedLearnerContentDocumentIdsForEntity(input: {
           entityId: input.entityId,
         }),
       ];
-    case 'course':
     case 'module':
+      return [
+        getPublishedLearnerContentDocumentId({
+          documentKind: 'module-summary',
+          entityId: input.entityId,
+        }),
+      ];
     case 'quiz':
-      return [];
+      return [
+        getPublishedLearnerContentDocumentId({
+          documentKind: 'quiz-summary',
+          entityId: input.entityId,
+        }),
+      ];
   }
 }
 
@@ -83,6 +100,44 @@ export function createPublishedLearnerContentDocuments(input: {
 }): readonly PublishedLearnerContentDocumentWrite[] {
   if (input.learnerContent === null) {
     return [];
+  }
+
+  if (input.learnerContent.contentType === 'course') {
+    if (input.content.entityType !== 'course') {
+      throw new Error('Course learner content must belong to a course entity.');
+    }
+
+    assertRevisionMatchesContent({
+      content: input.content,
+      revisionId: input.learnerContent.course.revisionId,
+    });
+
+    return [
+      createDocument({
+        content: input.content,
+        documentKind: 'course-summary',
+        learnerContent: input.learnerContent.course,
+      }),
+    ];
+  }
+
+  if (input.learnerContent.contentType === 'module') {
+    if (input.content.entityType !== 'module') {
+      throw new Error('Module learner content must belong to a module entity.');
+    }
+
+    assertRevisionMatchesContent({
+      content: input.content,
+      revisionId: input.learnerContent.module.revisionId,
+    });
+
+    return [
+      createDocument({
+        content: input.content,
+        documentKind: 'module-summary',
+        learnerContent: input.learnerContent.module,
+      }),
+    ];
   }
 
   if (input.learnerContent.contentType === 'post') {
@@ -120,6 +175,25 @@ export function createPublishedLearnerContentDocuments(input: {
     );
 
     return documents;
+  }
+
+  if (input.learnerContent.contentType === 'quiz') {
+    if (input.content.entityType !== 'quiz') {
+      throw new Error('Quiz learner content must belong to a quiz entity.');
+    }
+
+    assertRevisionMatchesContent({
+      content: input.content,
+      revisionId: input.learnerContent.quiz.revisionId,
+    });
+
+    return [
+      createDocument({
+        content: input.content,
+        documentKind: 'quiz-summary',
+        learnerContent: input.learnerContent.quiz,
+      }),
+    ];
   }
 
   if (input.content.entityType !== 'demo') {

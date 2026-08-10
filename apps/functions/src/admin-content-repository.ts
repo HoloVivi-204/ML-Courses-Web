@@ -1,4 +1,16 @@
 import { ApiError } from './api-error.js';
+import {
+  createAdminContentRevisionPreview,
+  type AdminContentRevisionPreview,
+} from './admin-content-preview.js';
+import { createReleaseOneFirestoreAdminContentSeed } from './admin-content-emulator-seed.js';
+import {
+  createAdminContentDraftChecksum,
+  isAdminContentEvidenceKind,
+  requiredAdminContentEvidenceKinds,
+  type AdminContentEvidenceKind,
+  type AdminContentExternalEvidence,
+} from './admin-content-evidence.js';
 
 export const adminContentEntityTypes = ['course', 'module', 'post', 'demo', 'quiz'] as const;
 
@@ -59,7 +71,7 @@ export interface AdminContentLifecycleEvent {
   reason: string;
   requestId: string;
   toRevisionId: string | null;
-  type: 'emergency-withdrawn' | 'published' | 'rolled-back' | 'unpublished';
+  type: 'emergency-withdrawn' | 'evidence-attached' | 'published' | 'rolled-back' | 'unpublished';
   publicationScope?: AdminContentPublicationScope | undefined;
 }
 
@@ -170,6 +182,28 @@ export interface ListAdminContentInput {
   moduleId?: string | undefined;
 }
 
+export interface AttachAdminContentEvidenceInput {
+  actorUid: string;
+  checksum: string;
+  evidenceRef: string;
+  kind: string;
+  requestId: string;
+  revisionId: string;
+}
+
+export interface ListAdminContentEvidenceInput {
+  revisionId: string;
+}
+
+export interface GetAdminContentRevisionPreviewInput {
+  revisionId: string;
+}
+
+export interface AdminContentEvidenceState {
+  contentChecksum: string;
+  evidence: readonly AdminContentExternalEvidence[];
+}
+
 export interface PublishAdminContentRevisionResult {
   data: {
     content: AdminContentSummary;
@@ -187,6 +221,10 @@ export interface AdminContentLifecycleResult {
 }
 
 export interface AdminContentRepository {
+  attachEvidence(input: AttachAdminContentEvidenceInput): Promise<{
+    data: { evidence: AdminContentExternalEvidence };
+    statusCode: 200;
+  }>;
   createDraft(input: CreateAdminContentDraftInput): Promise<{
     data: {
       draft: AdminContentDraft;
@@ -197,11 +235,22 @@ export interface AdminContentRepository {
   emergencyWithdrawEntity(
     input: EmergencyWithdrawAdminContentEntityInput,
   ): Promise<AdminContentLifecycleResult>;
+  getRevisionPreview(input: GetAdminContentRevisionPreviewInput): Promise<{
+    data: {
+      draft: AdminContentDraft;
+      preview: AdminContentRevisionPreview;
+    };
+    statusCode: 200;
+  }>;
   listContent(input: ListAdminContentInput): Promise<{
     data: {
       content: readonly AdminContentSummary[];
       nextCursor: string | null;
     };
+    statusCode: 200;
+  }>;
+  listEvidence(input: ListAdminContentEvidenceInput): Promise<{
+    data: AdminContentEvidenceState;
     statusCode: 200;
   }>;
   publishRevision(
@@ -618,7 +667,9 @@ export function createDraftFromPublished(published: AdminContentSummary): AdminC
     status: 'draft',
     title: { ...published.title },
     ...(published.trialPostId !== undefined ? { trialPostId: published.trialPostId } : {}),
-    validationManifest: cloneValidationManifest(published.validationManifest),
+    ...(published.validationManifest !== undefined
+      ? { validationManifest: cloneValidationManifest(published.validationManifest) }
+      : {}),
     validationStatus: 'not-run',
   };
 }
@@ -924,7 +975,9 @@ export function createPublishedContentFromDraft(input: {
     status: 'published',
     title: { ...input.draft.title },
     ...(input.draft.trialPostId !== undefined ? { trialPostId: input.draft.trialPostId } : {}),
-    validationManifest: cloneValidationManifest(input.draft.validationManifest),
+    ...(input.draft.validationManifest !== undefined
+      ? { validationManifest: cloneValidationManifest(input.draft.validationManifest) }
+      : {}),
     validationStatus: 'valid',
   };
 }
@@ -1019,9 +1072,47 @@ export function createStaticAdminContentRepository(
       result: PublishAdminContentRevisionResult;
     }
   >();
+  const evidenceByRevisionId = new Map<
+    string,
+    Map<AdminContentEvidenceKind, AdminContentExternalEvidence>
+  >();
+  const learnerContentByContentKey = new Map(
+    createReleaseOneFirestoreAdminContentSeed().map((record) => [
+      getAdminContentKey(record.content.entityType, record.content.entityId),
+      record.learnerContent ?? null,
+    ]),
+  );
 
   function findDraftByRevisionId(revisionId: string): AdminContentDraft | undefined {
     return [...draftsByContentKey.values()].find((draft) => draft.draftRevisionId === revisionId);
+  }
+
+  function getDraftEvidenceState(revisionId: string): {
+    contentChecksum: string;
+    draft: AdminContentDraft;
+    evidence: readonly AdminContentExternalEvidence[];
+  } {
+    const draft = findDraftByRevisionId(revisionId);
+
+    if (draft === undefined) {
+      throw new ApiError(
+        404,
+        'ADMIN_CONTENT_DRAFT_NOT_FOUND',
+        'The requested draft revision was not found.',
+      );
+    }
+
+    const evidenceByKind = evidenceByRevisionId.get(revisionId);
+
+    return {
+      contentChecksum: createAdminContentDraftChecksum(draft),
+      draft,
+      evidence: requiredAdminContentEvidenceKinds.flatMap((kind) => {
+        const evidence = evidenceByKind?.get(kind);
+
+        return evidence ? [evidence] : [];
+      }),
+    };
   }
 
   function findCurrentPublishedContent(
@@ -1075,6 +1166,42 @@ export function createStaticAdminContentRepository(
   }
 
   return {
+    async attachEvidence(input) {
+      if (!input.actorUid) {
+        throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
+      }
+
+      if (!isAdminContentEvidenceKind(input.kind)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_EVIDENCE_KIND_INVALID',
+          'The requested external evidence kind is not supported.',
+        );
+      }
+
+      const state = getDraftEvidenceState(input.revisionId);
+
+      if (state.contentChecksum !== input.checksum) {
+        throw new ApiError(
+          409,
+          'ADMIN_CONTENT_EVIDENCE_CHECKSUM_MISMATCH',
+          'External evidence must match the current draft checksum.',
+        );
+      }
+
+      const evidence: AdminContentExternalEvidence = {
+        artifactId: state.draft.entityId,
+        checksum: state.contentChecksum,
+        evidenceRef: input.evidenceRef,
+        kind: input.kind,
+        result: 'pending',
+      };
+      const evidenceByKind = evidenceByRevisionId.get(input.revisionId) ?? new Map();
+      evidenceByKind.set(input.kind, evidence);
+      evidenceByRevisionId.set(input.revisionId, evidenceByKind);
+
+      return { statusCode: 200, data: { evidence } };
+    },
     async createDraft(input) {
       if (!input.createdByUid) {
         throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
@@ -1480,6 +1607,48 @@ export function createStaticAdminContentRepository(
         data: {
           draft: validatedDraft,
           validation,
+        },
+      };
+    },
+    async getRevisionPreview(input) {
+      const draft = findDraftByRevisionId(input.revisionId);
+
+      if (draft === undefined) {
+        throw new ApiError(
+          404,
+          'ADMIN_CONTENT_DRAFT_NOT_FOUND',
+          'The requested draft revision was not found.',
+        );
+      }
+
+      const learnerContent = learnerContentByContentKey.get(
+        getAdminContentKey(draft.entityType, draft.entityId),
+      );
+
+      if (learnerContent === undefined) {
+        throw new ApiError(
+          409,
+          'ADMIN_CONTENT_PREVIEW_UNAVAILABLE',
+          'The draft does not have learner content available for preview.',
+        );
+      }
+
+      return {
+        statusCode: 200,
+        data: {
+          draft,
+          preview: createAdminContentRevisionPreview({ draft, learnerContent }),
+        },
+      };
+    },
+    async listEvidence(input) {
+      const state = getDraftEvidenceState(input.revisionId);
+
+      return {
+        statusCode: 200,
+        data: {
+          contentChecksum: state.contentChecksum,
+          evidence: state.evidence,
         },
       };
     },

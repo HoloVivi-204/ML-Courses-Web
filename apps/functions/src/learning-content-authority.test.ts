@@ -40,6 +40,20 @@ function createAuthority(currentContent: Record<string, unknown>): LearningConte
   );
 }
 
+function createCourseAuthority(currentContent: Record<string, unknown>): LearningContentAuthority {
+  return createFirestoreLearningContentAuthority(
+    createFirestore({
+      'adminContentEntities/course:course-deep-learning-basic': {
+        currentContent,
+        draftRevisionId: null,
+        entityId: 'course-deep-learning-basic',
+        entityType: 'course',
+        schemaVersion: 1,
+      },
+    }) as never,
+  );
+}
+
 describe('Firestore learning content authority', () => {
   it('resolves only the current published revision with an explicit active flag', async () => {
     const authority = createAuthority({
@@ -98,6 +112,34 @@ describe('Firestore learning content authority', () => {
     ).rejects.toMatchObject({
       code: 'LEARNER_CONTENT_DATA_INTEGRITY_ERROR',
       statusCode: 500,
+    });
+  });
+
+  it('keeps the current course pointer available only to an explicit planned-unpublish read', async () => {
+    const authority = createCourseAuthority({
+      emergencyBlocked: false,
+      entityId: 'course-deep-learning-basic',
+      entityType: 'course',
+      publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+      status: 'unpublished',
+    });
+
+    await expect(
+      authority.getCurrentPublishedEntity({
+        entityId: 'course-deep-learning-basic',
+        entityType: 'course',
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      authority.getCurrentPublishedEntity({
+        allowUnpublishedCourse: true,
+        entityId: 'course-deep-learning-basic',
+        entityType: 'course',
+      }),
+    ).resolves.toEqual({
+      entityId: 'course-deep-learning-basic',
+      entityType: 'course',
+      publishedRevisionId: 'course-deep-learning-basic-rev-r1',
     });
   });
 });

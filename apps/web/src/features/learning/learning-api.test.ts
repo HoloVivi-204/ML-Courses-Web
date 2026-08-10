@@ -302,6 +302,12 @@ describe('fetch learning API client', () => {
 
   it('loads trial and granted learning content from Firestore instead of adding product API routes', async () => {
     const contentReader = {
+      getCourseContent: vi.fn().mockResolvedValue({
+        courseId: 'course-deep-learning-basic',
+        description: { en: 'Course summary', vi: 'Tom tat khoa hoc' },
+        revisionId: 'course-deep-learning-basic-rev-r1',
+        title: { en: 'Deep Learning', vi: 'Hoc sau' },
+      }),
       getDemoContent: vi.fn().mockResolvedValue({
         algorithmId: 'perceptron',
         courseId: 'course-deep-learning-basic',
@@ -327,6 +333,22 @@ describe('fetch learning API client', () => {
         revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
         title: { en: 'Full', vi: 'Day du' },
       }),
+      getModuleContent: vi.fn().mockResolvedValue({
+        courseId: 'course-deep-learning-basic',
+        description: { en: 'Module summary', vi: 'Tom tat module' },
+        moduleId: 'dl-m01-neuron-perceptron',
+        revisionId: 'module-dl-m01-neuron-perceptron-rev-r1',
+        title: { en: 'Neuron', vi: 'Neuron' },
+      }),
+      getQuizContent: vi.fn().mockResolvedValue({
+        courseId: 'course-deep-learning-basic',
+        description: { en: 'Quiz summary', vi: 'Tom tat quiz' },
+        moduleId: 'dl-m01-neuron-perceptron',
+        postId: 'dl-p01-neuron-perceptron',
+        quizId: 'quiz-post-dl-p01',
+        revisionId: 'quiz-quiz-post-dl-p01-rev-r1',
+        title: { en: 'Neuron quiz', vi: 'Quiz neuron' },
+      }),
       getTrialPostContent: vi.fn().mockResolvedValue({
         accessLevel: 'trial',
         blocks: [],
@@ -345,6 +367,9 @@ describe('fetch learning API client', () => {
 
     const client = createFetchLearningApiClient({ contentReader });
 
+    await client.getCourseContent('course-deep-learning-basic');
+    await client.getModuleContent('dl-m01-neuron-perceptron');
+    await client.getQuizContent('quiz-post-dl-p01');
     await client.getTrialPostContent('dl-p01-neuron-perceptron');
     await client.getFullPostContent({
       idToken: 'local-id-token',
@@ -355,6 +380,9 @@ describe('fetch learning API client', () => {
       idToken: 'local-id-token',
     });
 
+    expect(contentReader.getCourseContent).toHaveBeenCalledWith('course-deep-learning-basic');
+    expect(contentReader.getModuleContent).toHaveBeenCalledWith('dl-m01-neuron-perceptron');
+    expect(contentReader.getQuizContent).toHaveBeenCalledWith('quiz-post-dl-p01');
     expect(contentReader.getTrialPostContent).toHaveBeenCalledWith('dl-p01-neuron-perceptron');
     expect(contentReader.getFullPostContent).toHaveBeenCalledWith('dl-p01-neuron-perceptron');
     expect(contentReader.getDemoContent).toHaveBeenCalledWith('demo-perceptron-and-gate');
@@ -441,6 +469,124 @@ describe('fetch learning API client', () => {
           authorization: 'Bearer local-admin-id-token',
           'content-type': 'application/json',
           'idempotency-key': 'publish-draft-local-01',
+        },
+        method: 'POST',
+      },
+    );
+  });
+
+  it('loads a typed Admin learner preview and attaches pending evidence by checksum', async () => {
+    const revisionId = 'draft-post-dl-p01-neuron-perceptron-rev-d1';
+    const checksum = 'a'.repeat(64);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              draft: {
+                baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+                courseId: 'course-deep-learning-basic',
+                draftRevisionId: revisionId,
+                entityId: 'dl-p01-neuron-perceptron',
+                entityType: 'post',
+                localeAvailability: ['en', 'vi'],
+                metadata: {
+                  attribution: { en: 'Source attribution', vi: 'Nguon tham khao' },
+                  externalLinkUrl: null,
+                },
+                moduleId: 'dl-m01-neuron-perceptron',
+                preview: { en: 'Draft description', vi: 'Mo ta draft' },
+                revisionVersion: 1,
+                sourceReview: {
+                  attribution: { en: 'Source attribution', vi: 'Nguon tham khao' },
+                  license: {
+                    name: 'CC BY 4.0',
+                    url: 'https://creativecommons.org/licenses/by/4.0/',
+                  },
+                  sourceId: 'source-google-ml-crash-course',
+                  title: 'Google ML Crash Course',
+                },
+                sourceStatus: 'seeded',
+                status: 'draft',
+                title: { en: 'Draft post', vi: 'Bai viet draft' },
+                validationStatus: 'not-run',
+              },
+              preview: {
+                contentType: 'post',
+                post: {
+                  accessLevel: 'full',
+                  blocks: [],
+                  courseId: 'course-deep-learning-basic',
+                  description: { en: 'Draft description', vi: 'Mo ta draft' },
+                  durationMinutes: 8,
+                  id: 'dl-p01-neuron-perceptron',
+                  moduleId: 'dl-m01-neuron-perceptron',
+                  postQuizId: 'quiz-post-dl-p01',
+                  revisionId,
+                  title: { en: 'Draft post', vi: 'Bai viet draft' },
+                },
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              evidence: {
+                artifactId: 'dl-p01-neuron-perceptron',
+                checksum,
+                evidenceRef: 'evidence://license-review/dl-p01-neuron-perceptron',
+                kind: 'license',
+                result: 'pending',
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createFetchLearningApiClient();
+    const preview = await client.getAdminContentRevisionPreview({
+      idToken: 'local-admin-id-token',
+      revisionId,
+    });
+    const evidence = await client.attachAdminContentEvidence({
+      checksum,
+      evidenceRef: 'evidence://license-review/dl-p01-neuron-perceptron',
+      idToken: 'local-admin-id-token',
+      kind: 'license',
+      revisionId,
+    });
+
+    expect(preview.preview).toEqual(
+      expect.objectContaining({
+        contentType: 'post',
+      }),
+    );
+    expect(evidence.result).toBe('pending');
+    expect(fetchMock).toHaveBeenNthCalledWith(1, `/api/v1/admin/revisions/${revisionId}/preview`, {
+      headers: {
+        authorization: 'Bearer local-admin-id-token',
+      },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/v1/admin/revisions/${revisionId}/evidence/license`,
+      {
+        body: JSON.stringify({
+          checksum,
+          evidenceRef: 'evidence://license-review/dl-p01-neuron-perceptron',
+        }),
+        headers: {
+          authorization: 'Bearer local-admin-id-token',
+          'content-type': 'application/json',
         },
         method: 'POST',
       },

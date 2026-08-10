@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { App } from '../../app/app';
+import { getCourse } from '../catalog/course-data';
 import type { AuthGateway } from './auth-context';
 
 function createLearnerProfileFixture(
@@ -113,6 +114,9 @@ function createLearningApiClient() {
       },
       validationStatus: 'not-run',
     }),
+    attachAdminContentEvidence: vi
+      .fn()
+      .mockRejectedValue(new Error('Admin evidence is not part of this test.')),
     updateAdminContentDraft: vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',
@@ -312,10 +316,39 @@ function createLearningApiClient() {
       },
       nextPath: '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
     }),
+    getCourseContent: vi.fn().mockImplementation((courseId) => {
+      const course = getCourse(courseId);
+
+      return course
+        ? Promise.resolve({
+            courseId,
+            description: course.description,
+            revisionId: `${courseId}-rev-r1`,
+            title: course.title,
+          })
+        : Promise.reject(new Error(`Missing test course content for ${courseId}.`));
+    }),
     getDemoContent: vi.fn().mockRejectedValue(new Error('Demo content is not part of this test.')),
     getFullPostContent: vi
       .fn()
       .mockRejectedValue(new Error('Post content is not part of this test.')),
+    getModuleContent: vi.fn().mockImplementation((moduleId) => {
+      const course = [
+        getCourse('course-classical-ml'),
+        getCourse('course-deep-learning-basic'),
+      ].find((candidate) => candidate?.modules?.some((module) => module.id === moduleId));
+      const module = course?.modules?.find((candidate) => candidate.id === moduleId);
+
+      return course && module
+        ? Promise.resolve({
+            courseId: course.id,
+            description: module.description,
+            moduleId,
+            revisionId: `${moduleId}-rev-r1`,
+            title: module.title,
+          })
+        : Promise.reject(new Error(`Missing test module content for ${moduleId}.`));
+    }),
     getProgress: vi.fn().mockResolvedValue({
       algorithmUnlocks: [],
       contentAccess: [
@@ -385,6 +418,7 @@ function createLearningApiClient() {
       releaseId: 'release-1',
       schemaVersion: 1,
     }),
+    getQuizContent: vi.fn().mockRejectedValue(new Error('Quiz content is not part of this test.')),
     getTrialPostContent: vi
       .fn()
       .mockRejectedValue(new Error('Trial post content is not part of this test.')),
@@ -418,7 +452,13 @@ function createLearningApiClient() {
         unpublishedCount: 0,
       },
     }),
+    getAdminContentRevisionPreview: vi
+      .fn()
+      .mockRejectedValue(new Error('Admin preview is not part of this test.')),
     listAdminContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null }),
+    listAdminContentEvidence: vi
+      .fn()
+      .mockRejectedValue(new Error('Admin evidence is not part of this test.')),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
     savePlaygroundRun: vi.fn().mockResolvedValue({

@@ -1,5 +1,5 @@
 import { ArrowLeft, CheckCircle2, FilePlus, FileText, RotateCcw, ShieldCheck } from 'lucide-react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { lazy, type FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
@@ -7,12 +7,22 @@ import { useAuth } from '../auth/auth-context';
 import type { Locale } from '../catalog/course-data';
 import type {
   AdminContentDraft,
+  AdminContentEvidenceKind,
+  AdminContentEvidenceState,
   AdminContentMetadata,
+  AdminContentRevisionPreview,
   AdminContentSourceReview,
   AdminContentSummary,
   LearningApiClient,
   UpdateAdminContentDraftInput,
 } from '../learning/learning-api';
+import { type Theme, useTheme } from '../../shared/theme/use-theme';
+
+const AdminLearnerRevisionPreview = lazy(async () => {
+  const module = await import('./admin-learner-revision-preview');
+
+  return { default: module.AdminLearnerRevisionPreview };
+});
 
 interface AdminContentPageProps {
   learningApiClient: LearningApiClient;
@@ -25,6 +35,7 @@ type DraftEditableFields = Pick<UpdateAdminContentDraftInput, 'metadata' | 'prev
 type LifecycleActionStatus =
   'failed' | 'idle' | 'publishing' | 'rolling-back' | 'succeeded' | 'unpublishing' | 'validating';
 type DraftSaveStatus = 'failed' | 'idle' | 'saved' | 'saving';
+type PreviewLoadStatus = 'failed' | 'idle' | 'loading' | 'ready';
 
 interface DraftActionState {
   contentKey: string;
@@ -41,10 +52,26 @@ interface DraftFormState {
   titleVi: string;
 }
 
+interface LearnerPreviewState {
+  preview: AdminContentRevisionPreview;
+  revisionVersion: number;
+}
+
 function getContentKey(
   item: Pick<AdminContentSummary | AdminContentDraft, 'entityId' | 'entityType'>,
 ): string {
   return `${item.entityType}:${item.entityId}`;
+}
+
+function getDraftPreviewTarget(
+  contentKey: string | null,
+  draftRevisionId: string | null | undefined,
+): { contentKey: string; draftRevisionId: string } | null {
+  if (contentKey === null || draftRevisionId === null || draftRevisionId === undefined) {
+    return null;
+  }
+
+  return { contentKey, draftRevisionId };
 }
 
 function createFallbackMetadata(): AdminContentMetadata {
@@ -148,13 +175,53 @@ function SourceReviewMeta({
 export function AdminContentPage({ learningApiClient, locale }: AdminContentPageProps) {
   const { t } = useTranslation();
   const { getIdToken } = useAuth();
+  const { theme } = useTheme();
   const [content, setContent] = useState<readonly AdminContentSummary[]>([]);
   const [draftAction, setDraftAction] = useState<DraftActionState | null>(null);
   const [draftPreviewsByKey, setDraftPreviewsByKey] = useState<
     Readonly<Record<string, AdminContentDraft>>
   >({});
+  const [learnerPreviewsByKey, setLearnerPreviewsByKey] = useState<
+    Readonly<Record<string, LearnerPreviewState>>
+  >({});
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
+  const [previewLocale, setPreviewLocale] = useState<Locale>(locale);
+  const [previewLoadStatusesByKey, setPreviewLoadStatusesByKey] = useState<
+    Readonly<Record<string, PreviewLoadStatus>>
+  >({});
+  const [previewTheme, setPreviewTheme] = useState<Theme>(theme);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  const loadDraftEvidence = useCallback(
+    async (revisionId: string): Promise<AdminContentEvidenceState> => {
+      const idToken = await getIdToken();
+
+      if (!idToken) {
+        throw new Error('Authenticated user is missing an ID token.');
+      }
+
+      return learningApiClient.listAdminContentEvidence({ idToken, revisionId });
+    },
+    [getIdToken, learningApiClient],
+  );
+
+  const attachDraftEvidence = useCallback(
+    async (input: {
+      checksum: string;
+      evidenceRef: string;
+      kind: AdminContentEvidenceKind;
+      revisionId: string;
+    }) => {
+      const idToken = await getIdToken();
+
+      if (!idToken) {
+        throw new Error('Authenticated user is missing an ID token.');
+      }
+
+      return learningApiClient.attachAdminContentEvidence({ ...input, idToken });
+    },
+    [getIdToken, learningApiClient],
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -202,6 +269,103 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
     draftAction?.contentKey === selectedContentKey ? draftAction.status : 'idle';
   const selectedDraftPreview =
     selectedContentKey !== null ? (draftPreviewsByKey[selectedContentKey] ?? null) : null;
+  const selectedLearnerPreview =
+    selectedContentKey !== null ? (learnerPreviewsByKey[selectedContentKey] ?? null) : null;
+  const selectedPreviewLoadStatus =
+    selectedContentKey !== null ? (previewLoadStatusesByKey[selectedContentKey] ?? 'idle') : 'idle';
+
+  useEffect(() => {
+    const previewTarget = getDraftPreviewTarget(
+      selectedContentKey,
+      selectedContent?.draftRevisionId,
+    );
+
+    if (previewTarget === null) {
+      return undefined;
+    }
+
+    const { contentKey, draftRevisionId } = previewTarget;
+
+    if (
+      selectedDraftPreview?.draftRevisionId === draftRevisionId &&
+      selectedLearnerPreview?.revisionVersion === selectedDraftPreview.revisionVersion
+    ) {
+      return undefined;
+    }
+
+    let isActive = true;
+
+    async function loadDraftPreview() {
+      setPreviewLoadStatusesByKey((currentStatuses) => ({
+        ...currentStatuses,
+        [contentKey]: 'loading',
+      }));
+
+      try {
+        const idToken = await getIdToken();
+
+        if (!idToken) {
+          throw new Error('Authenticated user is missing an ID token.');
+        }
+
+        const state = await learningApiClient.getAdminContentRevisionPreview({
+          idToken,
+          revisionId: draftRevisionId,
+        });
+
+        if (!isActive) {
+          return;
+        }
+
+        setDraftPreviewsByKey((currentDraftPreviews) => {
+          const existingDraft = currentDraftPreviews[contentKey];
+
+          if (
+            existingDraft?.draftRevisionId === state.draft.draftRevisionId &&
+            existingDraft.revisionVersion >= state.draft.revisionVersion
+          ) {
+            return currentDraftPreviews;
+          }
+
+          return {
+            ...currentDraftPreviews,
+            [contentKey]: state.draft,
+          };
+        });
+        setLearnerPreviewsByKey((currentPreviews) => ({
+          ...currentPreviews,
+          [contentKey]: {
+            preview: state.preview,
+            revisionVersion: state.draft.revisionVersion,
+          },
+        }));
+        setPreviewLoadStatusesByKey((currentStatuses) => ({
+          ...currentStatuses,
+          [contentKey]: 'ready',
+        }));
+      } catch {
+        if (isActive) {
+          setPreviewLoadStatusesByKey((currentStatuses) => ({
+            ...currentStatuses,
+            [contentKey]: 'failed',
+          }));
+        }
+      }
+    }
+
+    void loadDraftPreview();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    getIdToken,
+    learningApiClient,
+    selectedContentKey,
+    selectedContent?.draftRevisionId,
+    selectedDraftPreview,
+    selectedLearnerPreview,
+  ]);
 
   async function getRequiredIdToken(): Promise<string> {
     const idToken = await getIdToken();
@@ -271,6 +435,12 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
 
         return nextDraftPreviews;
       });
+      setLearnerPreviewsByKey((currentPreviews) => {
+        const nextPreviews = { ...currentPreviews };
+        delete nextPreviews[contentKey];
+
+        return nextPreviews;
+      });
       setDraftAction({ contentKey, status: 'failed' });
     }
   }
@@ -327,6 +497,12 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
       delete nextDraftPreviews[getContentKey(publishedContent)];
 
       return nextDraftPreviews;
+    });
+    setLearnerPreviewsByKey((currentPreviews) => {
+      const nextPreviews = { ...currentPreviews };
+      delete nextPreviews[getContentKey(publishedContent)];
+
+      return nextPreviews;
     });
   }
 
@@ -395,14 +571,22 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
           <ContentPreview
             draftActionStatus={selectedDraftActionStatus}
             draftPreview={selectedDraftPreview}
+            learnerPreview={selectedLearnerPreview?.preview ?? null}
             item={selectedContent}
             locale={locale}
             onCreateDraft={handleCreateDraft}
+            onAttachEvidence={attachDraftEvidence}
+            onLoadEvidence={loadDraftEvidence}
             onPublishDraft={handlePublishDraft}
             onRollbackContent={handleRollbackContent}
             onUnpublishContent={handleUnpublishContent}
             onUpdateDraft={handleUpdateDraft}
             onValidateDraft={handleValidateDraft}
+            previewLocale={previewLocale}
+            previewLoadStatus={selectedPreviewLoadStatus}
+            previewTheme={previewTheme}
+            setPreviewLocale={setPreviewLocale}
+            setPreviewTheme={setPreviewTheme}
           />
         </section>
       ) : null}
@@ -464,25 +648,46 @@ function ContentInventoryList({
 function ContentPreview({
   draftActionStatus,
   draftPreview,
+  learnerPreview,
   item,
   locale,
+  onAttachEvidence,
   onCreateDraft,
+  onLoadEvidence,
   onPublishDraft,
   onRollbackContent,
   onUnpublishContent,
   onUpdateDraft,
   onValidateDraft,
+  previewLocale,
+  previewLoadStatus,
+  previewTheme,
+  setPreviewLocale,
+  setPreviewTheme,
 }: {
   draftActionStatus: DraftActionStatus;
   draftPreview: AdminContentDraft | null;
+  learnerPreview: AdminContentRevisionPreview | null;
   item: AdminContentSummary | null;
   locale: Locale;
+  onAttachEvidence: (input: {
+    checksum: string;
+    evidenceRef: string;
+    kind: AdminContentEvidenceKind;
+    revisionId: string;
+  }) => Promise<unknown>;
   onCreateDraft: (item: AdminContentSummary) => void;
+  onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
   onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
   onRollbackContent: (revisionId: string, reason: string) => Promise<void>;
   onUnpublishContent: (item: AdminContentSummary, reason: string) => Promise<void>;
   onUpdateDraft: (draft: AdminContentDraft, fields: DraftEditableFields) => Promise<void>;
   onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
+  previewLocale: Locale;
+  previewLoadStatus: PreviewLoadStatus;
+  previewTheme: Theme;
+  setPreviewLocale: (locale: Locale) => void;
+  setPreviewTheme: (theme: Theme) => void;
 }) {
   const { t } = useTranslation();
 
@@ -609,9 +814,17 @@ function ContentPreview({
           draft={draftPreview}
           key={`${draftPreview.draftRevisionId}:${draftPreview.revisionVersion}`}
           locale={locale}
+          learnerPreview={learnerPreview}
+          onAttachEvidence={onAttachEvidence}
+          onLoadEvidence={onLoadEvidence}
           onPublishDraft={onPublishDraft}
           onUpdateDraft={onUpdateDraft}
           onValidateDraft={onValidateDraft}
+          previewLocale={previewLocale}
+          previewLoadStatus={previewLoadStatus}
+          previewTheme={previewTheme}
+          setPreviewLocale={setPreviewLocale}
+          setPreviewTheme={setPreviewTheme}
         />
       ) : (
         <p className="admin-content-muted">{t('admin.content.draftPreviewEmpty')}</p>
@@ -622,16 +835,37 @@ function ContentPreview({
 
 function DraftPreview({
   draft,
+  learnerPreview,
   locale,
+  onAttachEvidence,
+  onLoadEvidence,
   onPublishDraft,
   onUpdateDraft,
   onValidateDraft,
+  previewLocale,
+  previewLoadStatus,
+  previewTheme,
+  setPreviewLocale,
+  setPreviewTheme,
 }: {
   draft: AdminContentDraft;
+  learnerPreview: AdminContentRevisionPreview | null;
   locale: Locale;
+  onAttachEvidence: (input: {
+    checksum: string;
+    evidenceRef: string;
+    kind: AdminContentEvidenceKind;
+    revisionId: string;
+  }) => Promise<unknown>;
+  onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
   onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
   onUpdateDraft: (draft: AdminContentDraft, fields: DraftEditableFields) => Promise<void>;
   onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
+  previewLocale: Locale;
+  previewLoadStatus: PreviewLoadStatus;
+  previewTheme: Theme;
+  setPreviewLocale: (locale: Locale) => void;
+  setPreviewTheme: (theme: Theme) => void;
 }) {
   const { t } = useTranslation();
   const secondaryLocale: Locale = locale === 'vi' ? 'en' : 'vi';
@@ -689,12 +923,277 @@ function DraftPreview({
         </article>
       </div>
 
+      <DraftLearnerPreviewPanel
+        learnerPreview={learnerPreview}
+        locale={locale}
+        previewLocale={previewLocale}
+        previewLoadStatus={previewLoadStatus}
+        previewTheme={previewTheme}
+        setPreviewLocale={setPreviewLocale}
+        setPreviewTheme={setPreviewTheme}
+      />
+
+      <DraftEvidencePanel
+        draft={draft}
+        onAttachEvidence={onAttachEvidence}
+        onLoadEvidence={onLoadEvidence}
+      />
+
       <DraftEditor draft={draft} onUpdateDraft={onUpdateDraft} />
       <DraftLifecyclePanel
         draft={draft}
         onPublishDraft={onPublishDraft}
         onValidateDraft={onValidateDraft}
       />
+    </section>
+  );
+}
+
+function DraftLearnerPreviewPanel({
+  learnerPreview,
+  locale,
+  previewLocale,
+  previewLoadStatus,
+  previewTheme,
+  setPreviewLocale,
+  setPreviewTheme,
+}: {
+  learnerPreview: AdminContentRevisionPreview | null;
+  locale: Locale;
+  previewLocale: Locale;
+  previewLoadStatus: PreviewLoadStatus;
+  previewTheme: Theme;
+  setPreviewLocale: (locale: Locale) => void;
+  setPreviewTheme: (theme: Theme) => void;
+}) {
+  const copy =
+    locale === 'vi'
+      ? {
+          failed: 'Không thể tải learner preview. Hãy thử lại sau.',
+          language: 'Ngôn ngữ preview',
+          loading: 'Đang tải learner preview…',
+          theme: 'Giao diện preview',
+          title: 'Learner runtime preview',
+        }
+      : {
+          failed: 'The learner preview could not be loaded. Try again later.',
+          language: 'Preview language',
+          loading: 'Loading learner preview…',
+          theme: 'Preview theme',
+          title: 'Learner runtime preview',
+        };
+
+  return (
+    <section className="admin-content-runtime-preview" aria-label={copy.title}>
+      <div className="admin-content-panel-heading">
+        <ShieldCheck aria-hidden="true" size={18} />
+        <h3>{copy.title}</h3>
+      </div>
+
+      <div className="admin-content-preview-controls">
+        <label>
+          <span>{copy.language}</span>
+          <select
+            aria-label={copy.language}
+            onChange={(event) => setPreviewLocale(event.target.value as Locale)}
+            value={previewLocale}
+          >
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <label>
+          <span>{copy.theme}</span>
+          <select
+            aria-label={copy.theme}
+            onChange={(event) => setPreviewTheme(event.target.value as Theme)}
+            value={previewTheme}
+          >
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
+
+      {previewLoadStatus === 'loading' ? <p role="status">{copy.loading}</p> : null}
+      {previewLoadStatus === 'failed' ? <p role="alert">{copy.failed}</p> : null}
+      {learnerPreview ? (
+        <Suspense fallback={<p role="status">{copy.loading}</p>}>
+          <AdminLearnerRevisionPreview
+            locale={previewLocale}
+            preview={learnerPreview}
+            theme={previewTheme}
+          />
+        </Suspense>
+      ) : null}
+    </section>
+  );
+}
+
+const requiredEvidenceKinds: readonly AdminContentEvidenceKind[] = [
+  'license',
+  'provenance',
+  'content-review',
+  'gvhd-confirmation',
+];
+
+type EvidencePanelStatus = 'attaching' | 'failed' | 'loading' | 'ready';
+
+function DraftEvidencePanel({
+  draft,
+  onAttachEvidence,
+  onLoadEvidence,
+}: {
+  draft: AdminContentDraft;
+  onAttachEvidence: (input: {
+    checksum: string;
+    evidenceRef: string;
+    kind: AdminContentEvidenceKind;
+    revisionId: string;
+  }) => Promise<unknown>;
+  onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
+}) {
+  const [checksum, setChecksum] = useState('');
+  const [evidenceRef, setEvidenceRef] = useState('');
+  const [evidenceState, setEvidenceState] = useState<AdminContentEvidenceState | null>(null);
+  const [kind, setKind] = useState<AdminContentEvidenceKind>('license');
+  const [status, setStatus] = useState<EvidencePanelStatus>('loading');
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadEvidence() {
+      setStatus('loading');
+
+      try {
+        const nextEvidenceState = await onLoadEvidence(draft.draftRevisionId);
+
+        if (isActive) {
+          setChecksum(nextEvidenceState.contentChecksum);
+          setEvidenceState(nextEvidenceState);
+          setStatus('ready');
+        }
+      } catch {
+        if (isActive) {
+          setStatus('failed');
+        }
+      }
+    }
+
+    void loadEvidence();
+
+    return () => {
+      isActive = false;
+    };
+  }, [draft.draftRevisionId, onLoadEvidence]);
+
+  const evidenceByKind = new Map(
+    evidenceState?.evidence.map((evidence) => [evidence.kind, evidence]),
+  );
+
+  async function attachEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!checksum.trim() || !evidenceRef.trim()) {
+      return;
+    }
+
+    setStatus('attaching');
+
+    try {
+      await onAttachEvidence({
+        checksum: checksum.trim(),
+        evidenceRef: evidenceRef.trim(),
+        kind,
+        revisionId: draft.draftRevisionId,
+      });
+      const nextEvidenceState = await onLoadEvidence(draft.draftRevisionId);
+
+      setChecksum(nextEvidenceState.contentChecksum);
+      setEvidenceRef('');
+      setEvidenceState(nextEvidenceState);
+      setStatus('ready');
+    } catch {
+      setStatus('failed');
+    }
+  }
+
+  return (
+    <section className="admin-content-evidence-panel" aria-label="External evidence">
+      <div className="admin-content-panel-heading">
+        <ShieldCheck aria-hidden="true" size={18} />
+        <h3>External evidence</h3>
+      </div>
+      <p className="admin-content-emulator-notice" role="note">
+        An attachment remains pending. Only independent human review can approve publish-quality
+        evidence.
+      </p>
+
+      <dl className="admin-content-evidence-list">
+        {requiredEvidenceKinds.map((requiredKind) => {
+          const evidence = evidenceByKind.get(requiredKind);
+
+          return (
+            <div key={requiredKind}>
+              <dt>{requiredKind}</dt>
+              <dd data-evidence-status={evidence?.result ?? 'missing'}>
+                {evidence ? evidence.result : 'missing'}
+              </dd>
+              {evidence ? <code>{evidence.evidenceRef}</code> : null}
+            </div>
+          );
+        })}
+      </dl>
+
+      <form className="admin-content-evidence-form" onSubmit={attachEvidence}>
+        <label>
+          <span>Evidence type</span>
+          <select
+            onChange={(event) => setKind(event.target.value as AdminContentEvidenceKind)}
+            value={kind}
+          >
+            {requiredEvidenceKinds.map((requiredKind) => (
+              <option key={requiredKind} value={requiredKind}>
+                {requiredKind}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Reference</span>
+          <input
+            onChange={(event) => setEvidenceRef(event.target.value)}
+            placeholder="evidence://review/reference"
+            required
+            type="text"
+            value={evidenceRef}
+          />
+        </label>
+        <label className="admin-content-evidence-checksum">
+          <span>Draft checksum</span>
+          <input
+            onChange={(event) => setChecksum(event.target.value)}
+            pattern="[a-f0-9]{64}"
+            required
+            type="text"
+            value={checksum}
+          />
+        </label>
+        <button
+          className="admin-content-secondary-button"
+          disabled={status === 'attaching' || status === 'loading'}
+          type="submit"
+        >
+          {status === 'attaching' ? 'Attaching evidence…' : 'Attach pending evidence'}
+        </button>
+      </form>
+
+      {status === 'loading' ? <p role="status">Loading evidence…</p> : null}
+      {status === 'failed' ? (
+        <p className="admin-content-inline-error" role="alert">
+          Evidence could not be loaded or attached. Check the checksum and retry.
+        </p>
+      ) : null}
     </section>
   );
 }

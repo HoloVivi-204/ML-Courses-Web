@@ -16,11 +16,13 @@ export interface CurrentPublishedLearningContentEntity {
 
 export interface LearningContentAuthority {
   assertCurrentPublishedEntity(input: {
+    allowUnpublishedCourse?: boolean | undefined;
     entityId: string;
     entityType: LearningContentEntityType;
     transaction?: Transaction | undefined;
   }): Promise<CurrentPublishedLearningContentEntity>;
   getCurrentPublishedEntity(input: {
+    allowUnpublishedCourse?: boolean | undefined;
     entityId: string;
     entityType: LearningContentEntityType;
     transaction?: Transaction | undefined;
@@ -44,6 +46,7 @@ function getEntityDocumentId(entityType: LearningContentEntityType, entityId: st
 }
 
 function parseCurrentPublishedEntity(input: {
+  allowUnpublishedCourse?: boolean | undefined;
   entityData: unknown;
   entityId: string;
   entityType: LearningContentEntityType;
@@ -79,6 +82,19 @@ function parseCurrentPublishedEntity(input: {
   }
 
   if (currentContent.status === 'unpublished') {
+    if (
+      input.allowUnpublishedCourse === true &&
+      input.entityType === 'course' &&
+      typeof currentContent.publishedRevisionId === 'string' &&
+      currentContent.publishedRevisionId.trim().length > 0
+    ) {
+      return {
+        entityId: input.entityId,
+        entityType: input.entityType,
+        publishedRevisionId: currentContent.publishedRevisionId,
+      };
+    }
+
     return null;
   }
 
@@ -101,6 +117,7 @@ export function createFirestoreLearningContentAuthority(
   firestore: Firestore,
 ): LearningContentAuthority {
   async function getCurrentPublishedEntity(input: {
+    allowUnpublishedCourse?: boolean | undefined;
     entityId: string;
     entityType: LearningContentEntityType;
     transaction?: Transaction | undefined;
@@ -117,6 +134,7 @@ export function createFirestoreLearningContentAuthority(
     }
 
     return parseCurrentPublishedEntity({
+      allowUnpublishedCourse: input.allowUnpublishedCourse,
       entityData: snapshot.data(),
       entityId: input.entityId,
       entityType: input.entityType,

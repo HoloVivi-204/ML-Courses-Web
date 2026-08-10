@@ -5,10 +5,13 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type CourseSummary, type Locale } from '../catalog/course-data';
-import type {
-  LearningApiClient,
-  LearningCourseProgress,
-  LearningProgressSnapshot,
+import {
+  LearningApiError,
+  type LearningApiClient,
+  type LearningCourseContent,
+  type LearningModuleContent,
+  type LearningCourseProgress,
+  type LearningProgressSnapshot,
 } from './learning-api';
 import {
   getLearningCourseProgress,
@@ -26,7 +29,13 @@ type EnrollmentStatus = 'failed' | 'ready' | 'syncing';
 
 interface EnrollmentTask {
   key: string;
-  promise: Promise<LearningProgressSnapshot>;
+  promise: Promise<EnrollmentLoadResult>;
+}
+
+interface EnrollmentLoadResult {
+  courseContent: LearningCourseContent;
+  moduleContents: readonly LearningModuleContent[];
+  progressSnapshot: LearningProgressSnapshot;
 }
 
 function createIdempotencyKey(): string {
@@ -41,6 +50,8 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
   const idempotencyKey = useRef(createIdempotencyKey());
   const enrollmentTaskRef = useRef<EnrollmentTask | null>(null);
   const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus>('syncing');
+  const [courseContent, setCourseContent] = useState<LearningCourseContent | null>(null);
+  const [moduleContents, setModuleContents] = useState<readonly LearningModuleContent[]>([]);
   const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
 
   useEffect(() => {
@@ -54,6 +65,9 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
 
     async function enroll() {
       setEnrollmentStatus('syncing');
+      setCourseContent(null);
+      setModuleContents([]);
+      setProgressSnapshot(null);
 
       try {
         const idToken = await getIdToken();
@@ -73,13 +87,16 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
                 idempotencyKey: idempotencyKey.current,
                 key: taskKey,
                 learningApiClient,
+                moduleIds: (selectedCourse.modules ?? []).map((module) => module.id),
               });
 
         enrollmentTaskRef.current = enrollmentTask;
-        const nextProgressSnapshot = await enrollmentTask.promise;
+        const result = await enrollmentTask.promise;
 
         if (isActive) {
-          setProgressSnapshot(nextProgressSnapshot);
+          setCourseContent(result.courseContent);
+          setModuleContents(result.moduleContents);
+          setProgressSnapshot(result.progressSnapshot);
           setEnrollmentStatus('ready');
         }
       } catch {
@@ -107,6 +124,9 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
   const moduleEntries = progressSnapshot
     ? getLearningModuleProgressEntries(course, progressSnapshot)
     : [];
+  const moduleContentById = new Map(
+    moduleContents.map((moduleContent) => [moduleContent.moduleId, moduleContent]),
+  );
   const courseProgress = progressSnapshot
     ? getLearningCourseProgress(progressSnapshot, course.id)
     : undefined;
@@ -120,8 +140,14 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
 
       <section className="learning-course-card">
         <span className="eyebrow">{t('learning.eyebrow')}</span>
-        <h1>{t('learning.title', { title: localize(course.title, locale) })}</h1>
-        <p>{t('learning.intro')}</p>
+        <h1>
+          {courseContent ? localize(courseContent.title, locale) : t('learning.enrollment.syncing')}
+        </h1>
+        <p>
+          {courseContent
+            ? localize(courseContent.description, locale)
+            : t('learning.enrollment.syncing')}
+        </p>
 
         <p className="learning-sync-state" role="status">
           {t(`learning.enrollment.${enrollmentStatus}`)}
@@ -152,6 +178,7 @@ export function LearningCoursePage({ learningApiClient, locale }: LearningCourse
               entry={entry}
               key={entry.module.id}
               locale={locale}
+              moduleContent={moduleContentById.get(entry.module.id)}
             />
           ))}
         </div>
@@ -172,29 +199,81 @@ function createEnrollmentTask(input: {
   idempotencyKey: string;
   key: string;
   learningApiClient: LearningApiClient;
+  moduleIds: readonly string[];
 }): EnrollmentTask {
   return {
     key: input.key,
     promise: (async () => {
-      await input.learningApiClient.enrollCourse({
-        courseId: input.courseId,
-        idToken: input.idToken,
-        idempotencyKey: input.idempotencyKey,
-      });
+      let continuingProgress: LearningProgressSnapshot | null = null;
 
-      return input.learningApiClient.getProgress(input.idToken);
+      try {
+        await input.learningApiClient.enrollCourse({
+          courseId: input.courseId,
+          idToken: input.idToken,
+          idempotencyKey: input.idempotencyKey,
+        });
+      } catch (error) {
+        if (!(error instanceof LearningApiError) || error.code !== 'CONTENT_NOT_PUBLISHED') {
+          throw error;
+        }
+
+        const progressSnapshot = await input.learningApiClient.getProgress(input.idToken);
+
+        if (!hasContinuingCourseEnrollment(progressSnapshot, input.courseId)) {
+          throw error;
+        }
+
+        continuingProgress = progressSnapshot;
+      }
+
+      const [courseContent, moduleContents, progressSnapshot] = await Promise.all([
+        input.learningApiClient.getCourseContent(input.courseId),
+        Promise.all(
+          input.moduleIds.map((moduleId) => input.learningApiClient.getModuleContent(moduleId)),
+        ),
+        continuingProgress ?? input.learningApiClient.getProgress(input.idToken),
+      ]);
+
+      if (
+        courseContent.courseId !== input.courseId ||
+        moduleContents.some(
+          (moduleContent, index) =>
+            moduleContent.courseId !== input.courseId ||
+            moduleContent.moduleId !== input.moduleIds[index],
+        )
+      ) {
+        throw new Error('Published learner content does not match the requested course structure.');
+      }
+
+      return { courseContent, moduleContents, progressSnapshot };
     })(),
   };
+}
+
+function hasContinuingCourseEnrollment(
+  progressSnapshot: LearningProgressSnapshot,
+  courseId: string,
+): boolean {
+  const courseProgress = getLearningCourseProgress(progressSnapshot, courseId);
+  const status =
+    courseProgress?.status ??
+    (progressSnapshot.enrollment.courseId === courseId
+      ? progressSnapshot.enrollment.status
+      : 'not-enrolled');
+
+  return status === 'in-progress' || status === 'completed';
 }
 
 function LearningModuleCard({
   course,
   entry,
   locale,
+  moduleContent,
 }: {
   course: CourseSummary;
   entry: LearningModuleProgressEntry;
   locale: Locale;
+  moduleContent: LearningModuleContent | undefined;
 }) {
   const { t } = useTranslation();
   const isLocked = entry.progress.status === 'locked';
@@ -212,7 +291,7 @@ function LearningModuleCard({
         <div className="learning-module-card-heading">
           <div>
             <code>{entry.module.id}</code>
-            <h3>{localize(entry.module.title, locale)}</h3>
+            <h3>{moduleContent ? localize(moduleContent.title, locale) : entry.module.id}</h3>
           </div>
           <span className={isLocked ? 'module-state' : 'module-state open'}>
             {isLocked ? (
@@ -223,7 +302,11 @@ function LearningModuleCard({
             {t(stateKey)}
           </span>
         </div>
-        <p>{localize(entry.module.description, locale)}</p>
+        <p>
+          {moduleContent
+            ? localize(moduleContent.description, locale)
+            : t('learning.enrollment.syncing')}
+        </p>
         <div className="learning-module-card-progress">
           <span>
             {t('learning.moduleRoadmap.progress', {

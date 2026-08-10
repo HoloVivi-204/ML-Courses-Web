@@ -55,15 +55,52 @@ export interface LearnerDemoContent {
   visualization: FixedDemoVisualization;
 }
 
+export interface LearnerCourseContent {
+  courseId: string;
+  description: { en: string; vi: string };
+  revisionId: string;
+  title: { en: string; vi: string };
+}
+
+export interface LearnerModuleContent {
+  courseId: string;
+  description: { en: string; vi: string };
+  moduleId: string;
+  revisionId: string;
+  title: { en: string; vi: string };
+}
+
+export interface LearnerQuizContent {
+  courseId: string;
+  description: { en: string; vi: string };
+  moduleId: string;
+  postId?: string | undefined;
+  quizId: string;
+  revisionId: string;
+  title: { en: string; vi: string };
+}
+
 export type PublishedLearnerContent =
+  | {
+      contentType: 'course';
+      course: LearnerCourseContent;
+    }
   | {
       contentType: 'demo';
       demo: LearnerDemoContent;
     }
   | {
+      contentType: 'module';
+      module: LearnerModuleContent;
+    }
+  | {
       contentType: 'post';
       fullPost: LearnerPostContent;
       trialPost: LearnerPostContent | null;
+    }
+  | {
+      contentType: 'quiz';
+      quiz: LearnerQuizContent;
     };
 
 export interface LearningContentAccessReader {
@@ -243,6 +280,7 @@ function assertDemoContent(value: unknown, demoId: string, revisionId: string): 
 }
 
 async function assertCurrentContentAncestors(input: {
+  allowUnpublishedCourse?: boolean | undefined;
   authority: LearningContentAuthority;
   courseId: string;
   moduleId: string;
@@ -250,6 +288,7 @@ async function assertCurrentContentAncestors(input: {
 }): Promise<void> {
   await Promise.all([
     input.authority.assertCurrentPublishedEntity({
+      ...(input.allowUnpublishedCourse ? { allowUnpublishedCourse: true } : {}),
       entityId: input.courseId,
       entityType: 'course',
       transaction: input.transaction,
@@ -389,6 +428,46 @@ export function applyAdminDraftToPublishedLearnerContent(input: {
     return null;
   }
 
+  if (input.learnerContent.contentType === 'course') {
+    if (input.draft.entityType !== 'course') {
+      throw new ApiError(
+        500,
+        'LEARNER_CONTENT_DATA_INTEGRITY_ERROR',
+        'Published learner content data is invalid.',
+      );
+    }
+
+    return {
+      contentType: 'course',
+      course: {
+        ...input.learnerContent.course,
+        description: { ...input.draft.preview },
+        revisionId: input.draft.draftRevisionId,
+        title: { ...input.draft.title },
+      },
+    };
+  }
+
+  if (input.learnerContent.contentType === 'module') {
+    if (input.draft.entityType !== 'module') {
+      throw new ApiError(
+        500,
+        'LEARNER_CONTENT_DATA_INTEGRITY_ERROR',
+        'Published learner content data is invalid.',
+      );
+    }
+
+    return {
+      contentType: 'module',
+      module: {
+        ...input.learnerContent.module,
+        description: { ...input.draft.preview },
+        revisionId: input.draft.draftRevisionId,
+        title: { ...input.draft.title },
+      },
+    };
+  }
+
   if (input.learnerContent.contentType === 'post') {
     if (input.draft.entityType !== 'post') {
       throw new ApiError(
@@ -409,6 +488,26 @@ export function applyAdminDraftToPublishedLearnerContent(input: {
       contentType: 'post',
       fullPost: updatePost(input.learnerContent.fullPost),
       trialPost: input.learnerContent.trialPost ? updatePost(input.learnerContent.trialPost) : null,
+    };
+  }
+
+  if (input.learnerContent.contentType === 'quiz') {
+    if (input.draft.entityType !== 'quiz') {
+      throw new ApiError(
+        500,
+        'LEARNER_CONTENT_DATA_INTEGRITY_ERROR',
+        'Published learner content data is invalid.',
+      );
+    }
+
+    return {
+      contentType: 'quiz',
+      quiz: {
+        ...input.learnerContent.quiz,
+        description: { ...input.draft.preview },
+        revisionId: input.draft.draftRevisionId,
+        title: { ...input.draft.title },
+      },
     };
   }
 
@@ -498,6 +597,7 @@ export function createFirestoreLearningContentRepository(
         }
 
         await assertCurrentContentAncestors({
+          allowUnpublishedCourse: true,
           authority,
           courseId: post.courseId,
           moduleId: post.moduleId,
@@ -533,6 +633,7 @@ export function createFirestoreLearningContentRepository(
         }
 
         await assertCurrentContentAncestors({
+          allowUnpublishedCourse: true,
           authority,
           courseId: demo.courseId,
           moduleId: demo.moduleId,

@@ -1,4 +1,6 @@
 import {
+  adminContentEvidenceAttachRequestSchema,
+  adminContentEvidenceKindSchema,
   adminContentListQuerySchema,
   avatarFinalizeRequestSchema,
   avatarUploadSessionRequestSchema,
@@ -125,6 +127,49 @@ export interface PostViewResult {
     readingPosition: string;
     started: boolean;
     viewedItemIds: readonly string[];
+  };
+}
+
+export interface LearningCourseContent {
+  courseId: string;
+  description: {
+    en: string;
+    vi: string;
+  };
+  revisionId: string;
+  title: {
+    en: string;
+    vi: string;
+  };
+}
+
+export interface LearningModuleContent {
+  courseId: string;
+  description: {
+    en: string;
+    vi: string;
+  };
+  moduleId: string;
+  revisionId: string;
+  title: {
+    en: string;
+    vi: string;
+  };
+}
+
+export interface LearningQuizContent {
+  courseId: string;
+  description: {
+    en: string;
+    vi: string;
+  };
+  moduleId: string;
+  postId?: string | undefined;
+  quizId: string;
+  revisionId: string;
+  title: {
+    en: string;
+    vi: string;
   };
 }
 
@@ -361,6 +406,8 @@ export interface LearningProgressSnapshot {
 
 export type AdminContentEntityType = 'course' | 'demo' | 'module' | 'post' | 'quiz';
 export type AdminContentPublicationScope = 'emulator-demo' | 'publish-quality';
+export type AdminContentEvidenceKind =
+  'license' | 'provenance' | 'content-review' | 'gvhd-confirmation';
 
 export interface AdminContentMetadata {
   attribution: {
@@ -413,6 +460,48 @@ export interface AdminContentSummary {
 export interface AdminContentPage {
   content: AdminContentSummary[];
   nextCursor: string | null;
+}
+
+export interface AdminContentExternalEvidence {
+  artifactId: string;
+  checksum: string;
+  evidenceRef: string;
+  kind: AdminContentEvidenceKind;
+  result: 'approved' | 'pending' | 'rejected';
+  reviewedAt?: string | undefined;
+  reviewedBy?: string | undefined;
+}
+
+export interface AdminContentEvidenceState {
+  contentChecksum: string;
+  evidence: readonly AdminContentExternalEvidence[];
+}
+
+export interface AdminContentPreviewQuestion {
+  options: readonly {
+    optionId: string;
+    text: { en: string; vi: string };
+  }[];
+  prompt: { en: string; vi: string };
+  questionId: string;
+  sourceId: string;
+  type: 'multiple-choice' | 'single-choice' | 'true-false';
+}
+
+export type AdminContentRevisionPreview =
+  | { contentType: 'course'; course: LearningCourseContent }
+  | { contentType: 'demo'; demo: LearningDemoContent }
+  | { contentType: 'module'; module: LearningModuleContent }
+  | { contentType: 'post'; post: LearningPostContent }
+  | {
+      contentType: 'quiz';
+      questions: readonly AdminContentPreviewQuestion[];
+      quiz: LearningQuizContent;
+    };
+
+export interface AdminContentRevisionPreviewState {
+  draft: AdminContentDraft;
+  preview: AdminContentRevisionPreview;
 }
 
 export interface AdminContentDraft {
@@ -640,18 +729,32 @@ export interface LearningApiClient {
     entityType: AdminContentEntityType;
     idToken: string;
   }): Promise<AdminContentDraft>;
+  attachAdminContentEvidence(input: {
+    checksum: string;
+    evidenceRef: string;
+    idToken: string;
+    kind: AdminContentEvidenceKind;
+    revisionId: string;
+  }): Promise<AdminContentExternalEvidence>;
   createQuizAttempt(input: { idToken: string; quizId: string }): Promise<QuizAttemptResult>;
   enrollCourse(input: {
     courseId: string;
     idToken: string;
     idempotencyKey: string;
   }): Promise<EnrollmentResult>;
+  getCourseContent(courseId: string): Promise<LearningCourseContent>;
   getDemoContent(input: { demoId: string; idToken: string }): Promise<LearningDemoContent>;
   getFullPostContent(input: { idToken: string; postId: string }): Promise<LearningPostContent>;
+  getModuleContent(moduleId: string): Promise<LearningModuleContent>;
   getProgress(idToken: string): Promise<LearningProgressSnapshot>;
+  getQuizContent(quizId: string): Promise<LearningQuizContent>;
   getRuntimeFeatureManifest(): Promise<RuntimeFeatureManifest>;
   getTrialPostContent(postId: string): Promise<LearningPostContent>;
   getAdminReportSummary(input: { idToken: string }): Promise<AdminReportSummary>;
+  getAdminContentRevisionPreview(input: {
+    idToken: string;
+    revisionId: string;
+  }): Promise<AdminContentRevisionPreviewState>;
   listAdminContent(input: {
     courseId?: string | undefined;
     cursor?: string | undefined;
@@ -660,6 +763,10 @@ export interface LearningApiClient {
     limit?: number | undefined;
     moduleId?: string | undefined;
   }): Promise<AdminContentPage>;
+  listAdminContentEvidence(input: {
+    idToken: string;
+    revisionId: string;
+  }): Promise<AdminContentEvidenceState>;
   publishAdminContentRevision(
     input: AdminContentPublishRevisionInput,
   ): Promise<AdminContentSummary>;
@@ -1052,11 +1159,17 @@ export function createFetchLearningApiClient(
         MUST_API_CONTRACTS.enrollCourse.response,
       );
     },
+    async getCourseContent(courseId) {
+      return contentReader.getCourseContent(courseId);
+    },
     async getDemoContent({ demoId }) {
       return contentReader.getDemoContent(demoId);
     },
     async getFullPostContent({ postId }) {
       return contentReader.getFullPostContent(postId);
+    },
+    async getModuleContent(moduleId) {
+      return contentReader.getModuleContent(moduleId);
     },
     async getProgress(idToken) {
       return readSuccessEnvelope<LearningProgressSnapshot>(
@@ -1067,6 +1180,9 @@ export function createFetchLearningApiClient(
         }),
         learningProgressSnapshotSchema,
       );
+    },
+    async getQuizContent(quizId) {
+      return contentReader.getQuizContent(quizId);
     },
     async getRuntimeFeatureManifest() {
       return readSuccessEnvelope<RuntimeFeatureManifest>(
@@ -1085,6 +1201,16 @@ export function createFetchLearningApiClient(
           },
         }),
         MUST_API_CONTRACTS.getAdminReportSummary.response,
+      );
+    },
+    async getAdminContentRevisionPreview({ idToken, revisionId }) {
+      return readSuccessEnvelope<AdminContentRevisionPreviewState>(
+        await fetch(buildApiPath('getAdminContentRevisionPreview', { revisionId }), {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+        MUST_API_CONTRACTS.getAdminContentRevisionPreview.response,
       );
     },
     async listAdminContent({ courseId, cursor, entityType, idToken, limit, moduleId }) {
@@ -1126,6 +1252,36 @@ export function createFetchLearningApiClient(
         }),
         MUST_API_CONTRACTS.listAdminContent.response,
       );
+    },
+    async listAdminContentEvidence({ idToken, revisionId }) {
+      return readSuccessEnvelope<AdminContentEvidenceState>(
+        await fetch(buildApiPath('listAdminContentEvidence', { revisionId }), {
+          headers: {
+            authorization: `Bearer ${idToken}`,
+          },
+        }),
+        MUST_API_CONTRACTS.listAdminContentEvidence.response,
+      );
+    },
+    async attachAdminContentEvidence({ checksum, evidenceRef, idToken, kind, revisionId }) {
+      const body = adminContentEvidenceAttachRequestSchema.parse({ checksum, evidenceRef });
+      const evidenceKind = adminContentEvidenceKindSchema.parse(kind);
+      const data = await readSuccessEnvelope<{ evidence: AdminContentExternalEvidence }>(
+        await fetch(
+          buildApiPath('attachAdminContentEvidence', { kind: evidenceKind, revisionId }),
+          {
+            body: JSON.stringify(body),
+            headers: {
+              authorization: `Bearer ${idToken}`,
+              'content-type': 'application/json',
+            },
+            method: 'POST',
+          },
+        ),
+        MUST_API_CONTRACTS.attachAdminContentEvidence.response,
+      );
+
+      return data.evidence;
     },
     async createAdminContentDraft({ entityId, entityType, idToken }) {
       const data = await readSuccessEnvelope<{ draft: AdminContentDraft }>(

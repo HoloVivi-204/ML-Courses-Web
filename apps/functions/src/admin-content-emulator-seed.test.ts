@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createReleaseOneFirestoreAdminContentSeed } from './admin-content-emulator-seed.js';
 import { createStaticAdminContentRepository } from './admin-content-repository.js';
+import { createPublishedLearnerContentDocuments } from './published-learner-content.js';
 
 describe('Release 1 Firestore Admin content seed', () => {
   it('materializes every locked entity and learner-readable revision for the Emulator', () => {
@@ -94,5 +95,64 @@ describe('Release 1 Firestore Admin content seed', () => {
         validation: { status: 'valid' },
       },
     });
+  });
+
+  it('materializes course, module, and quiz learner summaries from their current published revisions', () => {
+    const seed = createReleaseOneFirestoreAdminContentSeed();
+    const course = seed.find(
+      (record) =>
+        record.content.entityType === 'course' &&
+        record.content.entityId === 'course-deep-learning-basic',
+    );
+    const module = seed.find(
+      (record) =>
+        record.content.entityType === 'module' &&
+        record.content.entityId === 'dl-m01-neuron-perceptron',
+    );
+    const quiz = seed.find(
+      (record) =>
+        record.content.entityType === 'quiz' && record.content.entityId === 'quiz-post-dl-p01',
+    );
+
+    expect(course).toBeDefined();
+    expect(module).toBeDefined();
+    expect(quiz).toBeDefined();
+
+    const documents = [course, module, quiz].flatMap((record) => {
+      if (!record) {
+        return [];
+      }
+
+      return createPublishedLearnerContentDocuments({
+        content: record.content,
+        learnerContent: record.learnerContent ?? null,
+      });
+    });
+
+    expect(documents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          documentId: 'course:course-deep-learning-basic:summary',
+          data: expect.objectContaining({
+            documentKind: 'course-summary',
+            revisionId: 'course-deep-learning-basic-rev-r1',
+          }),
+        }),
+        expect.objectContaining({
+          documentId: 'module:dl-m01-neuron-perceptron:summary',
+          data: expect.objectContaining({
+            documentKind: 'module-summary',
+            revisionId: 'module-dl-m01-neuron-perceptron-rev-r1',
+          }),
+        }),
+        expect.objectContaining({
+          documentId: 'quiz:quiz-post-dl-p01:summary',
+          data: expect.objectContaining({
+            documentKind: 'quiz-summary',
+            revisionId: 'quiz-quiz-post-dl-p01-rev-r1',
+          }),
+        }),
+      ]),
+    );
   });
 });

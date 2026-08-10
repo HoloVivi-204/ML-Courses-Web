@@ -12,14 +12,18 @@ export const requiredAdminContentEvidenceKinds = [
 
 export type AdminContentEvidenceKind = (typeof requiredAdminContentEvidenceKinds)[number];
 
+export function isAdminContentEvidenceKind(value: string): value is AdminContentEvidenceKind {
+  return (requiredAdminContentEvidenceKinds as readonly string[]).includes(value);
+}
+
 export interface AdminContentExternalEvidence {
   artifactId: string;
   checksum: string;
   evidenceRef: string;
   kind: AdminContentEvidenceKind;
-  result: 'approved' | 'rejected';
-  reviewedAt: string;
-  reviewedBy: string;
+  result: 'approved' | 'pending' | 'rejected';
+  reviewedAt?: string | undefined;
+  reviewedBy?: string | undefined;
 }
 
 export function createAdminContentDraftChecksum(draft: AdminContentDraft): string {

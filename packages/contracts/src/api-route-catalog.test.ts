@@ -10,9 +10,9 @@ import {
 } from './index.js';
 
 describe('Release 1 API route catalog', () => {
-  it('defines exactly the 32 Must product routes without treating health as a product route', () => {
-    expect(MUST_API_ROUTES).toHaveLength(32);
-    expect(API_ROUTE_CATALOG.filter((route) => route.scope === 'must')).toHaveLength(32);
+  it('defines exactly the 35 Must product routes without treating health as a product route', () => {
+    expect(MUST_API_ROUTES).toHaveLength(35);
+    expect(API_ROUTE_CATALOG.filter((route) => route.scope === 'must')).toHaveLength(35);
     expect(API_ROUTE_CATALOG).not.toContainEqual(
       expect.objectContaining({ path: '/api/v1/health' }),
     );

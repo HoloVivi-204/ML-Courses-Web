@@ -8,12 +8,14 @@ import { getFixedDemo } from '../../../functions/src/release-demo-content.js';
 import { getReadablePost } from '../../../functions/src/release-learning-content.js';
 import { getReleaseLearningCatalog } from '../../../functions/src/release-learning-catalog.js';
 import type { AuthGateway } from '../features/auth/auth-context';
+import { getCourse } from '../features/catalog/course-data';
 import {
   LearningApiError,
   type AdminContentSourceReview,
   type LearningApiClient,
   type PlaygroundConfig,
 } from '../features/learning/learning-api';
+import { getPublicQuizRoute } from '../features/learning/quiz-route-data';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
 const STOP_FALLBACK_SETTLE_MS = 300;
@@ -167,6 +169,15 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       },
       validationStatus: 'not-run',
     }),
+    attachAdminContentEvidence: vi.fn().mockImplementation(({ checksum, evidenceRef, kind }) =>
+      Promise.resolve({
+        artifactId: 'dl-p01-neuron-perceptron',
+        checksum,
+        evidenceRef,
+        kind,
+        result: 'pending',
+      }),
+    ),
     updateAdminContentDraft: vi.fn().mockResolvedValue({
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',
@@ -418,6 +429,18 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       },
       nextPath: '/learn/course-deep-learning-basic',
     }),
+    getCourseContent: vi.fn().mockImplementation((courseId) => {
+      const course = getCourse(courseId);
+
+      return course
+        ? Promise.resolve({
+            courseId,
+            description: course.description,
+            revisionId: `${courseId}-rev-r1`,
+            title: course.title,
+          })
+        : Promise.reject(new Error(`Missing test course content for ${courseId}.`));
+    }),
     getDemoContent: vi.fn().mockImplementation(({ demoId }) => {
       const demo = getFixedDemo(demoId);
 
@@ -434,6 +457,25 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       return post
         ? Promise.resolve(post)
         : Promise.reject(new Error(`Missing test full post content for ${postId}.`));
+    }),
+    getModuleContent: vi.fn().mockImplementation((moduleId) => {
+      const course = [
+        getCourse('course-classical-ml'),
+        getCourse('course-deep-learning-basic'),
+      ].find((candidate) => candidate?.modules?.some((module) => module.id === moduleId));
+      const module = course?.modules?.find((candidate) => candidate.id === moduleId);
+
+      if (!course || !module) {
+        return Promise.reject(new Error(`Missing test module content for ${moduleId}.`));
+      }
+
+      return Promise.resolve({
+        courseId: course.id,
+        description: module.description,
+        moduleId,
+        revisionId: `${moduleId}-rev-r1`,
+        title: module.title,
+      });
     }),
     getProgress: vi.fn().mockResolvedValue({
       algorithmUnlocks: [],
@@ -511,6 +553,24 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
       releaseId: 'release-1',
       schemaVersion: 1,
     }),
+    getQuizContent: vi.fn().mockImplementation((quizId) => {
+      const quizRoute = getPublicQuizRoute(quizId);
+
+      return quizRoute
+        ? Promise.resolve({
+            courseId: quizRoute.courseId,
+            description: {
+              en: `Mastery check for ${quizRoute.title.en}.`,
+              vi: `Bài kiểm tra thành thạo cho ${quizRoute.title.vi}.`,
+            },
+            moduleId: quizRoute.moduleId,
+            ...(quizRoute.postId ? { postId: quizRoute.postId } : {}),
+            quizId,
+            revisionId: `${quizId}-rev-r1`,
+            title: quizRoute.title,
+          })
+        : Promise.reject(new Error(`Missing test quiz content for ${quizId}.`));
+    }),
     getTrialPostContent: vi.fn().mockImplementation((postId) => {
       const course = getReleaseLearningCatalog().courses.find(
         (candidate) => candidate.trialPostId === postId,
@@ -522,7 +582,56 @@ function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): Le
         : Promise.reject(new Error(`Missing test trial post content for ${postId}.`));
     }),
     getAdminReportSummary: vi.fn().mockResolvedValue(createAdminReportSummaryFixture()),
+    getAdminContentRevisionPreview: vi.fn().mockResolvedValue({
+      draft: {
+        baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+        courseId: 'course-deep-learning-basic',
+        draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        localeAvailability: ['en', 'vi'],
+        metadata: {
+          attribution: {
+            en: 'Seed attribution',
+            vi: 'Seed attribution VI',
+          },
+          externalLinkUrl: null,
+        },
+        moduleId: 'dl-m01-neuron-perceptron',
+        preview: {
+          en: 'Draft preview',
+          vi: 'Preview draft',
+        },
+        revisionVersion: 1,
+        sourceStatus: 'seeded',
+        status: 'draft',
+        title: {
+          en: 'Draft title',
+          vi: 'Tiêu đề draft',
+        },
+        validationStatus: 'not-run',
+      },
+      preview: {
+        contentType: 'post',
+        post: {
+          accessLevel: 'full',
+          blocks: [],
+          courseId: 'course-deep-learning-basic',
+          description: { en: 'Draft preview', vi: 'Preview draft' },
+          durationMinutes: 8,
+          id: 'dl-p01-neuron-perceptron',
+          moduleId: 'dl-m01-neuron-perceptron',
+          postQuizId: 'quiz-post-dl-p01',
+          revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+          title: { en: 'Draft title', vi: 'Tiêu đề draft' },
+        },
+      },
+    }),
     listAdminContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null }),
+    listAdminContentEvidence: vi.fn().mockResolvedValue({
+      contentChecksum: 'a'.repeat(64),
+      evidence: [],
+    }),
     listPlaygroundConfigs: vi.fn().mockResolvedValue([]),
     listPlaygroundRuns: vi.fn().mockResolvedValue([]),
     savePlaygroundRun: vi.fn().mockResolvedValue(
@@ -1897,6 +2006,163 @@ describe('public learning journey', () => {
     expect(screen.getByText('FULL LESSON')).toBeVisible();
   });
 
+  it('renders course, module, and quiz copy from their current published learner documents', async () => {
+    const user = userEvent.setup();
+    const getCourseContent = vi.fn().mockResolvedValue({
+      courseId: 'course-deep-learning-basic',
+      description: {
+        en: 'Course description from revision r2.',
+        vi: 'Mô tả khóa học từ revision r2.',
+      },
+      revisionId: 'course-deep-learning-basic-rev-r2',
+      title: {
+        en: 'Course title from revision r2',
+        vi: 'Tiêu đề khóa học từ revision r2',
+      },
+    });
+    const getModuleContent = vi.fn().mockImplementation((moduleId) => {
+      if (moduleId === 'dl-m01-neuron-perceptron') {
+        return Promise.resolve({
+          courseId: 'course-deep-learning-basic',
+          description: {
+            en: 'Module description from revision r2.',
+            vi: 'Mô tả module từ revision r2.',
+          },
+          moduleId,
+          revisionId: 'dl-m01-neuron-perceptron-rev-r2',
+          title: {
+            en: 'Module title from revision r2',
+            vi: 'Tiêu đề module từ revision r2',
+          },
+        });
+      }
+
+      const course = getCourse('course-deep-learning-basic');
+      const module = course?.modules?.find((candidate) => candidate.id === moduleId);
+
+      if (!course || !module) {
+        return Promise.reject(new Error(`Missing module fixture for ${moduleId}.`));
+      }
+
+      return Promise.resolve({
+        courseId: course.id,
+        description: module.description,
+        moduleId,
+        revisionId: `${moduleId}-rev-r1`,
+        title: module.title,
+      });
+    });
+    const getQuizContent = vi.fn().mockImplementation((quizId) => {
+      if (quizId === 'quiz-post-dl-p01') {
+        return Promise.resolve({
+          courseId: 'course-deep-learning-basic',
+          description: {
+            en: 'Quiz description from revision r2.',
+            vi: 'Mô tả quiz từ revision r2.',
+          },
+          moduleId: 'dl-m01-neuron-perceptron',
+          postId: 'dl-p01-neuron-perceptron',
+          quizId,
+          revisionId: 'quiz-post-dl-p01-rev-r2',
+          title: {
+            en: 'Quiz title from revision r2',
+            vi: 'Tiêu đề quiz từ revision r2',
+          },
+        });
+      }
+
+      const quizRoute = getPublicQuizRoute(quizId);
+
+      return quizRoute
+        ? Promise.resolve({
+            courseId: quizRoute.courseId,
+            description: {
+              en: `Mastery check for ${quizRoute.title.en}.`,
+              vi: `Bài kiểm tra thành thạo cho ${quizRoute.title.vi}.`,
+            },
+            moduleId: quizRoute.moduleId,
+            quizId,
+            revisionId: `${quizId}-rev-r1`,
+            title: quizRoute.title,
+          })
+        : Promise.reject(new Error(`Missing quiz fixture for ${quizId}.`));
+    });
+    const learningApiClient = createLearningApiClient({
+      getCourseContent,
+      getModuleContent,
+      getQuizContent,
+    });
+
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const courseView = render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText('Tiêu đề khóa học từ revision r2')).toBeVisible();
+    expect(screen.getByText('Mô tả khóa học từ revision r2.')).toBeVisible();
+    expect(getCourseContent).toHaveBeenCalledWith('course-deep-learning-basic');
+
+    courseView.unmount();
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/modules/dl-m01-neuron-perceptron',
+    );
+    const moduleView = render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Tiêu đề module từ revision r2' }),
+    ).toBeVisible();
+    expect(screen.getByText('Mô tả module từ revision r2.')).toBeVisible();
+    expect(getModuleContent).toHaveBeenCalledWith('dl-m01-neuron-perceptron');
+
+    moduleView.unmount();
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic/quizzes/quiz-post-dl-p01');
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Tiêu đề quiz từ revision r2' }),
+    ).toBeVisible();
+    expect(screen.getByText('Mô tả quiz từ revision r2.')).toBeVisible();
+    expect(getQuizContent).toHaveBeenCalledWith('quiz-post-dl-p01');
+    await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Quiz title from revision r2' }),
+    ).toBeVisible();
+  });
+
+  it('keeps an existing learner in a planned-unpublished course without reopening enrollment', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const enrollCourse = vi
+      .fn()
+      .mockRejectedValue(
+        new LearningApiError(
+          403,
+          'CONTENT_NOT_PUBLISHED',
+          'The course is no longer accepting enrollments.',
+        ),
+      );
+    const getProgress = vi.fn().mockResolvedValue(createUnlockedProgressSnapshot());
+    const learningApiClient = createLearningApiClient({ enrollCourse, getProgress });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Học sâu cơ bản' })).toBeVisible();
+    expect(enrollCourse).toHaveBeenCalledWith({
+      courseId: 'course-deep-learning-basic',
+      idToken: 'local-id-token',
+      idempotencyKey: expect.any(String),
+    });
+    expect(getProgress).toHaveBeenCalledWith('local-id-token');
+    expect(learningApiClient.getCourseContent).toHaveBeenCalledWith('course-deep-learning-basic');
+  });
+
   it('deduplicates course enrollment when React StrictMode replays the route effect', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     const learningApiClient = createLearningApiClient();
@@ -2169,7 +2435,7 @@ describe('public learning journey', () => {
     await waitFor(() =>
       expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token'),
     );
-    expect(await screen.findByRole('heading', { name: /lộ trình học/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Học sâu cơ bản' })).toBeVisible();
     expect(screen.getByRole('link', { name: /mở tổng quan module/i })).toHaveAttribute(
       'href',
       '/learn/course-deep-learning-basic/modules/dl-m02-mlp',
@@ -2536,6 +2802,154 @@ describe('public learning journey', () => {
     );
     expect(screen.getAllByText('Draft-only copy')).toHaveLength(2);
     expect(screen.getByText('Published learner copy')).toBeVisible();
+  });
+
+  it('renders a durable draft through learner components and keeps attached evidence pending', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const checksum = 'b'.repeat(64);
+    const draft = {
+      baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post' as const,
+      localeAvailability: ['en', 'vi'] as const,
+      metadata: {
+        attribution: {
+          en: 'Seed attribution',
+          vi: 'Nguồn seed',
+        },
+        externalLinkUrl: null,
+      },
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'Draft runtime description',
+        vi: 'Mô tả runtime draft',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded' as const,
+      status: 'draft' as const,
+      title: {
+        en: 'Learner runtime title',
+        vi: 'Tiêu đề runtime learner',
+      },
+      validationStatus: 'not-run' as const,
+    };
+    const readablePost = getReadablePost(
+      'course-deep-learning-basic',
+      'dl-p01-neuron-perceptron',
+      true,
+    );
+
+    if (!readablePost) {
+      throw new Error('Expected seeded learner post content.');
+    }
+
+    let evidence = [] as Array<{
+      artifactId: string;
+      checksum: string;
+      evidenceRef: string;
+      kind: 'license';
+      result: 'pending';
+    }>;
+    const attachAdminContentEvidence = vi.fn().mockImplementation((input) => {
+      const attachedEvidence = {
+        artifactId: 'dl-p01-neuron-perceptron',
+        checksum: input.checksum,
+        evidenceRef: input.evidenceRef,
+        kind: input.kind,
+        result: 'pending' as const,
+      };
+
+      evidence = [attachedEvidence];
+
+      return Promise.resolve(attachedEvidence);
+    });
+    const getAdminContentRevisionPreview = vi.fn().mockResolvedValue({
+      draft,
+      preview: {
+        contentType: 'post' as const,
+        post: {
+          ...readablePost,
+          description: draft.preview,
+          revisionId: draft.draftRevisionId,
+          title: draft.title,
+        },
+      },
+    });
+    const listAdminContentEvidence = vi.fn().mockImplementation(() => {
+      return Promise.resolve({ contentChecksum: checksum, evidence });
+    });
+    const listAdminContent = vi.fn().mockResolvedValue(
+      createAdminContentPage([
+        {
+          courseId: 'course-deep-learning-basic',
+          draftRevisionId: draft.draftRevisionId,
+          entityId: 'dl-p01-neuron-perceptron',
+          entityType: 'post' as const,
+          localeAvailability: ['en', 'vi'] as const,
+          moduleId: 'dl-m01-neuron-perceptron',
+          preview: {
+            en: 'Published learner copy',
+            vi: 'Bản published cho learner',
+          },
+          publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          sourceStatus: 'seeded' as const,
+          status: 'published' as const,
+          title: {
+            en: 'Published title',
+            vi: 'Tiêu đề published',
+          },
+          validationStatus: 'not-run' as const,
+        },
+      ]),
+    );
+    const learningApiClient = createLearningApiClient({
+      attachAdminContentEvidence,
+      getAdminContentRevisionPreview,
+      listAdminContent,
+      listAdminContentEvidence,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    const learnerPreview = await screen.findByTestId(
+      'admin-learner-preview-post',
+      {},
+      { timeout: LAZY_ROUTE_TIMEOUT_MS },
+    );
+
+    expect(
+      within(learnerPreview).getByRole('heading', { name: 'Tiêu đề runtime learner' }),
+    ).toBeVisible();
+    expect(within(learnerPreview).getByText('Mô tả runtime draft')).toBeVisible();
+    expect(
+      within(learnerPreview).getByRole('heading', { name: 'Từ feature đến lựa chọn nhị phân' }),
+    ).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText('Ngôn ngữ preview'), 'en');
+    expect(
+      within(learnerPreview).getByRole('heading', { name: 'Learner runtime title' }),
+    ).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText('Giao diện preview'), 'dark');
+    expect(learnerPreview).toHaveAttribute('data-preview-theme', 'dark');
+
+    await user.type(screen.getByLabelText('Reference'), 'evidence://license-review/runtime');
+    await user.click(screen.getByRole('button', { name: 'Attach pending evidence' }));
+
+    expect(attachAdminContentEvidence).toHaveBeenCalledWith({
+      checksum,
+      evidenceRef: 'evidence://license-review/runtime',
+      idToken: 'local-id-token',
+      kind: 'license',
+      revisionId: draft.draftRevisionId,
+    });
+    expect(await screen.findByText('evidence://license-review/runtime')).toBeVisible();
+    expect(screen.getByText('pending', { exact: true })).toBeVisible();
   });
 
   it('lets an authenticated admin edit a draft with revision concurrency', async () => {
@@ -4558,7 +4972,11 @@ describe('public learning journey', () => {
     await user.click(screen.getByRole('link', { name: /Mở Playground Perceptron/i }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'Playground XOR: Perceptron' },
+        { timeout: LAZY_ROUTE_TIMEOUT_MS },
+      ),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Chạy' }));
 

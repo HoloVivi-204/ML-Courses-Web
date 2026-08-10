@@ -10,9 +10,11 @@ import {
 import {
   assertPublishEvidenceIsComplete,
   createAdminContentDraftChecksum,
+  isAdminContentEvidenceKind,
   requiredAdminContentEvidenceKinds,
   type AdminContentExternalEvidence,
 } from './admin-content-evidence.js';
+import { createAdminContentRevisionPreview } from './admin-content-preview.js';
 import {
   applyAdminDraftToPublishedLearnerContent,
   type PublishedLearnerContent,
@@ -41,6 +43,7 @@ import {
   type AdminContentPublicationScope,
   type AdminContentRepository,
   type AdminContentSummary,
+  type AttachAdminContentEvidenceInput,
   type PublishAdminContentRevisionResult,
 } from './admin-content-repository.js';
 import { ApiError } from './api-error.js';
@@ -246,6 +249,37 @@ function readStoredPublishedRevision(snapshot: DocumentSnapshot): StoredPublishe
   };
 }
 
+function readStoredExternalEvidence(value: unknown): AdminContentExternalEvidence | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== 1 ||
+    typeof value.artifactId !== 'string' ||
+    typeof value.checksum !== 'string' ||
+    typeof value.evidenceRef !== 'string' ||
+    typeof value.kind !== 'string' ||
+    !isAdminContentEvidenceKind(value.kind) ||
+    (value.result !== 'approved' && value.result !== 'pending' && value.result !== 'rejected') ||
+    (value.reviewedAt !== undefined && typeof value.reviewedAt !== 'string') ||
+    (value.reviewedBy !== undefined && typeof value.reviewedBy !== 'string')
+  ) {
+    throw createDataIntegrityError();
+  }
+
+  return {
+    artifactId: value.artifactId,
+    checksum: value.checksum,
+    evidenceRef: value.evidenceRef,
+    kind: value.kind,
+    result: value.result,
+    ...(value.reviewedAt === undefined ? {} : { reviewedAt: value.reviewedAt }),
+    ...(value.reviewedBy === undefined ? {} : { reviewedBy: value.reviewedBy }),
+  };
+}
+
 function readStoredIdempotencyRecord(snapshot: DocumentSnapshot): StoredPublishIdempotencyRecord {
   const value = snapshot.data();
 
@@ -355,9 +389,9 @@ async function readPublishEvidence(
   );
 
   return snapshots.flatMap((snapshot) => {
-    const evidence = snapshot.data();
+    const evidence = readStoredExternalEvidence(snapshot.data());
 
-    return isRecord(evidence) ? [evidence as unknown as AdminContentExternalEvidence] : [];
+    return evidence ? [evidence] : [];
   });
 }
 
@@ -374,6 +408,63 @@ export function createFirestoreAdminContentRepository(
   const idempotencyRecords = firestore.collection(ADMIN_CONTENT_IDEMPOTENCY_COLLECTION);
 
   return {
+    async attachEvidence(input: AttachAdminContentEvidenceInput) {
+      assertActorUid(input.actorUid);
+
+      if (!isAdminContentEvidenceKind(input.kind)) {
+        throw new ApiError(
+          400,
+          'ADMIN_CONTENT_EVIDENCE_KIND_INVALID',
+          'The requested external evidence kind is not supported.',
+        );
+      }
+
+      const evidenceKind = input.kind;
+
+      const revisionReference = revisions.doc(input.revisionId);
+      const evidenceReference = firestore.doc(
+        getEvidenceDocumentPath(input.revisionId, evidenceKind),
+      );
+
+      return firestore.runTransaction(async (transaction) => {
+        const storedDraft = readStoredDraftRevision(await transaction.get(revisionReference));
+
+        if (storedDraft.contentChecksum !== input.checksum) {
+          throw new ApiError(
+            409,
+            'ADMIN_CONTENT_EVIDENCE_CHECKSUM_MISMATCH',
+            'External evidence must match the current draft checksum.',
+          );
+        }
+
+        const evidence: AdminContentExternalEvidence = {
+          artifactId: storedDraft.draft.entityId,
+          checksum: storedDraft.contentChecksum,
+          evidenceRef: input.evidenceRef,
+          kind: evidenceKind,
+          result: 'pending',
+        };
+        const lifecycleEvent = createAdminContentLifecycleEvent({
+          actorUid: input.actorUid,
+          createdAt: now().toISOString(),
+          entityId: storedDraft.draft.entityId,
+          entityType: storedDraft.draft.entityType,
+          fromRevisionId: null,
+          reason: 'External evidence attached pending independent human review.',
+          requestId: input.requestId,
+          toRevisionId: input.revisionId,
+          type: 'evidence-attached',
+        });
+
+        transaction.set(evidenceReference, { ...evidence, schemaVersion: 1 });
+        transaction.create(lifecycleEvents.doc(randomUUID()), {
+          ...lifecycleEvent,
+          schemaVersion: 1,
+        });
+
+        return { statusCode: 200, data: { evidence } } as const;
+      });
+    },
     async createDraft(input) {
       assertActorUid(input.createdByUid);
 
@@ -443,6 +534,20 @@ export function createFirestoreAdminContentRepository(
         } as const;
       });
     },
+    async getRevisionPreview(input) {
+      const storedDraft = readStoredDraftRevision(await revisions.doc(input.revisionId).get());
+
+      return {
+        statusCode: 200,
+        data: {
+          draft: storedDraft.draft,
+          preview: createAdminContentRevisionPreview({
+            draft: storedDraft.draft,
+            learnerContent: storedDraft.learnerContent,
+          }),
+        },
+      } as const;
+    },
     async listContent(input) {
       if (input.entityType !== undefined && !isAdminContentEntityType(input.entityType)) {
         throw new ApiError(
@@ -475,6 +580,32 @@ export function createFirestoreAdminContentRepository(
       return {
         statusCode: 200,
         data: { content: page.content, nextCursor: page.nextCursor },
+      } as const;
+    },
+    async listEvidence(input) {
+      const storedDraft = readStoredDraftRevision(await revisions.doc(input.revisionId).get());
+      const evidenceSnapshot = await revisions
+        .doc(input.revisionId)
+        .collection('externalEvidence')
+        .get();
+      const evidenceByKind = new Map(
+        evidenceSnapshot.docs.flatMap((document) => {
+          const evidence = readStoredExternalEvidence(document.data());
+
+          return evidence ? [[evidence.kind, evidence] as const] : [];
+        }),
+      );
+
+      return {
+        statusCode: 200,
+        data: {
+          contentChecksum: storedDraft.contentChecksum,
+          evidence: requiredAdminContentEvidenceKinds.flatMap((kind) => {
+            const evidence = evidenceByKind.get(kind);
+
+            return evidence ? [evidence] : [];
+          }),
+        },
       } as const;
     },
     async updateDraft(input) {

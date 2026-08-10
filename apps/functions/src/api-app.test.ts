@@ -1723,6 +1723,132 @@ describe('API foundation', () => {
     ]);
   });
 
+  it('attaches checksum-matched external evidence as pending without granting client approval', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const evidenceBeforeAttach = await request(app)
+      .get('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/evidence')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+    const checksum = evidenceBeforeAttach.body.data.contentChecksum as string;
+
+    expect(checksum).toMatch(/^[a-f0-9]{64}$/);
+    expect(evidenceBeforeAttach.body.data.evidence).toEqual([]);
+
+    const attachedEvidence = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/evidence/license')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        checksum,
+        evidenceRef: 'evidence://license-review/dl-p01-neuron-perceptron',
+      })
+      .expect(200);
+
+    expect(attachedEvidence.body.data).toEqual({
+      evidence: {
+        artifactId: 'dl-p01-neuron-perceptron',
+        checksum,
+        evidenceRef: 'evidence://license-review/dl-p01-neuron-perceptron',
+        kind: 'license',
+        result: 'pending',
+      },
+    });
+
+    const evidenceAfterAttach = await request(app)
+      .get('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/evidence')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(evidenceAfterAttach.body.data).toEqual({
+      contentChecksum: checksum,
+      evidence: [attachedEvidence.body.data.evidence],
+    });
+
+    const mismatchedChecksumResponse = await request(app)
+      .post(
+        '/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/evidence/provenance',
+      )
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        checksum: 'b'.repeat(64),
+        evidenceRef: 'evidence://provenance/dl-p01-neuron-perceptron',
+      })
+      .expect(409);
+
+    expect(mismatchedChecksumResponse.body.error.code).toBe(
+      'ADMIN_CONTENT_EVIDENCE_CHECKSUM_MISMATCH',
+    );
+  });
+
+  it('returns a draft preview from learner content while withholding quiz answer material', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const postPreviewResponse = await request(app)
+      .get('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/preview')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(postPreviewResponse.body.data.preview).toEqual(
+      expect.objectContaining({
+        contentType: 'post',
+        post: expect.objectContaining({
+          blocks: expect.any(Array),
+          id: 'dl-p01-neuron-perceptron',
+          revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+        }),
+      }),
+    );
+
+    await request(app)
+      .post('/api/v1/admin/content/quiz/quiz-post-dl-p01/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const quizPreviewResponse = await request(app)
+      .get('/api/v1/admin/revisions/draft-quiz-quiz-post-dl-p01-rev-d1/preview')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(quizPreviewResponse.body.data.preview).toEqual(
+      expect.objectContaining({
+        contentType: 'quiz',
+        questions: expect.arrayContaining([
+          expect.objectContaining({
+            options: expect.any(Array),
+            prompt: expect.any(Object),
+            questionId: expect.any(String),
+          }),
+        ]),
+        quiz: expect.objectContaining({ quizId: 'quiz-post-dl-p01' }),
+      }),
+    );
+    expect(JSON.stringify(quizPreviewResponse.body.data.preview)).not.toMatch(
+      /correctAnswer|explanation|hint/i,
+    );
+  });
+
   it('updates allowlisted draft text and metadata without changing the published inventory', async () => {
     const app = createApiApp({
       verifyAuthToken: async () => ({

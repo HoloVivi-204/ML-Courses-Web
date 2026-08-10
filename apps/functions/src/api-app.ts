@@ -546,6 +546,24 @@ function getAdminContentPublishBody(request: Request): {
   };
 }
 
+function getAdminContentEvidenceBody(request: Request): {
+  checksum: string;
+  evidenceRef: string;
+} {
+  const body = getObjectBody(request);
+  assertBodyFieldsAllowlisted(body, ['checksum', 'evidenceRef']);
+  const checksum = getTrimmedStringValue(body.checksum, 'checksum', 64);
+
+  if (!/^[a-f0-9]{64}$/.test(checksum)) {
+    throw new ApiError(400, 'INVALID_REQUEST_BODY', 'checksum must be a SHA-256 hex digest.');
+  }
+
+  return {
+    checksum,
+    evidenceRef: getTrimmedStringValue(body.evidenceRef, 'evidenceRef', 2_048),
+  };
+}
+
 function getOptionalObjectBody(request: Request): Record<string, unknown> {
   if (request.body === undefined) {
     return {};
@@ -1586,6 +1604,91 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           result.statusCode,
           assertContractResponse(
             MUST_API_CONTRACTS.validateAdminContentRevision.response,
+            result.data,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.get(
+    '/api/v1/admin/revisions/:revisionId/preview',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        requireAdminUser(response);
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('getAdminContentRevisionPreview', { params: { revisionId } });
+        const result = await getAdminContentRepository().getRevisionPreview({ revisionId });
+
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.getAdminContentRevisionPreview.response,
+            result.data,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.get(
+    '/api/v1/admin/revisions/:revisionId/evidence',
+    requireAuth,
+    async (request, response, next) => {
+      try {
+        requireAdminUser(response);
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('listAdminContentEvidence', { params: { revisionId } });
+        const result = await getAdminContentRepository().listEvidence({ revisionId });
+
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(MUST_API_CONTRACTS.listAdminContentEvidence.response, result.data),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/revisions/:revisionId/evidence/:kind',
+    requireAuth,
+    requireAdminRevisionUpdateRateLimit,
+    async (request, response, next) => {
+      try {
+        const adminUser = requireAdminUser(response);
+        const body = getAdminContentEvidenceBody(request);
+        const kind = getRouteParam(request, 'kind');
+        const revisionId = getRouteParam(request, 'revisionId');
+
+        assertMustApiRequest('attachAdminContentEvidence', {
+          body: getObjectBody(request),
+          params: { kind, revisionId },
+        });
+        const result = await getAdminContentRepository().attachEvidence({
+          actorUid: adminUser.uid,
+          checksum: body.checksum,
+          evidenceRef: body.evidenceRef,
+          kind,
+          requestId: getRequestId(response),
+          revisionId,
+        });
+
+        sendSuccess(
+          response,
+          result.statusCode,
+          assertContractResponse(
+            MUST_API_CONTRACTS.attachAdminContentEvidence.response,
             result.data,
           ),
         );

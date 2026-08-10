@@ -147,6 +147,24 @@ export const API_ROUTE_CATALOG = [
     scope: 'must',
   },
   {
+    id: 'getAdminContentRevisionPreview',
+    method: 'GET',
+    path: '/api/v1/admin/revisions/:revisionId/preview',
+    scope: 'must',
+  },
+  {
+    id: 'listAdminContentEvidence',
+    method: 'GET',
+    path: '/api/v1/admin/revisions/:revisionId/evidence',
+    scope: 'must',
+  },
+  {
+    id: 'attachAdminContentEvidence',
+    method: 'POST',
+    path: '/api/v1/admin/revisions/:revisionId/evidence/:kind',
+    scope: 'must',
+  },
+  {
     id: 'publishAdminContentRevision',
     method: 'POST',
     path: '/api/v1/admin/revisions/:revisionId/publish',

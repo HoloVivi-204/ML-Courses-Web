@@ -4,6 +4,7 @@ import { ApiError } from './api-error.js';
 import {
   assertPublishEvidenceIsComplete,
   createAdminContentDraftChecksum,
+  requiredAdminContentEvidenceKinds,
 } from './admin-content-evidence.js';
 import type { AdminContentDraft } from './admin-content-repository.js';
 
@@ -54,5 +55,22 @@ describe('Admin content publish evidence', () => {
     });
 
     expect(changedChecksum).not.toBe(originalChecksum);
+  });
+
+  it('does not treat a locally attached pending reference as human approval', () => {
+    const attemptPublish = () =>
+      assertPublishEvidenceIsComplete({
+        artifactId: 'dl-p01-neuron-perceptron',
+        contentChecksum: 'revision-checksum',
+        evidence: requiredAdminContentEvidenceKinds.map((kind) => ({
+          artifactId: 'dl-p01-neuron-perceptron',
+          checksum: 'revision-checksum',
+          evidenceRef: `evidence://${kind}`,
+          kind,
+          result: 'pending' as const,
+        })),
+      });
+
+    expect(attemptPublish).toThrow(ApiError);
   });
 });

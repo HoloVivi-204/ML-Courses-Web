@@ -41,15 +41,15 @@ function sortRoutes<T extends { method: string; path: string }>(routes: readonly
 }
 
 describe('Release 1 Functions route registry', () => {
-  it('registers exactly 32 Must APIs plus the liveness-only health exception', () => {
+  it('registers exactly 35 Must APIs plus the liveness-only health exception', () => {
     const registeredRoutes = getRegisteredProductRoutes();
     const expectedRoutes = [HEALTH_ROUTE, ...MUST_API_ROUTES].map(({ method, path }) => ({
       method,
       path,
     }));
 
-    expect(MUST_API_ROUTES).toHaveLength(32);
-    expect(registeredRoutes).toHaveLength(33);
+    expect(MUST_API_ROUTES).toHaveLength(35);
+    expect(registeredRoutes).toHaveLength(36);
     expect(sortRoutes(registeredRoutes)).toEqual(sortRoutes(expectedRoutes));
   });
 });

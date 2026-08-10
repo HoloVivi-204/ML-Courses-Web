@@ -2,8 +2,11 @@ import type { AdminContentSourceReview, AdminContentSummary } from './admin-cont
 import type { DraftProvenance } from './content-source-trace.js';
 import type { FirestoreAdminContentSeed } from './firestore-admin-content-repository.js';
 import type {
+  LearnerCourseContent,
   LearnerDemoContent,
+  LearnerModuleContent,
   LearnerPostContent,
+  LearnerQuizContent,
   PublishedLearnerContent,
 } from './learning-content-repository.js';
 import { getFixedDemo, type FixedDemoManifest } from './release-demo-content.js';
@@ -149,6 +152,49 @@ function toLearnerDemoContent(demo: FixedDemoManifest): LearnerDemoContent {
   });
 }
 
+function toLearnerCourseContent(content: AdminContentSummary): LearnerCourseContent {
+  if (content.entityType !== 'course') {
+    throw new Error(`Expected course content, received ${content.entityType}.`);
+  }
+
+  return copyForFirestore({
+    courseId: content.courseId,
+    description: content.preview,
+    revisionId: content.publishedRevisionId,
+    title: content.title,
+  });
+}
+
+function toLearnerModuleContent(content: AdminContentSummary): LearnerModuleContent {
+  if (content.entityType !== 'module' || !content.moduleId) {
+    throw new Error(`Expected module content, received ${content.entityType}.`);
+  }
+
+  return copyForFirestore({
+    courseId: content.courseId,
+    description: content.preview,
+    moduleId: content.moduleId,
+    revisionId: content.publishedRevisionId,
+    title: content.title,
+  });
+}
+
+function toLearnerQuizContent(content: AdminContentSummary): LearnerQuizContent {
+  if (content.entityType !== 'quiz' || !content.moduleId) {
+    throw new Error(`Expected quiz content, received ${content.entityType}.`);
+  }
+
+  return copyForFirestore({
+    courseId: content.courseId,
+    description: content.preview,
+    moduleId: content.moduleId,
+    ...(content.postId ? { postId: content.postId } : {}),
+    quizId: content.entityId,
+    revisionId: content.publishedRevisionId,
+    title: content.title,
+  });
+}
+
 function getFullPost(courseId: string, postId: string): TrialPost {
   const post = getReadablePost(courseId, postId, true);
 
@@ -263,27 +309,33 @@ function createModuleQuizSeed(input: {
     throw new Error(`Module quiz ${quiz.quizId} does not match the locked question count.`);
   }
 
+  const content = createSummary({
+    courseId: input.course.courseId,
+    entityId: input.module.moduleQuizId,
+    entityType: 'quiz',
+    moduleId: input.module.moduleId,
+    preview: {
+      en: `${questionCount}-question module assessment.`,
+      vi: `Đánh giá module gồm ${questionCount} câu hỏi.`,
+    },
+    publishedRevisionId: createQuizRevisionId(input.module.moduleQuizId),
+    sourceReview: input.sourceReview,
+    title: {
+      en: `${input.module.title.en} module quiz`,
+      vi: `Quiz module ${input.module.title.vi}`,
+    },
+    validationManifest: {
+      questionCount,
+      taskFingerprints: quiz.questions.map((question) => question.taskFingerprint),
+    },
+  });
+
   return {
-    content: createSummary({
-      courseId: input.course.courseId,
-      entityId: input.module.moduleQuizId,
-      entityType: 'quiz',
-      moduleId: input.module.moduleId,
-      preview: {
-        en: `${questionCount}-question module assessment.`,
-        vi: `Đánh giá module gồm ${questionCount} câu hỏi.`,
-      },
-      publishedRevisionId: createQuizRevisionId(input.module.moduleQuizId),
-      sourceReview: input.sourceReview,
-      title: {
-        en: `${input.module.title.en} module quiz`,
-        vi: `Quiz module ${input.module.title.vi}`,
-      },
-      validationManifest: {
-        questionCount,
-        taskFingerprints: quiz.questions.map((question) => question.taskFingerprint),
-      },
-    }),
+    content,
+    learnerContent: {
+      contentType: 'quiz',
+      quiz: toLearnerQuizContent(content),
+    },
   };
 }
 
@@ -300,28 +352,34 @@ function createPostQuizSeed(input: {
     throw new Error(`Post quiz ${quiz.quizId} must contain exactly three questions.`);
   }
 
+  const content = createSummary({
+    courseId: input.course.courseId,
+    entityId: input.post.postQuizId,
+    entityType: 'quiz',
+    moduleId: input.module.moduleId,
+    postId: input.post.postId,
+    preview: {
+      en: 'Three-question post mastery quiz.',
+      vi: 'Quiz nắm vững bài học gồm ba câu hỏi.',
+    },
+    publishedRevisionId: createQuizRevisionId(input.post.postQuizId),
+    sourceReview: input.sourceReview,
+    title: {
+      en: `${input.post.title.en} quiz`,
+      vi: `Quiz ${input.post.title.vi}`,
+    },
+    validationManifest: {
+      questionCount,
+      taskFingerprints: quiz.questions.map((question) => question.taskFingerprint),
+    },
+  });
+
   return {
-    content: createSummary({
-      courseId: input.course.courseId,
-      entityId: input.post.postQuizId,
-      entityType: 'quiz',
-      moduleId: input.module.moduleId,
-      postId: input.post.postId,
-      preview: {
-        en: 'Three-question post mastery quiz.',
-        vi: 'Quiz nắm vững bài học gồm ba câu hỏi.',
-      },
-      publishedRevisionId: createQuizRevisionId(input.post.postQuizId),
-      sourceReview: input.sourceReview,
-      title: {
-        en: `${input.post.title.en} quiz`,
-        vi: `Quiz ${input.post.title.vi}`,
-      },
-      validationManifest: {
-        questionCount,
-        taskFingerprints: quiz.questions.map((question) => question.taskFingerprint),
-      },
-    }),
+    content,
+    learnerContent: {
+      contentType: 'quiz',
+      quiz: toLearnerQuizContent(content),
+    },
   };
 }
 
@@ -336,38 +394,48 @@ export function createReleaseOneFirestoreAdminContentSeed(): readonly FirestoreA
     }
 
     const courseSourceReview = getModuleSourceReview(course, firstModule);
+    const courseContent = createSummary({
+      courseId: course.courseId,
+      entityId: course.courseId,
+      entityType: 'course',
+      preview: {
+        en: `Release 1 course with ${course.modules.length} locked modules.`,
+        vi: `Khóa học Release 1 có ${course.modules.length} module đã khóa cấu trúc.`,
+      },
+      publishedRevisionId: course.courseRevisionId,
+      sourceReview: courseSourceReview,
+      title: course.title,
+      trialPostId: course.trialPostId,
+    });
     seed.push({
-      content: createSummary({
-        courseId: course.courseId,
-        entityId: course.courseId,
-        entityType: 'course',
-        preview: {
-          en: `Release 1 course with ${course.modules.length} locked modules.`,
-          vi: `Khóa học Release 1 có ${course.modules.length} module đã khóa cấu trúc.`,
-        },
-        publishedRevisionId: course.courseRevisionId,
-        sourceReview: courseSourceReview,
-        title: course.title,
-        trialPostId: course.trialPostId,
-      }),
+      content: courseContent,
+      learnerContent: {
+        contentType: 'course',
+        course: toLearnerCourseContent(courseContent),
+      },
     });
 
     for (const module of course.modules) {
       const sourceReview = getModuleSourceReview(course, module);
+      const moduleContent = createSummary({
+        courseId: course.courseId,
+        entityId: module.moduleId,
+        entityType: 'module',
+        moduleId: module.moduleId,
+        preview: {
+          en: `Locked Release 1 module with ${module.posts.length} lesson(s).`,
+          vi: `Module Release 1 đã khóa cấu trúc với ${module.posts.length} bài học.`,
+        },
+        publishedRevisionId: createModuleRevisionId(module.moduleId),
+        sourceReview,
+        title: module.title,
+      });
       seed.push({
-        content: createSummary({
-          courseId: course.courseId,
-          entityId: module.moduleId,
-          entityType: 'module',
-          moduleId: module.moduleId,
-          preview: {
-            en: `Locked Release 1 module with ${module.posts.length} lesson(s).`,
-            vi: `Module Release 1 đã khóa cấu trúc với ${module.posts.length} bài học.`,
-          },
-          publishedRevisionId: createModuleRevisionId(module.moduleId),
-          sourceReview,
-          title: module.title,
-        }),
+        content: moduleContent,
+        learnerContent: {
+          contentType: 'module',
+          module: toLearnerModuleContent(moduleContent),
+        },
       });
 
       seed.push(createModuleQuizSeed({ course, module, sourceReview }));

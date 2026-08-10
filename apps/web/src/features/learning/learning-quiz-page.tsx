@@ -4,9 +4,11 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { localize, type Locale } from '../catalog/course-data';
+import { QuizQuestionChoices } from './quiz-question-choices';
 import type {
   LearningApiClient,
   LearningProgressSnapshot,
+  LearningQuizContent,
   QuizAnswer,
   QuizAnswerValue,
   QuizAttemptResult,
@@ -106,6 +108,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   );
   const [pageStatus, setPageStatus] = useState<QuizPageStatus>('idle');
   const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
+  const [quizContent, setQuizContent] = useState<LearningQuizContent | null>(null);
   const [progressStatus, setProgressStatus] = useState<QuizProgressStatus>('idle');
   const [submitStatus, setSubmitStatus] = useState<QuizSubmitStatus>('idle');
   const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
@@ -187,15 +190,28 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
         }
 
         attemptStarted.current = true;
-        const nextAttempt = await learningApiClient.createQuizAttempt({
-          idToken,
-          quizId: activeQuizRoute.quizId,
-        });
+        const [nextAttempt, nextQuizContent] = await Promise.all([
+          learningApiClient.createQuizAttempt({
+            idToken,
+            quizId: activeQuizRoute.quizId,
+          }),
+          learningApiClient.getQuizContent(activeQuizRoute.quizId),
+        ]);
+
+        if (
+          nextQuizContent.courseId !== activeQuizRoute.courseId ||
+          nextQuizContent.moduleId !== activeQuizRoute.moduleId ||
+          nextQuizContent.quizId !== activeQuizRoute.quizId ||
+          (nextQuizContent.postId ?? null) !== activeQuizRoute.postId
+        ) {
+          throw new Error('Published learner content does not match the requested quiz structure.');
+        }
 
         if (isActive) {
           idempotencyKey.current = createIdempotencyKey();
           setAnswersByQuestionId({});
           setAttempt(nextAttempt);
+          setQuizContent(nextQuizContent);
           setPageStatus('ready');
           setSubmitStatus('idle');
         }
@@ -237,7 +253,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
     );
   }
 
-  if (pageStatus === 'failed' || !attempt) {
+  if (pageStatus === 'failed' || !attempt || !quizContent) {
     return (
       <main className="not-found page-shell">
         <span aria-hidden="true">QUIZ / ERROR</span>
@@ -324,7 +340,8 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
 
       <header className="quiz-heading">
         <span className="eyebrow">{text.attempt(attempt.attempt.attemptNumber)}</span>
-        <h1>{localize(quizRoute.title, locale)}</h1>
+        <h1>{localize(quizContent.title, locale)}</h1>
+        <p>{localize(quizContent.description, locale)}</p>
         <p>{localize(attempt.mastery, locale)}</p>
       </header>
 
@@ -336,32 +353,21 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
               {localize(question.prompt, locale)}
             </legend>
 
-            <div className="quiz-option-list">
-              {question.options.map((option) => (
-                <label className="quiz-option" key={option.optionId}>
-                  <input
-                    checked={isOptionSelected(
-                      answersByQuestionId[question.questionId],
-                      option.optionId,
-                    )}
-                    name={question.questionId}
-                    onChange={() =>
-                      setAnswersByQuestionId((currentValue) =>
-                        updateAnswerValue(currentValue, {
-                          optionId: option.optionId,
-                          questionId: question.questionId,
-                          questionType: question.type,
-                        }),
-                      )
-                    }
-                    disabled={isAttemptClosed || submitStatus === 'submitting'}
-                    type={question.type === 'multiple-choice' ? 'checkbox' : 'radio'}
-                    value={option.optionId}
-                  />
-                  <span>{localize(option.text, locale)}</span>
-                </label>
-              ))}
-            </div>
+            <QuizQuestionChoices
+              answersByQuestionId={answersByQuestionId}
+              disabled={isAttemptClosed || submitStatus === 'submitting'}
+              locale={locale}
+              onAnswerChange={(optionId) =>
+                setAnswersByQuestionId((currentValue) =>
+                  updateAnswerValue(currentValue, {
+                    optionId,
+                    questionId: question.questionId,
+                    questionType: question.type,
+                  }),
+                )
+              }
+              question={question}
+            />
 
             {submissionResult?.feedback
               .filter((feedback) => feedback.questionId === question.questionId)
@@ -525,14 +531,6 @@ function updateAnswerValue(
     ...currentValue,
     [input.questionId]: nextSelectedOptionIds,
   };
-}
-
-function isOptionSelected(value: QuizAnswerValue | undefined, optionId: string): boolean {
-  if (Array.isArray(value)) {
-    return value.includes(optionId);
-  }
-
-  return value === optionId;
 }
 
 function formatCorrectAnswer(

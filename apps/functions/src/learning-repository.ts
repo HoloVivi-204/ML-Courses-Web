@@ -471,8 +471,10 @@ function getDemoAccessSeedByDemoId(demoId: string): DemoAccessSeed | null {
 }
 
 async function assertCurrentLearningContentEntities(input: {
+  allowUnpublishedCourseForUid?: string | undefined;
   authority: LearningContentAuthority;
   entities: ReadonlyArray<{ entityId: string; entityType: LearningContentEntityType }>;
+  firestore: Firestore;
   transaction: Transaction;
 }): Promise<void> {
   const entities = [
@@ -482,20 +484,50 @@ async function assertCurrentLearningContentEntities(input: {
   ];
 
   await Promise.all(
-    entities.map(({ entityId, entityType }) =>
-      input.authority.assertCurrentPublishedEntity({
-        entityId,
-        entityType,
-        transaction: input.transaction,
-      }),
-    ),
+    entities.map(async ({ entityId, entityType }) => {
+      try {
+        await input.authority.assertCurrentPublishedEntity({
+          entityId,
+          entityType,
+          transaction: input.transaction,
+        });
+      } catch (error) {
+        if (
+          entityType !== 'course' ||
+          input.allowUnpublishedCourseForUid === undefined ||
+          !(error instanceof ApiError) ||
+          error.code !== 'CONTENT_NOT_PUBLISHED'
+        ) {
+          throw error;
+        }
+
+        const enrollmentSnapshot = await input.transaction.get(
+          input.firestore.doc(
+            `users/${input.allowUnpublishedCourseForUid}/enrollments/${entityId}`,
+          ),
+        );
+
+        if (!isContinuingCourseEnrollment(enrollmentSnapshot, entityId)) {
+          throw error;
+        }
+
+        await input.authority.assertCurrentPublishedEntity({
+          allowUnpublishedCourse: true,
+          entityId,
+          entityType,
+          transaction: input.transaction,
+        });
+      }
+    }),
   );
 }
 
 async function assertQuizAttemptContentIsActive(input: {
   authority: LearningContentAuthority;
+  firestore: Firestore;
   manifest: ReturnType<typeof getQuizManifest>;
   transaction: Transaction;
+  uid: string;
 }): Promise<void> {
   const entities: Array<{ entityId: string; entityType: LearningContentEntityType }> = [
     { entityId: input.manifest.quizId, entityType: 'quiz' },
@@ -523,10 +555,27 @@ async function assertQuizAttemptContentIsActive(input: {
   }
 
   await assertCurrentLearningContentEntities({
+    allowUnpublishedCourseForUid: input.uid,
     authority: input.authority,
     entities,
+    firestore: input.firestore,
     transaction: input.transaction,
   });
+}
+
+function isContinuingCourseEnrollment(
+  snapshot: { data(): unknown; exists: boolean },
+  courseId: string,
+): boolean {
+  const data = snapshot.data();
+
+  return (
+    snapshot.exists &&
+    isRecord(data) &&
+    data.schemaVersion === 1 &&
+    data.courseId === courseId &&
+    (data.status === 'in-progress' || data.status === 'completed')
+  );
 }
 
 function normalizeDisplayName(displayName: string): string {
@@ -1503,6 +1552,7 @@ export function createFirestoreLearningRepository(
 
       return firestore.runTransaction(async (transaction) => {
         await assertCurrentLearningContentEntities({
+          allowUnpublishedCourseForUid: input.uid,
           authority: contentAuthority,
           entities: [
             { entityId: input.demoId, entityType: 'demo' },
@@ -1519,6 +1569,7 @@ export function createFirestoreLearningRepository(
                 ]
               : []),
           ],
+          firestore,
           transaction,
         });
 
@@ -1616,6 +1667,7 @@ export function createFirestoreLearningRepository(
 
       return firestore.runTransaction(async (transaction) => {
         await assertCurrentLearningContentEntities({
+          allowUnpublishedCourseForUid: input.uid,
           authority: contentAuthority,
           entities: [
             { entityId: input.demoId, entityType: 'demo' },
@@ -1626,6 +1678,7 @@ export function createFirestoreLearningRepository(
               ? [{ entityId: demoAccessSeed.moduleId, entityType: 'module' as const }]
               : []),
           ],
+          firestore,
           transaction,
         });
 
@@ -1680,12 +1733,14 @@ export function createFirestoreLearningRepository(
 
       return firestore.runTransaction(async (transaction) => {
         await assertCurrentLearningContentEntities({
+          allowUnpublishedCourseForUid: input.uid,
           authority: contentAuthority,
           entities: [
             { entityId: module.courseId, entityType: 'course' },
             { entityId: input.moduleId, entityType: 'module' },
             { entityId: responseData.moduleOverview.nextPostId, entityType: 'post' },
           ],
+          firestore,
           transaction,
         });
 
@@ -1781,12 +1836,14 @@ export function createFirestoreLearningRepository(
 
       return firestore.runTransaction(async (transaction) => {
         await assertCurrentLearningContentEntities({
+          allowUnpublishedCourseForUid: input.uid,
           authority: contentAuthority,
           entities: [
             { entityId: input.postId, entityType: 'post' },
             ...(module ? [{ entityId: module.courseId, entityType: 'course' as const }] : []),
             ...(moduleId ? [{ entityId: moduleId, entityType: 'module' as const }] : []),
           ],
+          firestore,
           transaction,
         });
 
@@ -1865,6 +1922,7 @@ export function createFirestoreLearningRepository(
 
       return firestore.runTransaction(async (transaction) => {
         await assertCurrentLearningContentEntities({
+          allowUnpublishedCourseForUid: input.uid,
           authority: contentAuthority,
           entities: [
             { entityId: post.postId, entityType: 'post' },
@@ -1872,6 +1930,7 @@ export function createFirestoreLearningRepository(
             { entityId: moduleId, entityType: 'module' },
             { entityId: post.postQuizId, entityType: 'quiz' },
           ],
+          firestore,
           transaction,
         });
 
@@ -1951,6 +2010,7 @@ export function createFirestoreLearningRepository(
               ? [{ entityId: demoAccessSeed.demoId, entityType: 'demo' as const }]
               : []),
           ],
+          firestore,
           transaction,
         });
 
@@ -2021,8 +2081,10 @@ export function createFirestoreLearningRepository(
       return firestore.runTransaction(async (transaction) => {
         await assertQuizAttemptContentIsActive({
           authority: contentAuthority,
+          firestore,
           manifest,
           transaction,
+          uid: input.uid,
         });
 
         const accessRef =
@@ -2162,6 +2224,7 @@ export function createFirestoreLearningRepository(
             { entityId: seed.courseId, entityType: 'course' },
             { entityId: seed.firstModuleId, entityType: 'module' },
           ],
+          firestore,
           transaction,
         });
 
@@ -2387,8 +2450,10 @@ export function createFirestoreLearningRepository(
 
         await assertQuizAttemptContentIsActive({
           authority: contentAuthority,
+          firestore,
           manifest,
           transaction,
+          uid: input.uid,
         });
 
         if (attemptData.quizRevisionId !== manifest.quizRevisionId) {
@@ -2512,6 +2577,7 @@ export function createFirestoreLearningRepository(
               ? [{ entityId: postDemoAccessSeed.demoId, entityType: 'demo' as const }]
               : []),
           ],
+          firestore,
           transaction,
         });
 

@@ -1,8 +1,11 @@
 import {
   getPublishedLearnerContentDocumentId,
   publishedLearnerContentDocumentSchema,
+  type LearnerCourseContent,
   type LearnerDemoContent,
+  type LearnerModuleContent,
   type LearnerPostContent,
+  type LearnerQuizContent,
   type PublishedLearnerContentDocument,
 } from '@ml-path/contracts';
 import {
@@ -22,8 +25,11 @@ const PUBLISHED_LEARNER_CONTENT_COLLECTION = 'publishedLearnerContent';
 const connectedEmulatorAppNames = new Set<string>();
 
 export interface LearningContentReader {
+  getCourseContent(courseId: string): Promise<LearnerCourseContent>;
   getDemoContent(demoId: string): Promise<LearnerDemoContent>;
   getFullPostContent(postId: string): Promise<LearnerPostContent>;
+  getModuleContent(moduleId: string): Promise<LearnerModuleContent>;
+  getQuizContent(quizId: string): Promise<LearnerQuizContent>;
   getTrialPostContent(postId: string): Promise<LearnerPostContent>;
 }
 
@@ -98,6 +104,22 @@ async function readPublishedDocument(input: {
 
 export function createFirebaseLearningContentReader(): LearningContentReader {
   return {
+    async getCourseContent(courseId) {
+      const document = await readPublishedDocument({
+        documentId: getPublishedLearnerContentDocumentId({
+          documentKind: 'course-summary',
+          entityId: courseId,
+        }),
+        documentKind: 'course-summary',
+        entityId: courseId,
+      });
+
+      if (document.documentKind !== 'course-summary') {
+        throw new LearningContentReadError('The requested content is not a course.');
+      }
+
+      return document.content;
+    },
     async getDemoContent(demoId) {
       const document = await readPublishedDocument({
         documentId: getPublishedLearnerContentDocumentId({
@@ -114,6 +136,22 @@ export function createFirebaseLearningContentReader(): LearningContentReader {
 
       return document.content;
     },
+    async getModuleContent(moduleId) {
+      const document = await readPublishedDocument({
+        documentId: getPublishedLearnerContentDocumentId({
+          documentKind: 'module-summary',
+          entityId: moduleId,
+        }),
+        documentKind: 'module-summary',
+        entityId: moduleId,
+      });
+
+      if (document.documentKind !== 'module-summary') {
+        throw new LearningContentReadError('The requested content is not a module.');
+      }
+
+      return document.content;
+    },
     async getFullPostContent(postId) {
       const document = await readPublishedDocument({
         documentId: getPublishedLearnerContentDocumentId({
@@ -126,6 +164,22 @@ export function createFirebaseLearningContentReader(): LearningContentReader {
 
       if (document.documentKind !== 'post-full') {
         throw new LearningContentReadError('The requested content is not a full post.');
+      }
+
+      return document.content;
+    },
+    async getQuizContent(quizId) {
+      const document = await readPublishedDocument({
+        documentId: getPublishedLearnerContentDocumentId({
+          documentKind: 'quiz-summary',
+          entityId: quizId,
+        }),
+        documentKind: 'quiz-summary',
+        entityId: quizId,
+      });
+
+      if (document.documentKind !== 'quiz-summary') {
+        throw new LearningContentReadError('The requested content is not a quiz.');
       }
 
       return document.content;

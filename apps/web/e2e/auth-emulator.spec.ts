@@ -159,7 +159,9 @@ test.describe('Firebase local Emulator journey', () => {
     await viewAllRequiredPostBlocks(page);
     await postContentViewed;
     await page.getByRole('link', { name: /Mở quiz bài học/i }).click();
-    await expect(page.getByRole('heading', { name: 'Quiz Perceptron/XOR' })).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: 'Quiz Quyết định của Neuron và Perceptron' }),
+    ).toBeVisible({
       timeout: EMULATOR_FLOW_TIMEOUT_MS,
     });
     await answerPostQuiz(page);

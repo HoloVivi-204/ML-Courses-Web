@@ -224,6 +224,56 @@ describe('Firestore learner content repository', () => {
     });
   });
 
+  it('keeps an enrolled learner on the current pointer after planned course unpublish', async () => {
+    const { firestore, transaction } = createReadTransactionFirestore();
+    const authority: LearningContentAuthority = {
+      assertCurrentPublishedEntity: vi.fn().mockImplementation(async (input) => {
+        if (input.entityType === 'course' && input.allowUnpublishedCourse !== true) {
+          throw new ApiError(
+            403,
+            'CONTENT_NOT_PUBLISHED',
+            'The course is no longer accepting enrollments.',
+          );
+        }
+
+        return {
+          entityId: input.entityId,
+          entityType: input.entityType,
+          publishedRevisionId: `${input.entityType}-${input.entityId}-rev-r1`,
+        };
+      }),
+      getCurrentPublishedEntity: vi.fn().mockResolvedValue(null),
+    };
+    const repository = createFirestoreLearningContentRepository({
+      accessReader: createAccessReader(),
+      authority,
+      firestore,
+      publishedContentReader: createPublishedContentReader(() =>
+        createPostContent({
+          revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+          title: 'Published revision one',
+        }),
+      ),
+    });
+
+    await expect(
+      repository.getFullPostContent({
+        postId: 'dl-p01-neuron-perceptron',
+        uid: 'learner-01',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        revisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      },
+    });
+    expect(authority.assertCurrentPublishedEntity).toHaveBeenCalledWith({
+      allowUnpublishedCourse: true,
+      entityId: 'course-deep-learning-basic',
+      entityType: 'course',
+      transaction,
+    });
+  });
+
   it('fails closed when Firestore has no current content instead of falling back to static content', async () => {
     const { firestore } = createReadTransactionFirestore();
     const repository = createFirestoreLearningContentRepository({

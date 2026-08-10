@@ -266,6 +266,37 @@ export const learnerFullPostContentSchema = learnerPostContentSchema.extend({
   accessLevel: z.literal('full'),
 });
 
+export const learnerCourseContentSchema = z
+  .object({
+    courseId: stableIdSchema,
+    description: localizedTextSchema,
+    revisionId: stableIdSchema,
+    title: localizedTextSchema,
+  })
+  .strict();
+
+export const learnerModuleContentSchema = z
+  .object({
+    courseId: stableIdSchema,
+    description: localizedTextSchema,
+    moduleId: stableIdSchema,
+    revisionId: stableIdSchema,
+    title: localizedTextSchema,
+  })
+  .strict();
+
+export const learnerQuizContentSchema = z
+  .object({
+    courseId: stableIdSchema,
+    description: localizedTextSchema,
+    moduleId: stableIdSchema,
+    postId: stableIdSchema.optional(),
+    quizId: stableIdSchema,
+    revisionId: stableIdSchema,
+    title: localizedTextSchema,
+  })
+  .strict();
+
 export const learnerDemoContentSchema = z
   .object({
     adapterVersion: stableIdSchema.optional(),
@@ -373,7 +404,91 @@ export const learnerDemoContentSchema = z
   })
   .strict();
 
+export const adminContentPreviewQuestionSchema = z
+  .object({
+    options: z
+      .array(
+        z
+          .object({
+            optionId: stableIdSchema,
+            text: localizedTextSchema,
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(12),
+    prompt: localizedTextSchema,
+    questionId: stableIdSchema,
+    sourceId: stableIdSchema,
+    type: z.enum(['multiple-choice', 'single-choice', 'true-false']),
+  })
+  .strict();
+
+export const adminContentRevisionPreviewSchema = z.discriminatedUnion('contentType', [
+  z
+    .object({
+      contentType: z.literal('course'),
+      course: learnerCourseContentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      contentType: z.literal('demo'),
+      demo: learnerDemoContentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      contentType: z.literal('module'),
+      module: learnerModuleContentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      contentType: z.literal('post'),
+      post: learnerPostContentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      contentType: z.literal('quiz'),
+      questions: z.array(adminContentPreviewQuestionSchema).min(1).max(160),
+      quiz: learnerQuizContentSchema,
+    })
+    .strict(),
+]);
+
 export const publishedLearnerContentDocumentSchema = z.discriminatedUnion('documentKind', [
+  z
+    .object({
+      content: learnerCourseContentSchema,
+      documentKind: z.literal('course-summary'),
+      entityId: stableIdSchema,
+      entityType: z.literal('course'),
+      revisionId: stableIdSchema,
+      schemaVersion: z.literal(1),
+    })
+    .strict(),
+  z
+    .object({
+      content: learnerModuleContentSchema,
+      documentKind: z.literal('module-summary'),
+      entityId: stableIdSchema,
+      entityType: z.literal('module'),
+      revisionId: stableIdSchema,
+      schemaVersion: z.literal(1),
+    })
+    .strict(),
+  z
+    .object({
+      content: learnerQuizContentSchema,
+      documentKind: z.literal('quiz-summary'),
+      entityId: stableIdSchema,
+      entityType: z.literal('quiz'),
+      revisionId: stableIdSchema,
+      schemaVersion: z.literal(1),
+    })
+    .strict(),
   z
     .object({
       content: learnerTrialPostContentSchema,
@@ -417,12 +532,18 @@ export function getPublishedLearnerContentDocumentId(input: {
   const entityId = stableIdSchema.parse(input.entityId);
 
   switch (input.documentKind) {
+    case 'course-summary':
+      return `course:${entityId}:summary`;
     case 'demo-full':
       return `demo:${entityId}:full`;
+    case 'module-summary':
+      return `module:${entityId}:summary`;
     case 'post-full':
       return `post:${entityId}:full`;
     case 'post-trial':
       return `post:${entityId}:trial`;
+    case 'quiz-summary':
+      return `quiz:${entityId}:summary`;
   }
 }
 
@@ -608,6 +729,12 @@ export const playgroundConfigsResponseSchema = z
 
 export const adminContentEntityTypeSchema = z.enum(['course', 'demo', 'module', 'post', 'quiz']);
 export const adminContentPublicationScopeSchema = z.enum(['emulator-demo', 'publish-quality']);
+export const adminContentEvidenceKindSchema = z.enum([
+  'license',
+  'provenance',
+  'content-review',
+  'gvhd-confirmation',
+]);
 
 export const adminContentListQuerySchema = z
   .object({
@@ -623,6 +750,12 @@ export const adminContentPathParamsSchema = z
   .object({ entityId: stableIdSchema, entityType: adminContentEntityTypeSchema })
   .strict();
 export const adminRevisionPathParamsSchema = z.object({ revisionId: stableIdSchema }).strict();
+export const adminRevisionEvidencePathParamsSchema = z
+  .object({
+    kind: adminContentEvidenceKindSchema,
+    revisionId: stableIdSchema,
+  })
+  .strict();
 export const adminEntityPathParamsSchema = z.object({ entityId: stableIdSchema }).strict();
 
 export const adminContentMetadataSchema = z
@@ -661,6 +794,13 @@ export const adminPublishRequestSchema = z
   })
   .strict();
 
+export const adminContentEvidenceAttachRequestSchema = z
+  .object({
+    checksum: z.string().regex(/^[a-f0-9]{64}$/),
+    evidenceRef: z.string().trim().min(1).max(2_048),
+  })
+  .strict();
+
 export const successEnvelopeSchema = <TData extends z.ZodType>(data: TData) =>
   z
     .object({
@@ -679,6 +819,9 @@ export type PlaygroundConfigCreateRequest = z.infer<typeof playgroundConfigCreat
 export type PlaygroundConfigUpdateRequest = z.infer<typeof playgroundConfigUpdateRequestSchema>;
 export type PlaygroundConfigRecord = z.infer<typeof playgroundConfigRecordSchema>;
 export type LearningProgressSnapshot = z.infer<typeof learningProgressSnapshotSchema>;
+export type LearnerCourseContent = z.infer<typeof learnerCourseContentSchema>;
 export type LearnerPostContent = z.infer<typeof learnerPostContentSchema>;
 export type LearnerDemoContent = z.infer<typeof learnerDemoContentSchema>;
+export type LearnerModuleContent = z.infer<typeof learnerModuleContentSchema>;
+export type LearnerQuizContent = z.infer<typeof learnerQuizContentSchema>;
 export type PublishedLearnerContentDocument = z.infer<typeof publishedLearnerContentDocumentSchema>;

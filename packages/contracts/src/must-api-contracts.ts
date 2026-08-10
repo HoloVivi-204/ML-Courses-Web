@@ -3,15 +3,19 @@ import { z } from 'zod';
 import { API_ROUTE_CATALOG, type ApiRouteId } from './api-route-catalog.js';
 import {
   adminContentDraftPatchRequestSchema,
+  adminContentEvidenceAttachRequestSchema,
+  adminContentEvidenceKindSchema,
   adminContentEntityTypeSchema,
   adminContentListQuerySchema,
   adminContentMetadataSchema,
   adminContentPathParamsSchema,
   adminContentPublicationScopeSchema,
+  adminContentRevisionPreviewSchema,
   adminEntityPathParamsSchema,
   adminLifecycleRequestSchema,
   adminPublishRequestSchema,
   adminRevisionPathParamsSchema,
+  adminRevisionEvidencePathParamsSchema,
   avatarFinalizeRequestSchema,
   avatarUploadSessionRequestSchema,
   avatarUploadSessionResponseSchema,
@@ -341,8 +345,37 @@ export const adminContentLifecycleEventSchema = z
     reason: z.string().trim().min(1).max(240),
     requestId: z.string().uuid(),
     toRevisionId: stableIdSchema.nullable(),
-    type: z.enum(['emergency-withdrawn', 'published', 'rolled-back', 'unpublished']),
+    type: z.enum([
+      'emergency-withdrawn',
+      'evidence-attached',
+      'published',
+      'rolled-back',
+      'unpublished',
+    ]),
   })
+  .strict();
+
+export const adminContentExternalEvidenceSchema = z
+  .object({
+    artifactId: stableIdSchema,
+    checksum: z.string().regex(/^[a-f0-9]{64}$/),
+    evidenceRef: z.string().trim().min(1).max(2_048),
+    kind: adminContentEvidenceKindSchema,
+    result: z.enum(['approved', 'pending', 'rejected']),
+    reviewedAt: z.string().datetime().optional(),
+    reviewedBy: stableIdSchema.optional(),
+  })
+  .strict();
+
+export const adminContentEvidenceStateResponseSchema = z
+  .object({
+    contentChecksum: z.string().regex(/^[a-f0-9]{64}$/),
+    evidence: z.array(adminContentExternalEvidenceSchema).max(4),
+  })
+  .strict();
+
+export const adminContentEvidenceAttachResponseSchema = z
+  .object({ evidence: adminContentExternalEvidenceSchema })
   .strict();
 
 export const adminContentListResponseSchema = z
@@ -367,6 +400,13 @@ export const adminContentValidationResponseSchema = z
   .object({
     draft: adminContentDraftSchema,
     validation: adminContentValidationResultSchema,
+  })
+  .strict();
+
+export const adminContentRevisionPreviewResponseSchema = z
+  .object({
+    draft: adminContentDraftSchema,
+    preview: adminContentRevisionPreviewSchema,
   })
   .strict();
 
@@ -492,6 +532,21 @@ const adminDraftPatchRouteRequestSchema = z
   .object({
     body: adminContentDraftPatchRequestSchema,
     params: adminRevisionPathParamsSchema,
+  })
+  .strict();
+
+const adminContentEvidenceListRouteRequestSchema = z
+  .object({ params: adminRevisionPathParamsSchema })
+  .strict();
+
+const adminContentPreviewRouteRequestSchema = z
+  .object({ params: adminRevisionPathParamsSchema })
+  .strict();
+
+const adminContentEvidenceAttachRouteRequestSchema = z
+  .object({
+    body: adminContentEvidenceAttachRequestSchema,
+    params: adminRevisionEvidencePathParamsSchema,
   })
   .strict();
 
@@ -659,6 +714,18 @@ export const MUST_API_CONTRACTS = {
   validateAdminContentRevision: {
     request: z.object({ params: adminRevisionPathParamsSchema }).strict(),
     response: adminContentValidationResponseSchema,
+  },
+  getAdminContentRevisionPreview: {
+    request: adminContentPreviewRouteRequestSchema,
+    response: adminContentRevisionPreviewResponseSchema,
+  },
+  listAdminContentEvidence: {
+    request: adminContentEvidenceListRouteRequestSchema,
+    response: adminContentEvidenceStateResponseSchema,
+  },
+  attachAdminContentEvidence: {
+    request: adminContentEvidenceAttachRouteRequestSchema,
+    response: adminContentEvidenceAttachResponseSchema,
   },
   publishAdminContentRevision: {
     request: adminPublishRouteRequestSchema,

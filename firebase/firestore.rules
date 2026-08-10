@@ -49,26 +49,93 @@ service cloud.firestore {
         ).data);
     }
 
-    function hasActiveAncestors(content) {
+    function hasCourseEnrollment(courseId) {
+      return request.auth != null &&
+        exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)/enrollments/$(courseId)
+        ) &&
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)/enrollments/$(courseId)
+        ).data.schemaVersion == 1 &&
+        (
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)/enrollments/$(courseId)
+          ).data.status == 'in-progress' ||
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)/enrollments/$(courseId)
+          ).data.status == 'completed'
+        );
+    }
+
+    function isSafelyUnpublishedCourse(courseId) {
+      return exists(
+          /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+        ) &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+        ).data.schemaVersion == 1 &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+        ).data.entityType == 'course' &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+        ).data.entityId == courseId &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+        ).data.currentContent.status == 'unpublished' &&
+        get(
+          /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+        ).data.currentContent.emergencyBlocked == false;
+    }
+
+    function isLearnerVisibleCourse(courseId) {
+      return isActivePublishedEntity('course', courseId) ||
+        (hasCourseEnrollment(courseId) && isSafelyUnpublishedCourse(courseId));
+    }
+
+    function isCurrentLearnerVisibleCourse(courseId, revisionId) {
+      return isCurrentPublishedEntity('course', courseId, revisionId) ||
+        (
+          hasCourseEnrollment(courseId) &&
+          isSafelyUnpublishedCourse(courseId) &&
+          get(
+            /databases/$(database)/documents/adminContentEntities/$('course:' + courseId)
+          ).data.currentContent.publishedRevisionId == revisionId
+        );
+    }
+
+    function hasPublicAncestors(content) {
       return isActivePublishedEntity('course', content.courseId) &&
         isActivePublishedEntity('module', content.moduleId);
     }
 
-    function isCurrentLearnerContent() {
+    function hasLearnerVisibleAncestors(content) {
+      return isLearnerVisibleCourse(content.courseId) &&
+        isActivePublishedEntity('module', content.moduleId);
+    }
+
+    function isCurrentGrantedLearnerContent() {
       return resource.data.schemaVersion == 1 &&
         isCurrentPublishedEntity(
           resource.data.entityType,
           resource.data.entityId,
           resource.data.revisionId
         ) &&
-        hasActiveAncestors(resource.data.content);
+        hasLearnerVisibleAncestors(resource.data.content);
     }
 
     function isPublicTrialPost(documentId) {
       return documentId == 'post:' + resource.data.entityId + ':trial' &&
         resource.data.documentKind == 'post-trial' &&
         resource.data.entityType == 'post' &&
-        resource.data.content.accessLevel == 'trial';
+        resource.data.content.accessLevel == 'trial' &&
+        resource.data.schemaVersion == 1 &&
+        isCurrentPublishedEntity(
+          resource.data.entityType,
+          resource.data.entityId,
+          resource.data.revisionId
+        ) &&
+        hasPublicAncestors(resource.data.content);
     }
 
     function isGrantedLearnerContent(documentId) {
@@ -84,11 +151,65 @@ service cloud.firestore {
         );
     }
 
+    function isCurrentCourseSummary(documentId) {
+      return documentId == 'course:' + resource.data.entityId + ':summary' &&
+        resource.data.documentKind == 'course-summary' &&
+        resource.data.entityType == 'course' &&
+        resource.data.content.courseId == resource.data.entityId &&
+        resource.data.schemaVersion == 1 &&
+        hasCourseEnrollment(resource.data.entityId) &&
+        isCurrentLearnerVisibleCourse(resource.data.entityId, resource.data.revisionId);
+    }
+
+    function isCurrentModuleSummary(documentId) {
+      return documentId == 'module:' + resource.data.entityId + ':summary' &&
+        resource.data.documentKind == 'module-summary' &&
+        resource.data.entityType == 'module' &&
+        resource.data.content.moduleId == resource.data.entityId &&
+        resource.data.schemaVersion == 1 &&
+        hasCourseEnrollment(resource.data.content.courseId) &&
+        isCurrentPublishedEntity(
+          resource.data.entityType,
+          resource.data.entityId,
+          resource.data.revisionId
+        ) &&
+        isLearnerVisibleCourse(resource.data.content.courseId);
+    }
+
+    function isCurrentQuizSummary(documentId) {
+      return documentId == 'quiz:' + resource.data.entityId + ':summary' &&
+        resource.data.documentKind == 'quiz-summary' &&
+        resource.data.entityType == 'quiz' &&
+        resource.data.content.quizId == resource.data.entityId &&
+        resource.data.schemaVersion == 1 &&
+        isCurrentPublishedEntity(
+          resource.data.entityType,
+          resource.data.entityId,
+          resource.data.revisionId
+        ) &&
+        hasLearnerVisibleAncestors(resource.data.content) &&
+        (
+          (
+            'postId' in resource.data.content &&
+            hasStableContentGrant('post', resource.data.content.postId)
+          ) ||
+          (
+            !('postId' in resource.data.content) &&
+            hasStableContentGrant('module', resource.data.content.moduleId)
+          )
+        );
+    }
+
     match /publishedLearnerContent/{documentId} {
-      allow get: if isCurrentLearnerContent() &&
-        (isPublicTrialPost(documentId) ||
-          (isGrantedLearnerContent(documentId) &&
-            hasStableContentGrant(resource.data.entityType, resource.data.entityId)));
+      allow get: if isCurrentCourseSummary(documentId) ||
+        isCurrentModuleSummary(documentId) ||
+        isCurrentQuizSummary(documentId) ||
+        isPublicTrialPost(documentId) ||
+        (
+          isCurrentGrantedLearnerContent() &&
+          isGrantedLearnerContent(documentId) &&
+          hasStableContentGrant(resource.data.entityType, resource.data.entityId)
+        );
     }
 
     match /{document=**} {

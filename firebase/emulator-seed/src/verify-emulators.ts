@@ -947,6 +947,131 @@ async function assertFirestoreAdminContentPersistence(): Promise<void> {
   }
 }
 
+async function assertAdminRevisionTypeLifecycleApi(input: {
+  adminToken: string;
+  entityId: string;
+  entityType: 'course' | 'demo' | 'module' | 'quiz';
+  initialRevisionId: string;
+  learnerDocumentPath: string;
+  studentToken: string;
+}): Promise<void> {
+  const learnerBeforePublish = await readFirestoreDocument(
+    await requestFirestoreDocument({
+      documentPath: input.learnerDocumentPath,
+      idToken: input.studentToken,
+    }),
+    200,
+  );
+  const initialTitle = getRecordField(getRecordField(learnerBeforePublish, 'content'), 'title').en;
+  const createDraftData = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/content/${input.entityType}/${input.entityId}/drafts`, {
+      idToken: input.adminToken,
+      method: 'POST',
+    }),
+    201,
+  );
+  const createdDraft = getRecordField(createDraftData, 'draft');
+  const draftRevisionId = getStringField(createdDraft, 'draftRevisionId');
+  const title = `Emulator learner ${input.entityType} revision`;
+
+  await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}`, {
+      body: {
+        metadata: {
+          attribution: {
+            en: `Verified ${input.entityType} attribution for the local Emulator.`,
+            vi: `Attribution ${input.entityType} da kiem tra tren Emulator cuc bo.`,
+          },
+          externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
+        },
+        preview: {
+          en: `Draft learner ${input.entityType} preview.`,
+          vi: `Preview ${input.entityType} draft cho learner.`,
+        },
+        revisionVersion: 1,
+        title: {
+          en: title,
+          vi: `Ban ${input.entityType} cho learner`,
+        },
+      },
+      idToken: input.adminToken,
+      method: 'PATCH',
+    }),
+    200,
+  );
+
+  const previewData = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/preview`, {
+      idToken: input.adminToken,
+    }),
+    200,
+  );
+  const learnerPreview = getRecordField(previewData, 'preview');
+  assert.equal(learnerPreview.contentType, input.entityType);
+
+  const previewPayloadKey = input.entityType;
+  const previewPayload = getRecordField(learnerPreview, previewPayloadKey);
+  assert.equal(getRecordField(previewPayload, 'title').en, title);
+
+  if (input.entityType === 'quiz') {
+    assert.equal(JSON.stringify(learnerPreview).includes('correctAnswer'), false);
+    assert.equal(JSON.stringify(learnerPreview).includes('explanation'), false);
+    assert.equal(JSON.stringify(learnerPreview).includes('hints'), false);
+  }
+
+  await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/validate`, {
+      idToken: input.adminToken,
+      method: 'POST',
+    }),
+    200,
+  );
+  const publishedData = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/publish`, {
+      body: {
+        publicationScope: 'emulator-demo',
+        reason: `Publish the ${input.entityType} revision in the local Emulator only.`,
+      },
+      idToken: input.adminToken,
+      idempotencyKey: `emulator-${input.entityType}-publish-${randomUUID()}`,
+      method: 'POST',
+    }),
+    200,
+  );
+  assert.equal(getRecordField(publishedData, 'content').publicationScope, 'emulator-demo');
+
+  const learnerAfterPublish = await readFirestoreDocument(
+    await requestFirestoreDocument({
+      documentPath: input.learnerDocumentPath,
+      idToken: input.studentToken,
+    }),
+    200,
+  );
+  assert.equal(getRecordField(getRecordField(learnerAfterPublish, 'content'), 'title').en, title);
+
+  await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${input.initialRevisionId}/rollback`, {
+      body: {
+        reason: `Restore the original ${input.entityType} learner revision in the Emulator.`,
+      },
+      idToken: input.adminToken,
+      method: 'POST',
+    }),
+    200,
+  );
+  const learnerAfterRollback = await readFirestoreDocument(
+    await requestFirestoreDocument({
+      documentPath: input.learnerDocumentPath,
+      idToken: input.studentToken,
+    }),
+    200,
+  );
+  assert.equal(
+    getRecordField(getRecordField(learnerAfterRollback, 'content'), 'title').en,
+    initialTitle,
+  );
+}
+
 async function assertAdminContentLifecycleApi(): Promise<void> {
   const services = createLocalAdminServices();
   const adminUid = `admin-${randomUUID()}`;
@@ -959,25 +1084,42 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     await seedAdminContentLifecycleRepository(services.firestore);
     const studentToken = await registerWithEmailPassword(studentEmail, studentPassword);
     const studentUid = (await services.auth.getUserByEmail(studentEmail)).uid;
+    const courseId = 'course-deep-learning-basic';
+    const demoId = 'demo-perceptron-and-gate';
     const postId = 'dl-p01-neuron-perceptron';
     const postAccessPath = `users/${studentUid}/contentAccess/post_${postId}`;
+    const demoAccessPath = `users/${studentUid}/contentAccess/demo_${demoId}`;
+    const courseEnrollmentPath = `users/${studentUid}/enrollments/${courseId}`;
     const postProgressPath = `users/${studentUid}/postProgress/${postId}`;
 
-    await services.firestore.doc(postAccessPath).set({
-      contentType: 'post',
-      entityId: postId,
-      schemaVersion: 1,
-    });
-    await services.firestore.doc(postProgressPath).set({
-      completed: true,
-      schemaVersion: 1,
-    });
-    await services.firestore.doc(`users/${studentUid}/postViews/${postId}`).set({
-      contentViewed: true,
-      postId,
-      schemaVersion: 1,
-      started: true,
-    });
+    await Promise.all([
+      services.firestore.doc(postAccessPath).set({
+        contentType: 'post',
+        entityId: postId,
+        schemaVersion: 1,
+      }),
+      services.firestore.doc(demoAccessPath).set({
+        contentType: 'demo',
+        entityId: demoId,
+        schemaVersion: 1,
+      }),
+      services.firestore.doc(courseEnrollmentPath).set({
+        courseId,
+        progressPercent: 33,
+        schemaVersion: 1,
+        status: 'in-progress',
+      }),
+      services.firestore.doc(postProgressPath).set({
+        completed: true,
+        schemaVersion: 1,
+      }),
+      services.firestore.doc(`users/${studentUid}/postViews/${postId}`).set({
+        contentViewed: true,
+        postId,
+        schemaVersion: 1,
+        started: true,
+      }),
+    ]);
 
     await services.auth.createUser({
       uid: adminUid,
@@ -995,6 +1137,39 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     const forbiddenBody = await readJsonObject(forbiddenResponse);
     assert.equal(forbiddenBody.success, false);
     assert.equal(getRecordField(forbiddenBody, 'error').code, 'ADMIN_FORBIDDEN');
+
+    await assertAdminRevisionTypeLifecycleApi({
+      adminToken,
+      entityId: courseId,
+      entityType: 'course',
+      initialRevisionId: 'course-deep-learning-basic-rev-r1',
+      learnerDocumentPath: `publishedLearnerContent/course:${courseId}:summary`,
+      studentToken,
+    });
+    await assertAdminRevisionTypeLifecycleApi({
+      adminToken,
+      entityId: 'dl-m01-neuron-perceptron',
+      entityType: 'module',
+      initialRevisionId: 'module-dl-m01-neuron-perceptron-rev-r1',
+      learnerDocumentPath: 'publishedLearnerContent/module:dl-m01-neuron-perceptron:summary',
+      studentToken,
+    });
+    await assertAdminRevisionTypeLifecycleApi({
+      adminToken,
+      entityId: demoId,
+      entityType: 'demo',
+      initialRevisionId: 'demo-perceptron-and-gate-rev-r1',
+      learnerDocumentPath: `publishedLearnerContent/demo:${demoId}:full`,
+      studentToken,
+    });
+    await assertAdminRevisionTypeLifecycleApi({
+      adminToken,
+      entityId: 'quiz-post-dl-p01',
+      entityType: 'quiz',
+      initialRevisionId: 'quiz-quiz-post-dl-p01-rev-r1',
+      learnerDocumentPath: 'publishedLearnerContent/quiz:quiz-post-dl-p01:summary',
+      studentToken,
+    });
 
     const initialInventoryData = await readSuccessData(
       await requestApiJson(
@@ -1062,6 +1237,19 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     assert.equal(updatedDraft.revisionVersion, 2);
     assert.equal(getRecordField(updatedDraft, 'preview').en, 'Draft-only learner preview copy.');
 
+    const postPreviewData = await readSuccessData(
+      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/preview`, {
+        idToken: adminToken,
+      }),
+      200,
+    );
+    const postPreview = getRecordField(postPreviewData, 'preview');
+    assert.equal(postPreview.contentType, 'post');
+    assert.equal(
+      getRecordField(getRecordField(postPreview, 'post'), 'title').en,
+      'Draft neuron decision title',
+    );
+
     const validateData = await readSuccessData(
       await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/validate`, {
         idToken: adminToken,
@@ -1071,6 +1259,42 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     );
     assert.equal(getRecordField(validateData, 'draft').validationStatus, 'valid');
     assert.equal(getRecordField(validateData, 'validation').status, 'valid');
+
+    const evidenceBeforeAttach = await readSuccessData(
+      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/evidence`, {
+        idToken: adminToken,
+      }),
+      200,
+    );
+    const evidenceChecksum = getStringField(evidenceBeforeAttach, 'contentChecksum');
+    assert.equal(getArrayField(evidenceBeforeAttach, 'evidence').length, 0);
+
+    const attachedEvidenceData = await readSuccessData(
+      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/evidence/license`, {
+        body: {
+          checksum: evidenceChecksum,
+          evidenceRef: 'emulator://evidence/license-draft-neuron',
+        },
+        idToken: adminToken,
+        method: 'POST',
+      }),
+      200,
+    );
+    assert.equal(getRecordField(attachedEvidenceData, 'evidence').result, 'pending');
+
+    const evidenceAfterAttach = await readSuccessData(
+      await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/evidence`, {
+        idToken: adminToken,
+      }),
+      200,
+    );
+    const pendingLicenseEvidence = findRecordByField(
+      getArrayField(evidenceAfterAttach, 'evidence'),
+      'kind',
+      'license',
+    );
+    assert.equal(pendingLicenseEvidence.result, 'pending');
+    assert.equal(pendingLicenseEvidence.checksum, evidenceChecksum);
 
     const publishResponse = await requestApiJson(
       `/api/v1/admin/revisions/${draftRevisionId}/publish`,
@@ -1155,6 +1379,71 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
       schemaVersion: 1,
       status: 'in-progress',
     });
+
+    const plannedUnpublishData = await readSuccessData(
+      await requestApiJson(`/api/v1/admin/entities/${courseId}/unpublish`, {
+        body: { reason: 'Keep current learners active while the course is temporarily hidden.' },
+        idToken: adminToken,
+        method: 'POST',
+      }),
+      200,
+    );
+    assert.equal(getRecordField(plannedUnpublishData, 'content').status, 'unpublished');
+    assert.equal(
+      getRecordField(plannedUnpublishData, 'content').publishedRevisionId,
+      'course-deep-learning-basic-rev-r1',
+    );
+    assert.equal(getRecordField(plannedUnpublishData, 'lifecycleEvent').type, 'unpublished');
+
+    for (const learnerDocumentPath of [
+      `publishedLearnerContent/course:${courseId}:summary`,
+      'publishedLearnerContent/module:dl-m01-neuron-perceptron:summary',
+      `publishedLearnerContent/post:${postId}:full`,
+      `publishedLearnerContent/demo:${demoId}:full`,
+      'publishedLearnerContent/quiz:quiz-post-dl-p01:summary',
+    ]) {
+      await readFirestoreDocument(
+        await requestFirestoreDocument({
+          documentPath: learnerDocumentPath,
+          idToken: studentToken,
+        }),
+        200,
+      );
+    }
+
+    const continuedPostViewData = await readSuccessData(
+      await requestApiJson(`/api/v1/posts/${postId}/views`, {
+        body: {
+          readingPosition: 'what-is-a-neuron',
+          viewedItemIds: ['what-is-a-neuron'],
+        },
+        idToken: studentToken,
+        method: 'POST',
+      }),
+      200,
+    );
+    assert.equal(
+      getRecordField(continuedPostViewData, 'postView').readingPosition,
+      'what-is-a-neuron',
+    );
+    const continuingEnrollment = await services.firestore.doc(courseEnrollmentPath).get();
+    assert.equal(continuingEnrollment.get('status'), 'in-progress');
+    assert.equal(continuingEnrollment.get('progressPercent'), 33);
+
+    const lateJoinerToken = await registerWithEmailPassword(
+      `late-joiner-${randomUUID()}@example.test`,
+      `test-${randomUUID()}`,
+    );
+    const refusedEnrollment = await requestApiJson(`/api/v1/courses/${courseId}/enrollments`, {
+      idToken: lateJoinerToken,
+      idempotencyKey: `refused-enrollment-${randomUUID()}`,
+      method: 'POST',
+    });
+    assert.equal(refusedEnrollment.status, 403);
+    assert.equal(
+      getRecordField(await readJsonObject(refusedEnrollment), 'error').code,
+      'CONTENT_NOT_PUBLISHED',
+    );
 
     const publicEmergencyResponse = await requestApiJson(
       `/api/v1/admin/content/post/${postId}/emergency-withdraw`,

@@ -5,12 +5,16 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
-import type { LearningApiClient, LearningProgressSnapshot } from './learning-api';
+import type {
+  LearningApiClient,
+  LearningModuleContent,
+  LearningProgressSnapshot,
+  LearningQuizContent,
+} from './learning-api';
 import {
   getLearningCourseProgress,
   getLearningModuleProgressEntries,
 } from './learning-progression';
-import { getPublicQuizRoute } from './quiz-route-data';
 
 interface LearningModulePageProps {
   learningApiClient: LearningApiClient;
@@ -25,6 +29,8 @@ interface ModuleLoadTask {
 }
 
 interface ModuleLoadResult {
+  moduleContent: LearningModuleContent;
+  moduleQuizContent: LearningQuizContent;
   nextPostId: string;
   progressSnapshot: LearningProgressSnapshot;
 }
@@ -39,6 +45,8 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
   const loadTaskRef = useRef<ModuleLoadTask | null>(null);
   const [loadStatus, setLoadStatus] = useState<ModuleLoadStatus>('loading');
   const [loadedRouteKey, setLoadedRouteKey] = useState<string | null>(null);
+  const [moduleContent, setModuleContent] = useState<LearningModuleContent | null>(null);
+  const [moduleQuizContent, setModuleQuizContent] = useState<LearningQuizContent | null>(null);
   const [progressSnapshot, setProgressSnapshot] = useState<LearningProgressSnapshot | null>(null);
   const [nextPostId, setNextPostId] = useState<string | null>(null);
 
@@ -59,7 +67,9 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             idToken: getIdToken,
             key: taskKey,
             learningApiClient,
+            courseId: course.id,
             moduleId: activeModule.id,
+            moduleQuizId: getModuleQuizId(activeModule.id),
             postIds: activeModule.postIds,
           });
 
@@ -69,6 +79,8 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
       .then((result) => {
         if (isActive) {
           setLoadedRouteKey(activeRouteKey);
+          setModuleContent(result.moduleContent);
+          setModuleQuizContent(result.moduleQuizContent);
           setProgressSnapshot(result.progressSnapshot);
           setNextPostId(result.nextPostId);
           setLoadStatus('ready');
@@ -98,7 +110,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
     );
   }
 
-  if (loadStatus === 'failed' || !progressSnapshot) {
+  if (loadStatus === 'failed' || !moduleContent || !moduleQuizContent || !progressSnapshot) {
     return <LearningModuleLockedPage courseId={course.id} />;
   }
 
@@ -118,7 +130,6 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
     (courseProgress?.posts ?? progressSnapshot.posts).map((post) => [post.postId, post]),
   );
   const moduleQuizId = getModuleQuizId(module.id);
-  const moduleQuizRoute = getPublicQuizRoute(moduleQuizId);
   const completedPosts = module.postIds.every(
     (postId) => postProgressById.get(postId)?.completed === true,
   );
@@ -146,8 +157,8 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
           </span>
         </div>
         <code>{module.id}</code>
-        <h1>{localize(module.title, locale)}</h1>
-        <p>{localize(module.description, locale)}</p>
+        <h1>{localize(moduleContent.title, locale)}</h1>
+        <p>{localize(moduleContent.description, locale)}</p>
         <p className="learning-module-progress-summary">
           {t('learning.moduleOverview.progress', {
             completed: moduleProgressEntry.progress.completedStepCount,
@@ -237,9 +248,8 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             <span className="learning-module-step-number">QUIZ</span>
             <div>
               <span className="eyebrow">{t('learning.moduleOverview.quizLabel')}</span>
-              <h3>
-                {moduleQuizRoute?.title ? localize(moduleQuizRoute.title, locale) : moduleQuizId}
-              </h3>
+              <h3>{localize(moduleQuizContent.title, locale)}</h3>
+              <p>{localize(moduleQuizContent.description, locale)}</p>
               {isModuleQuizOpen ? (
                 <Link
                   className="module-trial-link"
@@ -263,10 +273,12 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
 }
 
 function createModuleLoadTask(input: {
+  courseId: string;
   idToken: () => Promise<string | null>;
   key: string;
   learningApiClient: LearningApiClient;
   moduleId: string;
+  moduleQuizId: string;
   postIds: readonly string[];
 }): ModuleLoadTask {
   return {
@@ -290,10 +302,29 @@ function createModuleLoadTask(input: {
         throw new Error('The module overview response does not match the requested module.');
       }
 
-      const nextPostId = moduleOverview.moduleOverview.nextPostId;
-      const progressSnapshot = await input.learningApiClient.getProgress(idToken);
+      const [moduleContent, moduleQuizContent, progressSnapshot] = await Promise.all([
+        input.learningApiClient.getModuleContent(input.moduleId),
+        input.learningApiClient.getQuizContent(input.moduleQuizId),
+        input.learningApiClient.getProgress(idToken),
+      ]);
 
-      return { nextPostId, progressSnapshot };
+      if (
+        moduleContent.courseId !== input.courseId ||
+        moduleContent.moduleId !== input.moduleId ||
+        moduleQuizContent.courseId !== input.courseId ||
+        moduleQuizContent.moduleId !== input.moduleId ||
+        moduleQuizContent.quizId !== input.moduleQuizId ||
+        moduleQuizContent.postId !== undefined
+      ) {
+        throw new Error('Published learner content does not match the requested module structure.');
+      }
+
+      return {
+        moduleContent,
+        moduleQuizContent,
+        nextPostId: moduleOverview.moduleOverview.nextPostId,
+        progressSnapshot,
+      };
     })(),
   };
 }
