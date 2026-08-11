@@ -20,6 +20,12 @@ interface PostContentLoadState {
   trialStatus: 'failed' | 'loading' | 'ready';
 }
 
+interface PostViewSyncState {
+  pending: boolean;
+  promise: Promise<PostViewResult | null> | null;
+  routeKey: string | null;
+}
+
 function isRequiredContentBlock(value: unknown): value is { id: string; required: boolean } {
   return (
     typeof value === 'object' &&
@@ -57,6 +63,11 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const observedItemIdsRef = useRef(new Set<string>());
   const readingPositionRef = useRef<string | null>(null);
   const restoredReadingPositionRef = useRef<string | null>(null);
+  const postViewSyncStateRef = useRef<PostViewSyncState>({
+    pending: false,
+    promise: null,
+    routeKey: null,
+  });
   const trialPost = loadedTrialPost?.routeKey === routeKey ? loadedTrialPost.post : null;
   const fullPost =
     status === 'authenticated' &&
@@ -93,30 +104,86 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       return null;
     }
 
-    try {
-      const idToken = await getIdToken();
+    const syncState = postViewSyncStateRef.current;
 
-      if (!idToken) {
-        throw new Error('Authenticated user is missing an ID token.');
+    if (syncState.routeKey !== routeKey) {
+      syncState.pending = false;
+      syncState.promise = null;
+      syncState.routeKey = routeKey;
+    }
+
+    syncState.pending = true;
+
+    if (syncState.promise) {
+      return syncState.promise;
+    }
+
+    const syncPromise = (async () => {
+      let latestPostViewResult: PostViewResult | null = null;
+
+      while (syncState.pending && syncState.routeKey === routeKey) {
+        syncState.pending = false;
+        const readingPosition = readingPositionRef.current;
+        const viewedItemIds = [...observedItemIdsRef.current];
+
+        if (!readingPosition || viewedItemIds.length === 0) {
+          return latestPostViewResult;
+        }
+
+        try {
+          const idToken = await getIdToken();
+
+          if (!idToken) {
+            throw new Error('Authenticated user is missing an ID token.');
+          }
+
+          if (syncState.routeKey !== routeKey) {
+            return null;
+          }
+
+          const postViewResult = await learningApiClient.recordPostView({
+            idToken,
+            postId,
+            readingPosition,
+            viewedItemIds,
+          });
+
+          if (syncState.routeKey !== routeKey) {
+            return null;
+          }
+
+          observedItemIdsRef.current = new Set([
+            ...observedItemIdsRef.current,
+            ...postViewResult.postView.viewedItemIds,
+          ]);
+          latestPostViewResult = postViewResult;
+        } catch {
+          // Progress sync is retried as the learner continues through required blocks.
+          if (!syncState.pending) {
+            return null;
+          }
+        }
       }
 
-      const postViewResult = await learningApiClient.recordPostView({
-        idToken,
-        postId,
-        readingPosition: readingPositionRef.current,
-        viewedItemIds: [...observedItemIdsRef.current],
-      });
+      return latestPostViewResult;
+    })();
 
-      observedItemIdsRef.current = new Set([
-        ...observedItemIdsRef.current,
-        ...postViewResult.postView.viewedItemIds,
-      ]);
-      return postViewResult;
-    } catch {
-      // Progress sync is retried as the learner continues through required blocks.
-      return null;
-    }
-  }, [courseId, getIdToken, hasFullAccess, learningApiClient, postId, status, uid]);
+    syncState.promise = syncPromise;
+    void syncPromise.then(
+      () => {
+        if (syncState.promise === syncPromise) {
+          syncState.promise = null;
+        }
+      },
+      () => {
+        if (syncState.promise === syncPromise) {
+          syncState.promise = null;
+        }
+      },
+    );
+
+    return syncPromise;
+  }, [courseId, getIdToken, hasFullAccess, learningApiClient, postId, routeKey, status, uid]);
 
   const recordExternalResourceOpen = useCallback(
     (resource: ExternalResource) => {
@@ -190,6 +257,9 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
     observedItemIdsRef.current = new Set();
     readingPositionRef.current = null;
     restoredReadingPositionRef.current = null;
+    postViewSyncStateRef.current.pending = false;
+    postViewSyncStateRef.current.promise = null;
+    postViewSyncStateRef.current.routeKey = routeKey;
 
     if (postViewTimerRef.current !== null) {
       clearTimeout(postViewTimerRef.current);

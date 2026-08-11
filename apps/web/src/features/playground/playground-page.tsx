@@ -417,23 +417,28 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
             setIsPersistenceLoading(true);
           }
 
-          try {
-            const artifacts = await loadSavedArtifacts(idToken, routeScenarioId);
-
-            if (isMounted) {
-              setSavedRuns(artifacts.runs);
-              setSavedConfigs(artifacts.configs);
-              setPersistenceError(null);
-            }
-          } catch {
-            if (isMounted) {
-              setPersistenceError(t('playground.error.persistence'));
-            }
-          } finally {
-            if (isMounted) {
-              setIsPersistenceLoading(false);
-            }
-          }
+          void loadSavedArtifacts(idToken, routeScenarioId)
+            .then(
+              (artifacts) => {
+                if (isMounted) {
+                  setSavedRuns((currentRuns) => mergeSavedRuns(artifacts.runs, currentRuns));
+                  setSavedConfigs((currentConfigs) =>
+                    mergeSavedConfigs(artifacts.configs, currentConfigs),
+                  );
+                  setPersistenceError(null);
+                }
+              },
+              () => {
+                if (isMounted) {
+                  setPersistenceError(t('playground.error.persistence'));
+                }
+              },
+            )
+            .finally(() => {
+              if (isMounted) {
+                setIsPersistenceLoading(false);
+              }
+            });
         }
       } catch {
         if (isMounted) {
@@ -2109,6 +2114,18 @@ function upsertSavedRun(
   return [savedRun, ...currentRuns.filter((run) => run.runId !== savedRun.runId)].slice(0, 50);
 }
 
+function mergeSavedRuns(
+  persistedRuns: readonly PlaygroundRunRecord[],
+  currentRuns: readonly PlaygroundRunRecord[],
+): PlaygroundRunRecord[] {
+  const currentRunIds = new Set(currentRuns.map((run) => run.runId));
+
+  return [...currentRuns, ...persistedRuns.filter((run) => !currentRunIds.has(run.runId))].slice(
+    0,
+    50,
+  );
+}
+
 function upsertSavedConfig(
   currentConfigs: readonly PlaygroundConfigRecord[],
   savedConfig: PlaygroundConfigRecord,
@@ -2116,6 +2133,18 @@ function upsertSavedConfig(
   return [
     savedConfig,
     ...currentConfigs.filter((config) => config.configId !== savedConfig.configId),
+  ];
+}
+
+function mergeSavedConfigs(
+  persistedConfigs: readonly PlaygroundConfigRecord[],
+  currentConfigs: readonly PlaygroundConfigRecord[],
+): PlaygroundConfigRecord[] {
+  const currentConfigIds = new Set(currentConfigs.map((config) => config.configId));
+
+  return [
+    ...currentConfigs,
+    ...persistedConfigs.filter((config) => !currentConfigIds.has(config.configId)),
   ];
 }
 

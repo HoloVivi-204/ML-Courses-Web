@@ -17,6 +17,7 @@ export interface LocalAdminServices {
   auth: Auth;
   bucket: LocalBucket;
   firestore: Firestore;
+  projectId: string;
 }
 
 export function createLocalAdminServices(
@@ -37,5 +38,6 @@ export function createLocalAdminServices(
     auth: getAuth(app),
     bucket: getStorage(app).bucket(),
     firestore: getFirestore(app),
+    projectId,
   };
 }

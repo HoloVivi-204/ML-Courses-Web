@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LOCAL_EMULATOR_HOSTS,
   LOCAL_FIREBASE_PROJECT_ID,
+  LOCAL_FUNCTIONS_DISCOVERY_TIMEOUT_SECONDS,
   LOCAL_METADATA_SERVER_DETECTION,
   applyLocalEmulatorEnvironment,
   assertRunningEmulatorEnvironment,
@@ -81,10 +82,17 @@ describe('local Firebase environment guard', () => {
   it('creates a complete canonical environment for local tools', () => {
     expect(createLocalEmulatorEnvironment({})).toMatchObject({
       FIREBASE_PROJECT_ID: LOCAL_FIREBASE_PROJECT_ID,
+      FUNCTIONS_DISCOVERY_TIMEOUT: LOCAL_FUNCTIONS_DISCOVERY_TIMEOUT_SECONDS,
       GCLOUD_PROJECT: LOCAL_FIREBASE_PROJECT_ID,
       GOOGLE_CLOUD_PROJECT: LOCAL_FIREBASE_PROJECT_ID,
       METADATA_SERVER_DETECTION: LOCAL_METADATA_SERVER_DETECTION,
       ...LOCAL_EMULATOR_HOSTS,
+    });
+  });
+
+  it('keeps an explicit Functions discovery timeout for local tools', () => {
+    expect(createLocalEmulatorEnvironment({ FUNCTIONS_DISCOVERY_TIMEOUT: '45' })).toMatchObject({
+      FUNCTIONS_DISCOVERY_TIMEOUT: '45',
     });
   });
 

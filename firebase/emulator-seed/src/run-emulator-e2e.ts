@@ -138,7 +138,7 @@ const browserEnvironment = await createLocalE2eAdminEnvironment(seededEnvironmen
 console.log('Starting a fresh Vite server for authenticated browser checks.');
 const viteServer = startViteServer(webDirectory, browserEnvironment);
 
-console.log('Running authenticated Playwright journeys on desktop and 360px.');
+console.log('Running Chromium journeys on desktop and 360px plus Firefox/WebKit smoke.');
 const playwrightEnvironment = {
   ...browserEnvironment,
   RUN_AUTH_EMULATOR_E2E: 'true',

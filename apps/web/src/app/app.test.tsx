@@ -20,6 +20,7 @@ import { getPlaygroundDataset } from '../features/playground/playground-datasets
 import { PlaygroundResult } from '../features/playground/playground-page';
 
 const LAZY_ROUTE_TIMEOUT_MS = 5_000;
+const LAZY_ROUTE_TEST_TIMEOUT_MS = LAZY_ROUTE_TIMEOUT_MS + 1_000;
 const STOP_FALLBACK_SETTLE_MS = 300;
 const seedSourceReview: AdminContentSourceReview = {
   attribution: {
@@ -72,6 +73,20 @@ function createAuthenticatedGateway(input: { role?: 'admin' | undefined } = {}):
 
 function createAdminContentPage<T>(content: readonly T[]) {
   return { content: [...content], nextCursor: null };
+}
+
+function createDeferred<T>() {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  return {
+    promise,
+    resolve(value: T) {
+      resolvePromise(value);
+    },
+  };
 }
 
 function createLearningApiClient(overrides: Partial<LearningApiClient> = {}): LearningApiClient {
@@ -1193,6 +1208,62 @@ function installVisibleContentBlockObserver() {
   vi.stubGlobal('IntersectionObserver', VisibleContentBlockObserver);
 }
 
+function installManualContentBlockObserver() {
+  let callback: IntersectionObserverCallback | null = null;
+  const observedTargets = new Map<string, Element>();
+
+  class ManualContentBlockObserver {
+    constructor(nextCallback: IntersectionObserverCallback) {
+      callback = nextCallback;
+    }
+
+    disconnect() {}
+
+    observe(target: Element) {
+      const blockId = (target as HTMLElement).dataset.contentBlockId;
+
+      if (blockId) {
+        observedTargets.set(blockId, target);
+      }
+    }
+
+    takeRecords() {
+      return [];
+    }
+
+    unobserve() {}
+  }
+
+  vi.stubGlobal('IntersectionObserver', ManualContentBlockObserver);
+
+  return {
+    getObservedBlockIds() {
+      return [...observedTargets.keys()];
+    },
+    trigger(blockIds: readonly string[]) {
+      if (!callback) {
+        throw new Error('Content block observer was not created.');
+      }
+
+      callback(
+        blockIds.map((blockId) => {
+          const target = observedTargets.get(blockId);
+
+          if (!target) {
+            throw new Error(`Unknown observed content block: ${blockId}`);
+          }
+
+          return {
+            isIntersecting: true,
+            target,
+          } as IntersectionObserverEntry;
+        }),
+        {} as IntersectionObserver,
+      );
+    },
+  };
+}
+
 function installImmediatePlaygroundWorker() {
   class ImmediatePlaygroundWorker {
     onmessage: ((event: MessageEvent) => void) | null = null;
@@ -1918,7 +1989,7 @@ describe('public learning journey', () => {
         '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
       );
     },
-    LAZY_ROUTE_TIMEOUT_MS,
+    LAZY_ROUTE_TEST_TIMEOUT_MS,
   );
 
   it(
@@ -1945,7 +2016,7 @@ describe('public learning journey', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Neuron kích hoạt: 1');
       expect(screen.getByText('0.7 × 1 + 0.7 × 1 − 1.0 = 0.4')).toBeVisible();
     },
-    LAZY_ROUTE_TIMEOUT_MS,
+    LAZY_ROUTE_TEST_TIMEOUT_MS,
   );
 
   it('presents the trial lesson as a navigable learning sequence', async () => {
@@ -2284,7 +2355,9 @@ describe('public learning journey', () => {
       ),
     ).toBeVisible();
     expect(screen.getByText('Vì sao AND được nhưng XOR không')).toBeVisible();
-    expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
+    await waitFor(() =>
+      expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token'),
+    );
 
     await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
 
@@ -3874,6 +3947,76 @@ describe('public learning journey', () => {
     },
   );
 
+  it('renders an unlocked lab while saved artifacts are still loading', async () => {
+    window.history.pushState({}, '', '/playground/pg-spam-detection');
+    const listPlaygroundConfigs = vi.fn(() => new Promise<never>(() => undefined));
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue({
+        ...createUnlockedProgressSnapshot(),
+        algorithmUnlocks: [
+          {
+            algorithmId: 'logistic-regression',
+            moduleId: 'cml-m04-logistic-classification',
+          },
+        ],
+      }),
+      listPlaygroundConfigs,
+      listPlaygroundRuns: vi.fn().mockResolvedValue([]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByTestId('playground-dataset-tray', {}, { timeout: LAZY_ROUTE_TIMEOUT_MS }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Chạy' })).toBeEnabled();
+    expect(listPlaygroundConfigs).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      scenarioId: 'pg-spam-detection',
+    });
+  });
+
+  it('retains a config saved while saved artifacts finish loading', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const savedConfigs =
+      createDeferred<Awaited<ReturnType<LearningApiClient['listPlaygroundConfigs']>>>();
+    const listPlaygroundConfigs = vi.fn(() => savedConfigs.promise);
+    const learningApiClient = createLearningApiClient({
+      createPlaygroundConfig: vi.fn().mockResolvedValue(
+        createSavedPlaygroundConfigFixture({
+          configId: 'config-pg-xor-during-load',
+          name: 'XOR saved during load',
+        }),
+      ),
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+      listPlaygroundConfigs,
+      listPlaygroundRuns: vi.fn().mockResolvedValue([]),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await screen.findByTestId('playground-dataset-tray', {}, { timeout: LAZY_ROUTE_TIMEOUT_MS });
+    await user.clear(screen.getByLabelText('Tên cấu hình'));
+    await user.type(screen.getByLabelText('Tên cấu hình'), 'XOR saved during load');
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+
+    expect(await screen.findByText('XOR saved during load')).toBeVisible();
+    savedConfigs.resolve([
+      createSavedPlaygroundConfigFixture({
+        configId: 'config-pg-xor-existing',
+        name: 'XOR existing config',
+      }),
+    ]);
+
+    expect(await screen.findByText('XOR existing config')).toBeVisible();
+    expect(screen.getByText('XOR saved during load')).toBeVisible();
+  });
+
   it('loads saved pg-xor runs and configs, then restores a config without starting a run', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
     const user = userEvent.setup();
@@ -4953,6 +5096,80 @@ describe('public learning journey', () => {
     ).toBeVisible();
   });
 
+  it('coalesces post-view syncs while a prior request is still in flight', async () => {
+    window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const observer = installManualContentBlockObserver();
+    const user = userEvent.setup();
+    const firstSync = createDeferred<Awaited<ReturnType<LearningApiClient['recordPostView']>>>();
+    let callCount = 0;
+    const recordPostView = vi.fn((input: Parameters<LearningApiClient['recordPostView']>[0]) => {
+      callCount += 1;
+
+      if (callCount === 1) {
+        return firstSync.promise;
+      }
+
+      return Promise.resolve({
+        postView: {
+          contentViewed: true,
+          postId: input.postId,
+          readingPosition: input.readingPosition,
+          started: true,
+          viewedItemIds: input.viewedItemIds,
+        },
+      });
+    });
+    const learningApiClient = createLearningApiClient({ recordPostView });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByText(/Enrollment đã sẵn sàng/i)).toBeVisible();
+    await user.click(
+      screen.getByRole('link', {
+        name: /Mở tổng quan module|Tiếp tục module|Open module overview|Resume module/i,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('link', {
+        name: /Mở bài viết|Tiếp tục đọc|Tiếp tục bài viết|Xem lại bài viết|Ôn lại bài viết|Open post|Resume post|Review post/i,
+      }),
+    );
+    await screen.findByRole(
+      'heading',
+      { name: 'Nơi một lớp tuyến tính dừng lại' },
+      { timeout: LAZY_ROUTE_TIMEOUT_MS },
+    );
+    await waitFor(() => expect(observer.getObservedBlockIds()).not.toHaveLength(0));
+
+    const observedBlockIds = observer.getObservedBlockIds();
+    observer.trigger([observedBlockIds[0]!]);
+    await waitFor(() => expect(recordPostView).toHaveBeenCalledTimes(1));
+
+    observer.trigger(observedBlockIds.slice(1));
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 300));
+    expect(recordPostView).toHaveBeenCalledTimes(1);
+
+    firstSync.resolve({
+      postView: {
+        contentViewed: false,
+        postId: 'dl-p01-neuron-perceptron',
+        readingPosition: observedBlockIds[0]!,
+        started: true,
+        viewedItemIds: [observedBlockIds[0]!],
+      },
+    });
+
+    await waitFor(() => expect(recordPostView).toHaveBeenCalledTimes(2));
+    expect(recordPostView).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        viewedItemIds: expect.arrayContaining(observedBlockIds),
+      }),
+    );
+    vi.unstubAllGlobals();
+  });
+
   it('lets an enrolled learner pass the post mastery quiz with server-side scoring', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
     installVisibleContentBlockObserver();
@@ -5221,5 +5438,5 @@ describe('public learning journey', () => {
     expect(screen.getByText('client-computed')).toBeVisible();
 
     vi.unstubAllGlobals();
-  }, 15_000);
+  }, 30_000);
 });

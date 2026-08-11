@@ -858,7 +858,6 @@ async function assertFirestoreAdminContentPersistence(): Promise<void> {
   const services = createLocalAdminServices();
 
   try {
-    await resetAndSeedLocalEmulators(services, createLocalSeedManifest());
     await seedAdminContentLifecycleRepository(services.firestore);
 
     const firstRepository = await createFirestoreLifecycleRepositoryForVerification(
@@ -1687,12 +1686,12 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
 
 await assertEmulatorHub();
 await verifyResetAndSeed();
+await assertFirestoreAdminContentPersistence();
 await assertHealthEndpoint();
 await assertEmailPasswordAuthentication();
 await assertProfileAvatarAccountLifecycle();
 await assertDirectLearnerContentRules();
 await assertAdminContentLifecycleApi();
-await assertFirestoreAdminContentPersistence();
 await assertClientAccessDenied();
 await assertPlaygroundDatasetStorageRules();
 await assertDirectProgressMutationDenied();

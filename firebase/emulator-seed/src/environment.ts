@@ -1,4 +1,5 @@
 export const LOCAL_FIREBASE_PROJECT_ID = 'demo-ml-learning-local';
+export const LOCAL_FUNCTIONS_DISCOVERY_TIMEOUT_SECONDS = '30';
 export const LOCAL_METADATA_SERVER_DETECTION = 'none';
 
 export const LOCAL_EMULATOR_HOSTS = Object.freeze({
@@ -81,6 +82,8 @@ export function createLocalEmulatorEnvironment(environment: Environment): NodeJS
   const localEnvironment = {
     ...environment,
     FIREBASE_PROJECT_ID: environment.FIREBASE_PROJECT_ID ?? LOCAL_FIREBASE_PROJECT_ID,
+    FUNCTIONS_DISCOVERY_TIMEOUT:
+      environment.FUNCTIONS_DISCOVERY_TIMEOUT ?? LOCAL_FUNCTIONS_DISCOVERY_TIMEOUT_SECONDS,
     GCLOUD_PROJECT: environment.GCLOUD_PROJECT ?? LOCAL_FIREBASE_PROJECT_ID,
     GOOGLE_CLOUD_PROJECT: environment.GOOGLE_CLOUD_PROJECT ?? LOCAL_FIREBASE_PROJECT_ID,
     METADATA_SERVER_DETECTION:

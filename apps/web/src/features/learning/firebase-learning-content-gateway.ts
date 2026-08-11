@@ -16,7 +16,10 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 
-import { getConfiguredFirebaseApp, isFirebaseEmulator } from '../auth/firebase-auth-gateway';
+import {
+  getConfiguredFirebaseApp,
+  shouldUseLocalDataEmulators,
+} from '../auth/firebase-auth-gateway';
 
 const LOCAL_FIRESTORE_EMULATOR_HOST = '127.0.0.1';
 const LOCAL_FIRESTORE_EMULATOR_PORT = 8080;
@@ -49,7 +52,7 @@ function getConfiguredFirestore(): Firestore {
 
   const firestore = getFirestore(app);
 
-  if (isFirebaseEmulator() && !connectedEmulatorAppNames.has(app.name)) {
+  if (shouldUseLocalDataEmulators() && !connectedEmulatorAppNames.has(app.name)) {
     connectFirestoreEmulator(
       firestore,
       LOCAL_FIRESTORE_EMULATOR_HOST,

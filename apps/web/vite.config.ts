@@ -2,12 +2,15 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 import { getFunctionsEmulatorTarget } from './src/app/functions-emulator-target';
+import { getViteEnvironmentDirectory } from './vite-environment';
 
 const require = createRequire(import.meta.url);
+const webRoot = fileURLToPath(new URL('.', import.meta.url));
 const libsvmWasmModuleId = '@libsvm-js/libsvm-js/out/wasm/libsvm';
 const libsvmWasmVirtualModuleId = '\0libsvm-worker-compatible';
 const libsvmWasmEntryPath = require.resolve('@libsvm-js/libsvm-js/out/wasm/libsvm.js');
@@ -64,9 +67,11 @@ function libsvmWorkerCompatibilityPlugin(): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const environment = loadEnv(mode, process.cwd(), '');
+  const environmentDirectory = getViteEnvironmentDirectory(mode, webRoot);
+  const environment = loadEnv(mode, environmentDirectory, '');
 
   return {
+    envDir: environmentDirectory,
     plugins: [react(), tailwindcss(), libsvmWorkerCompatibilityPlugin()],
     worker: {
       plugins: () => [libsvmWorkerCompatibilityPlugin()],
@@ -83,7 +88,7 @@ export default defineConfig(({ mode }) => {
       include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
       maxWorkers: 1,
-      pool: 'threads',
+      pool: 'forks',
       setupFiles: './src/test/setup.ts',
       css: true,
       fileParallelism: false,

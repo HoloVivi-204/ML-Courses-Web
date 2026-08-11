@@ -32,18 +32,43 @@ const FIREBASE_APP_NAME = 'ml-path-web';
 const LOCAL_AUTH_EMULATOR_URL = 'http://127.0.0.1:9099';
 const LOCAL_FIREBASE_PROJECT_ID = 'demo-ml-learning-local';
 
+interface FirebaseEnvironment {
+  VITE_FIREBASE_API_KEY?: string;
+  VITE_FIREBASE_APP_ID?: string;
+  VITE_FIREBASE_AUTH_DOMAIN?: string;
+  VITE_FIREBASE_PROJECT_ID?: string;
+  VITE_FIREBASE_STORAGE_BUCKET?: string;
+}
+
+export interface LocalDataEmulatorConfiguration {
+  authEmulatorEnabled: boolean;
+  dataEmulatorSetting?: string;
+}
+
 export function isFirebaseEmulator(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_FIREBASE_USE_EMULATOR !== 'false';
 }
 
-function getFirebaseOptions(): FirebaseOptions | null {
-  if (isFirebaseEmulator()) {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? LOCAL_FIREBASE_PROJECT_ID;
+export function shouldUseLocalDataEmulators(
+  configuration: LocalDataEmulatorConfiguration = {
+    authEmulatorEnabled: isFirebaseEmulator(),
+    dataEmulatorSetting: import.meta.env.VITE_FIREBASE_USE_DATA_EMULATORS,
+  },
+): boolean {
+  return configuration.authEmulatorEnabled || configuration.dataEmulatorSetting === 'true';
+}
+
+export function getFirebaseOptionsFromEnvironment(
+  environment: FirebaseEnvironment,
+  useEmulator: boolean,
+): FirebaseOptions | null {
+  if (useEmulator) {
+    const projectId = environment.VITE_FIREBASE_PROJECT_ID ?? LOCAL_FIREBASE_PROJECT_ID;
 
     return {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'local-emulator-api-key',
-      appId: import.meta.env.VITE_FIREBASE_APP_ID ?? 'local-emulator-app',
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'localhost',
+      apiKey: environment.VITE_FIREBASE_API_KEY ?? 'local-emulator-api-key',
+      appId: environment.VITE_FIREBASE_APP_ID ?? 'local-emulator-app',
+      authDomain: environment.VITE_FIREBASE_AUTH_DOMAIN ?? 'localhost',
       projectId,
       storageBucket: `${projectId}.appspot.com`,
     };
@@ -55,14 +80,13 @@ function getFirebaseOptions(): FirebaseOptions | null {
     VITE_FIREBASE_AUTH_DOMAIN,
     VITE_FIREBASE_PROJECT_ID,
     VITE_FIREBASE_STORAGE_BUCKET,
-  } = import.meta.env;
+  } = environment;
 
   if (
     !VITE_FIREBASE_API_KEY ||
     !VITE_FIREBASE_APP_ID ||
     !VITE_FIREBASE_AUTH_DOMAIN ||
-    !VITE_FIREBASE_PROJECT_ID ||
-    !VITE_FIREBASE_STORAGE_BUCKET
+    !VITE_FIREBASE_PROJECT_ID
   ) {
     return null;
   }
@@ -72,8 +96,21 @@ function getFirebaseOptions(): FirebaseOptions | null {
     appId: VITE_FIREBASE_APP_ID,
     authDomain: VITE_FIREBASE_AUTH_DOMAIN,
     projectId: VITE_FIREBASE_PROJECT_ID,
-    storageBucket: VITE_FIREBASE_STORAGE_BUCKET,
+    ...(VITE_FIREBASE_STORAGE_BUCKET ? { storageBucket: VITE_FIREBASE_STORAGE_BUCKET } : {}),
   };
+}
+
+function getFirebaseOptions(): FirebaseOptions | null {
+  return getFirebaseOptionsFromEnvironment(
+    {
+      VITE_FIREBASE_API_KEY: import.meta.env.VITE_FIREBASE_API_KEY,
+      VITE_FIREBASE_APP_ID: import.meta.env.VITE_FIREBASE_APP_ID,
+      VITE_FIREBASE_AUTH_DOMAIN: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      VITE_FIREBASE_STORAGE_BUCKET: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    },
+    isFirebaseEmulator(),
+  );
 }
 
 function getFirebaseApp(options: FirebaseOptions): FirebaseApp {

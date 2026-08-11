@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "node scripts/run-coverage.mjs",
     "pretest:performance": "pnpm run build",
     "test:performance": "node scripts/check-performance-budget.mjs",
     "typecheck": "tsc -b --pretty false",

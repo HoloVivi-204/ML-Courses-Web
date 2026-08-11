@@ -2,11 +2,17 @@ import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
 
 import type { LocalAdminServices, LocalBucket } from './admin-services.js';
+import { LOCAL_EMULATOR_HOSTS } from './environment.js';
 import type { LocalSeedManifest } from './seed-manifest.js';
+
+const FIRESTORE_EMULATOR_RESET_TIMEOUT_MS = 10_000;
+const FIRESTORE_EMULATOR_RESET_MAX_ATTEMPTS = 6;
+const FIRESTORE_EMULATOR_RESET_RETRY_DELAY_MS = 1_000;
 
 export interface LocalDataEmulatorServices {
   bucket: LocalBucket;
   firestore: Firestore;
+  projectId: string;
 }
 
 async function deleteAllAuthUsers(auth: Auth): Promise<void> {
@@ -28,11 +34,27 @@ async function deleteAllAuthUsers(auth: Auth): Promise<void> {
   } while (pageToken);
 }
 
-async function deleteAllFirestoreDocuments(firestore: Firestore): Promise<void> {
-  const collections = await firestore.listCollections();
+async function deleteAllFirestoreDocuments(projectId: string): Promise<void> {
+  for (let attempt = 1; attempt <= FIRESTORE_EMULATOR_RESET_MAX_ATTEMPTS; attempt += 1) {
+    const response = await fetch(
+      `http://${LOCAL_EMULATOR_HOSTS.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${projectId}/databases/(default)/documents`,
+      {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(FIRESTORE_EMULATOR_RESET_TIMEOUT_MS),
+      },
+    );
 
-  for (const collection of collections) {
-    await firestore.recursiveDelete(collection);
+    if (response.ok) {
+      return;
+    }
+
+    if (response.status !== 409 || attempt === FIRESTORE_EMULATOR_RESET_MAX_ATTEMPTS) {
+      throw new Error(`Firestore Emulator document reset failed with HTTP ${response.status}.`);
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, FIRESTORE_EMULATOR_RESET_RETRY_DELAY_MS * 2 ** (attempt - 1));
+    });
   }
 }
 
@@ -79,7 +101,7 @@ export async function resetAndSeedLocalDataEmulators(
   services: LocalDataEmulatorServices,
   manifest: LocalSeedManifest,
 ): Promise<void> {
-  await deleteAllFirestoreDocuments(services.firestore);
+  await deleteAllFirestoreDocuments(services.projectId);
   await deleteAllStorageObjects(services.bucket);
 
   await seedFirestore(services.firestore, manifest);

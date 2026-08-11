@@ -6,7 +6,10 @@ import {
   type FirebaseStorage,
 } from 'firebase/storage';
 
-import { getConfiguredFirebaseApp, isFirebaseEmulator } from '../auth/firebase-auth-gateway';
+import {
+  getConfiguredFirebaseApp,
+  shouldUseLocalDataEmulators,
+} from '../auth/firebase-auth-gateway';
 import {
   DatasetLoadError,
   createCacheApiDatasetByteCache,
@@ -29,8 +32,9 @@ export function createFirebasePlaygroundDatasetLoader(): PlaygroundDatasetLoader
   }
 
   const storage = getStorage(app);
+  const usesLocalDataEmulators = shouldUseLocalDataEmulators();
 
-  if (isFirebaseEmulator() && !connectedStorageEmulators.has(storage)) {
+  if (usesLocalDataEmulators && !connectedStorageEmulators.has(storage)) {
     connectStorageEmulator(storage, LOCAL_STORAGE_EMULATOR_HOST, LOCAL_STORAGE_EMULATOR_PORT);
     connectedStorageEmulators.add(storage);
   }
@@ -38,7 +42,7 @@ export function createFirebasePlaygroundDatasetLoader(): PlaygroundDatasetLoader
   return createPlaygroundDatasetLoader({
     cache: createCacheApiDatasetByteCache(),
     decodeGzip: decodeGzipDatasetBytes,
-    environment: isFirebaseEmulator() ? 'emulator' : 'firebase',
+    environment: usesLocalDataEmulators ? 'emulator' : 'firebase',
     sha256: sha256DatasetBytes,
     source: {
       async download(path, maxDownloadBytes) {

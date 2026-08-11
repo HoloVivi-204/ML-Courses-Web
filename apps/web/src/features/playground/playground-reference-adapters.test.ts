@@ -78,7 +78,12 @@ import spamLogisticFixture from './fixtures/spam-logistic-v1.json';
 import xorPerceptronFixture from './fixtures/xor-perceptron-v1.json';
 import xorMlpFixture from './fixtures/xor-mlp-v1.json';
 
-const TENSORFLOW_GOLDEN_FIXTURE_TIMEOUT_MS = 15_000;
+const TENSORFLOW_GOLDEN_FIXTURE_RUNTIME_TIMEOUT_MS = 15_000;
+const TENSORFLOW_GOLDEN_FIXTURE_V8_PROFILING_TIMEOUT_MS = 30_000;
+const tensorflowGoldenFixtureTimeoutMs =
+  process.env.ML_PATH_V8_COVERAGE_PROFILING === 'true'
+    ? TENSORFLOW_GOLDEN_FIXTURE_V8_PROFILING_TIMEOUT_MS
+    : TENSORFLOW_GOLDEN_FIXTURE_RUNTIME_TIMEOUT_MS;
 
 const fixtureCases = [
   {
@@ -322,7 +327,7 @@ describe('Playground reference adapters', () => {
       expectGoldenFixture(result, 'run-moons-mlp', moonsMlpFixture);
       expect(result.textAlternative?.vi).toEqual(expect.stringContaining('accuracy'));
     },
-    TENSORFLOW_GOLDEN_FIXTURE_TIMEOUT_MS,
+    tensorflowGoldenFixtureTimeoutMs,
   );
 
   it('runs pg-house-price linear regression through the registry and matches the golden fixture', async () => {
@@ -832,6 +837,6 @@ describe('Playground reference adapters', () => {
       expect(progressEpochs[0]).toBe(1);
       expect(progressEpochs.at(-1)).toBe(300);
     },
-    TENSORFLOW_GOLDEN_FIXTURE_TIMEOUT_MS,
+    tensorflowGoldenFixtureTimeoutMs,
   );
 });

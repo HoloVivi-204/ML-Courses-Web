@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test';
 
 const trialPath = '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron';
 
-test('public learning journey is responsive and passes automated WCAG checks', async ({ page }) => {
+test('@cross-browser-smoke public learning journey is responsive and passes automated WCAG checks', async ({
+  page,
+}) => {
   await page.goto('/');
 
   await expect(
@@ -24,6 +26,7 @@ test('public learning journey is responsive and passes automated WCAG checks', a
     page.getByRole('heading', { name: 'Một neuron đưa ra quyết định như thế nào?' }),
   ).toBeVisible();
   await expect(page.locator('.katex').first()).toBeVisible();
+  await waitForVisualState(page);
   await expectNoHorizontalOverflow(page);
   await expectNoWcagViolations(page);
 
@@ -32,6 +35,7 @@ test('public learning journey is responsive and passes automated WCAG checks', a
   await expect(
     page.getByRole('heading', { name: 'How does a neuron make a decision?' }),
   ).toBeVisible();
+  await waitForVisualState(page);
   await expectNoHorizontalOverflow(page);
   await expectNoWcagViolations(page);
 
@@ -61,6 +65,16 @@ async function waitForVisualState(page: import('@playwright/test').Page) {
   await page.evaluate(async () => {
     await Promise.all(
       document.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+
+  await page.waitForFunction(() => {
+    const inheritedText = [...document.querySelectorAll<HTMLElement>('.brand-wordmark, h1')];
+    const bodyColor = getComputedStyle(document.body).color;
+
+    return (
+      inheritedText.length > 0 &&
+      inheritedText.every((element) => getComputedStyle(element).color === bodyColor)
     );
   });
 }

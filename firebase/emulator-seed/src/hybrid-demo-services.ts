@@ -10,6 +10,7 @@ export interface HybridDemoServices {
   app: App;
   bucket: HybridDemoBucket;
   firestore: Firestore;
+  projectId: string;
 }
 
 export function createHybridDemoServices(
@@ -34,5 +35,6 @@ export function createHybridDemoServices(
     app,
     bucket: getStorage(app).bucket(),
     firestore: getFirestore(app),
+    projectId,
   };
 }

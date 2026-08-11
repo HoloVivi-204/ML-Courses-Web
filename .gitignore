@@ -18,7 +18,6 @@ ui-debug.log*
 .env
 .env.*
 !apps/web/.env.example
-!apps/web/.env.friend-demo
 !apps/functions/.env.example
 *.local
 *.pem

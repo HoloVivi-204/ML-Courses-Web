@@ -5,7 +5,10 @@ pushd "%~dp0" || exit /b 1
 set "ML_PATH_NONINTERACTIVE=false"
 if /i "%~1"=="--non-interactive" set "ML_PATH_NONINTERACTIVE=true"
 
-if not exist "apps\web\.env.friend-demo" goto missing_config
+if not exist "apps\web\friend-demo.config" goto missing_config
+
+call :prepare_friend_demo_environment
+if errorlevel 1 goto runtime_config_failed
 
 call :read_friend_demo_project
 if errorlevel 1 goto invalid_config
@@ -99,17 +102,28 @@ goto success
 
 :read_friend_demo_project
 set "FIREBASE_PROJECT_ID="
-for /f "tokens=1,* delims==" %%A in ('findstr /r /c:"^[ ]*VITE_FIREBASE_PROJECT_ID=" "apps\web\.env.friend-demo"') do set "FIREBASE_PROJECT_ID=%%B"
+for /f "tokens=1,* delims==" %%A in ('findstr /r /c:"^[ ]*VITE_FIREBASE_PROJECT_ID=" "apps\web\friend-demo.config"') do set "FIREBASE_PROJECT_ID=%%B"
 set "FIREBASE_PROJECT_ID=%FIREBASE_PROJECT_ID:"=%"
 if defined FIREBASE_PROJECT_ID exit /b 0
 exit /b 1
 
+:prepare_friend_demo_environment
+if not exist ".runtime\friend-demo-web\" mkdir ".runtime\friend-demo-web"
+if errorlevel 1 exit /b 1
+copy /y "apps\web\friend-demo.config" ".runtime\friend-demo-web\.env.friend-demo" >nul
+if errorlevel 1 exit /b 1
+exit /b 0
+
 :missing_config
-echo ERROR: apps\web\.env.friend-demo is missing. Restore the local friend-demo configuration, then retry.
+echo ERROR: apps\web\friend-demo.config is missing. Restore the versioned public friend-demo configuration, then retry.
 goto fail
 
 :invalid_config
-echo ERROR: VITE_FIREBASE_PROJECT_ID is missing from apps\web\.env.friend-demo.
+echo ERROR: VITE_FIREBASE_PROJECT_ID is missing from apps\web\friend-demo.config.
+goto fail
+
+:runtime_config_failed
+echo ERROR: Could not prepare .runtime\friend-demo-web\.env.friend-demo. Check that the project folder is writable, then retry.
 goto fail
 
 :port_conflict

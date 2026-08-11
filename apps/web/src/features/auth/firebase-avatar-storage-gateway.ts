@@ -7,7 +7,7 @@ import {
 } from 'firebase/storage';
 
 import type { AvatarUploadSession } from '../learning/learning-api';
-import { getConfiguredFirebaseApp, isFirebaseEmulator } from './firebase-auth-gateway';
+import { getConfiguredFirebaseApp, shouldUseLocalDataEmulators } from './firebase-auth-gateway';
 
 const LOCAL_STORAGE_EMULATOR_HOST = '127.0.0.1';
 const LOCAL_STORAGE_EMULATOR_PORT = 9199;
@@ -30,7 +30,7 @@ export function createFirebaseAvatarUploadStorageGateway(): AvatarUploadStorageG
 
   const storage = getStorage(app);
 
-  if (isFirebaseEmulator() && !connectedStorageEmulators.has(storage)) {
+  if (shouldUseLocalDataEmulators() && !connectedStorageEmulators.has(storage)) {
     connectStorageEmulator(storage, LOCAL_STORAGE_EMULATOR_HOST, LOCAL_STORAGE_EMULATOR_PORT);
     connectedStorageEmulators.add(storage);
   }
