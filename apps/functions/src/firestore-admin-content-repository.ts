@@ -10,10 +10,12 @@ import {
 import {
   assertPublishEvidenceIsComplete,
   createAdminContentDraftChecksum,
+  createLegacyAdminContentDraftChecksum,
   isAdminContentEvidenceKind,
   requiredAdminContentEvidenceKinds,
   type AdminContentExternalEvidence,
 } from './admin-content-evidence.js';
+import { createAdminContentDraftUpdateAuditRecord } from './admin-content-audit.js';
 import { createAdminContentRevisionPreview } from './admin-content-preview.js';
 import {
   applyAdminDraftToPublishedLearnerContent,
@@ -47,6 +49,16 @@ import {
   type PublishAdminContentRevisionResult,
 } from './admin-content-repository.js';
 import { ApiError } from './api-error.js';
+import {
+  parseStoredAdminContentRevisionValue,
+  serializeStoredAdminContentDraftRevisionV2,
+  serializeStoredAdminContentPublishedRevisionV1,
+  serializeStoredAdminContentPublishedRevisionV2,
+  type StoredAdminContentDraftRevisionV1,
+  type StoredAdminContentDraftRevisionV2,
+  type StoredAdminContentPublishedRevisionV1,
+  type StoredAdminContentPublishedRevisionV2,
+} from './admin-content-revision-storage.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { getReleaseLearningCatalog, getReleasePost } from './release-learning-catalog.js';
 
@@ -54,6 +66,7 @@ const ADMIN_CONTENT_ENTITIES_COLLECTION = 'adminContentEntities';
 const ADMIN_CONTENT_IDEMPOTENCY_COLLECTION = 'adminContentPublishIdempotency';
 const ADMIN_CONTENT_LIFECYCLE_EVENTS_COLLECTION = 'adminContentLifecycleEvents';
 const ADMIN_CONTENT_REVISIONS_COLLECTION = 'adminContentRevisions';
+const AUDIT_LOGS_COLLECTION = 'auditLogs';
 const IDEMPOTENCY_RECORD_TTL_MILLISECONDS = 24 * 60 * 60 * 1000;
 
 interface StoredAdminContentEntity {
@@ -66,27 +79,10 @@ interface StoredAdminContentEntity {
   updatedAt: string;
 }
 
-interface StoredDraftRevision {
-  contentChecksum: string;
-  createdAt: string;
-  draft: AdminContentDraft;
-  entityKey: string;
-  learnerContent: PublishedLearnerContent | null;
-  schemaVersion: 1;
-  state: 'draft';
-  updatedAt: string;
-}
+type StoredDraftRevision = StoredAdminContentDraftRevisionV1 | StoredAdminContentDraftRevisionV2;
 
-interface StoredPublishedRevision {
-  contentChecksum: string;
-  createdAt: string;
-  entityKey: string;
-  learnerContent: PublishedLearnerContent | null;
-  publishedAt: string;
-  publishedContent: AdminContentSummary;
-  schemaVersion: 1;
-  state: 'published';
-}
+type StoredPublishedRevision =
+  StoredAdminContentPublishedRevisionV1 | StoredAdminContentPublishedRevisionV2;
 
 interface StoredPublishIdempotencyRecord {
   actorUid: string;
@@ -97,6 +93,7 @@ interface StoredPublishIdempotencyRecord {
 }
 
 export interface FirestoreAdminContentRepositoryOptions {
+  createAuditDocumentId?: (() => string) | undefined;
   firestore?: Firestore | undefined;
   now?: (() => Date) | undefined;
   verifyPublishEvidence?:
@@ -119,6 +116,31 @@ function createDataIntegrityError(): ApiError {
     'ADMIN_CONTENT_DATA_INTEGRITY_ERROR',
     'Persisted admin content data is invalid.',
   );
+}
+
+function assertDraftChecksumUpgradeComplete(
+  revision: StoredDraftRevision,
+): asserts revision is StoredAdminContentDraftRevisionV2 {
+  if (revision.schemaVersion === 1) {
+    throw new ApiError(
+      409,
+      'ADMIN_CONTENT_DRAFT_CHECKSUM_UPGRADE_REQUIRED',
+      'Save this draft before using evidence, validation, or publish operations.',
+    );
+  }
+}
+
+function createPersistedDraftChecksum(
+  revision: StoredDraftRevision,
+  checksumVersion: 1 | 2,
+): string {
+  try {
+    return checksumVersion === 1
+      ? createLegacyAdminContentDraftChecksum(revision.draft)
+      : createAdminContentDraftChecksum(revision.draft);
+  } catch {
+    throw createDataIntegrityError();
+  }
 }
 
 function getEntityDocumentId(entityType: AdminContentEntityType, entityId: string): string {
@@ -199,17 +221,7 @@ function getAffectedQuizIds(content: AdminContentSummary): readonly string[] {
 }
 
 function readStoredDraftRevision(snapshot: DocumentSnapshot): StoredDraftRevision {
-  const value = snapshot.data();
-
-  if (
-    !snapshot.exists ||
-    !isRecord(value) ||
-    value.schemaVersion !== 1 ||
-    value.state !== 'draft' ||
-    !isRecord(value.draft) ||
-    typeof value.contentChecksum !== 'string' ||
-    typeof value.entityKey !== 'string'
-  ) {
+  if (!snapshot.exists) {
     throw new ApiError(
       404,
       'ADMIN_CONTENT_DRAFT_NOT_FOUND',
@@ -217,24 +229,34 @@ function readStoredDraftRevision(snapshot: DocumentSnapshot): StoredDraftRevisio
     );
   }
 
-  return {
-    ...(value as unknown as StoredDraftRevision),
-    learnerContent:
-      (value as { learnerContent?: PublishedLearnerContent | undefined }).learnerContent ?? null,
-  };
+  let revision;
+
+  try {
+    revision = parseStoredAdminContentRevisionValue(snapshot.data());
+  } catch {
+    throw createDataIntegrityError();
+  }
+
+  if (revision.state !== 'draft') {
+    throw new ApiError(
+      404,
+      'ADMIN_CONTENT_DRAFT_NOT_FOUND',
+      'The requested draft revision was not found.',
+    );
+  }
+
+  if (
+    revision.schemaVersion === 2 &&
+    revision.contentChecksum !== createPersistedDraftChecksum(revision, 2)
+  ) {
+    throw createDataIntegrityError();
+  }
+
+  return revision;
 }
 
 function readStoredPublishedRevision(snapshot: DocumentSnapshot): StoredPublishedRevision {
-  const value = snapshot.data();
-
-  if (
-    !snapshot.exists ||
-    !isRecord(value) ||
-    value.schemaVersion !== 1 ||
-    value.state !== 'published' ||
-    !isRecord(value.publishedContent) ||
-    typeof value.entityKey !== 'string'
-  ) {
+  if (!snapshot.exists) {
     throw new ApiError(
       404,
       'ADMIN_CONTENT_REVISION_NOT_FOUND',
@@ -242,11 +264,23 @@ function readStoredPublishedRevision(snapshot: DocumentSnapshot): StoredPublishe
     );
   }
 
-  return {
-    ...(value as unknown as StoredPublishedRevision),
-    learnerContent:
-      (value as { learnerContent?: PublishedLearnerContent | undefined }).learnerContent ?? null,
-  };
+  let revision;
+
+  try {
+    revision = parseStoredAdminContentRevisionValue(snapshot.data());
+  } catch {
+    throw createDataIntegrityError();
+  }
+
+  if (revision.state !== 'published') {
+    throw new ApiError(
+      404,
+      'ADMIN_CONTENT_REVISION_NOT_FOUND',
+      'The requested published revision was not found.',
+    );
+  }
+
+  return revision;
 }
 
 function readStoredExternalEvidence(value: unknown): AdminContentExternalEvidence | null {
@@ -398,12 +432,14 @@ async function readPublishEvidence(
 export function createFirestoreAdminContentRepository(
   options: FirestoreAdminContentRepositoryOptions = {},
 ): AdminContentRepository {
+  const createAuditDocumentId = options.createAuditDocumentId ?? randomUUID;
   const firestore = options.firestore ?? getFirestore(getFirebaseAdminApp());
   const now = options.now ?? (() => new Date());
   const verifyPublishEvidence = options.verifyPublishEvidence ?? assertPublishEvidenceIsComplete;
   const isEmulator = options.isEmulator ?? (() => Boolean(process.env.FIRESTORE_EMULATOR_HOST));
   const entities = firestore.collection(ADMIN_CONTENT_ENTITIES_COLLECTION);
   const revisions = firestore.collection(ADMIN_CONTENT_REVISIONS_COLLECTION);
+  const auditLogs = firestore.collection(AUDIT_LOGS_COLLECTION);
   const lifecycleEvents = firestore.collection(ADMIN_CONTENT_LIFECYCLE_EVENTS_COLLECTION);
   const idempotencyRecords = firestore.collection(ADMIN_CONTENT_IDEMPOTENCY_COLLECTION);
 
@@ -428,6 +464,7 @@ export function createFirestoreAdminContentRepository(
 
       return firestore.runTransaction(async (transaction) => {
         const storedDraft = readStoredDraftRevision(await transaction.get(revisionReference));
+        assertDraftChecksumUpgradeComplete(storedDraft);
 
         if (storedDraft.contentChecksum !== input.checksum) {
           throw new ApiError(
@@ -508,16 +545,14 @@ export function createFirestoreAdminContentRepository(
           draftRevisionId,
         } satisfies AdminContentDraft;
         const contentChecksum = createAdminContentDraftChecksum(draft);
-        const storedDraft: StoredDraftRevision = {
+        const storedDraft = serializeStoredAdminContentDraftRevisionV2({
           contentChecksum,
           createdAt: currentTime,
           draft,
           entityKey: getAdminContentKey(draft.entityType, draft.entityId),
           learnerContent: currentRevision.learnerContent,
-          schemaVersion: 1,
-          state: 'draft',
           updatedAt: currentTime,
-        };
+        });
 
         transaction.create(draftReference, storedDraft);
         transaction.update(entityReference, {
@@ -584,6 +619,7 @@ export function createFirestoreAdminContentRepository(
     },
     async listEvidence(input) {
       const storedDraft = readStoredDraftRevision(await revisions.doc(input.revisionId).get());
+      assertDraftChecksumUpgradeComplete(storedDraft);
       const evidenceSnapshot = await revisions
         .doc(input.revisionId)
         .collection('externalEvidence')
@@ -620,9 +656,18 @@ export function createFirestoreAdminContentRepository(
       }
 
       const revisionReference = revisions.doc(input.revisionId);
+      const auditReference = auditLogs.doc(createAuditDocumentId());
+      const createdAt = now().toISOString();
 
       return firestore.runTransaction(async (transaction) => {
         const existingDraft = readStoredDraftRevision(await transaction.get(revisionReference));
+
+        if (
+          existingDraft.schemaVersion === 1 &&
+          existingDraft.contentChecksum !== createPersistedDraftChecksum(existingDraft, 1)
+        ) {
+          throw createDataIntegrityError();
+        }
 
         if (existingDraft.draft.revisionVersion !== input.revisionVersion) {
           throw new ApiError(
@@ -633,14 +678,27 @@ export function createFirestoreAdminContentRepository(
         }
 
         const draft = applyDraftPatch(existingDraft.draft, input.patch);
-        const updatedAt = now().toISOString();
+        const auditRecord = createAdminContentDraftUpdateAuditRecord({
+          actorId: input.actorUid,
+          after: draft,
+          before: existingDraft.draft,
+          contentChecksumVersionBefore: existingDraft.schemaVersion,
+          createdAt,
+          requestId: input.requestId,
+        });
 
-        transaction.set(revisionReference, {
-          ...existingDraft,
-          contentChecksum: createAdminContentDraftChecksum(draft),
-          draft,
-          updatedAt,
-        } satisfies StoredDraftRevision);
+        transaction.set(
+          revisionReference,
+          serializeStoredAdminContentDraftRevisionV2({
+            contentChecksum: createAdminContentDraftChecksum(draft),
+            createdAt: existingDraft.createdAt,
+            draft,
+            entityKey: existingDraft.entityKey,
+            learnerContent: existingDraft.learnerContent,
+            updatedAt: createdAt,
+          }),
+        );
+        transaction.create(auditReference, auditRecord);
 
         return { statusCode: 200, data: { draft } } as const;
       });
@@ -652,6 +710,7 @@ export function createFirestoreAdminContentRepository(
 
       return firestore.runTransaction(async (transaction) => {
         const storedDraft = readStoredDraftRevision(await transaction.get(revisionReference));
+        assertDraftChecksumUpgradeComplete(storedDraft);
         const entityReference = entities.doc(
           getEntityDocumentId(storedDraft.draft.entityType, storedDraft.draft.entityId),
         );
@@ -668,12 +727,17 @@ export function createFirestoreAdminContentRepository(
         const draft = { ...storedDraft.draft, validationStatus: 'valid' } as AdminContentDraft;
         const updatedAt = now().toISOString();
 
-        transaction.set(revisionReference, {
-          ...storedDraft,
-          contentChecksum: createAdminContentDraftChecksum(draft),
-          draft,
-          updatedAt,
-        } satisfies StoredDraftRevision);
+        transaction.set(
+          revisionReference,
+          serializeStoredAdminContentDraftRevisionV2({
+            contentChecksum: createAdminContentDraftChecksum(draft),
+            createdAt: storedDraft.createdAt,
+            draft,
+            entityKey: storedDraft.entityKey,
+            learnerContent: storedDraft.learnerContent,
+            updatedAt,
+          }),
+        );
 
         return {
           statusCode: 200,
@@ -691,7 +755,7 @@ export function createFirestoreAdminContentRepository(
         throw new ApiError(
           403,
           'ADMIN_CONTENT_EMULATOR_PUBLISH_ONLY',
-          'Emulator demo publication is only available in the Firestore Emulator Suite.',
+          'This publication scope is only available in the local workspace.',
         );
       }
 
@@ -722,6 +786,12 @@ export function createFirestoreAdminContentRepository(
         }
 
         const storedDraft = readStoredDraftRevision(await transaction.get(revisionReference));
+        assertDraftChecksumUpgradeComplete(storedDraft);
+        const sourceDraftEvidenceChecksum = createPersistedDraftChecksum(storedDraft, 2);
+
+        if (sourceDraftEvidenceChecksum !== storedDraft.contentChecksum) {
+          throw createDataIntegrityError();
+        }
 
         if (storedDraft.draft.validationStatus !== 'valid') {
           throw new ApiError(
@@ -748,7 +818,7 @@ export function createFirestoreAdminContentRepository(
 
           await verifyPublishEvidence({
             artifactId: storedDraft.draft.entityId,
-            contentChecksum: storedDraft.contentChecksum,
+            contentChecksum: sourceDraftEvidenceChecksum,
             evidence,
           });
         }
@@ -774,8 +844,7 @@ export function createFirestoreAdminContentRepository(
           statusCode: 200,
           data: { content, lifecycleEvent },
         };
-        const publishedRevision: StoredPublishedRevision = {
-          contentChecksum: storedDraft.contentChecksum,
+        const publishedRevision = serializeStoredAdminContentPublishedRevisionV2({
           createdAt: storedDraft.createdAt,
           entityKey: storedDraft.entityKey,
           learnerContent: applyAdminDraftToPublishedLearnerContent({
@@ -784,9 +853,8 @@ export function createFirestoreAdminContentRepository(
           }),
           publishedAt: createdAt,
           publishedContent: content,
-          schemaVersion: 1,
-          state: 'published',
-        };
+          sourceDraftEvidenceChecksum,
+        });
         const idempotencyRecord: StoredPublishIdempotencyRecord = {
           actorUid: input.actorUid,
           expireAt: new Date(currentTime.getTime() + IDEMPOTENCY_RECORD_TTL_MILLISECONDS),
@@ -1003,7 +1071,7 @@ export function createFirestoreAdminContentRepository(
           throw new ApiError(
             409,
             'ADMIN_CONTENT_UNPUBLISH_SCOPE_UNSUPPORTED',
-            'Release 1 only supports planned course unpublish from this endpoint.',
+            'This endpoint only supports unpublishing planned course content.',
           );
         }
 
@@ -1067,7 +1135,7 @@ export async function seedFirestoreAdminContentForEmulator(input: {
   firestore: Firestore;
 }): Promise<void> {
   if (!process.env.FIRESTORE_EMULATOR_HOST) {
-    throw new Error('Firestore Admin content seed is restricted to the Emulator Suite.');
+    throw new Error('Firestore Admin content seed is restricted to the local workspace.');
   }
 
   const batch = input.firestore.batch();
@@ -1089,16 +1157,14 @@ export async function seedFirestoreAdminContentForEmulator(input: {
       schemaVersion: 1,
       updatedAt: seededAt,
     };
-    const revision: StoredPublishedRevision = {
+    const revision = serializeStoredAdminContentPublishedRevisionV1({
       contentChecksum: createHash('sha256').update(content.publishedRevisionId).digest('hex'),
       createdAt: seededAt,
       entityKey: getAdminContentKey(content.entityType, content.entityId),
       learnerContent: learnerContent ?? null,
       publishedAt: seededAt,
       publishedContent: withDraftRevision(content, null),
-      schemaVersion: 1,
-      state: 'published',
-    };
+    });
 
     batch.set(entityReference, entity);
     batch.set(revisionReference, revision);

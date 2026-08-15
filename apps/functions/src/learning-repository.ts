@@ -13,6 +13,7 @@ import { getDemoCompletionSeed } from './demo-manifest.js';
 import { getFirebaseAdminApp } from './firebase-admin-app.js';
 import { createLearningLearnerHash } from './learning-events.js';
 import { setLearningEventInTransaction } from './learning-event-repository.js';
+import { isLocalCloudAuthDemo } from './local-cloud-auth-demo.js';
 import {
   createFirestoreLearningContentAuthority,
   type LearningContentAuthority,
@@ -62,6 +63,7 @@ export interface LearnerAccountDeletionState {
 }
 
 export interface EnrollLearnerInput {
+  allowLocalCloudAuthDemoEntitlements?: boolean | undefined;
   courseId: string;
   displayName: string;
   idempotencyKey: string;
@@ -423,6 +425,95 @@ function getEnrollmentSeed(courseId: string): EnrollmentSeed {
     courseRevisionId: course.courseRevisionId,
     firstModuleId: firstModule.moduleId,
   };
+}
+
+function grantLocalCloudAuthDemoEntitlements(
+  transaction: Transaction,
+  firestore: Firestore,
+  uid: string,
+): void {
+  const grantedAlgorithmIds = new Set<string>();
+
+  for (const course of getReleaseLearningCatalog().courses) {
+    transaction.set(
+      firestore.doc(`users/${uid}/enrollments/${course.courseId}`),
+      {
+        schemaVersion: 1,
+        status: 'in-progress',
+        courseRevisionId: course.courseRevisionId,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    for (const module of course.modules) {
+      transaction.set(
+        firestore.doc(`users/${uid}/contentAccess/module_${module.moduleId}`),
+        {
+          schemaVersion: 1,
+          contentType: 'module',
+          entityId: module.moduleId,
+          grantedAt: FieldValue.serverTimestamp(),
+          reason: 'local-cloud-auth-demo',
+          sourceProgressId: 'local-cloud-auth-demo',
+        },
+        { merge: true },
+      );
+
+      for (const post of module.posts) {
+        transaction.set(
+          firestore.doc(`users/${uid}/contentAccess/post_${post.postId}`),
+          {
+            schemaVersion: 1,
+            contentType: 'post',
+            entityId: post.postId,
+            grantedAt: FieldValue.serverTimestamp(),
+            reason: 'local-cloud-auth-demo',
+            sourceProgressId: 'local-cloud-auth-demo',
+          },
+          { merge: true },
+        );
+      }
+
+      if (module.demoId) {
+        transaction.set(
+          firestore.doc(`users/${uid}/contentAccess/demo_${module.demoId}`),
+          {
+            schemaVersion: 1,
+            contentType: 'demo',
+            entityId: module.demoId,
+            grantedAt: FieldValue.serverTimestamp(),
+            reason: 'local-cloud-auth-demo',
+            sourceProgressId: 'local-cloud-auth-demo',
+          },
+          { merge: true },
+        );
+      }
+
+      for (const algorithmId of module.unlockAlgorithmIds) {
+        if (grantedAlgorithmIds.has(algorithmId)) {
+          continue;
+        }
+
+        grantedAlgorithmIds.add(algorithmId);
+        transaction.set(
+          firestore.doc(`users/${uid}/algorithmUnlocks/${algorithmId}`),
+          {
+            schemaVersion: 1,
+            algorithmId,
+            moduleId: module.moduleId,
+            moduleRevisionId: `${module.moduleId}-rev-r1`,
+            grantedAt: FieldValue.serverTimestamp(),
+            quizId: module.moduleQuizId,
+            reason: 'local-cloud-auth-demo',
+            sourceModuleId: module.moduleId,
+            unlockedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+    }
+  }
 }
 
 function createModuleCompletionSeed(module: ReleaseLearningModule): ModuleCompletionSeed {
@@ -2546,6 +2637,8 @@ export function createFirestoreLearningRepository(
     async enrollLearner(input) {
       const seed = getEnrollmentSeed(input.courseId);
       const requestHash = createEnrollmentRequestHash(input);
+      const shouldGrantLocalCloudAuthDemoEntitlements =
+        isLocalCloudAuthDemo() && input.allowLocalCloudAuthDemoEntitlements === true;
 
       return firestore.runTransaction(async (transaction) => {
         await assertCurrentLearningContentEntities({
@@ -2578,6 +2671,10 @@ export function createFirestoreLearningRepository(
               'IDEMPOTENCY_CONFLICT',
               'This Idempotency-Key was used for a different request.',
             );
+          }
+
+          if (shouldGrantLocalCloudAuthDemoEntitlements) {
+            grantLocalCloudAuthDemoEntitlements(transaction, firestore, input.uid);
           }
 
           return {
@@ -2628,6 +2725,10 @@ export function createFirestoreLearningRepository(
               sourceProgressId: `enrollments/${input.courseId}`,
             },
           );
+        }
+
+        if (shouldGrantLocalCloudAuthDemoEntitlements) {
+          grantLocalCloudAuthDemoEntitlements(transaction, firestore, input.uid);
         }
 
         transaction.set(idempotencyRef, {

@@ -1,5 +1,9 @@
 import { ApiError } from './api-error.js';
 import {
+  createAdminContentDraftUpdateAuditRecord,
+  type AdminContentDraftUpdateAuditRecord,
+} from './admin-content-audit.js';
+import {
   createAdminContentRevisionPreview,
   type AdminContentRevisionPreview,
 } from './admin-content-preview.js';
@@ -134,6 +138,7 @@ export interface AdminContentDraftPatch {
 export interface UpdateAdminContentDraftInput {
   actorUid: string;
   patch: AdminContentDraftPatch;
+  requestId: string;
   revisionId: string;
   revisionVersion: number;
 }
@@ -642,8 +647,8 @@ function cloneValidationManifest(
 function createSeededAdminContentMetadata(): AdminContentMetadata {
   return {
     attribution: {
-      en: 'Seeded Release 1 source attribution pending validation.',
-      vi: 'Attribution nguồn Release 1 đã seed, chờ validation.',
+      en: 'Source attribution is pending review.',
+      vi: 'Attribution nguồn đang chờ review.',
     },
     externalLinkUrl: null,
   };
@@ -882,7 +887,7 @@ function createValidationChecks(input: {
     createValidationCheck({
       checkId: 'source-status',
       isPassed: draft.sourceStatus === 'seeded',
-      message: 'Draft must come from the Release 1 seeded source pipeline.',
+      message: 'Draft must come from the approved source pipeline.',
     }),
     createValidationCheck({
       checkId: 'source-license',
@@ -897,15 +902,16 @@ function createValidationChecks(input: {
     createValidationCheck({
       checkId: 'external-link',
       isPassed:
-        typeof draft.metadata.externalLinkUrl === 'string' &&
-        hasHttpUrl(draft.metadata.externalLinkUrl),
-      message: 'Draft external source link must be present and use HTTP(S).',
+        draft.metadata.externalLinkUrl === null ||
+        (typeof draft.metadata.externalLinkUrl === 'string' &&
+          hasHttpUrl(draft.metadata.externalLinkUrl)),
+      message: 'Draft external source link must use HTTP(S) when provided.',
     }),
     createValidationCheck({
       checkId: 'release-hard-limits',
       isPassed: hasReleaseOneHardLimits(publishCandidateContent),
       message:
-        'Publish candidate must stay within Release 1 hard limits for modules, posts, blocks, quizzes, and demos.',
+        'Publish candidate must stay within the course limits for modules, posts, blocks, quizzes, and demos.',
     }),
     createValidationCheck({
       checkId: 'problem-registry',
@@ -1038,7 +1044,7 @@ function assertReleaseOnePublishedRevisionLimits(content: readonly AdminContentS
       throw new ApiError(
         500,
         'ADMIN_CONTENT_CURRENT_POINTER_DUPLICATE',
-        'Release 1 supports exactly one current published pointer per content entity.',
+        'Each content entity must have exactly one current published pointer.',
       );
     }
 
@@ -1046,7 +1052,7 @@ function assertReleaseOnePublishedRevisionLimits(content: readonly AdminContentS
       throw new ApiError(
         500,
         'ADMIN_CONTENT_REVISION_ID_DUPLICATE',
-        'Published revision IDs must be unique across Release 1 content.',
+        'Published revision IDs must be unique across the content library.',
       );
     }
 
@@ -1055,12 +1061,31 @@ function assertReleaseOnePublishedRevisionLimits(content: readonly AdminContentS
   }
 }
 
+export interface StaticAdminContentRepositoryOptions {
+  appendDraftAuditRecord?:
+    ((record: AdminContentDraftUpdateAuditRecord) => Promise<void>) | undefined;
+  now?: (() => Date) | undefined;
+}
+
+const processLocalAdminContentDraftAuditRecords: AdminContentDraftUpdateAuditRecord[] = [];
+
+async function appendProcessLocalAdminContentDraftAuditRecord(
+  record: AdminContentDraftUpdateAuditRecord,
+): Promise<void> {
+  processLocalAdminContentDraftAuditRecords.push(record);
+}
+
 export function createStaticAdminContentRepository(
   content: readonly AdminContentSummary[] = releaseOneAdminContent,
+  options: StaticAdminContentRepositoryOptions = {},
 ): AdminContentRepository {
   assertReleaseOnePublishedRevisionLimits(content);
 
+  const appendDraftAuditRecord =
+    options.appendDraftAuditRecord ?? appendProcessLocalAdminContentDraftAuditRecord;
+  const now = options.now ?? (() => new Date());
   const draftsByContentKey = new Map<string, AdminContentDraft>();
+  const draftMutationTailsByRevisionId = new Map<string, Promise<void>>();
   const publishedByContentKey = new Map<string, AdminContentSummary>();
   const publishedRevisionsByRevisionId = new Map<string, AdminContentSummary>(
     content.map((item) => [item.publishedRevisionId, item]),
@@ -1085,6 +1110,27 @@ export function createStaticAdminContentRepository(
 
   function findDraftByRevisionId(revisionId: string): AdminContentDraft | undefined {
     return [...draftsByContentKey.values()].find((draft) => draft.draftRevisionId === revisionId);
+  }
+
+  async function runSerializedDraftMutation<TResult>(
+    revisionId: string,
+    mutation: () => Promise<TResult>,
+  ): Promise<TResult> {
+    const previousTail = draftMutationTailsByRevisionId.get(revisionId) ?? Promise.resolve();
+    const mutationPromise = previousTail.then(mutation);
+    const currentTail = mutationPromise.then(
+      () => undefined,
+      () => undefined,
+    );
+    draftMutationTailsByRevisionId.set(revisionId, currentTail);
+
+    try {
+      return await mutationPromise;
+    } finally {
+      if (draftMutationTailsByRevisionId.get(revisionId) === currentTail) {
+        draftMutationTailsByRevisionId.delete(revisionId);
+      }
+    }
   }
 
   function getDraftEvidenceState(revisionId: string): {
@@ -1480,7 +1526,7 @@ export function createStaticAdminContentRepository(
         throw new ApiError(
           409,
           'ADMIN_CONTENT_UNPUBLISH_SCOPE_UNSUPPORTED',
-          'Release 1 only supports planned course unpublish from this endpoint.',
+          'This endpoint only supports unpublishing planned course content.',
         );
       }
 
@@ -1518,16 +1564,6 @@ export function createStaticAdminContentRepository(
         throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
       }
 
-      const existingDraft = findDraftByRevisionId(input.revisionId);
-
-      if (existingDraft === undefined) {
-        throw new ApiError(
-          404,
-          'ADMIN_CONTENT_DRAFT_NOT_FOUND',
-          'The requested draft revision was not found.',
-        );
-      }
-
       if (!hasDraftPatchValue(input.patch)) {
         throw new ApiError(
           400,
@@ -1536,26 +1572,48 @@ export function createStaticAdminContentRepository(
         );
       }
 
-      if (existingDraft.revisionVersion !== input.revisionVersion) {
-        throw new ApiError(
-          409,
-          'ADMIN_CONTENT_DRAFT_VERSION_CONFLICT',
-          'The draft has changed. Reload it before saving again.',
+      return runSerializedDraftMutation(input.revisionId, async () => {
+        const existingDraft = findDraftByRevisionId(input.revisionId);
+
+        if (existingDraft === undefined) {
+          throw new ApiError(
+            404,
+            'ADMIN_CONTENT_DRAFT_NOT_FOUND',
+            'The requested draft revision was not found.',
+          );
+        }
+
+        if (existingDraft.revisionVersion !== input.revisionVersion) {
+          throw new ApiError(
+            409,
+            'ADMIN_CONTENT_DRAFT_VERSION_CONFLICT',
+            'The draft has changed. Reload it before saving again.',
+          );
+        }
+
+        const updatedDraft = applyDraftPatch(existingDraft, input.patch);
+        const auditRecord = createAdminContentDraftUpdateAuditRecord({
+          actorId: input.actorUid,
+          after: updatedDraft,
+          before: existingDraft,
+          contentChecksumVersionBefore: 2,
+          createdAt: now().toISOString(),
+          requestId: input.requestId,
+        });
+
+        await appendDraftAuditRecord(auditRecord);
+        draftsByContentKey.set(
+          getAdminContentKey(updatedDraft.entityType, updatedDraft.entityId),
+          updatedDraft,
         );
-      }
 
-      const updatedDraft = applyDraftPatch(existingDraft, input.patch);
-      draftsByContentKey.set(
-        getAdminContentKey(updatedDraft.entityType, updatedDraft.entityId),
-        updatedDraft,
-      );
-
-      return {
-        statusCode: 200,
-        data: {
-          draft: updatedDraft,
-        },
-      };
+        return {
+          statusCode: 200,
+          data: {
+            draft: updatedDraft,
+          },
+        };
+      });
     },
     async validateDraft(input) {
       if (!input.actorUid) {

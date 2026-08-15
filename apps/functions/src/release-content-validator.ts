@@ -497,7 +497,7 @@ export function validateReleaseContentBaseline(
       findings,
       'BASELINE_COUNT_MISMATCH',
       'baseline.counts',
-      'Release 1 content must preserve the exact locked baseline counts.',
+      'Course content must preserve the exact locked baseline counts.',
     );
   }
 

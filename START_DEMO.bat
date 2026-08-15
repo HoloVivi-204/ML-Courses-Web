@@ -13,8 +13,8 @@ if errorlevel 1 goto runtime_config_failed
 call :read_friend_demo_project
 if errorlevel 1 goto invalid_config
 
-echo ML Path friend demo
-echo Firebase Auth stays in the configured cloud project, so Internet is required to sign in.
+echo ML Path local demo
+echo Firebase Auth uses real Google OAuth; Firestore, Functions, and Storage run locally.
 echo.
 echo [1/8] Checking Node.js 22 and pnpm...
 call "ops\windows\_ensure_pnpm.bat"
@@ -44,8 +44,8 @@ set "LOCAL_CLOUD_AUTH_DEMO=true"
 set "APP_ENV=local"
 set "APPCHECK_ENFORCEMENT_MODE=disabled"
 set "FIREBASE_AUTH_EMULATOR_HOST="
-set "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080"
-set "FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199"
+set "FIRESTORE_EMULATOR_HOST=localhost:8080"
+set "FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199"
 set "METADATA_SERVER_DETECTION=none"
 
 if not defined XDG_CONFIG_HOME set "XDG_CONFIG_HOME=%CD%\.runtime\firebase-tools-config"
@@ -56,10 +56,12 @@ if defined LOCAL_DEMO_ADMIN_EMAIL (
   echo Optional Admin pages are disabled because no LOCAL_DEMO_ADMIN_EMAIL was provided.
 ) else (
   echo.
-  echo Optional: enter the email you will use with Firebase Auth to enable local Admin pages.
+  echo Optional: enter the Gmail address that should have local Admin access.
   echo Leave it blank for learner-only testing.
-  set /p "LOCAL_DEMO_ADMIN_EMAIL=Admin email (optional): "
+  set /p "LOCAL_DEMO_ADMIN_EMAIL=Admin Gmail (optional): "
 )
+set "VITE_LOCAL_CLOUD_AUTH_DEMO=true"
+set "VITE_LOCAL_DEMO_ADMIN_EMAIL=%LOCAL_DEMO_ADMIN_EMAIL%"
 
 echo [4/8] Building local Functions and demo tooling...
 call "ops\windows\_run_pnpm.bat" firebase:build
@@ -75,9 +77,9 @@ echo Starting local Functions, Firestore, and Storage in a new window...
 start "ML Path Local Services" /D "%CD%" cmd.exe /d /k "call ops\windows\_run_pnpm.bat firebase:friend-demo:start"
 
 echo Waiting for the Emulator Hub and local API health endpoint...
-"%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://127.0.0.1:4400/emulators" 60
+"%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://localhost:4400/emulators" 60
 if errorlevel 1 goto services_not_ready
-"%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://127.0.0.1:5001/%FIREBASE_PROJECT_ID%/asia-southeast1/api/api/v1/health" 60
+"%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://localhost:5001/%FIREBASE_PROJECT_ID%/asia-southeast1/api/api/v1/health" 60
 if errorlevel 1 goto services_not_ready
 
 echo [6/8] Resetting and seeding fresh local Firestore and Storage data...
@@ -89,14 +91,15 @@ call "ops\windows\_run_pnpm.bat" analytics:aggregate
 if errorlevel 1 goto aggregation_failed
 
 echo [8/8] Starting the web app in a new window...
-start "ML Path Web" /D "%CD%" cmd.exe /d /k "call ops\windows\_run_pnpm.bat --filter @ml-path/web dev --mode friend-demo --host 127.0.0.1"
-"%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://127.0.0.1:5173" 45
+start "ML Path Web" /D "%CD%" cmd.exe /d /k "call ops\windows\_run_pnpm.bat --filter @ml-path/web dev --mode friend-demo --host localhost"
+"%ML_PATH_NODE_EXE%" "firebase\emulator-seed\dist\demo-readiness-cli.js" wait-for-http "http://localhost:5173" 45
 if errorlevel 1 goto web_not_ready
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process 'http://127.0.0.1:5173' -ErrorAction Stop; exit 0 } catch { exit 1 }"
-if errorlevel 1 echo NOTICE: Windows could not open the default browser. Open http://127.0.0.1:5173 manually.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process 'http://localhost:5173' -ErrorAction Stop; exit 0 } catch { exit 1 }"
+if errorlevel 1 echo NOTICE: Windows could not open the default browser. Open http://localhost:5173 manually.
 echo.
-echo DONE: The fresh hybrid-local demo is ready at http://127.0.0.1:5173.
+echo DONE: The fresh local demo is ready at http://localhost:5173.
+echo Sign in with the Gmail account entered above to open local Admin flows.
 echo Keep the ML Path Local Services and ML Path Web windows open while presenting.
 goto success
 

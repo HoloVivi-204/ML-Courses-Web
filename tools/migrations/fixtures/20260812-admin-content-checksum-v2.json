@@ -1,0 +1,150 @@
+{
+  "records": [
+    {
+      "documentId": "revision-published-v2",
+      "data": {
+        "createdAt": "2026-08-12T00:00:00.000Z",
+        "entityKey": "course:course-classical-ml",
+        "learnerContent": null,
+        "publishedAt": "2026-08-12T01:00:00.000Z",
+        "publishedContent": {
+          "courseId": "course-classical-ml",
+          "draftRevisionId": null,
+          "emergencyBlocked": false,
+          "entityId": "course-classical-ml",
+          "entityType": "course",
+          "localeAvailability": ["en", "vi"],
+          "preview": { "en": "Preview", "vi": "Tom tat" },
+          "publicationScope": "publish-quality",
+          "previousPublishedRevisionId": "course-classical-ml-rev-r1",
+          "publishedRevisionId": "draft-course-course-classical-ml-rev-d1",
+          "sourceReview": {
+            "attribution": { "en": "Source attribution", "vi": "Nguon tham khao" },
+            "license": { "name": "MIT", "url": "https://example.test/license" },
+            "sourceId": "source-example",
+            "title": "Example source"
+          },
+          "sourceStatus": "seeded",
+          "status": "published",
+          "title": { "en": "Classical ML", "vi": "Hoc may co dien" },
+          "trialPostId": "cml-p01-problem-data-types",
+          "validationStatus": "valid"
+        },
+        "schemaVersion": 2,
+        "sourceDraftEvidenceChecksum": "bdcc7e27b9eb354126f4a7451e503271dc34677976cf40380ffddf30b0e5a719",
+        "sourceDraftEvidenceChecksumVersion": 2,
+        "state": "published"
+      }
+    },
+    {
+      "documentId": "revision-draft-v1",
+      "data": {
+        "contentChecksum": "a6b99e98a06cf4f21b2b834faab83ca7c9c6b8819379ee38b0db8bc42012b216",
+        "createdAt": "2026-08-11T00:00:00.000Z",
+        "draft": {
+          "baseRevisionId": "course-classical-ml-rev-r1",
+          "courseId": "course-classical-ml",
+          "draftRevisionId": "draft-course-course-classical-ml-rev-d1",
+          "entityId": "course-classical-ml",
+          "entityType": "course",
+          "localeAvailability": ["en", "vi"],
+          "metadata": {
+            "attribution": { "en": "Source attribution", "vi": "Nguon tham khao" },
+            "externalLinkUrl": "https://example.test/source"
+          },
+          "preview": { "en": "Preview", "vi": "Tom tat" },
+          "revisionVersion": 1,
+          "sourceReview": {
+            "attribution": { "en": "Source attribution", "vi": "Nguon tham khao" },
+            "license": { "name": "MIT", "url": "https://example.test/license" },
+            "sourceId": "source-example",
+            "title": "Example source"
+          },
+          "sourceStatus": "seeded",
+          "status": "draft",
+          "title": { "en": "Classical ML", "vi": "Hoc may co dien" },
+          "trialPostId": "cml-p01-problem-data-types",
+          "validationStatus": "not-run"
+        },
+        "entityKey": "course:course-classical-ml",
+        "learnerContent": null,
+        "schemaVersion": 1,
+        "state": "draft",
+        "updatedAt": "2026-08-11T00:30:00.000Z"
+      }
+    },
+    {
+      "documentId": "revision-published-v1",
+      "data": {
+        "contentChecksum": "a6b99e98a06cf4f21b2b834faab83ca7c9c6b8819379ee38b0db8bc42012b216",
+        "createdAt": "2026-08-11T00:00:00.000Z",
+        "entityKey": "course:course-classical-ml",
+        "learnerContent": null,
+        "publishedAt": "2026-08-11T01:00:00.000Z",
+        "publishedContent": {
+          "courseId": "course-classical-ml",
+          "draftRevisionId": null,
+          "emergencyBlocked": false,
+          "entityId": "course-classical-ml",
+          "entityType": "course",
+          "localeAvailability": ["en", "vi"],
+          "preview": { "en": "Preview", "vi": "Tom tat" },
+          "publicationScope": "publish-quality",
+          "previousPublishedRevisionId": "course-classical-ml-rev-r1",
+          "publishedRevisionId": "draft-course-course-classical-ml-rev-d1",
+          "sourceReview": {
+            "attribution": { "en": "Source attribution", "vi": "Nguon tham khao" },
+            "license": { "name": "MIT", "url": "https://example.test/license" },
+            "sourceId": "source-example",
+            "title": "Example source"
+          },
+          "sourceStatus": "seeded",
+          "status": "published",
+          "title": { "en": "Classical ML", "vi": "Hoc may co dien" },
+          "trialPostId": "cml-p01-problem-data-types",
+          "validationStatus": "valid"
+        },
+        "schemaVersion": 1,
+        "state": "published"
+      }
+    },
+    {
+      "documentId": "revision-draft-v2",
+      "data": {
+        "contentChecksum": "bdcc7e27b9eb354126f4a7451e503271dc34677976cf40380ffddf30b0e5a719",
+        "contentChecksumVersion": 2,
+        "createdAt": "2026-08-12T00:00:00.000Z",
+        "draft": {
+          "baseRevisionId": "course-classical-ml-rev-r1",
+          "courseId": "course-classical-ml",
+          "draftRevisionId": "draft-course-course-classical-ml-rev-d1",
+          "entityId": "course-classical-ml",
+          "entityType": "course",
+          "localeAvailability": ["en", "vi"],
+          "metadata": {
+            "attribution": { "en": "Source attribution", "vi": "Nguon tham khao" },
+            "externalLinkUrl": "https://example.test/source"
+          },
+          "preview": { "en": "Preview", "vi": "Tom tat" },
+          "revisionVersion": 1,
+          "sourceReview": {
+            "attribution": { "en": "Source attribution", "vi": "Nguon tham khao" },
+            "license": { "name": "MIT", "url": "https://example.test/license" },
+            "sourceId": "source-example",
+            "title": "Example source"
+          },
+          "sourceStatus": "seeded",
+          "status": "draft",
+          "title": { "en": "Classical ML", "vi": "Hoc may co dien" },
+          "trialPostId": "cml-p01-problem-data-types",
+          "validationStatus": "not-run"
+        },
+        "entityKey": "course:course-classical-ml",
+        "learnerContent": null,
+        "schemaVersion": 2,
+        "state": "draft",
+        "updatedAt": "2026-08-12T00:30:00.000Z"
+      }
+    }
+  ]
+}

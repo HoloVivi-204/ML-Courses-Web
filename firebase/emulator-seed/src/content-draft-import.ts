@@ -277,7 +277,7 @@ function validateParsedSkeleton(input: ParsedSkeleton): void {
     postQuizQuestions !== input.counts.postQuizQuestions ||
     moduleQuizQuestions + postQuizQuestions !== input.counts.quizQuestions
   ) {
-    throw new Error('content-skeleton.yaml does not match the locked Release 1 baseline counts.');
+    throw new Error('content-skeleton.yaml does not match the locked course baseline counts.');
   }
 
   for (const course of input.courses) {

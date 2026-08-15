@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
+import type { AdminContentDraftUpdateAuditRecord } from './admin-content-audit.js';
 import { createApiApp } from './api-app.js';
 import {
   createStaticAdminContentRepository,
@@ -8,7 +9,7 @@ import {
 } from './admin-content-repository.js';
 import type { AvatarUploadService } from './avatar-upload-service.js';
 import type { LearningEventRepository } from './learning-event-repository.js';
-import type { LearningRepository } from './learning-repository.js';
+import type { EnrollLearnerInput, LearningRepository } from './learning-repository.js';
 import type { PlaygroundRepository } from './playground-repository.js';
 
 function createLearningRepository(overrides: Partial<LearningRepository>): LearningRepository {
@@ -970,9 +971,11 @@ describe('API foundation', () => {
   it('enrolls an authenticated learner idempotently and opens the first module overview', async () => {
     const idempotencyRecords = new Map<string, unknown>();
     const enrollmentKeys = new Set<string>();
+    const enrollmentInputs: EnrollLearnerInput[] = [];
     const app = createApiApp({
       learningRepository: createLearningRepository({
-        enrollLearner: async (input: { courseId: string; idempotencyKey: string; uid: string }) => {
+        enrollLearner: async (input) => {
+          enrollmentInputs.push(input);
           const requestHash = `${input.uid}:${input.courseId}`;
           const stored = idempotencyRecords.get(input.idempotencyKey);
 
@@ -1035,6 +1038,47 @@ describe('API foundation', () => {
     });
     expect(retryResponse.body.data).toEqual(firstResponse.body.data);
     expect(enrollmentKeys).toEqual(new Set(['learner-01:course-deep-learning-basic']));
+    expect(enrollmentInputs).toEqual([
+      expect.objectContaining({ allowLocalCloudAuthDemoEntitlements: false }),
+      expect.objectContaining({ allowLocalCloudAuthDemoEntitlements: false }),
+    ]);
+  });
+
+  it('enables local cloud Auth demo entitlements only for a verified Admin', async () => {
+    let enrollmentInput: EnrollLearnerInput | undefined;
+    const app = createApiApp({
+      learningRepository: createLearningRepository({
+        enrollLearner: async (input) => {
+          enrollmentInput = input;
+
+          return {
+            statusCode: 201,
+            data: {
+              access: { moduleId: 'dl-m01-neuron-perceptron' },
+              enrollment: {
+                courseId: 'course-deep-learning-basic',
+                progressPercent: 0,
+                status: 'in-progress',
+              },
+              nextPath: '/learn/course-deep-learning-basic',
+            },
+          };
+        },
+      }),
+      verifyAuthToken: async () => ({
+        displayName: 'Operator',
+        role: 'admin',
+        uid: 'admin-01',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/courses/course-deep-learning-basic/enrollments')
+      .set('authorization', 'Bearer admin-id-token')
+      .set('idempotency-key', '9a7939e4-498e-4646-91db-59f836a6fa2f')
+      .expect(201);
+
+    expect(enrollmentInput).toMatchObject({ allowLocalCloudAuthDemoEntitlements: true });
   });
 
   it('rejects demo completion when required steps are missing', async () => {
@@ -2006,6 +2050,57 @@ describe('API foundation', () => {
         status: 'published',
       }),
     ]);
+  });
+
+  it('correlates the internal draft audit with the server request ID without widening data', async () => {
+    const auditRecords: AdminContentDraftUpdateAuditRecord[] = [];
+    const repository = createStaticAdminContentRepository(undefined, {
+      appendDraftAuditRecord: async (record) => {
+        auditRecords.push(record);
+      },
+      now: () => new Date('2026-08-13T13:10:00.000Z'),
+    });
+    const app = createApiApp({
+      adminContentRepository: repository,
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    const response = await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        title: {
+          en: 'Correlated draft title',
+          vi: 'Tieu de draft co correlation',
+        },
+      })
+      .expect(200);
+
+    expect(response.body.success).toBe(true);
+    expect(response.body.requestId).toBe(response.headers['x-request-id']);
+    expect(Object.keys(response.body.data)).toEqual(['draft']);
+    expect(auditRecords).toHaveLength(1);
+    expect(auditRecords[0]).toMatchObject({
+      actorId: 'admin-01',
+      action: 'admin-content-draft.updated',
+      createdAt: '2026-08-13T13:10:00.000Z',
+      requestId: response.headers['x-request-id'],
+      target: {
+        entityId: 'dl-p01-neuron-perceptron',
+        entityType: 'post',
+        revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
+      },
+    });
   });
 
   it('accepts a stable course-level trial post selection through the Admin draft contract', async () => {

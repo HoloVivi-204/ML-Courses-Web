@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { deleteApp } from 'firebase-admin/app';
+import type { CollectionReference, DocumentReference } from 'firebase-admin/firestore';
 
 import { LOCAL_STORAGE_BUCKET, createLocalAdminServices } from './admin-services.js';
 import {
@@ -18,6 +19,12 @@ const AUTH_EMULATOR_BASE_URL = 'http://127.0.0.1:9099/identitytoolkit.googleapis
 const FIRESTORE_DOCUMENTS_BASE_URL =
   `http://127.0.0.1:8080/v1/projects/${LOCAL_FIREBASE_PROJECT_ID}` +
   '/databases/(default)/documents';
+const REQUIRED_ADMIN_CONTENT_EVIDENCE_KINDS = [
+  'license',
+  'provenance',
+  'content-review',
+  'gvhd-confirmation',
+] as const;
 const VALID_PNG_BYTES = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jE8UAAAAASUVORK5CYII=',
   'base64',
@@ -134,6 +141,28 @@ async function requestFirestoreDocument(input: {
   });
 }
 
+async function writeFirestoreDocument(input: {
+  documentPath: string;
+  idToken?: string | undefined;
+}): Promise<Response> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+
+  if (input.idToken) {
+    headers.authorization = `Bearer ${input.idToken}`;
+  }
+
+  return fetch(`${FIRESTORE_DOCUMENTS_BASE_URL}/${input.documentPath}`, {
+    body: JSON.stringify({
+      fields: {
+        forged: { booleanValue: true },
+        schemaVersion: { integerValue: '1' },
+      },
+    }),
+    headers,
+    method: 'PATCH',
+  });
+}
+
 function decodeFirestoreValue(value: unknown): unknown {
   assertRecord(value, 'Firestore value must be an object.');
 
@@ -190,6 +219,22 @@ async function readFirestoreDocument(
   assertRecord(decoded, 'Firestore document must decode to an object.');
 
   return decoded;
+}
+
+async function snapshotFirestoreDocument(reference: DocumentReference): Promise<unknown> {
+  const snapshot = await reference.get();
+
+  return snapshot.exists ? snapshot.data() : null;
+}
+
+async function snapshotFirestoreCollection(
+  reference: CollectionReference,
+): Promise<readonly unknown[]> {
+  const snapshot = await reference.get();
+
+  return snapshot.docs
+    .map((document) => ({ documentId: document.id, data: document.data() }))
+    .sort((left, right) => left.documentId.localeCompare(right.documentId));
 }
 
 async function requestAvatarStorageUpload(input: {
@@ -734,12 +779,19 @@ async function seedAdminContentLifecycleRepository(
   });
 }
 
+interface VerificationAdminContentDraft {
+  draftRevisionId: string;
+  revisionVersion: number;
+  trialPostId?: string | undefined;
+  validationStatus?: string | undefined;
+}
+
 interface FirestoreLifecycleRepository {
   createDraft(input: {
     createdByUid: string;
     entityId: string;
     entityType: string;
-  }): Promise<{ data: { draft: { draftRevisionId: string; revisionVersion: number } } }>;
+  }): Promise<{ data: { draft: VerificationAdminContentDraft } }>;
   emergencyWithdrawEntity(input: {
     actorUid: string;
     entityId: string;
@@ -789,14 +841,16 @@ interface FirestoreLifecycleRepository {
   updateDraft(input: {
     actorUid: string;
     patch: Record<string, unknown>;
+    requestId: string;
     revisionId: string;
     revisionVersion: number;
-  }): Promise<unknown>;
+  }): Promise<{ data: { draft: VerificationAdminContentDraft } }>;
   validateDraft(input: { actorUid: string; revisionId: string }): Promise<unknown>;
 }
 
 async function createFirestoreLifecycleRepositoryForVerification(
   firestore: ReturnType<typeof createLocalAdminServices>['firestore'],
+  options: { createAuditDocumentId?: (() => string) | undefined } = {},
 ): Promise<FirestoreLifecycleRepository> {
   const repositoryModulePath = new URL(
     '../../../apps/functions/dist/firestore-admin-content-repository.js',
@@ -804,6 +858,7 @@ async function createFirestoreLifecycleRepositoryForVerification(
   ).href;
   const repositoryModule = (await import(repositoryModulePath)) as {
     createFirestoreAdminContentRepository: (input: {
+      createAuditDocumentId?: (() => string) | undefined;
       firestore: ReturnType<typeof createLocalAdminServices>['firestore'];
       verifyPublishEvidence: () => void;
     }) => FirestoreLifecycleRepository;
@@ -812,6 +867,9 @@ async function createFirestoreLifecycleRepositoryForVerification(
   // The API default above proves missing evidence fails closed. This test double only isolates
   // transaction and persistence behavior after an external verifier has accepted evidence.
   return repositoryModule.createFirestoreAdminContentRepository({
+    ...(options.createAuditDocumentId
+      ? { createAuditDocumentId: options.createAuditDocumentId }
+      : {}),
     firestore,
     verifyPublishEvidence: () => undefined,
   });
@@ -846,6 +904,7 @@ async function prepareValidatedDraftForPersistenceTest(
         vi: 'Quyet dinh neuron ben vung',
       },
     },
+    requestId: 'request-persistence-draft-update',
     revisionId,
     revisionVersion: created.data.draft.revisionVersion,
   });
@@ -854,10 +913,93 @@ async function prepareValidatedDraftForPersistenceTest(
   return revisionId;
 }
 
+async function assertAuditCollisionRollback(
+  firestore: ReturnType<typeof createLocalAdminServices>['firestore'],
+): Promise<void> {
+  const auditDocumentId = 'emulator-audit-collision';
+  const auditReference = firestore.doc(`auditLogs/${auditDocumentId}`);
+  const repository = await createFirestoreLifecycleRepositoryForVerification(firestore, {
+    createAuditDocumentId: () => auditDocumentId,
+  });
+  const created = await repository.createDraft({
+    createdByUid: 'admin-audit-collision-test',
+    entityId: 'course-classical-ml',
+    entityType: 'course',
+  });
+  const originalDraft = created.data.draft;
+  const revisionReference = firestore.doc(`adminContentRevisions/${originalDraft.draftRevisionId}`);
+  const entityReference = firestore.doc('adminContentEntities/course:course-classical-ml');
+  const originalRevision = await snapshotFirestoreDocument(revisionReference);
+  const originalEntity = await snapshotFirestoreDocument(entityReference);
+  const requestId = 'request-emulator-audit-collision';
+  const updateInput = {
+    actorUid: 'admin-audit-collision-test',
+    patch: {
+      title: {
+        en: 'RAW_COLLISION_TITLE_SENTINEL_EN',
+        vi: 'RAW_COLLISION_TITLE_SENTINEL_VI',
+      },
+      trialPostId: 'cml-p02-train-test-metrics',
+    },
+    requestId,
+    revisionId: originalDraft.draftRevisionId,
+    revisionVersion: originalDraft.revisionVersion,
+  };
+
+  assert.equal(originalDraft.revisionVersion, 1);
+  assert.equal(originalDraft.trialPostId, 'cml-p01-problem-data-types');
+  await auditReference.create({ immutableExistingAudit: true });
+  await assert.rejects(
+    repository.updateDraft(updateInput),
+    (error: unknown) => isRecord(error) && error.code === 6,
+  );
+  const revisionAfterCollisionFailure = await snapshotFirestoreDocument(revisionReference);
+
+  assert.deepEqual(revisionAfterCollisionFailure, originalRevision);
+  assert.deepEqual(await snapshotFirestoreDocument(entityReference), originalEntity);
+  assertRecord(revisionAfterCollisionFailure, 'The original draft revision must survive failure.');
+  const unchangedDraft = getRecordField(revisionAfterCollisionFailure, 'draft');
+
+  assert.equal(unchangedDraft.revisionVersion, 1);
+  assert.equal(unchangedDraft.trialPostId, 'cml-p01-problem-data-types');
+  assert.equal(
+    (await firestore.collection('auditLogs').where('requestId', '==', requestId).get()).size,
+    0,
+  );
+
+  await auditReference.delete();
+  const retried = await repository.updateDraft(updateInput);
+  const storedRevision = await snapshotFirestoreDocument(revisionReference);
+
+  assert.equal(retried.data.draft.revisionVersion, 2);
+  assert.equal(retried.data.draft.trialPostId, 'cml-p02-train-test-metrics');
+  assertRecord(storedRevision, 'The retried draft revision must remain persisted.');
+  assert.equal(getRecordField(storedRevision, 'draft').revisionVersion, 2);
+  assert.equal(getRecordField(storedRevision, 'draft').trialPostId, 'cml-p02-train-test-metrics');
+  const retriedAudits = await firestore
+    .collection('auditLogs')
+    .where('requestId', '==', requestId)
+    .get();
+
+  assert.equal(retriedAudits.size, 1);
+  assert.equal(retriedAudits.docs[0]?.id, auditDocumentId);
+  assert.equal(JSON.stringify(retriedAudits.docs[0]?.data()).includes('RAW_COLLISION'), false);
+  const storedDraftDocuments = (await firestore.collection('adminContentRevisions').get()).docs
+    .filter((document) => document.get('entityKey') === 'course:course-classical-ml')
+    .filter((document) => document.get('state') === 'draft');
+
+  assert.deepEqual(
+    storedDraftDocuments.map((document) => document.id),
+    [originalDraft.draftRevisionId],
+  );
+}
+
 async function assertFirestoreAdminContentPersistence(): Promise<void> {
   const services = createLocalAdminServices();
 
   try {
+    await seedAdminContentLifecycleRepository(services.firestore);
+    await assertAuditCollisionRollback(services.firestore);
     await seedAdminContentLifecycleRepository(services.firestore);
 
     const firstRepository = await createFirestoreLifecycleRepositoryForVerification(
@@ -1122,6 +1264,301 @@ async function assertAdminRevisionTypeLifecycleApi(input: {
   );
 }
 
+async function assertAuditLogClientAccessDenied(input: {
+  auditDocumentId: string;
+  firestore: ReturnType<typeof createLocalAdminServices>['firestore'];
+  learnerToken: string;
+}): Promise<void> {
+  for (const idToken of [undefined, input.learnerToken]) {
+    const readResponse = await requestFirestoreDocument({
+      documentPath: `auditLogs/${input.auditDocumentId}`,
+      ...(idToken ? { idToken } : {}),
+    });
+    const forgedAuditDocumentId = idToken ? 'forged-audit-learner' : 'forged-audit-unauthenticated';
+    const writeResponse = await writeFirestoreDocument({
+      documentPath: `auditLogs/${forgedAuditDocumentId}`,
+      ...(idToken ? { idToken } : {}),
+    });
+
+    assert.equal(readResponse.status, 403, 'Audit reads must stay server-only.');
+    assert.equal(writeResponse.status, 403, 'Audit writes must stay server-only.');
+    assert.equal(
+      (await input.firestore.doc(`auditLogs/${forgedAuditDocumentId}`).get()).exists,
+      false,
+    );
+  }
+}
+
+async function assertTrustedCourseDraftBoundary(input: {
+  adminToken: string;
+  adminUid: string;
+  firestore: ReturnType<typeof createLocalAdminServices>['firestore'];
+  learnerToken: string;
+}): Promise<void> {
+  const courseId = 'course-classical-ml';
+  const originalTrialPostId = 'cml-p01-problem-data-types';
+  const changedTrialPostId = 'cml-p02-train-test-metrics';
+  const rawSentinels = {
+    attributionEn: 'RAW_AUDIT_ATTRIBUTION_SENTINEL_EN',
+    attributionVi: 'RAW_AUDIT_ATTRIBUTION_SENTINEL_VI',
+    previewEn: 'RAW_AUDIT_PREVIEW_SENTINEL_EN',
+    previewVi: 'RAW_AUDIT_PREVIEW_SENTINEL_VI',
+    titleEn: 'RAW_AUDIT_TITLE_SENTINEL_EN',
+    titleVi: 'RAW_AUDIT_TITLE_SENTINEL_VI',
+    url: 'https://raw-audit-url-sentinel.example/source',
+  };
+  const createdData = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/content/course/${courseId}/drafts`, {
+      idToken: input.adminToken,
+      method: 'POST',
+    }),
+    201,
+  );
+  const createdDraft = getRecordField(createdData, 'draft');
+  const draftRevisionId = getStringField(createdDraft, 'draftRevisionId');
+
+  assert.equal(createdDraft.revisionVersion, 1);
+  assert.equal(createdDraft.trialPostId, originalTrialPostId);
+
+  await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}`, {
+      body: {
+        metadata: {
+          attribution: { en: rawSentinels.attributionEn, vi: rawSentinels.attributionVi },
+          externalLinkUrl: rawSentinels.url,
+        },
+        preview: { en: rawSentinels.previewEn, vi: rawSentinels.previewVi },
+        revisionVersion: 1,
+        title: { en: rawSentinels.titleEn, vi: rawSentinels.titleVi },
+        trialPostId: originalTrialPostId,
+      },
+      idToken: input.adminToken,
+      method: 'PATCH',
+    }),
+    200,
+  );
+
+  const validatedA = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/validate`, {
+      idToken: input.adminToken,
+      method: 'POST',
+    }),
+    200,
+  );
+  assert.equal(getRecordField(validatedA, 'draft').validationStatus, 'valid');
+  const evidenceA = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/evidence`, {
+      idToken: input.adminToken,
+    }),
+    200,
+  );
+  const checksumA = getStringField(evidenceA, 'contentChecksum');
+
+  await Promise.all(
+    REQUIRED_ADMIN_CONTENT_EVIDENCE_KINDS.map((kind) =>
+      input.firestore.doc(`adminContentRevisions/${draftRevisionId}/externalEvidence/${kind}`).set({
+        artifactId: courseId,
+        checksum: checksumA,
+        evidenceRef: `emulator://external-review/${kind}`,
+        kind,
+        result: 'approved',
+        reviewedAt: '2026-08-13T00:00:00.000Z',
+        reviewedBy: 'emulator-operator',
+        schemaVersion: 1,
+      }),
+    ),
+  );
+
+  const patchResponse = await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}`, {
+    body: { revisionVersion: 2, trialPostId: changedTrialPostId },
+    idToken: input.adminToken,
+    method: 'PATCH',
+  });
+  const patchBody = await readJsonObject(patchResponse);
+  const patchRequestId = patchResponse.headers.get('x-request-id');
+
+  assert.equal(patchResponse.status, 200, JSON.stringify(patchBody));
+  assert.match(patchRequestId ?? '', /^[0-9a-f-]{36}$/);
+  assert.equal(patchBody.requestId, patchRequestId);
+  assert.equal(patchBody.success, true);
+  const patchData = getRecordField(patchBody, 'data');
+
+  assert.deepEqual(Object.keys(patchData), ['draft']);
+  const draftB = getRecordField(patchData, 'draft');
+  assert.equal(draftB.revisionVersion, 3);
+  assert.equal(draftB.trialPostId, changedTrialPostId);
+  assert.equal(draftB.validationStatus, 'not-run');
+
+  const auditQuery = await input.firestore
+    .collection('auditLogs')
+    .where('requestId', '==', patchRequestId)
+    .get();
+
+  assert.equal(auditQuery.size, 1);
+  const auditDocument = auditQuery.docs[0];
+  assert.ok(auditDocument, 'The correlated audit document must exist.');
+  const auditRecord = auditDocument.data();
+
+  assert.deepEqual(Object.keys(auditRecord).sort(), [
+    'action',
+    'actorId',
+    'createdAt',
+    'diff',
+    'requestId',
+    'schemaVersion',
+    'target',
+  ]);
+  assert.equal(typeof auditRecord.createdAt, 'string');
+  assert.equal(new Date(String(auditRecord.createdAt)).toISOString(), auditRecord.createdAt);
+  assert.deepEqual(auditRecord, {
+    action: 'admin-content-draft.updated',
+    actorId: input.adminUid,
+    createdAt: auditRecord.createdAt,
+    diff: {
+      changedFields: ['trialPostId', 'validationStatus'],
+      revisionVersion: { after: 3, before: 2 },
+      trialPostId: { after: changedTrialPostId, before: originalTrialPostId },
+      validationStatus: { after: 'not-run', before: 'valid' },
+    },
+    requestId: patchRequestId,
+    schemaVersion: 1,
+    target: {
+      entityId: courseId,
+      entityType: 'course',
+      revisionId: draftRevisionId,
+    },
+  });
+  for (const sentinel of Object.values(rawSentinels)) {
+    assert.equal(JSON.stringify(auditRecord).includes(sentinel), false);
+  }
+  const courseDraftAudits = await input.firestore
+    .collection('auditLogs')
+    .where('actorId', '==', input.adminUid)
+    .get();
+
+  assert.equal(courseDraftAudits.size, 2);
+  for (const audit of courseDraftAudits.docs) {
+    for (const sentinel of Object.values(rawSentinels)) {
+      assert.equal(JSON.stringify(audit.data()).includes(sentinel), false);
+    }
+  }
+  await assertAuditLogClientAccessDenied({
+    auditDocumentId: auditDocument.id,
+    firestore: input.firestore,
+    learnerToken: input.learnerToken,
+  });
+
+  const validatedB = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/validate`, {
+      idToken: input.adminToken,
+      method: 'POST',
+    }),
+    200,
+  );
+  assert.equal(getRecordField(validatedB, 'draft').validationStatus, 'valid');
+  assert.equal(getRecordField(validatedB, 'draft').trialPostId, changedTrialPostId);
+  const evidenceB = await readSuccessData(
+    await requestApiJson(`/api/v1/admin/revisions/${draftRevisionId}/evidence`, {
+      idToken: input.adminToken,
+    }),
+    200,
+  );
+  const checksumB = getStringField(evidenceB, 'contentChecksum');
+  const staleEvidence = getArrayField(evidenceB, 'evidence');
+
+  assert.notEqual(checksumB, checksumA);
+  assert.equal(staleEvidence.length, REQUIRED_ADMIN_CONTENT_EVIDENCE_KINDS.length);
+  assert.deepEqual(
+    staleEvidence
+      .map((evidence) => {
+        assertRecord(evidence, 'External evidence must be an object.');
+        return getStringField(evidence, 'kind');
+      })
+      .sort(),
+    [...REQUIRED_ADMIN_CONTENT_EVIDENCE_KINDS].sort(),
+  );
+  for (const evidence of staleEvidence) {
+    assertRecord(evidence, 'External evidence must be an object.');
+    assert.equal(evidence.checksum, checksumA);
+  }
+
+  const entityReference = input.firestore.doc(`adminContentEntities/course:${courseId}`);
+  const draftReference = input.firestore.doc(`adminContentRevisions/${draftRevisionId}`);
+  const publishedReference = input.firestore.doc(
+    'adminContentRevisions/course-classical-ml-rev-r1',
+  );
+  const learnerReference = input.firestore.doc(
+    `publishedLearnerContent/course:${courseId}:summary`,
+  );
+  const lifecycleEvents = input.firestore.collection('adminContentLifecycleEvents');
+  const idempotencyRecords = input.firestore.collection('adminContentPublishIdempotency');
+  const beforePublish = {
+    draft: await snapshotFirestoreDocument(draftReference),
+    entity: await snapshotFirestoreDocument(entityReference),
+    evidence: await snapshotFirestoreCollection(draftReference.collection('externalEvidence')),
+    idempotency: await snapshotFirestoreCollection(idempotencyRecords),
+    learner: await snapshotFirestoreDocument(learnerReference),
+    lifecycle: await snapshotFirestoreCollection(lifecycleEvents),
+    published: await snapshotFirestoreDocument(publishedReference),
+  };
+  const publishIdempotencyKey = `trusted-draft-boundary-${randomUUID()}`;
+  const exactIdempotencyDocumentId = createHash('sha256')
+    .update(`${input.adminUid}:${publishIdempotencyKey}`)
+    .digest('hex');
+  const publishResponse = await requestApiJson(
+    `/api/v1/admin/revisions/${draftRevisionId}/publish`,
+    {
+      body: {
+        publicationScope: 'publish-quality',
+        reason: 'Reject approved evidence for the previous trial post selection.',
+      },
+      idToken: input.adminToken,
+      idempotencyKey: publishIdempotencyKey,
+      method: 'POST',
+    },
+  );
+  const publishBody = await readJsonObject(publishResponse);
+
+  assert.equal(publishResponse.status, 422, JSON.stringify(publishBody));
+  assert.deepEqual(publishBody, {
+    error: {
+      code: 'ADMIN_CONTENT_EXTERNAL_EVIDENCE_REQUIRED',
+      details: [],
+      message: 'External evidence is required before publish.',
+    },
+    requestId: publishResponse.headers.get('x-request-id'),
+    success: false,
+  });
+  const afterPublish = {
+    draft: await snapshotFirestoreDocument(draftReference),
+    entity: await snapshotFirestoreDocument(entityReference),
+    evidence: await snapshotFirestoreCollection(draftReference.collection('externalEvidence')),
+    idempotency: await snapshotFirestoreCollection(idempotencyRecords),
+    learner: await snapshotFirestoreDocument(learnerReference),
+    lifecycle: await snapshotFirestoreCollection(lifecycleEvents),
+    published: await snapshotFirestoreDocument(publishedReference),
+  };
+
+  assert.deepEqual(afterPublish, beforePublish);
+  assert.equal(
+    (
+      await input.firestore
+        .doc(`adminContentPublishIdempotency/${exactIdempotencyDocumentId}`)
+        .get()
+    ).exists,
+    false,
+  );
+  assertRecord(afterPublish.entity, 'The course entity must remain persisted.');
+  const currentContent = getRecordField(afterPublish.entity, 'currentContent');
+  assert.equal(currentContent.publishedRevisionId, 'course-classical-ml-rev-r1');
+  assert.equal(currentContent.trialPostId, originalTrialPostId);
+  assertRecord(afterPublish.draft, 'The draft must survive rejected publish.');
+  assert.equal(afterPublish.draft.contentChecksum, checksumB);
+  const persistedDraftB = getRecordField(afterPublish.draft, 'draft');
+  assert.equal(persistedDraftB.trialPostId, changedTrialPostId);
+  assert.equal(persistedDraftB.validationStatus, 'valid');
+}
+
 async function assertAdminContentLifecycleApi(): Promise<void> {
   const services = createLocalAdminServices();
   const adminUid = `admin-${randomUUID()}`;
@@ -1245,6 +1682,14 @@ async function assertAdminContentLifecycleApi(): Promise<void> {
     const forbiddenBody = await readJsonObject(forbiddenResponse);
     assert.equal(forbiddenBody.success, false);
     assert.equal(getRecordField(forbiddenBody, 'error').code, 'ADMIN_FORBIDDEN');
+
+    await assertTrustedCourseDraftBoundary({
+      adminToken,
+      adminUid,
+      firestore: services.firestore,
+      learnerToken: studentToken,
+    });
+    await seedAdminContentLifecycleRepository(services.firestore);
 
     await assertAdminRevisionTypeLifecycleApi({
       adminToken,
@@ -1707,6 +2152,8 @@ console.log(
     clientAccess: 'deny-by-default',
     playgroundDatasetStorage: 'authenticated-read-and-integrity-metadata-verified',
     directProgressWrites: 'denied',
+    trustedDraftAuditBoundary: 'verified',
+    evidenceReplayBoundary: 'verified',
     adminContentLifecycle: 'verified',
     emergencyWithdraw: 'verified',
     localAnalyticsAggregation: 'verified',

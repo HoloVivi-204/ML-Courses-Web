@@ -174,7 +174,7 @@ export function validateFirestoreIndexMigrationDryRun(input: {
     ...[...actual].filter((index) => !expected.has(index)),
     ...(configuration.fieldOverrides.length === 0
       ? []
-      : ['fieldOverrides must be empty in Release 1']),
+      : ['fieldOverrides must be empty for the current course']),
   ];
 
   return {

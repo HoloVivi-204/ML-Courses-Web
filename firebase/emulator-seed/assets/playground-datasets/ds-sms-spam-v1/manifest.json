@@ -10,18 +10,18 @@
   "source": {
     "kind": "generated",
     "attribution": {
-      "en": "Generated synthetic dataset for the Release 1 playground baseline.",
-      "vi": "Dữ liệu tổng hợp được tạo cho baseline Playground Release 1."
+      "en": "Generated synthetic dataset for interactive practice.",
+      "vi": "Dữ liệu tổng hợp cho hoạt động thực hành."
     },
     "generator": {
-      "formula": "Versioned deterministic synthetic rows defined by the Release 1 generator.",
+      "formula": "Deterministic rows generated from the dataset parameters.",
       "id": "release-one-playground-generator",
       "parameterManifest": "ds-sms-spam-v1:generator-v1",
       "version": "1"
     },
     "license": {
       "id": "LicenseRef-generated-playground-baseline",
-      "notice": "Generated internally for the Release 1 Playground baseline."
+      "notice": "Generated for interactive practice."
     },
     "sourceId": "generated-playground-baseline"
   },

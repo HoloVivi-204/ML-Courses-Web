@@ -39,3 +39,6 @@ Thumbs.db
 .edge-*
 .runtime/
 .content-pipeline/
+
+# bv (beads viewer) local config and caches
+.bv/

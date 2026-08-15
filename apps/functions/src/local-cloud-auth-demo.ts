@@ -6,11 +6,19 @@ function normalizeEmail(email: string | undefined): string | undefined {
   return normalizedEmail ? normalizedEmail : undefined;
 }
 
+export function isLocalCloudAuthDemo(environment: Environment = process.env): boolean {
+  return environment.FUNCTIONS_EMULATOR === 'true' && environment.LOCAL_CLOUD_AUTH_DEMO === 'true';
+}
+
+export function shouldCheckIdTokenRevocation(environment: Environment = process.env): boolean {
+  return !isLocalCloudAuthDemo(environment);
+}
+
 export function hasLocalCloudAuthDemoAdminRole(
   email: string | undefined,
   environment: Environment = process.env,
 ): boolean {
-  if (environment.FUNCTIONS_EMULATOR !== 'true' || environment.LOCAL_CLOUD_AUTH_DEMO !== 'true') {
+  if (!isLocalCloudAuthDemo(environment)) {
     return false;
   }
 

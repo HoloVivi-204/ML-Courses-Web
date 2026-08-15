@@ -60,7 +60,10 @@ import {
   createDefaultLearningEventRepository,
   type LearningEventRepository,
 } from './learning-event-repository.js';
-import { hasLocalCloudAuthDemoAdminRole } from './local-cloud-auth-demo.js';
+import {
+  hasLocalCloudAuthDemoAdminRole,
+  shouldCheckIdTokenRevocation,
+} from './local-cloud-auth-demo.js';
 import { createFirestoreAdminContentRepository } from './firestore-admin-content-repository.js';
 import {
   createDefaultLearningRepository,
@@ -775,7 +778,10 @@ function createRateLimitMiddleware(
 }
 
 async function defaultVerifyAuthToken(idToken: string): Promise<VerifiedAuthUser> {
-  const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(idToken, true);
+  const decodedToken = await getAuth(getFirebaseAdminApp()).verifyIdToken(
+    idToken,
+    shouldCheckIdTokenRevocation(),
+  );
   const email = typeof decodedToken.email === 'string' ? decodedToken.email : undefined;
 
   return {
@@ -1097,7 +1103,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
 
   app.use('/api/v1', requireAppCheck);
 
-  /** Returns Release 1 runtime feature flags after App Check verification. */
+  /** Returns runtime feature flags after App Check verification. */
   app.get('/api/v1/system/features', (_request, response) => {
     sendSuccess(
       response,
@@ -1253,6 +1259,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
           params: { courseId },
         });
         const result = await getLearningRepository().enrollLearner({
+          allowLocalCloudAuthDemoEntitlements: authUser.role === 'admin',
           courseId,
           displayName: authUser.displayName,
           idempotencyKey,
@@ -1623,6 +1630,7 @@ export function createApiApp(options: ApiAppOptions = {}): express.Express {
         const result = await getAdminContentRepository().updateDraft({
           actorUid: adminUser.uid,
           patch: updateBody.patch,
+          requestId: getRequestId(response),
           revisionId,
           revisionVersion: updateBody.revisionVersion,
         });

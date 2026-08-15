@@ -1,5 +1,5 @@
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createLearningLearnerHash } from './learning-events.js';
 import { createFirestoreLearningRepository } from './learning-repository.js';
@@ -711,6 +711,84 @@ describe('Firestore learning repository', () => {
     expect(
       documents.get('users/learner-classical/contentAccess/post_cml-p01-problem-data-types'),
     ).toBeUndefined();
+  });
+
+  it('grants every catalog item and Playground algorithm only for the local Admin demo path', async () => {
+    vi.stubEnv('FUNCTIONS_EMULATOR', 'true');
+    vi.stubEnv('LOCAL_CLOUD_AUTH_DEMO', 'true');
+
+    try {
+      const { documents, firestore } = createFakeFirestore();
+      const repository = createFirestoreLearningRepository(firestore);
+      const catalog = getReleaseLearningCatalog();
+      const modules = catalog.courses.flatMap((course) => course.modules);
+      const expectedContentAccess = [
+        ...modules.map((module) => `module:${module.moduleId}`),
+        ...modules.flatMap((module) => module.posts.map((post) => `post:${post.postId}`)),
+        ...modules.flatMap((module) => (module.demoId ? [`demo:${module.demoId}`] : [])),
+      ];
+      const expectedAlgorithmIds = [
+        ...new Set(modules.flatMap((module) => module.unlockAlgorithmIds)),
+      ];
+
+      await repository.enrollLearner({
+        allowLocalCloudAuthDemoEntitlements: true,
+        courseId: 'course-deep-learning-basic',
+        displayName: 'Demo learner',
+        idempotencyKey: 'local-demo-unlock-all',
+        uid: 'demo-learner',
+      });
+      const progress = await repository.getProgress({ uid: 'demo-learner' });
+
+      expect(progress.data.courses.map((course) => course.courseId)).toEqual(
+        catalog.courses.map((course) => course.courseId),
+      );
+      expect(
+        new Set(progress.data.contentAccess.map((item) => `${item.contentType}:${item.entityId}`)),
+      ).toEqual(new Set(expectedContentAccess));
+      expect(new Set(progress.data.algorithmUnlocks.map((item) => item.algorithmId))).toEqual(
+        new Set(expectedAlgorithmIds),
+      );
+      expect(
+        [...documents.keys()].filter((path) => path.startsWith('users/demo-learner/enrollments/')),
+      ).toHaveLength(catalog.courses.length);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('does not grant local cloud Auth demo entitlements to a learner', async () => {
+    vi.stubEnv('FUNCTIONS_EMULATOR', 'true');
+    vi.stubEnv('LOCAL_CLOUD_AUTH_DEMO', 'true');
+
+    try {
+      const { documents, firestore } = createFakeFirestore();
+      const repository = createFirestoreLearningRepository(firestore);
+
+      await repository.enrollLearner({
+        allowLocalCloudAuthDemoEntitlements: false,
+        courseId: 'course-deep-learning-basic',
+        displayName: 'Regular learner',
+        idempotencyKey: 'local-demo-learner',
+        uid: 'regular-learner',
+      });
+      const progress = await repository.getProgress({ uid: 'regular-learner' });
+
+      expect(progress.data.courses.map((course) => course.courseId)).toEqual([
+        'course-deep-learning-basic',
+      ]);
+      expect(progress.data.contentAccess).toHaveLength(1);
+      expect(progress.data.contentAccess[0]).toMatchObject({
+        contentType: 'module',
+        entityId: 'dl-m01-neuron-perceptron',
+      });
+      expect(progress.data.algorithmUnlocks).toEqual([]);
+      expect(
+        [...documents.keys()].filter((path) => path.startsWith('users/regular-learner/')),
+      ).not.toContain('users/regular-learner/algorithmUnlocks/perceptron');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('records an accessible module overview before granting its first post', async () => {

@@ -199,7 +199,7 @@ function getFullPost(courseId: string, postId: string): TrialPost {
   const post = getReadablePost(courseId, postId, true);
 
   if (!post) {
-    throw new Error(`Missing full Release 1 post ${postId}.`);
+    throw new Error(`Missing lesson ${postId}.`);
   }
 
   return post;
@@ -265,7 +265,7 @@ function createDemoSeed(input: {
   const demo = getFixedDemo(input.module.demoId);
 
   if (!demo) {
-    throw new Error(`Missing fixed Release 1 demo ${input.module.demoId}.`);
+    throw new Error(`Missing fixed practice demo ${input.module.demoId}.`);
   }
 
   const sourceReview = createPendingSourceReview({
@@ -399,8 +399,8 @@ export function createReleaseOneFirestoreAdminContentSeed(): readonly FirestoreA
       entityId: course.courseId,
       entityType: 'course',
       preview: {
-        en: `Release 1 course with ${course.modules.length} locked modules.`,
-        vi: `Khóa học Release 1 có ${course.modules.length} module đã khóa cấu trúc.`,
+        en: `Course with ${course.modules.length} modules in a structured learning path.`,
+        vi: `Khóa học gồm ${course.modules.length} module theo lộ trình có cấu trúc.`,
       },
       publishedRevisionId: course.courseRevisionId,
       sourceReview: courseSourceReview,
@@ -423,8 +423,8 @@ export function createReleaseOneFirestoreAdminContentSeed(): readonly FirestoreA
         entityType: 'module',
         moduleId: module.moduleId,
         preview: {
-          en: `Locked Release 1 module with ${module.posts.length} lesson(s).`,
-          vi: `Module Release 1 đã khóa cấu trúc với ${module.posts.length} bài học.`,
+          en: `Structured module with ${module.posts.length} lesson(s).`,
+          vi: `Module có cấu trúc gồm ${module.posts.length} bài học.`,
         },
         publishedRevisionId: createModuleRevisionId(module.moduleId),
         sourceReview,

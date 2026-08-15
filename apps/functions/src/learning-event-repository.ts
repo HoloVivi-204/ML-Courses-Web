@@ -138,7 +138,7 @@ function assertClientEvent(input: RecordLearningEventInput): void {
     throw new ApiError(
       400,
       'LEARNING_EVENT_VERIFICATION_INVALID',
-      'Client learning events must be client-computed.',
+      'Client learning events must use a browser result.',
     );
   }
 }

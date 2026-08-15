@@ -26,8 +26,11 @@ export interface AdminContentExternalEvidence {
   reviewedBy?: string | undefined;
 }
 
-export function createAdminContentDraftChecksum(draft: AdminContentDraft): string {
-  const contentProjection = {
+export const adminContentDraftChecksumDomain = 'admin-content-draft-evidence';
+export const adminContentDraftChecksumVersion = 2 as const;
+
+function createLegacyAdminContentDraftProjection(draft: AdminContentDraft) {
+  return {
     baseRevisionId: draft.baseRevisionId,
     courseId: draft.courseId,
     draftRevisionId: draft.draftRevisionId,
@@ -66,8 +69,25 @@ export function createAdminContentDraftChecksum(draft: AdminContentDraft): strin
         }
       : null,
   };
+}
 
-  return createHash('sha256').update(JSON.stringify(contentProjection)).digest('hex');
+function hashAdminContentDraftProjection(value: object): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+export function createLegacyAdminContentDraftChecksum(draft: AdminContentDraft): string {
+  return hashAdminContentDraftProjection(createLegacyAdminContentDraftProjection(draft));
+}
+
+export function createAdminContentDraftChecksum(draft: AdminContentDraft): string {
+  return hashAdminContentDraftProjection({
+    checksumDomain: adminContentDraftChecksumDomain,
+    checksumVersion: adminContentDraftChecksumVersion,
+    content: {
+      ...createLegacyAdminContentDraftProjection(draft),
+      trialPostId: draft.trialPostId ?? null,
+    },
+  });
 }
 
 function isNonEmptyString(value: unknown): value is string {

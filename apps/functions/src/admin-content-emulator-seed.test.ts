@@ -81,6 +81,7 @@ describe('Release 1 Firestore Admin content seed', () => {
           externalLinkUrl: 'https://developers.google.com/machine-learning/crash-course',
         },
       },
+      requestId: 'request-emulator-seed-validation',
       revisionId: draft.draftRevisionId,
       revisionVersion: draft.revisionVersion,
     });
