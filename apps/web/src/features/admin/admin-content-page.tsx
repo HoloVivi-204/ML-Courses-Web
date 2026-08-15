@@ -16,6 +16,7 @@ import type {
   LearningApiClient,
   UpdateAdminContentDraftInput,
 } from '../learning/learning-api';
+import { formatUserFacingTitle } from '../../shared/user-facing-labels';
 import { type Theme, useTheme } from '../../shared/theme/use-theme';
 
 const AdminLearnerRevisionPreview = lazy(async () => {
@@ -77,8 +78,8 @@ function getDraftPreviewTarget(
 function createFallbackMetadata(): AdminContentMetadata {
   return {
     attribution: {
-      en: 'Seeded Release 1 source attribution pending validation.',
-      vi: 'Attribution nguồn Release 1 đã seed, chờ validation.',
+      en: 'Source attribution is pending review.',
+      vi: 'Attribution nguồn đang chờ review.',
     },
     externalLinkUrl: null,
   };
@@ -97,8 +98,8 @@ function createDraftFormState(draft: AdminContentDraft): DraftFormState {
     externalLinkUrl: metadata.externalLinkUrl ?? '',
     previewEn: draft.preview.en,
     previewVi: draft.preview.vi,
-    titleEn: draft.title.en,
-    titleVi: draft.title.vi,
+    titleEn: formatUserFacingTitle(draft.title.en),
+    titleVi: formatUserFacingTitle(draft.title.vi),
   };
 }
 
@@ -149,12 +150,6 @@ function SourceReviewMeta({
       <div>
         <dt>{t('admin.content.sourceTitle')}</dt>
         <dd>{sourceReview.title}</dd>
-      </div>
-      <div>
-        <dt>{t('admin.content.sourceId')}</dt>
-        <dd>
-          <code>{sourceReview.sourceId}</code>
-        </dd>
       </div>
       <div>
         <dt>{t('admin.content.license')}</dt>
@@ -540,6 +535,9 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
           <span className="eyebrow">{t('admin.content.eyebrow')}</span>
           <h1>{t('admin.content.title')}</h1>
           <p>{t('admin.content.intro')}</p>
+          <Link className="breadcrumb-link" to="/admin/reports">
+            {t('admin.content.reports')}
+          </Link>
         </div>
         <div className="admin-content-guard" aria-label={t('admin.content.guardLabel')}>
           <ShieldCheck aria-hidden="true" size={22} />
@@ -630,8 +628,7 @@ function ContentInventoryList({
                   type="button"
                 >
                   <span>{t(`admin.content.entity.${item.entityType}`)}</span>
-                  <strong>{item.title[locale]}</strong>
-                  <code>{item.entityId}</code>
+                  <strong>{formatUserFacingTitle(item.title[locale])}</strong>
                   {item.draftRevisionId ? <em>{t('admin.content.draftBadge')}</em> : null}
                 </button>
               </li>
@@ -711,8 +708,7 @@ function ContentPreview({
 
       <div className="admin-content-preview-title">
         <span>{t(`admin.content.entity.${item.entityType}`)}</span>
-        <h3>{item.title[locale]}</h3>
-        <code>{item.entityId}</code>
+        <h3>{formatUserFacingTitle(item.title[locale])}</h3>
       </div>
 
       <dl className="admin-content-meta">
@@ -720,43 +716,21 @@ function ContentPreview({
           <dt>{t('admin.content.status')}</dt>
           <dd>{t(`admin.content.status.${item.status}`)}</dd>
         </div>
-        <div>
-          <dt>{t('admin.content.revision')}</dt>
-          <dd>
-            <code>{item.publishedRevisionId}</code>
-          </dd>
-        </div>
         {item.publicationScope ? (
           <div>
             <dt>{t('admin.content.publicationScope')}</dt>
             <dd>{t(`admin.content.publicationScope.${item.publicationScope}`)}</dd>
           </div>
         ) : null}
-        {item.previousPublishedRevisionId ? (
-          <div>
-            <dt>{t('admin.content.previousRevision')}</dt>
-            <dd>
-              <code>{item.previousPublishedRevisionId}</code>
-            </dd>
-          </div>
-        ) : null}
         <div>
           <dt>{t('admin.content.draftRevision')}</dt>
           <dd>
-            {item.draftRevisionId ? (
-              <code>{item.draftRevisionId}</code>
-            ) : (
-              t('admin.content.noDraft')
-            )}
+            {item.draftRevisionId ? t('admin.content.draftExists') : t('admin.content.noDraft')}
           </dd>
         </div>
         <div>
           <dt>{t('admin.content.locales')}</dt>
           <dd>{item.localeAvailability.join(' / ')}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.parent')}</dt>
-          <dd>{formatParentPath(item)}</dd>
         </div>
         <div>
           <dt>{t('admin.content.source')}</dt>
@@ -799,12 +773,12 @@ function ContentPreview({
       <div className="admin-content-preview-copy">
         <article>
           <span>{locale.toUpperCase()}</span>
-          <h4>{item.title[locale]}</h4>
+          <h4>{formatUserFacingTitle(item.title[locale])}</h4>
           <p>{item.preview[locale]}</p>
         </article>
         <article>
           <span>{secondaryLocale.toUpperCase()}</span>
-          <h4>{item.title[secondaryLocale]}</h4>
+          <h4>{formatUserFacingTitle(item.title[secondaryLocale])}</h4>
           <p>{item.preview[secondaryLocale]}</p>
         </article>
       </div>
@@ -884,18 +858,6 @@ function DraftPreview({
           <dd>{t('admin.content.status.draft')}</dd>
         </div>
         <div>
-          <dt>{t('admin.content.draftRevision')}</dt>
-          <dd>
-            <code>{draft.draftRevisionId}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.baseRevision')}</dt>
-          <dd>
-            <code>{draft.baseRevisionId}</code>
-          </dd>
-        </div>
-        <div>
           <dt>{t('admin.content.revisionVersion')}</dt>
           <dd>{draft.revisionVersion}</dd>
         </div>
@@ -913,12 +875,12 @@ function DraftPreview({
       <div className="admin-content-preview-copy">
         <article>
           <span>{locale.toUpperCase()}</span>
-          <h4>{draft.title[locale]}</h4>
+          <h4>{formatUserFacingTitle(draft.title[locale])}</h4>
           <p>{draft.preview[locale]}</p>
         </article>
         <article>
           <span>{secondaryLocale.toUpperCase()}</span>
-          <h4>{draft.title[secondaryLocale]}</h4>
+          <h4>{formatUserFacingTitle(draft.title[secondaryLocale])}</h4>
           <p>{draft.preview[secondaryLocale]}</p>
         </article>
       </div>
@@ -1053,6 +1015,7 @@ function DraftEvidencePanel({
   }) => Promise<unknown>;
   onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
 }) {
+  const { t } = useTranslation();
   const [checksum, setChecksum] = useState('');
   const [evidenceRef, setEvidenceRef] = useState('');
   const [evidenceState, setEvidenceState] = useState<AdminContentEvidenceState | null>(null);
@@ -1119,14 +1082,13 @@ function DraftEvidencePanel({
   }
 
   return (
-    <section className="admin-content-evidence-panel" aria-label="External evidence">
+    <section className="admin-content-evidence-panel" aria-label={t('admin.content.evidence')}>
       <div className="admin-content-panel-heading">
         <ShieldCheck aria-hidden="true" size={18} />
-        <h3>External evidence</h3>
+        <h3>{t('admin.content.evidence')}</h3>
       </div>
       <p className="admin-content-emulator-notice" role="note">
-        An attachment remains pending. Only independent human review can approve publish-quality
-        evidence.
+        {t('admin.content.evidenceNotice')}
       </p>
 
       <dl className="admin-content-evidence-list">
@@ -1139,7 +1101,6 @@ function DraftEvidencePanel({
               <dd data-evidence-status={evidence?.result ?? 'missing'}>
                 {evidence ? evidence.result : 'missing'}
               </dd>
-              {evidence ? <code>{evidence.evidenceRef}</code> : null}
             </div>
           );
         })}
@@ -1534,10 +1495,4 @@ function DraftEditor({
       </div>
     </form>
   );
-}
-
-function formatParentPath(item: AdminContentSummary): string {
-  const parents = [item.courseId, item.moduleId, item.postId].filter(Boolean);
-
-  return parents.join(' / ');
 }

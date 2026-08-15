@@ -49,7 +49,6 @@ const copy: Readonly<
       openPlayground: (algorithm: string) => string;
       retry: string;
       score: (score: number, bestScore: number) => string;
-      sourceAttribution: string;
       submit: string;
       submitting: string;
     }
@@ -71,7 +70,6 @@ const copy: Readonly<
     openPlayground: (algorithm) => `Open ${algorithm} Playground`,
     retry: 'Try again',
     score: (score, bestScore) => `Score ${score}% · Best ${bestScore}%`,
-    sourceAttribution: 'Source attribution',
     submit: 'Submit quiz',
     submitting: 'Submitting quiz…',
   },
@@ -91,7 +89,6 @@ const copy: Readonly<
     openPlayground: (algorithm) => `Mở Playground ${algorithm}`,
     retry: 'Làm lại',
     score: (score, bestScore) => `Điểm ${score}% · Cao nhất ${bestScore}%`,
-    sourceAttribution: 'Nguồn tham khảo',
     submit: 'Nộp quiz',
     submitting: 'Đang nộp quiz…',
   },
@@ -399,12 +396,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
                           <dd>{localize(feedback.explanation, locale)}</dd>
                         </div>
                       ) : null}
-                      <div>
-                        <dt>{text.sourceAttribution}</dt>
-                        <dd>
-                          <code>{question.sourceId}</code>
-                        </dd>
-                      </div>
                     </dl>
                   ) : null}
                 </div>
@@ -419,7 +410,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
               {text.score(submissionResult.score, submissionResult.bestScore)}
             </p>
           ) : null}
-          {submissionResult?.passed ? <p>quiz_passed: {attempt.attempt.quizId}</p> : null}
           {submissionResult?.passed
             ? submissionResult.newlyUnlocked
                 .filter((unlock) => unlock.type === 'algorithm')
@@ -544,7 +534,7 @@ function formatCorrectAnswer(
     .map((optionId) => {
       const option = question.options.find((candidate) => candidate.optionId === optionId);
 
-      return option ? localize(option.text, locale) : optionId;
+      return option ? localize(option.text, locale) : locale === 'vi' ? 'Lựa chọn' : 'Option';
     })
     .join(', ');
 }

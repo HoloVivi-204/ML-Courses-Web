@@ -81,7 +81,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
         unavailable: 'Authentication is not available right now. Try again later.',
       },
       google: 'Continue with Google',
-      lead: 'Your account starts as a Student. No email verification is required to begin Release 1 learning.',
+      lead: 'Your account starts as a Student. You can begin learning right after signing up.',
       password: 'Password',
       signal: 'AUTHENTICATION / STUDENT ACCESS',
       status: 'Creating your account…',
@@ -152,7 +152,7 @@ const copy: Readonly<Record<Locale, Readonly<Record<AuthMode, AuthCopy>>>> = {
         unavailable: 'Xác thực tạm thời chưa sẵn sàng. Hãy thử lại sau.',
       },
       google: 'Tiếp tục với Google',
-      lead: 'Tài khoản mới bắt đầu với vai trò Học viên. Release 1 không yêu cầu xác minh email trước khi học.',
+      lead: 'Tài khoản mới bắt đầu với vai trò Học viên. Bạn có thể bắt đầu học ngay sau khi đăng ký.',
       password: 'Mật khẩu',
       signal: 'XÁC THỰC / TRUY CẬP HỌC VIÊN',
       status: 'Đang tạo tài khoản…',
@@ -432,8 +432,8 @@ export function AuthPage({
         <p className="auth-security-note">
           <ShieldCheck aria-hidden="true" size={15} />
           {locale === 'vi'
-            ? 'Mật khẩu và token không được hiển thị hoặc lưu trong giao diện.'
-            : 'Passwords and tokens are never displayed or stored in the interface.'}
+            ? 'Thông tin tài khoản của bạn được bảo vệ an toàn.'
+            : 'Your account information is kept safe.'}
         </p>
       </section>
     </main>

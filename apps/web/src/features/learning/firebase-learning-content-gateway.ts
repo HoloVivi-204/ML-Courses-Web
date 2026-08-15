@@ -21,7 +21,7 @@ import {
   shouldUseLocalDataEmulators,
 } from '../auth/firebase-auth-gateway';
 
-const LOCAL_FIRESTORE_EMULATOR_HOST = '127.0.0.1';
+const LOCAL_FIRESTORE_EMULATOR_HOST = 'localhost';
 const LOCAL_FIRESTORE_EMULATOR_PORT = 8080;
 const PUBLISHED_LEARNER_CONTENT_COLLECTION = 'publishedLearnerContent';
 

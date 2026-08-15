@@ -3,6 +3,7 @@ import { FixedDemoFrame } from '../learning/fixed-demo-frame';
 import { QuizQuestionChoices } from '../learning/quiz-question-choices';
 import type { AdminContentRevisionPreview, QuizAnswerValue } from '../learning/learning-api';
 import { ContentBlockRenderer } from '../learning/content-block-renderer';
+import { formatUserFacingTitle } from '../../shared/user-facing-labels';
 import type { Theme } from '../../shared/theme/use-theme';
 
 interface AdminLearnerRevisionPreviewProps {
@@ -34,10 +35,9 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
     case 'course':
       return (
         <section className="learning-course-card">
-          <span className="eyebrow">COURSE / LEARNER VIEW</span>
+          <span className="eyebrow">COURSE PREVIEW</span>
           <h3>{localize(preview.course.title, locale)}</h3>
           <p>{localize(preview.course.description, locale)}</p>
-          <code>{preview.course.revisionId}</code>
         </section>
       );
     case 'module':
@@ -46,13 +46,11 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
           <div className="learning-module-card-body">
             <div className="learning-module-card-heading">
               <div>
-                <code>{preview.module.moduleId}</code>
                 <h3>{localize(preview.module.title, locale)}</h3>
               </div>
               <span className="module-state open">OPEN</span>
             </div>
             <p>{localize(preview.module.description, locale)}</p>
-            <code>{preview.module.revisionId}</code>
           </div>
         </article>
       );
@@ -60,10 +58,9 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
       return (
         <article className="admin-learner-post-preview">
           <header className="lesson-heading">
-            <span className="eyebrow">POST / LEARNER VIEW</span>
+            <span className="eyebrow">LESSON PREVIEW</span>
             <h3>{localize(preview.post.title, locale)}</h3>
             <p>{localize(preview.post.description, locale)}</p>
-            <code>{preview.post.revisionId}</code>
           </header>
           <ContentBlockRenderer
             blocks={preview.post.blocks}
@@ -82,9 +79,8 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
       return (
         <article className="admin-learner-demo-preview">
           <header className="demo-heading">
-            <span className="eyebrow">FIXED DEMO / LEARNER VIEW</span>
-            <h3>{localize(preview.demo.title, locale)}</h3>
-            <code>{preview.demo.revisionId}</code>
+            <span className="eyebrow">INTERACTIVE PRACTICE PREVIEW</span>
+            <h3>{formatUserFacingTitle(localize(preview.demo.title, locale))}</h3>
           </header>
           <section className="and-demo-card" aria-labelledby={`preview-${firstStep.id}`}>
             <FixedDemoFrame demo={preview.demo} locale={locale} step={firstStep} stepIndex={0} />
@@ -101,10 +97,9 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
       return (
         <article className="admin-learner-quiz-preview">
           <header className="quiz-heading">
-            <span className="eyebrow">QUIZ / LEARNER VIEW</span>
+            <span className="eyebrow">QUIZ PREVIEW</span>
             <h3>{localize(preview.quiz.title, locale)}</h3>
             <p>{localize(preview.quiz.description, locale)}</p>
-            <code>{preview.quiz.revisionId}</code>
           </header>
           <div className="quiz-form">
             {preview.questions.map((question, questionIndex) => (
@@ -120,7 +115,6 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
                   onAnswerChange={() => undefined}
                   question={question}
                 />
-                <code>{question.sourceId}</code>
               </fieldset>
             ))}
           </div>

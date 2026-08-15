@@ -227,7 +227,7 @@ function createScatterSpec(
       },
       mode: 'markers',
       name: `Group ${groupIndex + 1}`,
-      text: groupRows.map((row) => `${row.rowId}: ${formatRowLabel(row.label)}`),
+      text: groupRows.map((row) => formatRowLabel(row.label)),
       type: 'scatter',
       x: groupRows.map((row) => row.features[0] ?? 0),
       y: groupRows.map((row) => row.features[1] ?? 0),

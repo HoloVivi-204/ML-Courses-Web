@@ -357,12 +357,6 @@ export function ProfilePage({
               <dd>{user?.email ?? t('profile.identity.noEmail')}</dd>
             </div>
             <div>
-              <dt>{t('profile.identity.uid')}</dt>
-              <dd>
-                <code>{user?.uid}</code>
-              </dd>
-            </div>
-            <div>
               <dt>{t('profile.identity.createdAt')}</dt>
               <dd>
                 {formatCreatedAt(profile?.createdAt, locale, t('profile.identity.unknownDate'))}

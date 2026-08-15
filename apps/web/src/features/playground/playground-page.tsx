@@ -22,8 +22,9 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 
-import { courses, localize, type Locale } from '../catalog/course-data';
 import { useAuth } from '../auth/auth-context';
+import { courses, localize, type Locale } from '../catalog/course-data';
+import { formatAlgorithmName, formatScenarioName } from '../../shared/user-facing-labels';
 import type {
   LearningApiClient,
   PlaygroundConfig,
@@ -68,7 +69,7 @@ const PERCENT_METRIC_IDS = new Set([
 
 export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundPageProps) {
   const { t } = useTranslation();
-  const { getIdToken } = useAuth();
+  const { getIdToken, user } = useAuth();
   const [status, setStatus] = useState<PlaygroundCatalogStatus>('loading');
   const [unlockedAlgorithmIds, setUnlockedAlgorithmIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -79,11 +80,18 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
     let isMounted = true;
 
     async function loadAccess() {
+      setUnlockedAlgorithmIds(new Set());
+      setStatus('loading');
+
       try {
         const idToken = await getIdToken();
 
         if (!idToken) {
-          throw new Error('Missing learner token.');
+          if (isMounted) {
+            setUnlockedAlgorithmIds(new Set());
+            setStatus('ready');
+          }
+          return;
         }
 
         const snapshot = await learningApiClient.getProgress(idToken);
@@ -107,7 +115,7 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
     return () => {
       isMounted = false;
     };
-  }, [getIdToken, learningApiClient]);
+  }, [getIdToken, learningApiClient, user?.uid]);
 
   if (status === 'loading') {
     return (
@@ -142,7 +150,6 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
             >
               <div className="playground-scenario-card-heading">
                 <div>
-                  <code>{scenarioId}</code>
                   <h2>{formatScenarioName(scenarioId, locale)}</h2>
                 </div>
                 <Database aria-hidden="true" size={20} />
@@ -179,7 +186,7 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
                 })}
               </ul>
               <Link
-                aria-label={`${t('playground.catalog.open')} ${scenarioId}`}
+                aria-label={`${t('playground.catalog.open')} ${formatScenarioName(scenarioId, locale)}`}
                 className="playground-catalog-link"
                 to={`/playground/${scenarioId}`}
               >
@@ -372,7 +379,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   useEffect(() => {
     let isMounted = true;
 
-    if (scenarioRegistrations.length === 0) {
+    if (!user || scenarioRegistrations.length === 0) {
       return () => {
         isMounted = false;
       };
@@ -380,6 +387,8 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
     async function loadProgress() {
       setIsProgressLoading(true);
+      setUnlockedAlgorithmIds(new Set());
+      setSelectedPairKey(null);
       setSavedRuns([]);
       setSavedConfigs([]);
       setConfigNameDrafts({});
@@ -466,6 +475,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
     activeScenarioRegistrations,
     scenarioRegistrations.length,
     t,
+    user,
   ]);
 
   useEffect(() => {
@@ -653,10 +663,10 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           activeRunRef.current = null;
         }
       }
-    } catch (error) {
+    } catch {
       if (!isStoppingRef.current) {
         setStatus('failed');
-        setSafeError(error instanceof Error ? error.message : t('playground.error.run'));
+        setSafeError(t('playground.error.run'));
 
         const failedRun = activeRunRef.current;
 
@@ -918,9 +928,10 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           <p>{localize(selectedRegistration.intro, locale)}</p>
         </div>
         <div className="playground-identity">
-          <code>
-            {selectedRegistration.scenarioId} / {selectedRegistration.algorithmId}
-          </code>
+          <span>
+            {formatScenarioName(selectedRegistration.scenarioId, locale)} ·{' '}
+            {formatAlgorithmName(selectedRegistration.algorithmId, locale)}
+          </span>
           <span>{t('playground.verification')}</span>
         </div>
       </section>
@@ -1059,7 +1070,7 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           ) : null}
           {savedRuns.length > 0 ? (
             <ul className="playground-card-list">
-              {savedRuns.map((savedRun) => {
+              {savedRuns.map((savedRun, runIndex) => {
                 const metricSummary = formatSavedRunMetric(savedRun, scenarioRegistrations);
 
                 return (
@@ -1069,16 +1080,14 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                     key={savedRun.runId}
                   >
                     <div>
-                      <strong>{savedRun.runId}</strong>
-                      <span>{savedRun.verificationLevel}</span>
+                      <strong>{t('playground.history.runLabel', { number: runIndex + 1 })}</strong>
+                      <span>{t('verification.client')}</span>
                     </div>
                     <time dateTime={savedRun.createdAt}>{savedRun.createdAt}</time>
-                    <code>
-                      {savedRun.scenarioId} / {savedRun.algorithmId} · {savedRun.datasetVersionId}
-                    </code>
-                    <small>
-                      {formatVersionSummary(savedRun.adapterVersion, savedRun.configSchemaVersion)}
-                    </small>
+                    <span>
+                      {formatScenarioName(savedRun.scenarioId, locale)} ·{' '}
+                      {formatAlgorithmName(savedRun.algorithmId, locale)}
+                    </span>
                     <p>
                       {metricSummary} ·{' '}
                       {t('playground.history.duration', {
@@ -1086,7 +1095,6 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                       })}
                     </p>
                     <small>{formatSavedRunConfigSummary(savedRun.config)}</small>
-                    <small>{formatSavedRunTargetSummary(savedRun)}</small>
                     <button onClick={() => void handleDeleteRun(savedRun.runId)} type="button">
                       {t('playground.history.delete')}
                     </button>
@@ -1137,15 +1145,9 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
                       <span>{isRestorable ? savedConfig.compatibilityStatus : 'read-only'}</span>
                     </div>
                     <p>
-                      {savedConfig.algorithmId} · {savedConfig.datasetVersionId} ·{' '}
+                      {formatAlgorithmName(savedConfig.algorithmId, locale)} ·{' '}
                       {formatSavedConfigSummary(savedConfig.config)}
                     </p>
-                    <small>
-                      {formatVersionSummary(
-                        savedConfig.adapterVersion,
-                        savedConfig.configSchemaVersion,
-                      )}
-                    </small>
                     {compatibilityReason ? (
                       <p className="playground-error" role="alert">
                         {compatibilityReason}
@@ -1313,13 +1315,9 @@ function DatasetTray({
               <div className="playground-dataset-card-heading">
                 <div>
                   <Database aria-hidden="true" size={17} />
-                  <code>{dataset.datasetVersionId}</code>
+                  <span>{formatScenarioName(entry.scenarioId, locale)}</span>
                 </div>
-                <span>
-                  {isSelected
-                    ? t('playground.dataset.selected')
-                    : formatScenarioName(entry.scenarioId, locale)}
-                </span>
+                <span>{isSelected ? t('playground.dataset.selected') : null}</span>
               </div>
               <p>{localize(dataset.textAlternative, locale)}</p>
               <div className="playground-dataset-facts">
@@ -1347,7 +1345,9 @@ function DatasetTray({
         })}
       </div>
       <p className="playground-dataset-selection" data-testid="playground-selected-dataset">
-        {t('playground.dataset.current', { dataset: selectedDatasetVersionId ?? '—' })}
+        {t('playground.dataset.current', {
+          dataset: formatScenarioName(currentScenarioId, locale),
+        })}
       </p>
       {dropMessage ? (
         <p className="playground-error" role="alert">
@@ -1626,7 +1626,7 @@ function LockedPlaygroundLabList({
               <span className={isUnlocked ? 'is-open' : ''}>
                 {formatPlaygroundLockState(isUnlocked, locale)}
               </span>
-              <code>{registration.datasetVersionId}</code>
+              <span>{formatAlgorithmName(registration.algorithmId, locale)}</span>
             </div>
             <h2>{localize(registration.title, locale)}</h2>
             <p>{localize(registration.intro, locale)}</p>
@@ -1780,14 +1780,14 @@ function formatLimitSummary(
 ): string {
   const parts = fields.flatMap((field) => {
     if (field.kind === 'number' && (field.maxByDeviceProfile || field.integer)) {
-      return [`${field.id} ≤ ${getNumberFieldMax(field, deviceProfile)}`];
+      return [`${field.label[locale]} ≤ ${getNumberFieldMax(field, deviceProfile)}`];
     }
 
     if (field.kind === 'integer-array') {
       const maxItems = field.maxItemsByDeviceProfile?.[deviceProfile] ?? field.maxItems;
       const itemMax = field.itemMaxByDeviceProfile?.[deviceProfile] ?? field.itemMax;
 
-      return [`${field.id}: ${maxItems} layers, each ≤ ${itemMax}`];
+      return [`${field.label[locale]}: ${maxItems} layers, each ≤ ${itemMax}`];
     }
 
     return [];
@@ -1963,12 +1963,6 @@ function deriveAccuracyFromChartSummary(
 
 function formatSavedRunConfigSummary(config: PlaygroundConfig): string {
   return `parameters ${formatSavedConfigSummary(config)}`;
-}
-
-function formatSavedRunTargetSummary(savedRun: PlaygroundRunRecord): string {
-  const target = savedRun.targetVersionId ?? (savedRun.targetReached === null ? null : 'reached');
-
-  return `target ${target ?? 'none'}`;
 }
 
 function getNumberFieldMax(
@@ -2273,35 +2267,6 @@ function formatSavedConfigSummary(config: PlaygroundConfig): string {
   return summaryParts.length > 0 ? summaryParts.join(' · ') : 'custom parameters';
 }
 
-function formatVersionSummary(
-  adapterVersion: string | undefined,
-  configSchemaVersion: 1 | undefined,
-): string {
-  return `adapter ${adapterVersion ?? 'current'} · schema v${configSchemaVersion ?? 1}`;
-}
-
-function formatAlgorithmName(algorithmId: string, locale: Locale): string {
-  const labels: Record<string, { en: string; vi: string }> = {
-    'decision-tree': { en: 'Decision tree', vi: 'Decision tree' },
-    'hierarchical-clustering': { en: 'Hierarchical clustering', vi: 'Phân cụm phân cấp' },
-    kmeans: { en: 'K-Means', vi: 'K-Means' },
-    knn: { en: 'K-Nearest Neighbors', vi: 'K-Nearest Neighbors' },
-    'lasso-regression': { en: 'Lasso regression', vi: 'Hồi quy Lasso' },
-    'linear-regression': { en: 'Linear regression', vi: 'Hồi quy tuyến tính' },
-    'logistic-regression': { en: 'Logistic regression', vi: 'Hồi quy logistic' },
-    mlp: { en: 'MLP', vi: 'MLP' },
-    'naive-bayes': { en: 'Naive Bayes', vi: 'Naive Bayes' },
-    pca: { en: 'PCA', vi: 'PCA' },
-    perceptron: { en: 'Perceptron', vi: 'Perceptron' },
-    'polynomial-regression': { en: 'Polynomial regression', vi: 'Hồi quy đa thức' },
-    'random-forest': { en: 'Random forest', vi: 'Random forest' },
-    'ridge-regression': { en: 'Ridge regression', vi: 'Hồi quy Ridge' },
-    svm: { en: 'Support vector machine', vi: 'Support vector machine' },
-  };
-
-  return labels[algorithmId]?.[locale] ?? algorithmId;
-}
-
 function formatStaticLabel(label: string, locale: Locale): string {
   const labels: Record<string, { en: string; vi: string }> = {
     Algorithm: { en: 'Algorithm', vi: 'Thuật toán' },
@@ -2420,23 +2385,6 @@ const SCENARIO_DISPLAY_ORDER: readonly string[] = [
   'pg-xor',
   'pg-nonlinear-2d',
 ] as const;
-
-function formatScenarioName(scenarioId: string, locale: Locale): string {
-  const labels: Record<string, { en: string; vi: string }> = {
-    'pg-country-indicators': { en: 'Country indicators', vi: 'Chỉ báo quốc gia' },
-    'pg-credit-risk': { en: 'Credit risk', vi: 'Rủi ro tín dụng' },
-    'pg-customer-churn': { en: 'Customer churn', vi: 'Rời bỏ khách hàng' },
-    'pg-house-price': { en: 'House price', vi: 'Giá nhà' },
-    'pg-insurance-cost': { en: 'Insurance cost', vi: 'Chi phí bảo hiểm' },
-    'pg-nonlinear-2d': { en: 'Nonlinear 2D', vi: '2D phi tuyến' },
-    'pg-retail-segments': { en: 'Retail segments', vi: 'Phân khúc bán lẻ' },
-    'pg-spam-detection': { en: 'Spam detection', vi: 'Phát hiện spam' },
-    'pg-wine-cultivar': { en: 'Wine cultivar', vi: 'Giống nho' },
-    'pg-xor': { en: 'XOR', vi: 'XOR' },
-  };
-
-  return labels[scenarioId]?.[locale] ?? scenarioId;
-}
 
 function formatFeedback(feedbackId: string, locale: Locale): string {
   const messages: Record<string, { en: string; vi: string }> = {

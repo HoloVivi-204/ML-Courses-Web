@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
+import { formatAlgorithmName, formatUserFacingTitle } from '../../shared/user-facing-labels';
 import { FixedDemoFrame } from './fixed-demo-frame';
 import type { DemoCompletionResult, LearningApiClient, LearningDemoContent } from './learning-api';
 
@@ -44,36 +45,37 @@ const copy: Readonly<
   en: {
     algorithm: 'Algorithm',
     backToLesson: 'Back to lesson',
-    complete: 'Completing demo…',
-    completed: 'demo_completed',
-    failed: 'Demo completion could not be recorded. Revisit the required steps and try again.',
-    fixed: 'FIXED DEMO',
+    complete: 'Completing practice…',
+    completed: 'Practice completed',
+    failed: 'Practice completion could not be recorded. Revisit the required steps and try again.',
+    fixed: 'INTERACTIVE PRACTICE',
     moduleQuiz: 'Open the module quiz',
     next: 'Next step',
     notFoundBack: 'Back to course catalog',
-    notFoundBody: 'This demo is not available for the current learner access.',
-    notFoundTitle: 'Demo not available',
+    notFoundBody: 'This practice is not available for the current learner access.',
+    notFoundTitle: 'Practice not available',
     previous: 'Previous step',
     progress: (viewed, total) => `Required steps ${viewed} / ${total}`,
-    progressLabel: 'Demo progress',
+    progressLabel: 'Practice progress',
     result: 'Result',
     seed: 'Seed',
   },
   vi: {
     algorithm: 'Thuật toán',
     backToLesson: 'Quay lại bài học',
-    complete: 'Đang ghi nhận demo…',
-    completed: 'demo_completed',
-    failed: 'Chưa thể ghi nhận hoàn thành demo. Hãy xem lại các bước bắt buộc rồi thử lại.',
-    fixed: 'DEMO CỐ ĐỊNH',
+    complete: 'Đang ghi nhận phần thực hành…',
+    completed: 'Đã hoàn thành phần thực hành',
+    failed:
+      'Chưa thể ghi nhận hoàn thành phần thực hành. Hãy xem lại các bước bắt buộc rồi thử lại.',
+    fixed: 'THỰC HÀNH TƯƠNG TÁC',
     moduleQuiz: 'Mở quiz module',
     next: 'Bước tiếp theo',
     notFoundBack: 'Về danh sách khóa học',
-    notFoundBody: 'Demo này chưa khả dụng với quyền truy cập hiện tại.',
-    notFoundTitle: 'Demo chưa khả dụng',
+    notFoundBody: 'Phần thực hành này chưa khả dụng với quyền truy cập hiện tại.',
+    notFoundTitle: 'Phần thực hành chưa khả dụng',
     previous: 'Bước trước',
     progress: (viewed, total) => `Bước bắt buộc ${viewed} / ${total}`,
-    progressLabel: 'Tiến độ demo',
+    progressLabel: 'Tiến độ thực hành',
     result: 'Kết quả',
     seed: 'Seed',
   },
@@ -286,11 +288,11 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
 
       <header className="demo-heading">
         <span className="eyebrow">{text.fixed}</span>
-        <h1>{localize(demo.title, locale)}</h1>
+        <h1>{formatUserFacingTitle(localize(demo.title, locale))}</h1>
         <dl className="demo-meta">
           <div>
             <dt>{text.algorithm}</dt>
-            <dd>{demo.algorithmId}</dd>
+            <dd>{formatAlgorithmName(demo.algorithmId, locale)}</dd>
           </div>
           <div>
             <dt>{text.seed}</dt>
@@ -339,7 +341,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
         {completionStatus === 'ready' && completionResult ? (
           <p>
             <CheckCircle2 aria-hidden="true" size={18} />
-            {text.completed}: {completionResult.event.demoId}
+            {text.completed}
           </p>
         ) : null}
         {completionStatus === 'ready' ? (
@@ -371,7 +373,7 @@ function DemoNotFoundPage({ locale }: { locale: Locale }) {
 
   return (
     <main className="not-found page-shell">
-      <span aria-hidden="true">404 / DEMO</span>
+      <span aria-hidden="true">404 / PRACTICE</span>
       <h1>{text.notFoundTitle}</h1>
       <p>{text.notFoundBody}</p>
       <Link className="primary-link" to="/courses">

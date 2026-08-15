@@ -553,9 +553,9 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         <h1>{localize(post.title, locale)}</h1>
         <p>{localize(post.description, locale)}</p>
         <div className="trial-post-identity" aria-label={t('trial.identityLabel')}>
-          <span>{post.moduleId}</span>
+          <span>{module ? localize(module.title, locale) : t('trial.moduleLabel')}</span>
           <MoveRight aria-hidden="true" size={15} />
-          <strong>{post.id}</strong>
+          <strong>{localize(post.title, locale)}</strong>
         </div>
       </header>
 
@@ -621,7 +621,7 @@ function TrialPostNotFoundPage() {
 
   return (
     <main className="not-found page-shell">
-      <span aria-hidden="true">404 / POST</span>
+      <span aria-hidden="true">404 / LESSON</span>
       <h1>{t('trial.notFound.title')}</h1>
       <p>{t('trial.notFound.body')}</p>
       <Link className="primary-link" to="/courses">

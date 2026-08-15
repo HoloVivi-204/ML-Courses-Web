@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
+import { formatLessonLabel, formatPracticeLabel } from '../../shared/user-facing-labels';
 import type {
   LearningApiClient,
   LearningModuleContent,
@@ -156,7 +157,6 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             {t(`learning.moduleRoadmap.state.${moduleProgressEntry.progress.status}`)}
           </span>
         </div>
-        <code>{module.id}</code>
         <h1>{localize(moduleContent.title, locale)}</h1>
         <p>{localize(moduleContent.description, locale)}</p>
         <p className="learning-module-progress-summary">
@@ -184,28 +184,24 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             const postProgress = postProgressById.get(postId);
             const isResume = postProgress?.started === true && postProgress.completed !== true;
             const isNextPost = postId === (firstIncompletePostId ?? nextPostId);
-
-            return (
-              <li className="learning-module-step-card" key={postId}>
+            const postActionLabel = postProgress?.completed
+              ? t('learning.moduleOverview.reviewPost')
+              : isResume
+                ? t('learning.moduleOverview.resumePost')
+                : t('learning.moduleOverview.openPost');
+            const stepContent = (
+              <>
                 <span className="learning-module-step-number">
                   {String(index + 1).padStart(2, '0')}
                 </span>
                 <div>
                   <span className="eyebrow">{t('learning.moduleOverview.postLabel')}</span>
-                  <h3>{postId}</h3>
+                  <h3>{formatLessonLabel(index + 1, locale)}</h3>
                   {isPostOpen ? (
-                    <Link
-                      className="module-trial-link"
-                      data-next-post={isNextPost ? 'true' : undefined}
-                      to={`/learn/${course.id}/posts/${postId}`}
-                    >
-                      {postProgress?.completed
-                        ? t('learning.moduleOverview.reviewPost')
-                        : isResume
-                          ? t('learning.moduleOverview.resumePost')
-                          : t('learning.moduleOverview.openPost')}
+                    <span className="module-trial-link">
+                      {postActionLabel}
                       <ArrowRight aria-hidden="true" size={17} />
-                    </Link>
+                    </span>
                   ) : (
                     <LockedCondition
                       body={t('learning.moduleOverview.postLockedReason')}
@@ -216,59 +212,162 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
                 {postProgress?.completed ? (
                   <CheckCircle2 aria-label={t('learning.moduleOverview.completed')} size={19} />
                 ) : null}
+              </>
+            );
+
+            return (
+              <li
+                className={
+                  isPostOpen ? 'learning-module-step-card is-open' : 'learning-module-step-card'
+                }
+                key={postId}
+              >
+                {isPostOpen ? (
+                  <Link
+                    aria-label={postActionLabel}
+                    className="learning-module-step-card-link"
+                    data-next-post={isNextPost ? 'true' : undefined}
+                    to={`/learn/${course.id}/posts/${postId}`}
+                  >
+                    {stepContent}
+                  </Link>
+                ) : (
+                  stepContent
+                )}
               </li>
             );
           })}
 
           {module.demoId ? (
-            <li className="learning-module-step-card" key={module.demoId}>
-              <span className="learning-module-step-number">DEMO</span>
-              <div>
-                <span className="eyebrow">{t('learning.moduleOverview.demoLabel')}</span>
-                <h3>{module.demoId}</h3>
-                {contentAccess.has(`demo:${module.demoId}`) ? (
-                  <Link
-                    className="module-trial-link"
-                    to={`/learn/${course.id}/demos/${module.demoId}`}
-                  >
-                    {t('learning.moduleOverview.openDemo')}
-                    <ArrowRight aria-hidden="true" size={17} />
-                  </Link>
-                ) : (
-                  <LockedCondition
-                    body={t('learning.moduleOverview.demoLockedReason')}
-                    title={t('learning.moduleOverview.lockedTitle')}
-                  />
-                )}
-              </div>
-            </li>
+            <LearningModuleDemoStep
+              courseId={course.id}
+              demoId={module.demoId}
+              isOpen={contentAccess.has(`demo:${module.demoId}`)}
+              key={module.demoId}
+              label={formatPracticeLabel(locale)}
+              number={String(module.postIds.length + 1).padStart(2, '0')}
+            />
           ) : null}
 
-          <li className="learning-module-step-card" key={moduleQuizId}>
-            <span className="learning-module-step-number">QUIZ</span>
-            <div>
-              <span className="eyebrow">{t('learning.moduleOverview.quizLabel')}</span>
-              <h3>{localize(moduleQuizContent.title, locale)}</h3>
-              <p>{localize(moduleQuizContent.description, locale)}</p>
-              {isModuleQuizOpen ? (
-                <Link
-                  className="module-trial-link"
-                  to={`/learn/${course.id}/quizzes/${moduleQuizId}`}
-                >
-                  {t('learning.moduleOverview.openQuiz')}
-                  <ArrowRight aria-hidden="true" size={17} />
-                </Link>
-              ) : (
-                <LockedCondition
-                  body={t('learning.moduleOverview.quizLockedReason')}
-                  title={t('learning.moduleOverview.lockedTitle')}
-                />
-              )}
-            </div>
-          </li>
+          <LearningModuleQuizStep
+            courseId={course.id}
+            description={localize(moduleQuizContent.description, locale)}
+            isOpen={isModuleQuizOpen}
+            key={moduleQuizId}
+            moduleQuizId={moduleQuizId}
+            number={String(module.postIds.length + (module.demoId ? 2 : 1)).padStart(2, '0')}
+            title={localize(moduleQuizContent.title, locale)}
+          />
         </ol>
       </section>
     </main>
+  );
+}
+
+function LearningModuleDemoStep({
+  courseId,
+  demoId,
+  isOpen,
+  label,
+  number,
+}: {
+  courseId: string;
+  demoId: string;
+  isOpen: boolean;
+  label: string;
+  number: string;
+}) {
+  const { t } = useTranslation();
+  const stepContent = (
+    <>
+      <span className="learning-module-step-number">{number}</span>
+      <div>
+        <span className="eyebrow">{t('learning.moduleOverview.demoLabel')}</span>
+        <h3>{label}</h3>
+        {isOpen ? (
+          <span className="module-trial-link">
+            {t('learning.moduleOverview.openDemo')}
+            <ArrowRight aria-hidden="true" size={17} />
+          </span>
+        ) : (
+          <LockedCondition
+            body={t('learning.moduleOverview.demoLockedReason')}
+            title={t('learning.moduleOverview.lockedTitle')}
+          />
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <li className={isOpen ? 'learning-module-step-card is-open' : 'learning-module-step-card'}>
+      {isOpen ? (
+        <Link
+          aria-label={t('learning.moduleOverview.openDemo')}
+          className="learning-module-step-card-link"
+          to={`/learn/${courseId}/demos/${demoId}`}
+        >
+          {stepContent}
+        </Link>
+      ) : (
+        stepContent
+      )}
+    </li>
+  );
+}
+
+function LearningModuleQuizStep({
+  courseId,
+  description,
+  isOpen,
+  moduleQuizId,
+  number,
+  title,
+}: {
+  courseId: string;
+  description: string;
+  isOpen: boolean;
+  moduleQuizId: string;
+  number: string;
+  title: string;
+}) {
+  const { t } = useTranslation();
+  const stepContent = (
+    <>
+      <span className="learning-module-step-number">{number}</span>
+      <div>
+        <span className="eyebrow">{t('learning.moduleOverview.quizLabel')}</span>
+        <h3>{title}</h3>
+        <p>{description}</p>
+        {isOpen ? (
+          <span className="module-trial-link">
+            {t('learning.moduleOverview.openQuiz')}
+            <ArrowRight aria-hidden="true" size={17} />
+          </span>
+        ) : (
+          <LockedCondition
+            body={t('learning.moduleOverview.quizLockedReason')}
+            title={t('learning.moduleOverview.lockedTitle')}
+          />
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <li className={isOpen ? 'learning-module-step-card is-open' : 'learning-module-step-card'}>
+      {isOpen ? (
+        <Link
+          aria-label={t('learning.moduleOverview.openQuiz')}
+          className="learning-module-step-card-link"
+          to={`/learn/${courseId}/quizzes/${moduleQuizId}`}
+        >
+          {stepContent}
+        </Link>
+      ) : (
+        stepContent
+      )}
+    </li>
   );
 }
 

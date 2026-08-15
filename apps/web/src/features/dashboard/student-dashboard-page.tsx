@@ -5,6 +5,12 @@ import { Link } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
+import {
+  formatAlgorithmName,
+  formatLessonLabel,
+  formatPracticeLabel,
+  formatScenarioName,
+} from '../../shared/user-facing-labels';
 import type {
   LearningApiClient,
   LearningCourseProgress,
@@ -192,7 +198,7 @@ function VerifiedLearningPanel({
           {progressSnapshot.algorithmUnlocks.map((unlock) => (
             <li key={unlock.algorithmId}>
               {t('dashboard.verified.algorithmUnlocked', {
-                algorithm: formatAlgorithmName(unlock.algorithmId),
+                algorithm: formatAlgorithmName(unlock.algorithmId, locale),
               })}
             </li>
           ))}
@@ -210,10 +216,10 @@ function VerifiedLearningPanel({
           <ul className="dashboard-list">
             {playgroundActivity.map((activity) => (
               <li key={`${activity.scenarioId}:${activity.algorithmId}`}>
-                <span>{activity.scenarioId}</span>
+                <span>{formatScenarioName(activity.scenarioId, locale)}</span>
                 <span>
                   {t('dashboard.verified.activityCounts', {
-                    algorithm: formatAlgorithmName(activity.algorithmId),
+                    algorithm: formatAlgorithmName(activity.algorithmId, locale),
                     failedRunCount: formatCount(activity.failedRunCount, locale),
                     runCount: formatCount(activity.runCount, locale),
                   })}
@@ -249,7 +255,9 @@ function CourseProgressCard({
     <article className="dashboard-course-card">
       <div className="dashboard-course-heading">
         <div>
-          <h3>{course ? localize(course.title, locale) : courseProgress.courseId}</h3>
+          <h3>
+            {course ? localize(course.title, locale) : locale === 'vi' ? 'Khóa học' : 'Course'}
+          </h3>
           <p>
             {t('dashboard.verified.courseProgress', {
               progressPercent: formatPercentNumber(courseProgress.progressPercent, locale),
@@ -280,30 +288,44 @@ function CourseProgressCard({
           return (
             <li key={moduleProgress.moduleId}>
               <div className="dashboard-progress-row">
-                <span>{module ? localize(module.title, locale) : moduleProgress.moduleId}</span>
+                <span>{module ? localize(module.title, locale) : 'Module'}</span>
                 <strong>{formatProgressPercent(moduleProgress.progressPercent, locale)}</strong>
               </div>
               {moduleProgress.missingConditions?.length ? (
                 <p className="dashboard-muted">
                   {t('dashboard.verified.missingConditions', {
-                    conditions: moduleProgress.missingConditions.join(', '),
+                    conditions: formatMissingConditions(
+                      moduleProgress.missingConditions,
+                      course,
+                      locale,
+                    ),
                   })}
                 </p>
               ) : null}
               {modulePosts.length ? (
                 <ul className="dashboard-post-list" aria-label={t('dashboard.verified.postLabel')}>
-                  {modulePosts.map((postProgress) => (
-                    <li key={postProgress.postId}>
-                      <span>{postProgress.postId}</span>
-                      <span>
-                        {t(
-                          postProgress.completed
-                            ? 'dashboard.verified.post.completed'
-                            : 'dashboard.verified.post.inProgress',
-                        )}
-                      </span>
-                    </li>
-                  ))}
+                  {modulePosts.map((postProgress) => {
+                    const postIndex = module?.postIds.indexOf(postProgress.postId) ?? -1;
+
+                    return (
+                      <li key={postProgress.postId}>
+                        <span>
+                          {postIndex >= 0
+                            ? formatLessonLabel(postIndex + 1, locale)
+                            : locale === 'vi'
+                              ? 'Bài học'
+                              : 'Lesson'}
+                        </span>
+                        <span>
+                          {t(
+                            postProgress.completed
+                              ? 'dashboard.verified.post.completed'
+                              : 'dashboard.verified.post.inProgress',
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : null}
             </li>
@@ -367,11 +389,11 @@ function ClientComputedRunsPanel({
 
       {runs.length ? (
         <ul className="dashboard-run-list">
-          {runs.map((run) => (
+          {runs.map((run, runIndex) => (
             <li key={run.runId}>
               <div>
-                <strong>{run.runId}</strong>
-                <span>{run.verificationLevel}</span>
+                <strong>{t('dashboard.client.runLabel', { number: runIndex + 1 })}</strong>
+                <span>{t('verification.client')}</span>
               </div>
               <p>
                 {t('dashboard.client.accuracy', {
@@ -439,12 +461,55 @@ function formatCount(value: number, locale: Locale): string {
   return new Intl.NumberFormat(getIntlLocale(locale)).format(value);
 }
 
-function formatAlgorithmName(algorithmId: string): string {
-  return algorithmId
-    .split('-')
-    .filter(Boolean)
-    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join(' ');
+function formatMissingConditions(
+  conditions: readonly string[] | undefined,
+  course: ReturnType<typeof getCourse>,
+  locale: Locale,
+): string {
+  if (!conditions?.length) {
+    return locale === 'vi' ? 'các bước còn lại' : 'the remaining steps';
+  }
+
+  return conditions
+    .map((condition) => {
+      const [kind, value] = condition.split(':', 2);
+
+      if (kind === 'overview') {
+        return locale === 'vi' ? 'tổng quan module' : 'module overview';
+      }
+
+      if (kind === 'post') {
+        const index =
+          course?.modules?.flatMap((module) => module.postIds).indexOf(value ?? '') ?? -1;
+
+        return index >= 0
+          ? formatLessonLabel(index + 1, locale)
+          : locale === 'vi'
+            ? 'bài học'
+            : 'lesson';
+      }
+
+      if (kind === 'demo') {
+        return formatPracticeLabel(locale);
+      }
+
+      if (kind === 'quiz') {
+        return locale === 'vi' ? 'quiz' : 'quiz';
+      }
+
+      if (kind === 'module') {
+        const module = course?.modules?.find((candidate) => candidate.id === value);
+
+        return module
+          ? localize(module.title, locale)
+          : locale === 'vi'
+            ? 'module trước'
+            : 'previous module';
+      }
+
+      return locale === 'vi' ? 'bước tiếp theo' : 'the next step';
+    })
+    .join(', ');
 }
 
 function formatPercent(value: number, locale: Locale = 'en'): string {

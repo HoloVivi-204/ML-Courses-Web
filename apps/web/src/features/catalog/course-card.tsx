@@ -15,7 +15,11 @@ export function CourseCard({ course, index, locale }: CourseCardProps) {
   const title = localize(course.title, locale);
 
   return (
-    <article className={`course-card course-card-${course.tone}`}>
+    <Link
+      aria-label={t('course.exploreLabel', { title })}
+      className={`course-card course-card-${course.tone}`}
+      to={`/courses/${course.id}`}
+    >
       <div className="course-card-index" aria-hidden="true">
         {String(index + 1).padStart(2, '0')}
       </div>
@@ -33,15 +37,11 @@ export function CourseCard({ course, index, locale }: CourseCardProps) {
             {t('course.hourCount', { count: course.durationHours })}
           </span>
         </div>
-        <Link
-          className="course-link"
-          to={`/courses/${course.id}`}
-          aria-label={t('course.exploreLabel', { title })}
-        >
+        <span className="course-link">
           {t('course.explore')}
           <ArrowUpRight aria-hidden="true" size={18} />
-        </Link>
+        </span>
       </div>
-    </article>
+    </Link>
   );
 }

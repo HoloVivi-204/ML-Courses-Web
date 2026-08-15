@@ -934,6 +934,7 @@ a {
 .course-card {
   position: relative;
   display: grid;
+  cursor: pointer;
   min-height: 340px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -961,6 +962,11 @@ a {
 .course-card:hover {
   border-color: var(--line-strong);
   transform: translateY(-4px);
+}
+
+.course-card:focus-visible {
+  position: relative;
+  z-index: 1;
 }
 
 .course-card-index {
@@ -1300,10 +1306,16 @@ a {
 }
 
 .module-row {
+  cursor: pointer;
   display: grid;
   min-height: 230px;
   border-bottom: 1px solid var(--line);
   grid-template-columns: 130px 1fr;
+  transition: background-color 180ms ease;
+}
+
+.module-row:hover {
+  background: color-mix(in srgb, var(--teal-soft) 24%, transparent);
 }
 
 .module-row:target {
@@ -1518,6 +1530,22 @@ a {
   grid-template-columns: 84px minmax(0, 1fr);
 }
 
+.learning-module-card.is-open {
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.learning-module-card.is-open:hover {
+  background: color-mix(in srgb, var(--teal-soft) 24%, var(--surface));
+}
+
+.learning-module-card.is-open:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
 .learning-module-card.is-locked {
   background: color-mix(in srgb, var(--surface) 74%, var(--bg));
 }
@@ -1673,6 +1701,28 @@ a {
   gap: 18px;
 }
 
+.learning-module-step-card.is-open {
+  padding: 0;
+}
+
+.learning-module-step-card.is-open:hover {
+  background: color-mix(in srgb, var(--teal-soft) 24%, transparent);
+}
+
+.learning-module-step-card-link {
+  display: grid;
+  padding: 24px 0;
+  align-items: start;
+  color: inherit;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  gap: 18px;
+}
+
+.learning-module-step-card-link:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
 .learning-module-step-number {
   color: var(--teal);
   font-family: ui-monospace, monospace;
@@ -1693,7 +1743,8 @@ a {
   margin-top: 13px;
 }
 
-.learning-module-step-card > svg {
+.learning-module-step-card > svg,
+.learning-module-step-card-link > svg {
   color: var(--teal);
 }
 
@@ -6102,7 +6153,13 @@ a {
     gap: 12px;
   }
 
-  .learning-module-step-card > svg {
+  .learning-module-step-card-link {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .learning-module-step-card > svg,
+  .learning-module-step-card-link > svg {
     grid-column: 2;
     grid-row: 1;
     justify-self: start;

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
+import { formatLessonLabel, formatPracticeLabel } from '../../shared/user-facing-labels';
 import { CourseCard } from './course-card';
 import { courses, getCourse, localize, type Locale } from './course-data';
 
@@ -68,7 +69,7 @@ export function CoursePage({ locale }: LocaleProps) {
               <span>{t('course.hourCount', { count: course.durationHours })}</span>
             </div>
             {course.modules?.[0] ? (
-              <a className="primary-link" href={`#${course.modules[0].id}`}>
+              <a className="primary-link" href="#module-01">
                 {t('course.viewRoadmap')}
                 <ArrowRight aria-hidden="true" size={18} />
               </a>
@@ -90,7 +91,6 @@ export function CoursePage({ locale }: LocaleProps) {
               <path d="M65 224C135 48 276 34 376 98" />
               <path d="M65 224C205 254 310 210 376 98" />
             </svg>
-            <code>{course.id}</code>
           </div>
         </div>
       </section>
@@ -110,10 +110,22 @@ export function CoursePage({ locale }: LocaleProps) {
               const isFirstModule = index === 0;
 
               return (
-                <article
+                <Link
+                  aria-label={
+                    isFirstModule
+                      ? t('course.openTrialLabel', {
+                          title: localize(module.title, locale),
+                        })
+                      : localize(module.title, locale)
+                  }
                   className={isFirstModule ? 'module-row is-first' : 'module-row'}
-                  id={module.id}
+                  id={`module-${String(module.index).padStart(2, '0')}`}
                   key={module.id}
+                  to={
+                    isFirstModule
+                      ? `/learn/${course.id}/posts/${module.postId}`
+                      : `/learn/${course.id}/modules/${module.id}`
+                  }
                 >
                   <div className="module-index">
                     <span>{String(module.index).padStart(2, '0')}</span>
@@ -122,7 +134,6 @@ export function CoursePage({ locale }: LocaleProps) {
                   <div className="module-content">
                     <div className="module-title-row">
                       <div>
-                        <code>{module.id}</code>
                         <h3>{localize(module.title, locale)}</h3>
                       </div>
                       <span className={isFirstModule ? 'module-state open' : 'module-state'}>
@@ -136,34 +147,25 @@ export function CoursePage({ locale }: LocaleProps) {
                     </div>
                     <p>{localize(module.description, locale)}</p>
                     {isFirstModule ? (
-                      <Link
-                        className="module-trial-link"
-                        to={`/learn/${course.id}/posts/${module.postId}`}
-                      >
+                      <span className="module-trial-link">
                         {t('course.openTrialLabel', {
                           title: localize(module.title, locale),
                         })}
                         <ArrowRight aria-hidden="true" size={17} />
-                      </Link>
+                      </span>
                     ) : null}
                     <div className="module-facts">
                       <span>
                         <Clock3 aria-hidden="true" size={15} />
                         {t('course.minuteCount', { count: module.durationMinutes })}
                       </span>
-                      {module.postIds.map((postId) => (
-                        <span key={postId}>
-                          POST <code>{postId}</code>
-                        </span>
+                      {module.postIds.map((postId, postIndex) => (
+                        <span key={postId}>{formatLessonLabel(postIndex + 1, locale)}</span>
                       ))}
-                      {module.demoId ? (
-                        <span>
-                          DEMO <code>{module.demoId}</code>
-                        </span>
-                      ) : null}
+                      {module.demoId ? <span>{formatPracticeLabel(locale)}</span> : null}
                     </div>
                   </div>
-                </article>
+                </Link>
               );
             })}
           </div>

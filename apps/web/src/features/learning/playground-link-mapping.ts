@@ -41,5 +41,5 @@ export function getPlaygroundPathForAlgorithm(algorithmId: string): string | nul
 }
 
 export function formatAlgorithmName(algorithmId: string): string {
-  return displayNames[algorithmId] ?? algorithmId;
+  return displayNames[algorithmId] ?? 'Algorithm';
 }

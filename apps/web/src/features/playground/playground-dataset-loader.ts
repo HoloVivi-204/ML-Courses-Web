@@ -60,7 +60,7 @@ export class DatasetIntegrityError extends Error {
     public readonly datasetVersionId: string,
     reason: string,
   ) {
-    super(`The ${datasetVersionId} dataset failed an integrity check: ${reason}`);
+    super(`The selected dataset failed an integrity check: ${reason}`);
     this.name = 'DatasetIntegrityError';
   }
 }
@@ -69,7 +69,7 @@ export class DatasetLoadError extends Error {
   readonly code = 'DATASET_LOAD_ERROR';
 
   constructor(public readonly datasetVersionId: string) {
-    super(`The ${datasetVersionId} dataset could not be downloaded.`);
+    super('The selected dataset could not be downloaded.');
     this.name = 'DatasetLoadError';
   }
 }

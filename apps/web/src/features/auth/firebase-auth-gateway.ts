@@ -29,15 +29,20 @@ import {
 import type { AuthGateway, AuthUser } from './auth-context';
 
 const FIREBASE_APP_NAME = 'ml-path-web';
-const LOCAL_AUTH_EMULATOR_URL = 'http://127.0.0.1:9099';
+const LOCAL_AUTH_EMULATOR_URL = 'http://localhost:9099';
 const LOCAL_FIREBASE_PROJECT_ID = 'demo-ml-learning-local';
 
 interface FirebaseEnvironment {
+  VITE_APP_ENV?: string;
   VITE_FIREBASE_API_KEY?: string;
   VITE_FIREBASE_APP_ID?: string;
   VITE_FIREBASE_AUTH_DOMAIN?: string;
   VITE_FIREBASE_PROJECT_ID?: string;
   VITE_FIREBASE_STORAGE_BUCKET?: string;
+  VITE_FIREBASE_USE_DATA_EMULATORS?: string;
+  VITE_FIREBASE_USE_EMULATOR?: string;
+  VITE_LOCAL_CLOUD_AUTH_DEMO?: string;
+  VITE_LOCAL_DEMO_ADMIN_EMAIL?: string;
 }
 
 export interface LocalDataEmulatorConfiguration {
@@ -136,7 +141,19 @@ async function toAuthUser(user: User): Promise<AuthUser> {
     .map((provider) => provider.providerId)
     .filter((providerId): providerId is string => Boolean(providerId));
   const tokenResult = await user.getIdTokenResult();
-  const role = getAuthRoleFromClaims(tokenResult.claims);
+  const normalizedLocalAdminEmail =
+    import.meta.env.VITE_LOCAL_DEMO_ADMIN_EMAIL?.trim().toLowerCase();
+  const normalizedUserEmail = user.email?.trim().toLowerCase();
+  const isConfiguredLocalAdmin =
+    import.meta.env.DEV &&
+    import.meta.env.VITE_APP_ENV === 'local' &&
+    import.meta.env.VITE_LOCAL_CLOUD_AUTH_DEMO === 'true' &&
+    import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'false' &&
+    import.meta.env.VITE_FIREBASE_USE_DATA_EMULATORS === 'true' &&
+    Boolean(normalizedLocalAdminEmail) &&
+    normalizedLocalAdminEmail === normalizedUserEmail;
+  const role =
+    getAuthRoleFromClaims(tokenResult.claims) ?? (isConfiguredLocalAdmin ? 'admin' : undefined);
 
   return {
     email: user.email,

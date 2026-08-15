@@ -6,6 +6,11 @@ import { Link } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { courses, localize, type Locale } from '../catalog/course-data';
 import type { AdminReportSummary, LearningApiClient } from '../learning/learning-api';
+import {
+  formatAlgorithmName,
+  formatLessonLabel,
+  formatScenarioName,
+} from '../../shared/user-facing-labels';
 
 interface AdminReportsPageProps {
   learningApiClient: LearningApiClient;
@@ -151,7 +156,6 @@ function LearningVerifiedReport({
             key={courseProgress.courseId}
           >
             <strong>{getCourseLabel(courseProgress.courseId, locale)}</strong>
-            <small>{courseProgress.courseId}</small>
             <span>
               {t('admin.reports.learning.courseCounts', {
                 completedCount: formatCount(courseProgress.completedCount, locale),
@@ -203,12 +207,13 @@ function LearningVerifiedReport({
       </div>
 
       <ul className="admin-report-list">
-        {learning.quizSummary.commonWrongQuestions.map((question) => (
+        {learning.quizSummary.commonWrongQuestions.map((question, questionIndex) => (
           <li key={`${question.quizId}:${question.questionId}`}>
-            <strong>{question.quizId}</strong>
+            <strong>
+              {t('admin.reports.learning.questionLabel', { number: questionIndex + 1 })}
+            </strong>
             <span>
               {t('admin.reports.learning.wrongQuestion', {
-                questionId: question.questionId,
                 wrongCount: formatCount(question.wrongCount, locale),
               })}
             </span>
@@ -220,7 +225,7 @@ function LearningVerifiedReport({
         {learning.algorithmUnlocks.map((unlock) => (
           <li key={unlock.algorithmId}>
             {t('admin.reports.learning.unlockCount', {
-              algorithm: formatAlgorithmName(unlock.algorithmId),
+              algorithm: formatAlgorithmName(unlock.algorithmId, locale),
               count: formatCount(unlock.unlockedLearnerCount, locale),
             })}
           </li>
@@ -291,18 +296,18 @@ function PlaygroundClientReportedPanel({
             percent: formatRate(playground.errorRate, locale),
           })}
         </p>
-        <p>{playground.verificationLevel}</p>
+        <p>{t('verification.client')}</p>
       </div>
 
       <ul className="admin-report-list">
         {playground.scenarioActivity.map((activity) => (
           <li key={`${activity.scenarioId}:${activity.algorithmId}`}>
-            <strong>{activity.scenarioId}</strong>
+            <strong>{formatScenarioName(activity.scenarioId, locale)}</strong>
             <span>
               {t('admin.reports.playground.scenarioActivity', {
-                algorithm: formatAlgorithmName(activity.algorithmId),
+                algorithm: formatAlgorithmName(activity.algorithmId, locale),
                 runCount: formatCount(activity.runCount, locale),
-                scenarioId: activity.scenarioId,
+                scenario: formatScenarioName(activity.scenarioId, locale),
               })}
             </span>
             <span>
@@ -315,14 +320,6 @@ function PlaygroundClientReportedPanel({
       </ul>
     </section>
   );
-}
-
-function formatAlgorithmName(algorithmId: string): string {
-  return algorithmId
-    .split('-')
-    .filter(Boolean)
-    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join(' ');
 }
 
 function formatCount(value: number, locale: Locale): string {
@@ -353,7 +350,7 @@ function formatGeneratedAt(value: string, locale: Locale): string {
 function getCourseLabel(courseId: string, locale: Locale): string {
   const course = courses.find((candidate) => candidate.id === courseId);
 
-  return course ? localize(course.title, locale) : courseId;
+  return course ? localize(course.title, locale) : locale === 'vi' ? 'Khóa học' : 'Course';
 }
 
 function getModuleLabel(moduleId: string, locale: Locale): string {
@@ -361,7 +358,7 @@ function getModuleLabel(moduleId: string, locale: Locale): string {
     .flatMap((course) => course.modules ?? [])
     .find((candidate) => candidate.id === moduleId);
 
-  return module ? localize(module.title, locale) : moduleId;
+  return module ? localize(module.title, locale) : 'Module';
 }
 
 function getPostLabel(postId: string, locale: Locale): string {
@@ -369,7 +366,16 @@ function getPostLabel(postId: string, locale: Locale): string {
     .flatMap((course) => course.modules ?? [])
     .find((candidate) => candidate.postIds.includes(postId));
 
-  return module ? `${localize(module.title, locale)} / ${postId}` : postId;
+  if (!module) {
+    return locale === 'vi' ? 'Bài học' : 'Lesson';
+  }
+
+  const postIndex = module.postIds.indexOf(postId);
+
+  return `${localize(module.title, locale)} · ${formatLessonLabel(
+    postIndex >= 0 ? postIndex + 1 : 1,
+    locale,
+  )}`;
 }
 
 function ReportProgressTable({
@@ -396,7 +402,6 @@ function ReportProgressTable({
         {rows.map((row) => (
           <li key={row.id}>
             <strong>{row.label}</strong>
-            <small>{row.id}</small>
             <span>
               {t('admin.reports.learning.progressCounts', {
                 completedCount: formatCount(row.completedCount, locale),

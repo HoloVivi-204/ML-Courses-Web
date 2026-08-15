@@ -1,4 +1,5 @@
 import { localize, type Locale } from '../catalog/course-data';
+import { formatAlgorithmName, formatUserFacingTitle } from '../../shared/user-facing-labels';
 
 import type { LearningDemoContent, LearningDemoStep } from './learning-api';
 
@@ -42,7 +43,7 @@ export function FixedDemoFrame({
           />
         ))}
         <text x="62" y="222">
-          {demo.algorithmId}
+          {formatAlgorithmName(demo.algorithmId, locale)}
         </text>
       </svg>
 
@@ -76,11 +77,11 @@ export function FixedDemoFrame({
         </table>
       ) : (
         <table className="and-truth-table">
-          <caption>{demo.problemId}</caption>
+          <caption>{formatUserFacingTitle(localize(demo.title, locale))}</caption>
           <tbody>
             <tr>
-              <th>step</th>
-              <td>{step.id}</td>
+              <th>{locale === 'vi' ? 'Bước' : 'Step'}</th>
+              <td>{stepIndex + 1}</td>
             </tr>
             <tr>
               <th>seed</th>

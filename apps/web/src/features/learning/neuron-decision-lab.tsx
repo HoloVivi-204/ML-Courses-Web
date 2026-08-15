@@ -11,11 +11,7 @@ function calculateDecision(inputOne: number, inputTwo: number) {
   };
 }
 
-interface NeuronDecisionLabProps {
-  activityId: string;
-}
-
-export function NeuronDecisionLab({ activityId }: NeuronDecisionLabProps) {
+export function NeuronDecisionLab() {
   const { t } = useTranslation();
   const [inputOne, setInputOne] = useState(0);
   const [inputTwo, setInputTwo] = useState(0);
@@ -29,7 +25,6 @@ export function NeuronDecisionLab({ activityId }: NeuronDecisionLabProps) {
           <span className="eyebrow">{t('trial.lab.eyebrow')}</span>
           <h2 id="neuron-lab-title">{t('trial.lab.title')}</h2>
         </div>
-        <span className="lab-activity-id">{activityId}</span>
       </header>
 
       <div className="neuron-lab-workspace">

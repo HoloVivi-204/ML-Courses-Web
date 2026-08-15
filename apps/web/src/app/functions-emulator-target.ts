@@ -8,5 +8,5 @@ export function getFunctionsEmulatorTarget(projectId?: string): string {
     throw new Error('The Functions emulator project identifier is invalid.');
   }
 
-  return `http://127.0.0.1:5001/${resolvedProjectId}/asia-southeast1/api`;
+  return `http://localhost:5001/${resolvedProjectId}/asia-southeast1/api`;
 }

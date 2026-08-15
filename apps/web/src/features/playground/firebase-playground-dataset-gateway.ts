@@ -20,7 +20,7 @@ import {
   type PlaygroundDatasetStorageManifest,
 } from './playground-dataset-loader';
 
-const LOCAL_STORAGE_EMULATOR_HOST = '127.0.0.1';
+const LOCAL_STORAGE_EMULATOR_HOST = 'localhost';
 const LOCAL_STORAGE_EMULATOR_PORT = 9199;
 const connectedStorageEmulators = new WeakSet<FirebaseStorage>();
 

@@ -6,8 +6,9 @@ import {
   Play,
   Sparkles,
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 
 import { CourseCard } from '../catalog/course-card';
 import { courses, type Locale } from '../catalog/course-data';
@@ -27,7 +28,7 @@ function XorLabPreview() {
           <i />
           <i />
         </span>
-        <code>pg-xor / perceptron</code>
+        <span>Perceptron · XOR</span>
         <span className="lab-status">{t('landing.lab.status')}</span>
       </div>
       <div className="lab-body">
@@ -111,6 +112,15 @@ const methodIcons = [BookOpenCheck, FlaskConical, MousePointer2] as const;
 
 export function LandingPage({ locale }: LandingPageProps) {
   const { t } = useTranslation();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash !== '#method') {
+      return;
+    }
+
+    document.getElementById('method')?.scrollIntoView({ block: 'start' });
+  }, [location.hash]);
 
   return (
     <main className="landing-page">
@@ -122,7 +132,7 @@ export function LandingPage({ locale }: LandingPageProps) {
           </h1>
           <p className="hero-lede">{t('landing.lede')}</p>
           <div className="hero-actions">
-            <Link className="primary-link" to="/courses/course-deep-learning-basic">
+            <Link className="primary-link" to="/courses/course-classical-ml">
               {t('landing.primaryCta')}
               <ArrowRight aria-hidden="true" size={18} />
             </Link>
@@ -202,7 +212,7 @@ export function LandingPage({ locale }: LandingPageProps) {
         <span aria-hidden="true">∴</span>
         <blockquote>{t('landing.closing.quote')}</blockquote>
         <p>{t('landing.closing.body')}</p>
-        <Link to="/courses/course-deep-learning-basic">
+        <Link to="/courses/course-classical-ml">
           {t('landing.closing.cta')}
           <ArrowRight aria-hidden="true" size={18} />
         </Link>

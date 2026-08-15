@@ -63,9 +63,9 @@ export function SiteHeader({
               {t('nav.admin')}
             </NavLink>
           ) : null}
-          <a className="site-nav-link" href="/#method">
-            {t('nav.method')}
-          </a>
+          <NavLink className={getNavClassName} to="/playground">
+            {t('nav.playground')}
+          </NavLink>
         </nav>
 
         <div className="site-actions">

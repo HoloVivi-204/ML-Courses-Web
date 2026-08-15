@@ -278,20 +278,26 @@ function LearningModuleCard({
   const { t } = useTranslation();
   const isLocked = entry.progress.status === 'locked';
   const stateKey = `learning.moduleRoadmap.state.${entry.progress.status}` as const;
+  const cardClassName = isLocked
+    ? 'learning-module-card is-locked'
+    : 'learning-module-card is-open';
+  const cardActionLabel = t(
+    entry.progress.overviewViewed ? 'learning.moduleRoadmap.resume' : 'learning.moduleRoadmap.open',
+  );
 
-  return (
-    <article
-      className={isLocked ? 'learning-module-card is-locked' : 'learning-module-card'}
-      data-module-id={entry.module.id}
-    >
+  const cardContent = (
+    <>
       <div className="learning-module-card-index" aria-hidden="true">
         {String(entry.module.index).padStart(2, '0')}
       </div>
       <div className="learning-module-card-body">
         <div className="learning-module-card-heading">
           <div>
-            <code>{entry.module.id}</code>
-            <h3>{moduleContent ? localize(moduleContent.title, locale) : entry.module.id}</h3>
+            <h3>
+              {moduleContent
+                ? localize(moduleContent.title, locale)
+                : localize(entry.module.title, locale)}
+            </h3>
           </div>
           <span className={isLocked ? 'module-state' : 'module-state open'}>
             {isLocked ? (
@@ -327,27 +333,38 @@ function LearningModuleCard({
             {entry.missingPrerequisiteIds.length ? (
               <ul>
                 {entry.missingPrerequisiteIds.map((prerequisiteId) => (
-                  <li key={prerequisiteId}>
-                    {t('learning.moduleRoadmap.missingPrerequisite', {
-                      moduleId: prerequisiteId,
-                    })}
-                  </li>
+                  <li key={prerequisiteId}>{t('learning.moduleRoadmap.missingPrerequisite')}</li>
                 ))}
               </ul>
             ) : null}
           </div>
         ) : (
-          <Link className="module-trial-link" to={`/learn/${course.id}/modules/${entry.module.id}`}>
-            {t(
-              entry.progress.overviewViewed
-                ? 'learning.moduleRoadmap.resume'
-                : 'learning.moduleRoadmap.open',
-            )}
+          <span className="module-trial-link">
+            {cardActionLabel}
             <ArrowRight aria-hidden="true" size={17} />
-          </Link>
+          </span>
         )}
       </div>
-    </article>
+    </>
+  );
+
+  if (isLocked) {
+    return (
+      <article className={cardClassName} data-module-id={entry.module.id}>
+        {cardContent}
+      </article>
+    );
+  }
+
+  return (
+    <Link
+      aria-label={cardActionLabel}
+      className={cardClassName}
+      data-module-id={entry.module.id}
+      to={`/learn/${course.id}/modules/${entry.module.id}`}
+    >
+      {cardContent}
+    </Link>
   );
 }
 

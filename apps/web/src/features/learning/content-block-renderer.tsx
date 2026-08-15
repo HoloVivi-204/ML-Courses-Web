@@ -126,7 +126,7 @@ function ExampleBlockView({
     return (
       <div className="lesson-section lesson-lab-section">
         <span className="lesson-section-index">{displayIndex}</span>
-        <NeuronDecisionLab activityId={block.activityId} />
+        <NeuronDecisionLab />
       </div>
     );
   }
@@ -138,7 +138,6 @@ function ExampleBlockView({
       <span className="lesson-section-index">{displayIndex}</span>
       <h2 id={headingId}>{block.locales[locale].navigationTitle}</h2>
       <p>{block.locales[locale].description ?? formatGenericExampleGuidance(locale)}</p>
-      <code>{block.activityId}</code>
     </section>
   );
 }
