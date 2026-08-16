@@ -91,6 +91,41 @@ describe('Release 1 protected learning content', () => {
     }
   });
 
+  it('keeps learner-facing source copy free of internal review state', () => {
+    const catalog = getReleaseLearningCatalog();
+    const sourceCopy = catalog.courses.flatMap((course) =>
+      course.modules.flatMap((module) =>
+        module.posts.flatMap((releasePost) => {
+          const post = getReadablePost(course.courseId, releasePost.postId, true)!;
+
+          return post.blocks.flatMap((block) => {
+            if (block.type !== 'source-list') {
+              return [];
+            }
+
+            const sourceList = block as typeof block & {
+              locales: { en: { intro: string }; vi: { intro: string } };
+              resources: ReadonlyArray<{ attribution: { en: string; vi: string } }>;
+            };
+
+            return [
+              sourceList.locales.en.intro,
+              sourceList.locales.vi.intro,
+              ...sourceList.resources.flatMap((resource) => [
+                resource.attribution.en,
+                resource.attribution.vi,
+              ]),
+            ];
+          });
+        }),
+      ),
+    );
+
+    expect(sourceCopy.join(' ')).not.toMatch(
+      /source review|review nguồn|pending|đang chờ|pinned local snapshot|snapshot cục bộ/i,
+    );
+  });
+
   it('keeps ten localized fixed demos server-side with unique task fingerprints', () => {
     const catalog = getReleaseLearningCatalog();
     const demos = catalog.courses.flatMap((course) =>

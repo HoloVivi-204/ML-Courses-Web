@@ -628,14 +628,12 @@ const trialBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'These pinned source references support the concise lesson summary; source review is still pending.',
+        intro: 'This lesson is based on the references below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Các tham chiếu nguồn đã pin này hỗ trợ phần diễn giải ngắn; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên các tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -984,14 +982,12 @@ const mlpFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Source used for this lesson',
-        intro:
-          'This concise original lesson is adapted from the pinned local snapshot below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson source',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -1239,14 +1235,12 @@ const trainingFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from pinned local snapshots of the two documents below; source review is still pending.',
+        intro: 'This lesson is based on the two references below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của hai tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên hai tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -1490,14 +1484,12 @@ const cmlM01ProblemFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from pinned local snapshots of the documents below; source review is still pending.',
+        intro: 'This lesson is based on the references below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của các tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên các tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -1716,14 +1708,12 @@ const cmlM01EvaluationFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -1908,14 +1898,12 @@ const cmlM02LinearFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -2100,14 +2088,12 @@ const cmlM02PolynomialFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -2292,14 +2278,12 @@ const cmlM03RegularizationFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -2484,14 +2468,12 @@ const cmlM04LogisticFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -2676,14 +2658,12 @@ const cmlM04MetricsFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -2868,14 +2848,12 @@ const cmlM05KnnFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -3060,14 +3038,12 @@ const cmlM05NaiveBayesFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -3252,14 +3228,12 @@ const cmlM06DecisionTreeFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -3444,14 +3418,12 @@ const cmlM06RandomForestFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -3636,14 +3608,12 @@ const cmlM07SvmFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -3828,14 +3798,12 @@ const cmlM08KmeansFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -4020,14 +3988,12 @@ const cmlM08HierarchicalFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },
@@ -4212,14 +4178,12 @@ const cmlM09PcaFullLessonBlocks = [
     locales: {
       en: {
         heading: 'Sources used for this lesson',
-        intro:
-          'This concise original lesson is adapted from a pinned local snapshot of the document below; source review is still pending.',
+        intro: 'This lesson is based on the reference below.',
         navigationTitle: 'Lesson sources',
       },
       vi: {
         heading: 'Nguồn dùng cho bài học này',
-        intro:
-          'Bài diễn giải ngắn gọn này được chuyển thể từ snapshot cục bộ đã pin của tài liệu bên dưới; review nguồn vẫn đang chờ.',
+        intro: 'Bài học được biên soạn dựa trên tài liệu tham khảo bên dưới.',
         navigationTitle: 'Nguồn bài học',
       },
     },

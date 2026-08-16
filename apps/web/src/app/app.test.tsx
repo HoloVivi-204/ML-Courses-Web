@@ -2432,7 +2432,8 @@ describe('public learning journey', () => {
       { timeout: LAZY_ROUTE_TIMEOUT_MS },
     );
     expect(resumeBanner).toHaveAttribute('data-reading-position', 'weighted-sum');
-    expect(within(resumeBanner).getByText(/weighted-sum/i)).toBeVisible();
+    expect(within(resumeBanner).getByText('Tiến độ đọc của bạn đã được lưu.')).toBeVisible();
+    expect(within(resumeBanner).queryByText(/weighted-sum/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Chuyển sang tiếng Anh' }));
 
@@ -2440,6 +2441,10 @@ describe('public learning journey', () => {
       name: 'Resume your reading',
     });
     expect(englishResumeBanner).toHaveAttribute('data-reading-position', 'weighted-sum');
+    expect(
+      within(englishResumeBanner).getByText('Your reading progress has been saved.'),
+    ).toBeVisible();
+    expect(within(englishResumeBanner).queryByText(/weighted-sum/i)).not.toBeInTheDocument();
     const savedBlock = document.getElementById('weighted-sum');
     expect(savedBlock).not.toBeNull();
     const scrollIntoView = vi.fn();

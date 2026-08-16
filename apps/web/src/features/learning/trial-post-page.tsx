@@ -569,7 +569,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         >
           <div>
             <strong>{t('trial.resumeReading.title')}</strong>
-            <p>{t('trial.resumeReading.body', { position: savedReadingPosition })}</p>
+            <p>{t('trial.resumeReading.body')}</p>
           </div>
           <button className="secondary-link" onClick={restoreSavedReadingPosition} type="button">
             {t('trial.resumeReading.cta')}

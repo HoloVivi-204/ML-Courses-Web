@@ -46,8 +46,8 @@ export const dlM01SourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Microsoft AI for Beginners; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft AI for Beginners; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Microsoft AI for Beginners.',
+        vi: 'Được biên soạn và diễn giải từ Microsoft AI for Beginners.',
       },
       contentSnapshotHash: '2423708024f4cb064ec3794cfdeba06cf2c62dfc01bba10d7f0ca96a80efea80',
       contentUrls: [
@@ -63,8 +63,8 @@ export const dlM01SourceTrace = {
     },
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Dive into Deep Learning Vietnamese; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Đắm mình vào Học Sâu; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Dive into Deep Learning Vietnamese.',
+        vi: 'Được biên soạn và diễn giải từ Đắm mình vào Học Sâu.',
       },
       contentSnapshotHash: '503f5fe87c26ab3c93d68142343a51feb72a0e743f293f0cc1090b34211bedc1',
       contentUrls: [
@@ -91,8 +91,8 @@ export const dlM03SourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Dive into Deep Learning Vietnamese; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Đắm mình vào Học Sâu; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Dive into Deep Learning Vietnamese.',
+        vi: 'Được biên soạn và diễn giải từ Đắm mình vào Học Sâu.',
       },
       contentSnapshotHash: '503f5fe87c26ab3c93d68142343a51feb72a0e743f293f0cc1090b34211bedc1',
       contentUrls: [
@@ -115,8 +115,8 @@ export const cmlM01SourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Microsoft ML for Beginners; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft ML for Beginners; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Microsoft ML for Beginners.',
+        vi: 'Được biên soạn và diễn giải từ Microsoft ML for Beginners.',
       },
       contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
       contentUrls: [
@@ -140,8 +140,8 @@ export const cmlM02SourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Microsoft ML for Beginners; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft ML for Beginners; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Microsoft ML for Beginners.',
+        vi: 'Được biên soạn và diễn giải từ Microsoft ML for Beginners.',
       },
       contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
       contentUrls: [
@@ -163,8 +163,8 @@ export const cmlM03SourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/linear_model.html'],
@@ -184,8 +184,8 @@ export const cmlM04LogisticSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Microsoft ML for Beginners; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft ML for Beginners; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Microsoft ML for Beginners.',
+        vi: 'Được biên soạn và diễn giải từ Microsoft ML for Beginners.',
       },
       contentSnapshotHash: '797e080d50a3e4d2d6fc1ea3dae931a6f5544a336fc0faa357fe520fc7ef0a39',
       contentUrls: [
@@ -207,8 +207,8 @@ export const cmlM04MetricsSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from Google Machine Learning Crash Course; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Google Machine Learning Crash Course; đang chờ review nguồn.',
+        en: 'Adapted and summarized from Google Machine Learning Crash Course.',
+        vi: 'Được biên soạn và diễn giải từ Google Machine Learning Crash Course.',
       },
       contentSnapshotHash: 'be3f8c79a7ba8e6e03f326de4ab92dc966792ae91cac36c9225348d9c0cdf60b',
       contentUrls: ['https://developers.google.com/machine-learning/crash-course/classification'],
@@ -236,8 +236,8 @@ export const cmlM05KnnSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/neighbors.html'],
@@ -257,8 +257,8 @@ export const cmlM05NaiveBayesSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/naive_bayes.html'],
@@ -286,8 +286,8 @@ export const cmlM06DecisionTreeSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/tree.html'],
@@ -307,8 +307,8 @@ export const cmlM06RandomForestSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/ensemble.html'],
@@ -336,8 +336,8 @@ export const cmlM07SvmSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/svm.html'],
@@ -357,8 +357,8 @@ export const cmlM08ClusteringSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/clustering.html'],
@@ -378,8 +378,8 @@ export const cmlM09PcaSourceTrace = {
   sourceSnapshots: [
     {
       attribution: {
-        en: 'Adapted as a concise original summary from the scikit-learn User Guide; source review is pending.',
-        vi: 'Diễn giải ngắn gọn, nguyên gốc từ Hướng dẫn sử dụng scikit-learn; đang chờ review nguồn.',
+        en: 'Adapted and summarized from the scikit-learn User Guide.',
+        vi: 'Được biên soạn và diễn giải từ Hướng dẫn sử dụng scikit-learn.',
       },
       contentSnapshotHash: '3029d964a0d9bf9d58bee03b7b648257d2dfb02f53402531f5f39a23aac69e60',
       contentUrls: ['https://scikit-learn.org/stable/modules/decomposition.html'],

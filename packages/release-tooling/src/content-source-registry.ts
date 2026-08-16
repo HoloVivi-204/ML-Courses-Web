@@ -32,8 +32,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
     adapter: 'github-markdown',
     allowedHostnames: ['docs.github.com', 'github.com', 'raw.githubusercontent.com'],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from Microsoft ML for Beginners; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft ML for Beginners; đang chờ review nguồn.',
+      en: 'Adapted and summarized from Microsoft ML for Beginners.',
+      vi: 'Được biên soạn và diễn giải từ Microsoft ML for Beginners.',
     },
     authorOrPublisher: 'Microsoft',
     canonicalUrl: 'https://github.com/microsoft/ML-For-Beginners',
@@ -63,8 +63,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
     adapter: 'html-article',
     allowedHostnames: ['creativecommons.org', 'developers.google.com'],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from Google Machine Learning Crash Course; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ Google Machine Learning Crash Course; đang chờ review nguồn.',
+      en: 'Adapted and summarized from Google Machine Learning Crash Course.',
+      vi: 'Được biên soạn và diễn giải từ Google Machine Learning Crash Course.',
     },
     authorOrPublisher: 'Google',
     canonicalUrl: 'https://developers.google.com/machine-learning/crash-course',
@@ -92,8 +92,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
     adapter: 'html-article',
     allowedHostnames: ['creativecommons.org', 'ocw.mit.edu'],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from MIT OpenCourseWare; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ MIT OpenCourseWare; đang chờ review nguồn.',
+      en: 'Adapted and summarized from MIT OpenCourseWare.',
+      vi: 'Được biên soạn và diễn giải từ MIT OpenCourseWare.',
     },
     authorOrPublisher: 'MIT OpenCourseWare',
     canonicalUrl:
@@ -115,8 +115,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
     adapter: 'html-article',
     allowedHostnames: ['github.com', 'scikit-learn.org'],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from scikit-learn documentation; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ tài liệu scikit-learn; đang chờ review nguồn.',
+      en: 'Adapted and summarized from scikit-learn documentation.',
+      vi: 'Được biên soạn và diễn giải từ tài liệu scikit-learn.',
     },
     authorOrPublisher: 'scikit-learn developers',
     canonicalUrl: 'https://scikit-learn.org/stable/',
@@ -149,8 +149,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
       'raw.githubusercontent.com',
     ],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from Dive into Deep Learning Vietnamese; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ Đắm mình vào Học Sâu; đang chờ review nguồn.',
+      en: 'Adapted and summarized from Dive into Deep Learning Vietnamese.',
+      vi: 'Được biên soạn và diễn giải từ Đắm mình vào Học Sâu.',
     },
     authorOrPublisher: 'Dive into Deep Learning authors and Vietnamese translators',
     canonicalUrl: 'https://github.com/d2l-ai/d2l-vi',
@@ -174,8 +174,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
     adapter: 'github-markdown',
     allowedHostnames: ['docs.github.com', 'github.com', 'raw.githubusercontent.com'],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from Microsoft AI for Beginners; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ Microsoft AI for Beginners; đang chờ review nguồn.',
+      en: 'Adapted and summarized from Microsoft AI for Beginners.',
+      vi: 'Được biên soạn và diễn giải từ Microsoft AI for Beginners.',
     },
     authorOrPublisher: 'Microsoft',
     canonicalUrl: 'https://github.com/microsoft/AI-For-Beginners',
@@ -199,8 +199,8 @@ const contentSourceRegistry: readonly ContentSource[] = [
     adapter: 'html-article',
     allowedHostnames: ['creativecommons.org', 'developers.google.com', 'www.tensorflow.org'],
     attributionTemplate: {
-      en: 'Adapted as a concise original summary from TensorFlow tutorials; source review is pending.',
-      vi: 'Diễn giải ngắn gọn, nguyên gốc từ TensorFlow tutorials; đang chờ review nguồn.',
+      en: 'Adapted and summarized from TensorFlow tutorials.',
+      vi: 'Được biên soạn và diễn giải từ các tài liệu TensorFlow.',
     },
     authorOrPublisher: 'TensorFlow',
     canonicalUrl: 'https://www.tensorflow.org/tutorials',

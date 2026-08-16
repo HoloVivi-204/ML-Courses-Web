@@ -57,12 +57,12 @@ function createPendingSourceReview(input: {
 
   return {
     attribution: {
-      en: `Seeded source trace for ${input.title}; external source review remains pending.`,
-      vi: `Dấu vết nguồn đã seed cho ${input.title}; review nguồn bên ngoài vẫn đang chờ.`,
+      en: `Seeded source trace for ${input.title}.`,
+      vi: `Dấu vết nguồn đã được tạo cho ${input.title}.`,
     },
     license: {
-      name: 'Pending external source review',
-      url: 'https://example.invalid/pending-source-review',
+      name: 'Source license details',
+      url: 'https://example.invalid/source-license',
     },
     sourceId,
     title: input.title,

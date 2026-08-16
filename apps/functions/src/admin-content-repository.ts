@@ -647,8 +647,8 @@ function cloneValidationManifest(
 function createSeededAdminContentMetadata(): AdminContentMetadata {
   return {
     attribution: {
-      en: 'Source attribution is pending review.',
-      vi: 'Attribution nguồn đang chờ review.',
+      en: 'Add source attribution before publishing.',
+      vi: 'Hãy bổ sung thông tin ghi nguồn trước khi xuất bản.',
     },
     externalLinkUrl: null,
   };
