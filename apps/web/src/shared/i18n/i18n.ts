@@ -176,6 +176,7 @@ const resources = {
       'dashboard.intro': 'Review your course progress and interactive practice in one place.',
       'dashboard.verified.title': 'Learning progress',
       'dashboard.verified.courseProgress': 'Course progress {{progressPercent}}%',
+      'dashboard.verified.openCourse': 'Open learning path',
       'dashboard.verified.courseCount': '{{count}} enrolled courses',
       'dashboard.verified.courseStatus.completed': 'completed',
       'dashboard.verified.courseStatus.in-progress': 'in progress',
@@ -482,11 +483,11 @@ const resources = {
       'trial.lab.inactive': 'Neuron is inactive: {{output}}',
       'trial.lab.active': 'Neuron fires: {{output}}',
       'trial.summary.eyebrow': 'LESSON COMPLETE',
-      'trial.summary.title': 'You just inspected a neuron from end to end.',
+      'trial.summary.title': 'You just completed this lesson.',
       'trial.summary.body':
         'The full course continues from this single unit to Perceptrons, layers, training, ' +
         'and the limits of linear decisions.',
-      'trial.summary.openDemo': 'Open the AND gate practice',
+      'trial.summary.openDemo': 'Open practice',
       'trial.summary.openQuiz': 'Open the lesson quiz',
       'trial.postViewRequired': 'View every required lesson block before opening the quiz.',
       'trial.resumeReading.title': 'Resume your reading',
@@ -714,6 +715,7 @@ const resources = {
       'dashboard.intro': 'Theo dõi tiến độ khóa học và hoạt động thực hành tại cùng một nơi.',
       'dashboard.verified.title': 'Tiến độ học tập',
       'dashboard.verified.courseProgress': 'Tiến độ khóa học {{progressPercent}}%',
+      'dashboard.verified.openCourse': 'Mở lộ trình học',
       'dashboard.verified.moduleSteps': 'Module hoàn thành {{completed}}/{{required}} bước',
       'dashboard.verified.quizLabel': 'Tiến độ quiz',
       'dashboard.verified.quiz.post':
@@ -971,11 +973,11 @@ const resources = {
       'trial.lab.inactive': 'Neuron chưa kích hoạt: {{output}}',
       'trial.lab.active': 'Neuron kích hoạt: {{output}}',
       'trial.summary.eyebrow': 'HOÀN THÀNH BÀI HỌC',
-      'trial.summary.title': 'Bạn vừa quan sát trọn vẹn một neuron.',
+      'trial.summary.title': 'Bạn vừa hoàn thành bài học này.',
       'trial.summary.body':
         'Khóa học đầy đủ đi tiếp từ đơn vị này đến Perceptron, các lớp, quá trình huấn ' +
         'luyện và giới hạn của quyết định tuyến tính.',
-      'trial.summary.openDemo': 'Mở phần thực hành cổng AND',
+      'trial.summary.openDemo': 'Mở phần thực hành',
       'trial.summary.openQuiz': 'Mở quiz bài học',
       'trial.postViewRequired': 'Hãy xem đầy đủ các khối bắt buộc trước khi mở quiz.',
       'trial.resumeReading.title': 'Tiếp tục phần đang đọc',

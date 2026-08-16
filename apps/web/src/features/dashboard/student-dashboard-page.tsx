@@ -358,6 +358,14 @@ function CourseProgressCard({
           ))}
         </ul>
       ) : null}
+
+      <Link
+        className="module-trial-link dashboard-course-action"
+        to={`/learn/${courseProgress.courseId}`}
+      >
+        {t('dashboard.verified.openCourse')}
+        <ArrowRight aria-hidden="true" size={17} />
+      </Link>
     </article>
   );
 }
@@ -432,12 +440,24 @@ function ClientComputedRunsPanel({
 }
 
 function getDashboardCourses(progressSnapshot: LearningProgressSnapshot): LearningCourseProgress[] {
-  if (progressSnapshot.courseCatalog?.length) {
-    return [...progressSnapshot.courseCatalog];
+  const enrolledCatalogCourses = (progressSnapshot.courseCatalog ?? []).filter(
+    (courseProgress) => courseProgress.status !== 'not-enrolled',
+  );
+
+  if (enrolledCatalogCourses.length) {
+    return enrolledCatalogCourses;
   }
 
-  if (progressSnapshot.courses?.length) {
-    return [...progressSnapshot.courses];
+  const enrolledCourses = (progressSnapshot.courses ?? []).filter(
+    (courseProgress) => courseProgress.status !== 'not-enrolled',
+  );
+
+  if (enrolledCourses.length) {
+    return enrolledCourses;
+  }
+
+  if (progressSnapshot.enrollment.status === 'not-enrolled') {
+    return [];
   }
 
   return [

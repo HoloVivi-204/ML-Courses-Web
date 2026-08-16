@@ -512,6 +512,8 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       : null;
   const quizPath =
     post.accessLevel === 'full' ? `/learn/${post.courseId}/quizzes/${post.postQuizId}` : null;
+  const summaryBackPath = hasFullAccess ? `/learn/${post.courseId}` : `/courses/${post.courseId}`;
+  const summaryBackLabel = hasFullAccess ? 'trial.summary.back' : 'trial.backToCourse';
 
   async function openQuiz(event: MouseEvent<HTMLAnchorElement>) {
     if (!quizPath) {
@@ -605,8 +607,8 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
               </Link>
             ) : null}
             {postViewSyncError ? <p role="alert">{t('trial.postViewRequired')}</p> : null}
-            <Link className="secondary-link" to={`/courses/${post.courseId}`}>
-              {t('trial.summary.back')}
+            <Link className="secondary-link" to={summaryBackPath}>
+              {t(summaryBackLabel)}
               <MoveRight aria-hidden="true" size={17} />
             </Link>
           </footer>

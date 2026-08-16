@@ -110,7 +110,7 @@ function createProgressSnapshot(): LearningProgressSnapshot {
 }
 
 describe('StudentDashboardPage', () => {
-  it('renders the full course catalog, missing conditions, and scenario activity', async () => {
+  it('renders enrolled courses, missing conditions, and scenario activity', async () => {
     const learningApiClient = {
       getProgress: vi.fn().mockResolvedValue(createProgressSnapshot()),
       listPlaygroundRuns: vi.fn().mockResolvedValue({ nextCursor: null, runs: [] }),
@@ -127,15 +127,20 @@ describe('StudentDashboardPage', () => {
       </I18nextProvider>,
     );
 
+    expect(await screen.findByText('1 enrolled courses')).toBeVisible();
     expect(
-      await screen.findByRole('heading', { level: 3, name: 'Classical Machine Learning' }),
-    ).toBeVisible();
+      screen.queryByRole('heading', { level: 3, name: 'Classical Machine Learning' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: 'Deep Learning Basics' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open learning path' })).toHaveAttribute(
+      'href',
+      '/learn/course-deep-learning-basic',
+    );
     expect(
-      screen.getByText(
+      screen.queryByText(
         'Next conditions: overview:cml-m01-foundations, post:cml-p01-problem-data-types',
       ),
-    ).toBeVisible();
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText((text) => text.startsWith('Perceptron') && text.includes('2 runs')),
     ).toBeVisible();

@@ -15,6 +15,7 @@ import type {
   QuizSubmissionResult,
 } from './learning-api';
 import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
+import { getQuizContinueAction } from './learning-navigation';
 import { getPublicQuizRoute, type PublicQuizRoute } from './quiz-route-data';
 
 interface LearningQuizPageProps {
@@ -38,6 +39,11 @@ const copy: Readonly<
       backToLesson: string;
       correctAnswer: string;
       correctFeedback: string;
+      continueModuleQuiz: string;
+      continueNextLesson: string;
+      continueNextModule: string;
+      continuePractice: string;
+      continueRoadmap: string;
       explanation: string;
       failed: string;
       firstWrongFeedback: string;
@@ -59,6 +65,11 @@ const copy: Readonly<
     backToLesson: 'Back to lesson',
     correctAnswer: 'Correct answer',
     correctFeedback: 'Correct',
+    continueModuleQuiz: 'Open the module quiz',
+    continueNextLesson: 'Open the next lesson',
+    continueNextModule: 'Open the next module',
+    continuePractice: 'Open practice',
+    continueRoadmap: 'Return to the learning roadmap',
     explanation: 'Explanation',
     failed: 'The quiz could not be loaded or submitted. Try again.',
     firstWrongFeedback: 'Review this concept, then try the question again.',
@@ -78,6 +89,11 @@ const copy: Readonly<
     backToLesson: 'Quay lại bài học',
     correctAnswer: 'Đáp án đúng',
     correctFeedback: 'Đúng',
+    continueModuleQuiz: 'Mở quiz module',
+    continueNextLesson: 'Mở bài học tiếp theo',
+    continueNextModule: 'Mở module tiếp theo',
+    continuePractice: 'Mở phần thực hành',
+    continueRoadmap: 'Về lộ trình học',
     explanation: 'Giải thích',
     failed: 'Chưa thể tải hoặc nộp quiz. Hãy thử lại.',
     firstWrongFeedback: 'Hãy xem lại khái niệm này rồi thử lại câu hỏi.',
@@ -99,6 +115,16 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
   const { courseId, quizId } = useParams();
   const quizRoute = getPublicQuizRoute(quizId);
   const text = copy[locale];
+  const continueAction = quizRoute ? getQuizContinueAction(quizRoute) : null;
+  const continueLabel = continueAction
+    ? {
+        'module-quiz': text.continueModuleQuiz,
+        'next-lesson': text.continueNextLesson,
+        'next-module': text.continueNextModule,
+        practice: text.continuePractice,
+        roadmap: text.continueRoadmap,
+      }[continueAction.kind]
+    : null;
   const [attempt, setAttempt] = useState<QuizAttemptResult | null>(null);
   const [answersByQuestionId, setAnswersByQuestionId] = useState<Record<string, QuizAnswerValue>>(
     {},
@@ -287,8 +313,6 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
         idempotencyKey: idempotencyKey.current,
       });
 
-      setSubmissionResult(result);
-
       if (result.passed && user) {
         try {
           if (activeQuizRoute.postId) {
@@ -307,6 +331,7 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
         }
       }
 
+      setSubmissionResult(result);
       setSubmitStatus('idle');
     } catch {
       setSubmitStatus('failed');
@@ -428,6 +453,12 @@ export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPage
                   ) : null;
                 })
             : null}
+          {submissionResult?.passed && continueAction && continueLabel ? (
+            <Link className="primary-link quiz-continue-link" to={continueAction.path}>
+              {continueLabel}
+              <ArrowRight aria-hidden="true" size={17} />
+            </Link>
+          ) : null}
           {submitStatus === 'failed' ? <p role="alert">{text.failed}</p> : null}
           {submitStatus === 'submitting' ? <p>{text.submitting}</p> : null}
           <button

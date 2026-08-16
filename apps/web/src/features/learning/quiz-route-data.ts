@@ -17,7 +17,7 @@ function createPostQuizId(postId: string) {
   return stablePrefix ? `quiz-post-${stablePrefix}` : `quiz-post-${postId}`;
 }
 
-function createModuleQuizId(moduleId: string) {
+export function getModuleQuizId(moduleId: string) {
   const stablePrefix = /^(cml|dl)-m\d{2}/.exec(moduleId)?.[0];
 
   return stablePrefix ? `quiz-module-${stablePrefix}` : `quiz-module-${moduleId}`;
@@ -68,7 +68,7 @@ const publicQuizRoutes: readonly PublicQuizRoute[] = courses.flatMap((course) =>
       demoId: module.demoId,
       moduleId: module.id,
       postId: null,
-      quizId: createModuleQuizId(module.id),
+      quizId: getModuleQuizId(module.id),
       quizKind: 'module' as const,
       requiredPostIds: module.postIds,
       title: createModuleQuizTitle(module.id, module.title),

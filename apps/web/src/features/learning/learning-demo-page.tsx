@@ -38,6 +38,7 @@ const copy: Readonly<
       progress: (viewed: number, total: number) => string;
       progressLabel: string;
       result: string;
+      retry: string;
       seed: string;
     }
   >
@@ -58,6 +59,7 @@ const copy: Readonly<
     progress: (viewed, total) => `Required steps ${viewed} / ${total}`,
     progressLabel: 'Practice progress',
     result: 'Result',
+    retry: 'Try recording completion again',
     seed: 'Seed',
   },
   vi: {
@@ -77,6 +79,7 @@ const copy: Readonly<
     progress: (viewed, total) => `Bước bắt buộc ${viewed} / ${total}`,
     progressLabel: 'Tiến độ thực hành',
     result: 'Kết quả',
+    retry: 'Ghi nhận hoàn tất lại',
     seed: 'Seed',
   },
 };
@@ -100,6 +103,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   const [viewedStepIds, setViewedStepIds] = useState<readonly string[]>([]);
   const [completionStatus, setCompletionStatus] = useState<CompletionStatus>('idle');
   const [completionResult, setCompletionResult] = useState<DemoCompletionResult | null>(null);
+  const [completionAttempt, setCompletionAttempt] = useState(0);
   const idempotencyKey = useRef(createIdempotencyKey());
   const completionStarted = useRef(false);
   const text = copy[locale];
@@ -109,6 +113,9 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     : null;
   const backPostId = module?.postIds.at(-1) ?? module?.postId ?? null;
   const moduleQuizId = module ? createModuleQuizId(module.id) : null;
+  const moduleQuizPath = moduleQuizId
+    ? `/learn/${demo?.courseId}/quizzes/${moduleQuizId}`
+    : `/learn/${courseId}`;
   const requiredStepIds = useMemo(() => new Set(demo?.requiredStepIds ?? []), [demo]);
   const requiredViewedCount = viewedStepIds.filter((stepId) => requiredStepIds.has(stepId)).length;
   const isComplete = demo ? requiredViewedCount === demo.requiredStepIds.length : false;
@@ -128,6 +135,17 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
         currentValue.includes(nextStepId) ? currentValue : [...currentValue, nextStepId],
       );
     }
+  }
+
+  function retryCompletion() {
+    if (!isComplete) {
+      return;
+    }
+
+    completionStarted.current = false;
+    setCompletionResult(null);
+    setCompletionStatus('idle');
+    setCompletionAttempt((value) => value + 1);
   }
 
   useEffect(() => {
@@ -255,7 +273,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     return () => {
       isActive = false;
     };
-  }, [demo, getIdToken, isComplete, learningApiClient, viewedStepIds]);
+  }, [completionAttempt, demo, getIdToken, isComplete, learningApiClient, viewedStepIds]);
 
   const isDemoLoading =
     status === 'loading' ||
@@ -323,14 +341,21 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
             >
               {text.previous}
             </button>
-            <button
-              disabled={stepIndex === demo.steps.length - 1}
-              onClick={() => showStep(stepIndex + 1)}
-              type="button"
-            >
-              {text.next}
-              <ArrowRight aria-hidden="true" size={16} />
-            </button>
+            {completionStatus === 'ready' ? (
+              <Link className="primary-link demo-next-action" to={moduleQuizPath}>
+                {text.moduleQuiz}
+                <ArrowRight aria-hidden="true" size={16} />
+              </Link>
+            ) : (
+              <button
+                disabled={stepIndex === demo.steps.length - 1}
+                onClick={() => showStep(stepIndex + 1)}
+                type="button"
+              >
+                {text.next}
+                <ArrowRight aria-hidden="true" size={16} />
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -338,24 +363,16 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
       <section className="demo-completion-card" aria-live="polite">
         {completionStatus === 'submitting' ? <p>{text.complete}</p> : null}
         {completionStatus === 'failed' ? <p role="alert">{text.failed}</p> : null}
+        {completionStatus === 'failed' ? (
+          <button className="primary-link" onClick={retryCompletion} type="button">
+            {text.retry}
+          </button>
+        ) : null}
         {completionStatus === 'ready' && completionResult ? (
           <p>
             <CheckCircle2 aria-hidden="true" size={18} />
             {text.completed}
           </p>
-        ) : null}
-        {completionStatus === 'ready' ? (
-          <Link
-            className="secondary-link"
-            to={
-              moduleQuizId
-                ? `/learn/${demo.courseId}/quizzes/${moduleQuizId}`
-                : `/learn/${demo.courseId}`
-            }
-          >
-            {text.moduleQuiz}
-            <ArrowRight aria-hidden="true" size={16} />
-          </Link>
         ) : null}
       </section>
     </main>

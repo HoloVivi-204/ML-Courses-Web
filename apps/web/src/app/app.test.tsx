@@ -4769,6 +4769,7 @@ describe('public learning journey', () => {
     await user.click(screen.getByRole('button', { name: 'Bước tiếp theo' }));
 
     expect(await screen.findByText('demo_completed: demo-perceptron-and-gate')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Mở quiz module' })).toHaveClass('demo-next-action');
     expect(learningApiClient.completeDemo).toHaveBeenCalledWith({
       demoId: 'demo-perceptron-and-gate',
       idToken: 'local-id-token',
