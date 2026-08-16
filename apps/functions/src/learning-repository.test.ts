@@ -975,6 +975,40 @@ describe('Firestore learning repository', () => {
     });
   });
 
+  it('repairs a stale module grant before opening a quiz with completed prerequisites', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/demoCompletions/demo-perceptron-and-gate': {
+        demoId: 'demo-perceptron-and-gate',
+        schemaVersion: 1,
+        status: 'completed',
+      },
+      'users/learner-01/postCompletions/dl-p01-neuron-perceptron': {
+        postId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+        status: 'completed',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.createQuizAttempt({
+      quizId: 'quiz-module-dl-m01',
+      uid: 'learner-01',
+    });
+
+    expect(result.statusCode).toBe(201);
+    expect(
+      documents.get('users/learner-01/contentAccess/module_dl-m01-neuron-perceptron'),
+    ).toMatchObject({
+      contentType: 'module',
+      entityId: 'dl-m01-neuron-perceptron',
+      reason: 'prerequisites-completed',
+      sourceProgressId: 'demoCompletions/demo-perceptron-and-gate',
+    });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/module_dl-m01-neuron-perceptron'),
+    );
+  });
+
   it('merges required post block views, retains the reading position, and opens the post quiz only after content is viewed', async () => {
     const { documents, firestore } = createFakeFirestore({
       'users/learner-01/contentAccess/post_dl-p01-neuron-perceptron': {
@@ -1650,6 +1684,44 @@ describe('Firestore learning repository', () => {
       code: 'DEMO_ACCESS_REQUIRED',
       statusCode: 403,
     });
+  });
+
+  it('repairs missing module access when completing an already unlocked demo', async () => {
+    const { documents, firestore } = createFakeFirestore({
+      'users/learner-01/contentAccess/demo_demo-perceptron-and-gate': {
+        contentType: 'demo',
+        entityId: 'demo-perceptron-and-gate',
+        schemaVersion: 1,
+      },
+      'users/learner-01/postCompletions/dl-p01-neuron-perceptron': {
+        postId: 'dl-p01-neuron-perceptron',
+        schemaVersion: 1,
+        status: 'completed',
+      },
+    });
+    const repository = createFirestoreLearningRepository(firestore);
+
+    const result = await repository.completeDemo({
+      demoId: 'demo-perceptron-and-gate',
+      idempotencyKey: 'demo-repair-module-access-key',
+      moduleId: 'dl-m01-neuron-perceptron',
+      requiredStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+      uid: 'learner-01',
+      viewedStepIds: ['and-problem', 'and-data', 'and-boundary', 'and-result'],
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(
+      documents.get('users/learner-01/contentAccess/module_dl-m01-neuron-perceptron'),
+    ).toMatchObject({
+      contentType: 'module',
+      entityId: 'dl-m01-neuron-perceptron',
+      reason: 'demo-completed',
+      sourceProgressId: 'demoCompletions/demo-perceptron-and-gate',
+    });
+    expectStableContentAccessGrant(
+      documents.get('users/learner-01/contentAccess/module_dl-m01-neuron-perceptron'),
+    );
   });
 
   it('rejects demo completion and preserves unlocks when the authoritative demo is emergency blocked', async () => {

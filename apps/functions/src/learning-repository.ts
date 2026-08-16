@@ -1911,6 +1911,9 @@ export function createFirestoreLearningRepository(
         });
 
         const accessRef = firestore.doc(`users/${input.uid}/contentAccess/demo_${input.demoId}`);
+        const moduleAccessRef = demoAccessSeed
+          ? firestore.doc(`users/${input.uid}/contentAccess/module_${demoAccessSeed.moduleId}`)
+          : null;
         const completionRef = firestore.doc(`users/${input.uid}/demoCompletions/${input.demoId}`);
         const idempotencyRef = firestore.doc(
           `users/${input.uid}/idempotencyKeys/${input.idempotencyKey}`,
@@ -1919,12 +1922,36 @@ export function createFirestoreLearningRepository(
           demoAccessSeed?.requiredPostIds.map((postId) =>
             firestore.doc(`users/${input.uid}/postCompletions/${postId}`),
           ) ?? [];
-        const [accessSnapshot, idempotencySnapshot, ...requiredPostCompletionSnapshots] =
-          await Promise.all([
-            transaction.get(accessRef),
-            transaction.get(idempotencyRef),
-            ...requiredPostCompletionRefs.map((reference) => transaction.get(reference)),
-          ]);
+        const [
+          accessSnapshot,
+          idempotencySnapshot,
+          moduleAccessSnapshot,
+          ...requiredPostCompletionSnapshots
+        ] = await Promise.all([
+          transaction.get(accessRef),
+          transaction.get(idempotencyRef),
+          moduleAccessRef ? transaction.get(moduleAccessRef) : Promise.resolve(null),
+          ...requiredPostCompletionRefs.map((reference) => transaction.get(reference)),
+        ]);
+
+        const repairMissingModuleAccess = () => {
+          if (!moduleAccessRef || moduleAccessSnapshot?.exists || !demoAccessSeed) {
+            return;
+          }
+
+          transaction.set(
+            moduleAccessRef,
+            {
+              schemaVersion: 1,
+              contentType: 'module',
+              entityId: demoAccessSeed.moduleId,
+              grantedAt: FieldValue.serverTimestamp(),
+              reason: 'demo-completed',
+              sourceProgressId: `demoCompletions/${input.demoId}`,
+            },
+            { merge: true },
+          );
+        };
 
         if (!accessSnapshot.exists) {
           throw new ApiError(403, 'DEMO_ACCESS_REQUIRED', 'Demo access is required.');
@@ -1949,6 +1976,8 @@ export function createFirestoreLearningRepository(
             );
           }
 
+          repairMissingModuleAccess();
+
           return {
             statusCode: 200 as const,
             data: record.responseData ?? createDemoCompletionResponseData(input),
@@ -1956,6 +1985,7 @@ export function createFirestoreLearningRepository(
         }
 
         const responseData = createDemoCompletionResponseData(input);
+        repairMissingModuleAccess();
 
         transaction.set(
           completionRef,
@@ -2538,8 +2568,35 @@ export function createFirestoreLearningRepository(
           ...requiredPostCompletionRefs.map((reference) => transaction.get(reference)),
         ]);
 
+        const requiredPostCompletionsPresent = requiredPostCompletionSnapshots.every(
+          (snapshot) => snapshot.exists,
+        );
+        const demoCompletionPresent =
+          demoCompletionRef === null || demoCompletionSnapshot?.exists === true;
+
         if (!accessSnapshot.exists) {
-          throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Quiz access is required.');
+          const canRepairModuleAccess =
+            manifest.quizKind === 'module' &&
+            manifest.demoId !== null &&
+            requiredPostCompletionsPresent &&
+            demoCompletionPresent;
+
+          if (!canRepairModuleAccess) {
+            throw new ApiError(403, 'CONTENT_ACCESS_REQUIRED', 'Quiz access is required.');
+          }
+
+          transaction.set(
+            accessRef,
+            {
+              schemaVersion: 1,
+              contentType: 'module',
+              entityId: manifest.moduleId,
+              grantedAt: FieldValue.serverTimestamp(),
+              reason: 'prerequisites-completed',
+              sourceProgressId: `demoCompletions/${manifest.demoId}`,
+            },
+            { merge: true },
+          );
         }
 
         if (postViewRef && !getBooleanField(postViewSnapshot?.data(), 'contentViewed')) {
@@ -2550,7 +2607,7 @@ export function createFirestoreLearningRepository(
           );
         }
 
-        if (requiredPostCompletionSnapshots.some((snapshot) => !snapshot.exists)) {
+        if (!requiredPostCompletionsPresent) {
           throw new ApiError(
             403,
             'POST_COMPLETION_REQUIRED',
@@ -2558,7 +2615,7 @@ export function createFirestoreLearningRepository(
           );
         }
 
-        if (demoCompletionRef && !demoCompletionSnapshot?.exists) {
+        if (!demoCompletionPresent) {
           throw new ApiError(
             403,
             'DEMO_COMPLETION_REQUIRED',

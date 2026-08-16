@@ -4930,6 +4930,36 @@ describe('public learning journey', () => {
     expect(learningApiClient.createQuizAttempt).not.toHaveBeenCalled();
   });
 
+  it('opens a completed module quiz when only its stale module grant is missing', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/learn/course-deep-learning-basic/quizzes/quiz-module-dl-m01',
+    );
+    const completedProgress = createUnlockedProgressSnapshot();
+    const learningApiClient = createLearningApiClient({
+      createQuizAttempt: vi.fn().mockResolvedValue(createModuleQuizAttemptResult()),
+      getProgress: vi.fn().mockResolvedValue({
+        ...completedProgress,
+        contentAccess: completedProgress.contentAccess.filter(
+          (item) => item.contentType !== 'module',
+        ),
+      }),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByText('Đạt ít nhất 70% để hoàn thành module và mở Playground Perceptron.'),
+    ).toBeVisible();
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      quizId: 'quiz-module-dl-m01',
+    });
+  });
+
   it('opens the module quiz on authenticated deep links after backend verifies post and demo completion', async () => {
     window.history.pushState(
       {},

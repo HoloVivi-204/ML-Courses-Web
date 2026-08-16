@@ -516,7 +516,9 @@ function hasVerifiedQuizProgress(
     quizRoute.demoId === null ||
     progressSnapshot.demos.some((demo) => demo.demoId === quizRoute.demoId && demo.completed);
 
-  return hasModuleAccess && requiredPostCompleted && requiredDemoCompleted;
+  const hasCompletedPrerequisites = requiredPostCompleted && requiredDemoCompleted;
+
+  return hasCompletedPrerequisites && (hasModuleAccess || quizRoute.demoId !== null);
 }
 
 function toAnswerList(
