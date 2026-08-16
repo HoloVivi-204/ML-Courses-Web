@@ -78,6 +78,43 @@ function createProgressSnapshot(): LearningProgressSnapshot {
   };
 }
 
+function createMultiCourseProgressSnapshot(): LearningProgressSnapshot {
+  const deepLearningProgress = createProgressSnapshot();
+
+  return {
+    ...deepLearningProgress,
+    courses: [
+      {
+        courseId: 'course-classical-ml',
+        demos: [],
+        modules: [],
+        posts: [],
+        progressPercent: 0,
+        quizzes: [],
+        status: 'in-progress',
+      },
+      {
+        courseId: COURSE_ID,
+        demos: deepLearningProgress.demos,
+        modules: deepLearningProgress.modules,
+        posts: deepLearningProgress.posts,
+        progressPercent: deepLearningProgress.enrollment.progressPercent,
+        quizzes: deepLearningProgress.quizzes,
+        status: deepLearningProgress.enrollment.status,
+      },
+    ],
+    demos: [],
+    enrollment: {
+      courseId: 'course-classical-ml',
+      progressPercent: 0,
+      status: 'in-progress',
+    },
+    modules: [],
+    posts: [],
+    quizzes: [],
+  };
+}
+
 function createQuestion(quizId: string, index: number): QuizAttemptResult['questions'][number] {
   return {
     options: [
@@ -169,6 +206,33 @@ function QuizRouteHarness({ learningApiClient }: { learningApiClient: LearningAp
 }
 
 describe('LearningQuizPage', () => {
+  it('uses the progress for the quiz course when the learner has multiple enrollments', async () => {
+    const learningApiClient = createLearningApiClient();
+    const authContextValue = createAuthContextValue();
+    learningApiClient.getProgress = vi.fn().mockResolvedValue(createMultiCourseProgressSnapshot());
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={authContextValue}>
+          <MemoryRouter initialEntries={[MODULE_PATH]}>
+            <QuizRouteHarness learningApiClient={learningApiClient} />
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Module quiz: Training and generalization',
+      }),
+    ).toBeVisible();
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'test-id-token',
+      quizId: MODULE_QUIZ_ID,
+    });
+  });
+
   it('loads the module quiz when the lesson quiz CTA changes the quiz route', async () => {
     const learningApiClient = createLearningApiClient();
     const authContextValue = createAuthContextValue();

@@ -16,6 +16,7 @@ import type {
 } from './learning-api';
 import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
 import { getQuizContinueAction } from './learning-navigation';
+import { getLearningCourseProgress } from './learning-progression';
 import { getPublicQuizRoute, type PublicQuizRoute } from './quiz-route-data';
 
 interface LearningQuizPageProps {
@@ -150,11 +151,16 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
   const idempotencyKey = useRef(createIdempotencyKey());
   const hasKnownQuizRoute = quizRoute !== undefined && quizRoute.courseId === courseId;
   const canVerifyBackendProgress = status === 'authenticated' && user !== null && hasKnownQuizRoute;
+  const quizCourseProgress =
+    quizRoute && progressSnapshot
+      ? getQuizCourseProgress(progressSnapshot, quizRoute.courseId)
+      : undefined;
   const hasAccess =
     canVerifyBackendProgress &&
     progressStatus === 'ready' &&
     progressSnapshot !== null &&
-    hasVerifiedQuizProgress(quizRoute, progressSnapshot);
+    quizCourseProgress !== undefined &&
+    hasVerifiedQuizProgress(quizRoute, progressSnapshot, quizCourseProgress);
   const answers = useMemo(
     () => toAnswerList(attempt, answersByQuestionId),
     [answersByQuestionId, attempt],
@@ -495,6 +501,7 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
 function hasVerifiedQuizProgress(
   quizRoute: PublicQuizRoute | undefined,
   progressSnapshot: LearningProgressSnapshot,
+  quizCourseProgress: Pick<LearningProgressSnapshot, 'demos' | 'posts'>,
 ): boolean {
   if (!quizRoute) {
     return false;
@@ -510,15 +517,28 @@ function hasVerifiedQuizProgress(
     (item) => item.contentType === 'module' && item.entityId === quizRoute.moduleId,
   );
   const requiredPostCompleted = quizRoute.requiredPostIds.every((postId) =>
-    progressSnapshot.posts.some((post) => post.postId === postId && post.completed),
+    quizCourseProgress.posts.some((post) => post.postId === postId && post.completed),
   );
   const requiredDemoCompleted =
     quizRoute.demoId === null ||
-    progressSnapshot.demos.some((demo) => demo.demoId === quizRoute.demoId && demo.completed);
+    quizCourseProgress.demos.some((demo) => demo.demoId === quizRoute.demoId && demo.completed);
 
   const hasCompletedPrerequisites = requiredPostCompleted && requiredDemoCompleted;
 
   return hasCompletedPrerequisites && (hasModuleAccess || quizRoute.demoId !== null);
+}
+
+function getQuizCourseProgress(
+  progressSnapshot: LearningProgressSnapshot,
+  courseId: string,
+): Pick<LearningProgressSnapshot, 'demos' | 'posts'> | undefined {
+  const courseProgress = getLearningCourseProgress(progressSnapshot, courseId);
+
+  if (courseProgress) {
+    return courseProgress;
+  }
+
+  return progressSnapshot.enrollment.courseId === courseId ? progressSnapshot : undefined;
 }
 
 function toAnswerList(
