@@ -294,9 +294,11 @@ function AppRoutes({ authGateway, avatarUploadStorageGateway, learningApiClient 
               <Route
                 path="/playground"
                 element={
-                  <Suspense fallback={<TrialRouteLoading />}>
-                    <PlaygroundCatalogPage learningApiClient={learningClient} locale={locale} />
-                  </Suspense>
+                  <RequireAuthenticated>
+                    <Suspense fallback={<TrialRouteLoading />}>
+                      <PlaygroundCatalogPage learningApiClient={learningClient} locale={locale} />
+                    </Suspense>
+                  </RequireAuthenticated>
                 }
               />
               <Route

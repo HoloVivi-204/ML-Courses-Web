@@ -622,6 +622,16 @@ describe('authentication routes', () => {
     expect(window.location.search).toBe('?returnTo=%2Fdashboard');
   });
 
+  it('redirects a guest from the Playground catalog to sign in with a safe return path', async () => {
+    window.history.pushState({}, '', '/playground');
+    const gateway = createGateway();
+
+    render(<App authGateway={gateway} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe('?returnTo=%2Fplayground');
+  });
+
   it('returns an authenticated learner to the requested relative learning path', async () => {
     window.history.pushState({}, '', '/login?returnTo=%2Flearn%2Fcourse-deep-learning-basic');
     const gateway = createGateway({
