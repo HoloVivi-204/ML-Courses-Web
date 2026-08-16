@@ -169,7 +169,9 @@ function VerifiedLearningPanel({
 }) {
   const { t } = useTranslation();
   const courses = getDashboardCourses(progressSnapshot);
-  const playgroundActivity = progressSnapshot.playgroundActivity ?? [];
+  const playgroundActivity = (progressSnapshot.playgroundActivity ?? []).filter(
+    (activity) => activity.runCount > 0 || activity.failedRunCount > 0,
+  );
 
   return (
     <section className="dashboard-panel dashboard-panel-verified">
@@ -207,12 +209,12 @@ function VerifiedLearningPanel({
         <p className="dashboard-muted">{t('dashboard.verified.noUnlocks')}</p>
       )}
 
-      {playgroundActivity.length ? (
-        <section
-          className="dashboard-verified-activity"
-          aria-label={t('dashboard.verified.activityLabel')}
-        >
-          <h3>{t('dashboard.verified.activityTitle')}</h3>
+      <section
+        className="dashboard-verified-activity"
+        aria-label={t('dashboard.verified.activityLabel')}
+      >
+        <h3>{t('dashboard.verified.activityTitle')}</h3>
+        {playgroundActivity.length ? (
           <ul className="dashboard-list">
             {playgroundActivity.map((activity) => (
               <li key={`${activity.scenarioId}:${activity.algorithmId}`}>
@@ -227,8 +229,10 @@ function VerifiedLearningPanel({
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        ) : (
+          <p className="dashboard-muted">{t('dashboard.verified.noActivity')}</p>
+        )}
+      </section>
     </section>
   );
 }
@@ -320,7 +324,9 @@ function CourseProgressCard({
                           {t(
                             postProgress.completed
                               ? 'dashboard.verified.post.completed'
-                              : 'dashboard.verified.post.inProgress',
+                              : postProgress.started
+                                ? 'dashboard.verified.post.inProgress'
+                                : 'dashboard.verified.post.notStarted',
                           )}
                         </span>
                       </li>

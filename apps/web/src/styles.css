@@ -272,6 +272,10 @@ a {
   padding: 0;
 }
 
+.mobile-menu-toggle {
+  display: none;
+}
+
 .site-actions .utility-button:hover,
 .site-actions .icon-button:hover {
   background: var(--teal-soft) !important;
@@ -1709,13 +1713,22 @@ a {
   background: color-mix(in srgb, var(--teal-soft) 24%, transparent);
 }
 
+.learning-module-step-card.is-complete {
+  background: color-mix(in srgb, var(--teal-soft) 28%, transparent);
+}
+
 .learning-module-step-card-link {
   display: grid;
+  min-width: 0;
   padding: 24px 0;
   align-items: start;
   color: inherit;
   grid-template-columns: 68px minmax(0, 1fr) auto;
   gap: 18px;
+}
+
+.learning-module-step-card.is-open > .learning-module-step-card-link {
+  grid-column: 1 / -1;
 }
 
 .learning-module-step-card-link:focus-visible {
@@ -1741,6 +1754,16 @@ a {
 
 .learning-module-step-card .module-trial-link {
   margin-top: 13px;
+}
+
+.learning-module-step-status {
+  display: inline-flex;
+  margin-top: 13px;
+  align-items: center;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  gap: 7px;
 }
 
 .learning-module-step-card > svg,
@@ -1857,6 +1880,33 @@ a {
 
 .dashboard-panel-client {
   border-color: color-mix(in srgb, var(--amber) 34%, var(--line));
+}
+
+.dashboard-verified-activity {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-verified-activity h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dashboard-verified-activity .dashboard-list li {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dashboard-verified-activity .dashboard-list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-verified-activity .dashboard-list li > span:last-child {
+  margin-left: auto;
+  text-align: right;
 }
 
 .dashboard-course-list,
@@ -4038,9 +4088,9 @@ a {
   align-items: center;
   flex-wrap: wrap;
   color: var(--ink-soft);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   gap: 10px 20px;
 }
 
@@ -5135,8 +5185,9 @@ a {
   display: grid;
   width: 100%;
   margin-bottom: 22px;
-  padding: 0;
+  padding: 5px 10px 2px;
   color: var(--ink);
+  background: var(--surface-strong);
   font-family: var(--font-display);
   font-size: clamp(25px, 4vw, 34px);
   font-weight: 600;
@@ -5257,6 +5308,10 @@ a {
   gap: 8px;
 }
 
+.quiz-submit-hint {
+  flex: 1 1 240px;
+}
+
 .quiz-submit-card p.is-correct {
   color: var(--teal);
 }
@@ -5281,7 +5336,10 @@ a {
 }
 
 .quiz-submit-card button:disabled {
-  opacity: 0.45;
+  border-color: var(--line-strong);
+  background: var(--line);
+  color: var(--ink-muted);
+  opacity: 1;
   cursor: not-allowed;
 }
 
@@ -5877,6 +5935,7 @@ a {
   }
 
   .site-header-inner {
+    position: relative;
     width: calc(100% - 28px);
     min-height: 64px;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -5884,6 +5943,36 @@ a {
 
   .site-nav {
     display: none;
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 1px);
+    right: 0;
+    left: 0;
+    padding: 8px 18px 14px;
+    border: 1px solid var(--line);
+    border-top: 0;
+    background: color-mix(in srgb, var(--bg) 96%, transparent);
+    box-shadow: 0 18px 30px rgb(23 35 34 / 10%);
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .site-nav.is-mobile-open {
+    display: flex;
+  }
+
+  .site-nav-link {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+
+  .site-nav-link:last-child {
+    border-bottom: 0;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-flex;
   }
 
   .site-actions {
@@ -5904,6 +5993,19 @@ a {
   }
 
   .site-actions .utility-label {
+    display: none;
+  }
+
+  .header-logout {
+    width: 38px;
+    padding: 0;
+  }
+
+  .header-logout > .ant-btn-icon {
+    margin-inline-end: 0;
+  }
+
+  .header-logout > span:not(.ant-btn-icon) {
     display: none;
   }
 
@@ -6154,8 +6256,12 @@ a {
   }
 
   .learning-module-step-card-link {
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr) auto;
     gap: 12px;
+  }
+
+  .learning-module-step-card.is-open > .learning-module-step-card-link {
+    grid-column: 1 / -1;
   }
 
   .learning-module-step-card > svg,
@@ -6163,6 +6269,11 @@ a {
     grid-column: 2;
     grid-row: 1;
     justify-self: start;
+  }
+
+  .learning-module-step-card-link > svg {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .trial-resume-banner {
@@ -6209,6 +6320,17 @@ a {
   .dashboard-run-list div {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .dashboard-verified-activity .dashboard-list li {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .dashboard-verified-activity .dashboard-list li > span:last-child {
+    margin-left: 0;
+    text-align: left;
   }
 
   .learning-demo-page {

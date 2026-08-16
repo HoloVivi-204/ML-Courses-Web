@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -62,6 +62,22 @@ function createProgressSnapshot(): LearningProgressSnapshot {
             requiredStepCount: 4,
             status: 'in-progress',
           },
+          {
+            completedStepCount: 0,
+            moduleId: 'dl-m02-mlp',
+            overviewViewed: false,
+            progressPercent: 0,
+            requiredStepCount: 4,
+            status: 'in-progress',
+          },
+          {
+            completedStepCount: 0,
+            moduleId: 'dl-m03-training-generalization',
+            overviewViewed: false,
+            progressPercent: 0,
+            requiredStepCount: 3,
+            status: 'in-progress',
+          },
         ],
         posts: [
           {
@@ -74,6 +90,28 @@ function createProgressSnapshot(): LearningProgressSnapshot {
             readingPosition: 'decision-boundary',
             started: true,
             viewedItemIds: ['intro'],
+          },
+          {
+            bestScore: 0,
+            completed: false,
+            contentViewed: false,
+            postId: 'dl-p02-mlp-forward-activation',
+            quizId: 'quiz-post-dl-p02',
+            quizPassed: false,
+            readingPosition: null,
+            started: false,
+            viewedItemIds: [],
+          },
+          {
+            bestScore: 0,
+            completed: false,
+            contentViewed: false,
+            postId: 'dl-p03-backprop-overfitting',
+            quizId: 'quiz-post-dl-p03',
+            quizPassed: false,
+            readingPosition: null,
+            started: false,
+            viewedItemIds: [],
           },
         ],
         progressPercent: 25,
@@ -102,6 +140,12 @@ function createProgressSnapshot(): LearningProgressSnapshot {
         failedRunCount: 1,
         runCount: 2,
         scenarioId: 'pg-xor',
+      },
+      {
+        algorithmId: 'mlp',
+        failedRunCount: 0,
+        runCount: 0,
+        scenarioId: 'pg-nonlinear-2d',
       },
     ],
     posts: [],
@@ -144,5 +188,11 @@ describe('StudentDashboardPage', () => {
     expect(
       screen.getByText((text) => text.startsWith('Perceptron') && text.includes('2 runs')),
     ).toBeVisible();
+    expect(screen.getAllByText('not started')).toHaveLength(2);
+    expect(
+      within(screen.getByRole('region', { name: 'Playground activity by scenario' })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(1);
   });
 });

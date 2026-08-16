@@ -56,6 +56,7 @@ const copy: Readonly<
       retry: string;
       score: (score: number, bestScore: number) => string;
       submit: string;
+      submitHint: string;
       submitting: string;
     }
   >
@@ -82,6 +83,7 @@ const copy: Readonly<
     retry: 'Try again',
     score: (score, bestScore) => `Score ${score}% · Best ${bestScore}%`,
     submit: 'Submit quiz',
+    submitHint: 'Choose an answer for every question before submitting.',
     submitting: 'Submitting quiz…',
   },
   vi: {
@@ -106,6 +108,7 @@ const copy: Readonly<
     retry: 'Làm lại',
     score: (score, bestScore) => `Điểm ${score}% · Cao nhất ${bestScore}%`,
     submit: 'Nộp quiz',
+    submitHint: 'Hãy chọn đáp án cho tất cả câu hỏi trước khi nộp.',
     submitting: 'Đang nộp quiz…',
   },
 };
@@ -468,6 +471,9 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
           ) : null}
           {submitStatus === 'failed' ? <p role="alert">{text.failed}</p> : null}
           {submitStatus === 'submitting' ? <p>{text.submitting}</p> : null}
+          {!isReadyToSubmit && !submissionResult && submitStatus === 'idle' ? (
+            <p className="quiz-submit-hint">{text.submitHint}</p>
+          ) : null}
           <button
             disabled={!isReadyToSubmit || isAttemptClosed || submitStatus === 'submitting'}
             type="submit"

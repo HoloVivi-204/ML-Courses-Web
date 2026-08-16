@@ -179,6 +179,20 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
         </div>
 
         <ol className="learning-module-step-list">
+          {moduleProgressEntry.progress.overviewViewed ? (
+            <li className="learning-module-step-card is-complete">
+              <span className="learning-module-step-number">01</span>
+              <div>
+                <span className="eyebrow">{t('learning.moduleOverview.overviewLabel')}</span>
+                <h3>{t('learning.moduleOverview.overviewTitle')}</h3>
+                <span className="learning-module-step-status">
+                  <CheckCircle2 aria-hidden="true" size={17} />
+                  {t('learning.moduleOverview.overviewCompleted')}
+                </span>
+              </div>
+            </li>
+          ) : null}
+
           {module.postIds.map((postId, index) => {
             const isPostOpen = contentAccess.has(`post:${postId}`);
             const postProgress = postProgressById.get(postId);
@@ -192,7 +206,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             const stepContent = (
               <>
                 <span className="learning-module-step-number">
-                  {String(index + 1).padStart(2, '0')}
+                  {String(index + 2).padStart(2, '0')}
                 </span>
                 <div>
                   <span className="eyebrow">{t('learning.moduleOverview.postLabel')}</span>
@@ -245,7 +259,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
               isOpen={contentAccess.has(`demo:${module.demoId}`)}
               key={module.demoId}
               label={formatPracticeLabel(locale)}
-              number={String(module.postIds.length + 1).padStart(2, '0')}
+              number={String(module.postIds.length + 2).padStart(2, '0')}
             />
           ) : null}
 
@@ -255,7 +269,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             isOpen={isModuleQuizOpen}
             key={moduleQuizId}
             moduleQuizId={moduleQuizId}
-            number={String(module.postIds.length + (module.demoId ? 2 : 1)).padStart(2, '0')}
+            number={String(module.postIds.length + (module.demoId ? 3 : 2)).padStart(2, '0')}
             title={localize(moduleQuizContent.title, locale)}
           />
         </ol>

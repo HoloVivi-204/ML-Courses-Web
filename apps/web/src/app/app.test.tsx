@@ -2597,7 +2597,7 @@ describe('public learning journey', () => {
       'href',
       '/learn/course-deep-learning-basic/modules/dl-m02-mlp',
     );
-    expect(screen.getByText('Hoàn thành dl-m02-mlp trước.')).toBeVisible();
+    expect(screen.getByText('Cần hoàn thành: Mạng nơ-ron nhiều lớp.')).toBeVisible();
   });
 
   it('opens the requested module overview and keeps its sequence links module-scoped', async () => {
@@ -2662,12 +2662,12 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Mạng nơ-ron nhiều lớp' }),
     ).toBeVisible();
-    expect(screen.getByRole('link', { name: /mở bài viết/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /mở bài học/i })).toHaveAttribute(
       'href',
       '/learn/course-deep-learning-basic/posts/dl-p02-mlp-forward-activation',
     );
     expect(
-      screen.getByText('Hoàn thành mọi bài viết trong module trước khi xem demo.'),
+      screen.getByText('Hoàn thành mọi bài học trong module trước khi mở phần thực hành.'),
     ).toBeVisible();
     expect(learningApiClient.recordModuleOverview).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -2727,13 +2727,13 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    const nextPost = await screen.findByRole('link', { name: 'Mở bài viết' });
+    const nextPost = await screen.findByRole('link', { name: 'Mở bài học' });
     expect(nextPost).toHaveAttribute(
       'href',
       '/learn/course-classical-ml/posts/cml-p02-train-test-metrics',
     );
     expect(nextPost).toHaveAttribute('data-next-post', 'true');
-    expect(screen.getByRole('link', { name: 'Xem lại bài viết' })).not.toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Xem lại bài học' })).not.toHaveAttribute(
       'data-next-post',
     );
   });
@@ -2776,15 +2776,15 @@ describe('public learning journey', () => {
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
-    expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
+    expect(screen.getByText('Tiến độ học tập')).toBeVisible();
     expect(screen.getByText('Tiến độ khóa học 33%')).toBeVisible();
     expect(screen.getByText('Module hoàn thành 4/4 bước')).toBeVisible();
-    expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
+    expect(screen.getByText('Bài kiểm tra module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
-    expect(screen.getByText('Hoạt động Playground client-computed')).toBeVisible();
-    expect(screen.getByText('run-history-01')).toBeVisible();
+    expect(screen.getByText('Hoạt động thực hành')).toBeVisible();
+    expect(screen.getByText('Lần chạy 1')).toBeVisible();
     expect(screen.getByText('Độ chính xác 50%')).toBeVisible();
-    expect(screen.getByText('client-computed')).toBeVisible();
+    expect(screen.getByText('Kết quả tính toán')).toBeVisible();
     expect(
       screen.queryByText(/điểm thành tích|achievement score|overall score/i),
     ).not.toBeInTheDocument();
@@ -5433,10 +5433,10 @@ describe('public learning journey', () => {
 
     await user.click(screen.getByRole('link', { name: 'Dashboard' }));
     expect(await screen.findByRole('heading', { name: 'Dashboard học viên' })).toBeVisible();
-    expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
+    expect(screen.getByText('Tiến độ học tập')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
-    expect(screen.getByText('run-pg-xor-baseline')).toBeVisible();
-    expect(screen.getByText('client-computed')).toBeVisible();
+    expect(screen.getByText('Lần chạy 1')).toBeVisible();
+    expect(screen.getByText('Kết quả tính toán')).toBeVisible();
 
     vi.unstubAllGlobals();
   }, 30_000);

@@ -284,6 +284,13 @@ function LearningModuleCard({
   const cardActionLabel = t(
     entry.progress.overviewViewed ? 'learning.moduleRoadmap.resume' : 'learning.moduleRoadmap.open',
   );
+  const missingPrerequisiteNames = entry.missingPrerequisiteIds
+    .map((prerequisiteId) => course.modules?.find((candidate) => candidate.id === prerequisiteId))
+    .filter(
+      (prerequisite): prerequisite is NonNullable<typeof prerequisite> =>
+        prerequisite !== undefined,
+    )
+    .map((prerequisite) => localize(prerequisite.title, locale));
 
   const cardContent = (
     <>
@@ -330,12 +337,12 @@ function LearningModuleCard({
           <div className="learning-module-lock" role="note">
             <strong>{t('learning.moduleRoadmap.lockedTitle')}</strong>
             <p>{t('learning.moduleRoadmap.lockedReason')}</p>
-            {entry.missingPrerequisiteIds.length ? (
-              <ul>
-                {entry.missingPrerequisiteIds.map((prerequisiteId) => (
-                  <li key={prerequisiteId}>{t('learning.moduleRoadmap.missingPrerequisite')}</li>
-                ))}
-              </ul>
+            {missingPrerequisiteNames.length ? (
+              <p>
+                {t('learning.moduleRoadmap.missingPrerequisites', {
+                  modules: missingPrerequisiteNames.join(locale === 'vi' ? ' và ' : ' and '),
+                })}
+              </p>
             ) : null}
           </div>
         ) : (

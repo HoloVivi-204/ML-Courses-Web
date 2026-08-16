@@ -188,6 +188,9 @@ describe('LearningQuizPage', () => {
       await screen.findByRole('heading', { level: 1, name: 'Lesson quiz: Overfitting' }),
     ).toBeVisible();
     expect(document.querySelectorAll('.quiz-question-card')).toHaveLength(3);
+    expect(
+      screen.getByText('Choose an answer for every question before submitting.'),
+    ).toBeVisible();
 
     for (const answer of screen.getAllByRole('radio')) {
       await user.click(answer);
