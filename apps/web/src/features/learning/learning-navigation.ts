@@ -7,6 +7,7 @@ export type QuizContinueAction =
   | { kind: 'practice'; path: string }
   | { kind: 'module-quiz'; path: string }
   | { kind: 'next-module'; path: string }
+  | { kind: 'module-overview'; path: string }
   | { kind: 'roadmap'; path: string };
 
 export function getQuizContinueAction(quizRoute: PublicQuizRoute): QuizContinueAction {
@@ -56,7 +57,7 @@ export function getQuizContinueAction(quizRoute: PublicQuizRoute): QuizContinueA
   }
 
   return {
-    kind: 'roadmap',
-    path: `/learn/${course.id}`,
+    kind: 'module-overview',
+    path: `/learn/${course.id}/modules/${module.id}`,
   };
 }

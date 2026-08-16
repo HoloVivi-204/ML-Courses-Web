@@ -34,13 +34,13 @@ describe('learning quiz continuation', () => {
     });
   });
 
-  it('returns to the learning roadmap after the final module quiz', () => {
+  it('returns to the lesson list after the final module quiz', () => {
     const route = getPublicQuizRoute('quiz-module-dl-m03');
 
     expect(route).toBeDefined();
     expect(getQuizContinueAction(route!)).toEqual({
-      kind: 'roadmap',
-      path: '/learn/course-deep-learning-basic',
+      kind: 'module-overview',
+      path: '/learn/course-deep-learning-basic/modules/dl-m03-training-generalization',
     });
   });
 });

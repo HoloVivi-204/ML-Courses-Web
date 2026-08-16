@@ -277,4 +277,38 @@ describe('LearningQuizPage', () => {
       quizId: MODULE_QUIZ_ID,
     });
   });
+
+  it('returns to the current module lesson list after the final module quiz', async () => {
+    const learningApiClient = createLearningApiClient();
+    const authContextValue = createAuthContextValue();
+    const user = userEvent.setup();
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={authContextValue}>
+          <MemoryRouter initialEntries={[MODULE_PATH]}>
+            <QuizRouteHarness learningApiClient={learningApiClient} />
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Module quiz: Training and generalization',
+      }),
+    ).toBeVisible();
+
+    for (const answer of screen.getAllByRole('radio')) {
+      await user.click(answer);
+    }
+    await user.click(screen.getByRole('button', { name: 'Submit quiz' }));
+
+    const continueLink = await screen.findByRole('link', { name: 'Back to module lessons' });
+    expect(continueLink).toHaveAttribute(
+      'href',
+      `/learn/${COURSE_ID}/modules/dl-m03-training-generalization`,
+    );
+  });
 });

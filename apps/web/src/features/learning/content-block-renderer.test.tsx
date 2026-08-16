@@ -212,7 +212,7 @@ describe('content block renderer', () => {
           },
           vi: {
             heading: 'Đọc thêm',
-            intro: 'Đọc tiếp từ nguồn chính thống.',
+            intro: 'Tài liệu tham khảo; review nguồn vẫn đang chờ.',
             navigationTitle: 'Tài liệu',
           },
         },
@@ -259,12 +259,14 @@ describe('content block renderer', () => {
     ];
 
     render(
-      <ContentBlockRenderer
-        blocks={blocks}
-        locale="vi"
-        onOpenResource={onOpenResource}
-        postId="post-test"
-      />,
+      <I18nextProvider i18n={createAppI18n()}>
+        <ContentBlockRenderer
+          blocks={blocks}
+          locale="vi"
+          onOpenResource={onOpenResource}
+          postId="post-test"
+        />
+      </I18nextProvider>,
     );
 
     const safeLink = screen.getByRole('link', {
@@ -280,7 +282,13 @@ describe('content block renderer', () => {
         sourceId: 'source-google-neural-nodes',
       }),
     );
-    expect(screen.getByText(/Tham khảo: Google for Developers/i)).toBeVisible();
+    expect(screen.getByText('Tài liệu tham khảo.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Link tham khảo' })).toHaveAttribute(
+      'href',
+      GOOGLE_NEURAL_NODES_URL,
+    );
+    expect(screen.queryByText(/review nguồn vẫn đang chờ/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tham khảo: Google for Developers/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'CC BY 4.0' })).toHaveAttribute(
       'href',
       'https://creativecommons.org/licenses/by/4.0/',

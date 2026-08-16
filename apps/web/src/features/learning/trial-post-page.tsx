@@ -512,8 +512,12 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
       : null;
   const quizPath =
     post.accessLevel === 'full' ? `/learn/${post.courseId}/quizzes/${post.postQuizId}` : null;
-  const summaryBackPath = hasFullAccess ? `/learn/${post.courseId}` : `/courses/${post.courseId}`;
-  const summaryBackLabel = hasFullAccess ? 'trial.summary.back' : 'trial.backToCourse';
+  const summaryBackPath =
+    hasFullAccess && module
+      ? `/learn/${post.courseId}/modules/${post.moduleId}`
+      : `/courses/${post.courseId}`;
+  const summaryBackLabel =
+    hasFullAccess && module ? 'trial.summary.backToModule' : 'trial.backToCourse';
 
   async function openQuiz(event: MouseEvent<HTMLAnchorElement>) {
     if (!quizPath) {

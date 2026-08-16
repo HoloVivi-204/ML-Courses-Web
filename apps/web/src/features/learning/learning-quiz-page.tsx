@@ -44,6 +44,7 @@ const copy: Readonly<
       continueNextLesson: string;
       continueNextModule: string;
       continuePractice: string;
+      continueModuleOverview: string;
       continueRoadmap: string;
       explanation: string;
       failed: string;
@@ -71,6 +72,7 @@ const copy: Readonly<
     continueNextLesson: 'Open the next lesson',
     continueNextModule: 'Open the next module',
     continuePractice: 'Open practice',
+    continueModuleOverview: 'Back to module lessons',
     continueRoadmap: 'Return to the learning roadmap',
     explanation: 'Explanation',
     failed: 'The quiz could not be loaded or submitted. Try again.',
@@ -96,6 +98,7 @@ const copy: Readonly<
     continueNextLesson: 'Mở bài học tiếp theo',
     continueNextModule: 'Mở module tiếp theo',
     continuePractice: 'Mở phần thực hành',
+    continueModuleOverview: 'Trở về danh sách các bài trong module',
     continueRoadmap: 'Về lộ trình học',
     explanation: 'Giải thích',
     failed: 'Chưa thể tải hoặc nộp quiz. Hãy thử lại.',
@@ -132,6 +135,7 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
         'module-quiz': text.continueModuleQuiz,
         'next-lesson': text.continueNextLesson,
         'next-module': text.continueNextModule,
+        'module-overview': text.continueModuleOverview,
         practice: text.continuePractice,
         roadmap: text.continueRoadmap,
       }[continueAction.kind]
