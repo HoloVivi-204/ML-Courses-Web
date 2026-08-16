@@ -110,7 +110,14 @@ const copy: Readonly<
   },
 };
 
-export function LearningQuizPage({ learningApiClient, locale }: LearningQuizPageProps) {
+export function LearningQuizPage(props: LearningQuizPageProps) {
+  const { courseId, quizId } = useParams();
+  const routeKey = `${courseId ?? ''}:${quizId ?? ''}`;
+
+  return <LearningQuizPageContent key={routeKey} {...props} />;
+}
+
+function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPageProps) {
   const { getIdToken, status, user } = useAuth();
   const { courseId, quizId } = useParams();
   const quizRoute = getPublicQuizRoute(quizId);
