@@ -169,12 +169,11 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
       </header>
 
       <section
-        aria-labelledby="learning-module-sequence-title"
+        aria-label={t('learning.moduleOverview.sequenceEyebrow')}
         className="learning-module-sequence"
       >
         <div className="learning-module-sequence-heading">
           <span className="eyebrow">{t('learning.moduleOverview.sequenceEyebrow')}</span>
-          <h2 id="learning-module-sequence-title">{t('learning.moduleOverview.sequenceTitle')}</h2>
           <p>{t('learning.moduleOverview.sequenceIntro')}</p>
         </div>
 

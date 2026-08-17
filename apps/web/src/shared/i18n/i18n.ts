@@ -150,7 +150,6 @@ const resources = {
       'learning.moduleOverview.progress':
         '{{completed}}/{{required}} steps complete · {{percent}}%',
       'learning.moduleOverview.sequenceEyebrow': 'LEARNING SEQUENCE',
-      'learning.moduleOverview.sequenceTitle': 'Complete each step in order',
       'learning.moduleOverview.sequenceIntro':
         'Read every lesson, complete the practice, then pass the module quiz to unlock the Playground.',
       'learning.moduleOverview.postLabel': 'LESSON',
@@ -699,7 +698,6 @@ const resources = {
       'learning.moduleOverview.progress':
         '{{completed}}/{{required}} bước hoàn thành · {{percent}}%',
       'learning.moduleOverview.sequenceEyebrow': 'TRÌNH TỰ HỌC',
-      'learning.moduleOverview.sequenceTitle': 'Hoàn thành từng bước theo thứ tự',
       'learning.moduleOverview.sequenceIntro':
         'Đọc từng bài học, hoàn thành phần thực hành, sau đó đạt quiz module để mở Playground.',
       'learning.moduleOverview.postLabel': 'BÀI HỌC',

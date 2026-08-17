@@ -1503,8 +1503,7 @@ a {
   gap: 28px;
 }
 
-.learning-module-roadmap-heading h2,
-.learning-module-sequence-heading h2 {
+.learning-module-roadmap-heading h2 {
   margin: 8px 0 0;
   font-family: var(--font-display);
   font-size: clamp(34px, 4vw, 50px);
@@ -1684,8 +1683,8 @@ a {
 
 .learning-module-sequence {
   display: grid;
-  max-width: 980px;
-  gap: 24px;
+  max-width: 1100px;
+  gap: 28px;
 }
 
 .learning-module-step-list {
@@ -1698,11 +1697,11 @@ a {
 
 .learning-module-step-card {
   display: grid;
-  padding: 24px 0;
+  padding: 30px 0;
   align-items: start;
   border-bottom: 1px solid var(--line);
-  grid-template-columns: 68px minmax(0, 1fr) auto;
-  gap: 18px;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  gap: 24px;
 }
 
 .learning-module-step-card.is-open {
@@ -1720,11 +1719,11 @@ a {
 .learning-module-step-card-link {
   display: grid;
   min-width: 0;
-  padding: 24px 0;
+  padding: 30px 0;
   align-items: start;
   color: inherit;
-  grid-template-columns: 68px minmax(0, 1fr) auto;
-  gap: 18px;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  gap: 24px;
 }
 
 .learning-module-step-card.is-open > .learning-module-step-card-link {
@@ -1739,31 +1738,34 @@ a {
 .learning-module-step-number {
   color: var(--teal);
   font-family: ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 900;
   letter-spacing: 0.08em;
 }
 
 .learning-module-step-card h3 {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   font-family: ui-monospace, monospace;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .learning-module-step-card .module-trial-link {
-  margin-top: 13px;
+  margin-top: 16px;
+  font-size: 14px;
+  gap: 10px;
 }
 
 .learning-module-step-status {
   display: inline-flex;
-  margin-top: 13px;
+  margin-top: 16px;
   align-items: center;
   color: var(--teal);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
-  gap: 7px;
+  gap: 8px;
 }
 
 .learning-module-step-card > svg,
@@ -1773,15 +1775,15 @@ a {
 
 .learning-module-condition {
   display: flex;
-  max-width: 620px;
-  margin-top: 14px;
-  padding: 12px 14px;
+  max-width: 720px;
+  margin-top: 16px;
+  padding: 16px 18px;
   align-items: flex-start;
   border-left: 3px solid var(--line-strong);
   background: var(--surface);
   color: var(--ink-soft);
-  font-size: 12px;
-  gap: 9px;
+  font-size: 14px;
+  gap: 12px;
 }
 
 .learning-module-condition strong {
@@ -1789,8 +1791,8 @@ a {
 }
 
 .learning-module-condition p {
-  margin: 4px 0 0;
-  line-height: 1.5;
+  margin: 5px 0 0;
+  line-height: 1.6;
 }
 
 .trial-resume-banner {
@@ -6251,13 +6253,33 @@ a {
   }
 
   .learning-module-step-card {
-    grid-template-columns: 42px minmax(0, 1fr);
-    gap: 12px;
+    padding: 26px 0;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 16px;
   }
 
   .learning-module-step-card-link {
-    grid-template-columns: 42px minmax(0, 1fr) auto;
-    gap: 12px;
+    padding: 26px 0;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 16px;
+  }
+
+  .learning-module-step-number {
+    font-size: 12px;
+  }
+
+  .learning-module-step-card h3 {
+    font-size: 16px;
+  }
+
+  .learning-module-step-card .module-trial-link,
+  .learning-module-step-status {
+    font-size: 13px;
+  }
+
+  .learning-module-condition {
+    padding: 14px 16px;
+    font-size: 13px;
   }
 
   .learning-module-step-card.is-open > .learning-module-step-card-link {

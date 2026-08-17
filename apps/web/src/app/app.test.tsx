@@ -2670,6 +2670,9 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Mạng nơ-ron nhiều lớp' }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Hoàn thành từng bước theo thứ tự' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /mở bài học/i })).toHaveAttribute(
       'href',
       '/learn/course-deep-learning-basic/posts/dl-p02-mlp-forward-activation',
