@@ -1967,25 +1967,28 @@ describe('public learning journey', () => {
   });
 
   it(
-    'lets a guest start the designated trial lesson from the course roadmap',
+    'opens the module lesson list from the course roadmap',
     async () => {
       window.history.pushState({}, '', '/courses/course-deep-learning-basic');
       const user = userEvent.setup();
 
-      render(<App learningApiClient={createLearningApiClient()} />);
+      render(
+        <App
+          authGateway={createAuthenticatedGateway()}
+          learningApiClient={createLearningApiClient()}
+        />,
+      );
 
-      await user.click(screen.getByRole('link', { name: /học thử neuron và perceptron/i }));
+      await user.click(screen.getByRole('link', { name: /mở tổng quan module/i }));
 
       expect(
-        await screen.findByRole(
-          'heading',
-          {
-            name: /một neuron đưa ra quyết định như thế nào/i,
-          },
-          { timeout: LAZY_ROUTE_TIMEOUT_MS },
-        ),
+        await screen.findByRole('heading', { level: 1, name: 'Neuron và Perceptron' }),
       ).toBeVisible();
       expect(window.location.pathname).toBe(
+        '/learn/course-deep-learning-basic/modules/dl-m01-neuron-perceptron',
+      );
+      expect(screen.getByRole('link', { name: 'Mở bài học' })).toHaveAttribute(
+        'href',
         '/learn/course-deep-learning-basic/posts/dl-p01-neuron-perceptron',
       );
     },

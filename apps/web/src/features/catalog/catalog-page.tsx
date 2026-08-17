@@ -113,19 +113,13 @@ export function CoursePage({ locale }: LocaleProps) {
                 <Link
                   aria-label={
                     isFirstModule
-                      ? t('course.openTrialLabel', {
-                          title: localize(module.title, locale),
-                        })
+                      ? t('learning.moduleRoadmap.open')
                       : localize(module.title, locale)
                   }
                   className={isFirstModule ? 'module-row is-first' : 'module-row'}
                   id={`module-${String(module.index).padStart(2, '0')}`}
                   key={module.id}
-                  to={
-                    isFirstModule
-                      ? `/learn/${course.id}/posts/${module.postId}`
-                      : `/learn/${course.id}/modules/${module.id}`
-                  }
+                  to={`/learn/${course.id}/modules/${module.id}`}
                 >
                   <div className="module-index">
                     <span>{String(module.index).padStart(2, '0')}</span>
@@ -148,9 +142,7 @@ export function CoursePage({ locale }: LocaleProps) {
                     <p>{localize(module.description, locale)}</p>
                     {isFirstModule ? (
                       <span className="module-trial-link">
-                        {t('course.openTrialLabel', {
-                          title: localize(module.title, locale),
-                        })}
+                        {t('learning.moduleRoadmap.open')}
                         <ArrowRight aria-hidden="true" size={17} />
                       </span>
                     ) : null}
