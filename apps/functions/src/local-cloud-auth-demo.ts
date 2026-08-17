@@ -6,6 +6,20 @@ function normalizeEmail(email: string | undefined): string | undefined {
   return normalizedEmail ? normalizedEmail : undefined;
 }
 
+function getConfiguredAdminEmails(environment: Environment): Set<string> {
+  const configuredEmails = [
+    environment.LOCAL_DEMO_ADMIN_EMAILS,
+    environment.LOCAL_DEMO_ADMIN_EMAIL,
+  ];
+
+  return new Set(
+    configuredEmails
+      .flatMap((value) => value?.split(',') ?? [])
+      .map(normalizeEmail)
+      .filter((email): email is string => email !== undefined),
+  );
+}
+
 export function isLocalCloudAuthDemo(environment: Environment = process.env): boolean {
   return environment.FUNCTIONS_EMULATOR === 'true' && environment.LOCAL_CLOUD_AUTH_DEMO === 'true';
 }
@@ -22,8 +36,10 @@ export function hasLocalCloudAuthDemoAdminRole(
     return false;
   }
 
-  const configuredAdminEmail = normalizeEmail(environment.LOCAL_DEMO_ADMIN_EMAIL);
   const authenticatedEmail = normalizeEmail(email);
 
-  return configuredAdminEmail !== undefined && configuredAdminEmail === authenticatedEmail;
+  return (
+    authenticatedEmail !== undefined &&
+    getConfiguredAdminEmails(environment).has(authenticatedEmail)
+  );
 }

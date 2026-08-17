@@ -50,17 +50,23 @@ set "METADATA_SERVER_DETECTION=none"
 
 if not defined XDG_CONFIG_HOME set "XDG_CONFIG_HOME=%CD%\.runtime\firebase-tools-config"
 
-if defined LOCAL_DEMO_ADMIN_EMAIL (
+if defined LOCAL_DEMO_ADMIN_EMAILS (
+  echo Optional Admin emails are configured for this local Functions session.
+) else if defined LOCAL_DEMO_ADMIN_EMAIL (
+  set "LOCAL_DEMO_ADMIN_EMAILS=%LOCAL_DEMO_ADMIN_EMAIL%"
   echo Optional Admin email is configured for this local Functions session.
 ) else if /i "%ML_PATH_NONINTERACTIVE%"=="true" (
-  echo Optional Admin pages are disabled because no LOCAL_DEMO_ADMIN_EMAIL was provided.
+  echo Optional Admin pages are disabled because no Admin email was provided.
 ) else (
   echo.
-  echo Optional: enter the Gmail address that should have local Admin access.
-  echo Leave it blank for learner-only testing.
-  set /p "LOCAL_DEMO_ADMIN_EMAIL=Admin Gmail (optional): "
+  echo Optional: enter Gmail addresses that should have local Admin access.
+  echo Separate multiple addresses with commas. Leave it blank for learner-only testing.
+  set /p "LOCAL_DEMO_ADMIN_EMAILS=Admin Gmail(s) (optional): "
 )
+set "LOCAL_DEMO_ADMIN_EMAIL="
+for /f "tokens=1 delims=," %%A in ("%LOCAL_DEMO_ADMIN_EMAILS%") do set "LOCAL_DEMO_ADMIN_EMAIL=%%A"
 set "VITE_LOCAL_CLOUD_AUTH_DEMO=true"
+set "VITE_LOCAL_DEMO_ADMIN_EMAILS=%LOCAL_DEMO_ADMIN_EMAILS%"
 set "VITE_LOCAL_DEMO_ADMIN_EMAIL=%LOCAL_DEMO_ADMIN_EMAIL%"
 
 echo [4/8] Building local Functions and demo tooling...

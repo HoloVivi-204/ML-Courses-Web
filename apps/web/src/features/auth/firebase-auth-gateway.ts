@@ -33,6 +33,7 @@ const LOCAL_AUTH_EMULATOR_URL = 'http://localhost:9099';
 const LOCAL_FIREBASE_PROJECT_ID = 'demo-ml-learning-local';
 
 interface FirebaseEnvironment {
+  DEV?: boolean;
   VITE_APP_ENV?: string;
   VITE_FIREBASE_API_KEY?: string;
   VITE_FIREBASE_APP_ID?: string;
@@ -43,6 +44,7 @@ interface FirebaseEnvironment {
   VITE_FIREBASE_USE_EMULATOR?: string;
   VITE_LOCAL_CLOUD_AUTH_DEMO?: string;
   VITE_LOCAL_DEMO_ADMIN_EMAIL?: string;
+  VITE_LOCAL_DEMO_ADMIN_EMAILS?: string;
 }
 
 export interface LocalDataEmulatorConfiguration {
@@ -136,24 +138,51 @@ export function getAuthRoleFromClaims(
   return claims.role === 'admin' ? 'admin' : undefined;
 }
 
+function normalizeEmail(email: string | null | undefined): string | undefined {
+  const normalizedEmail = email?.trim().toLowerCase();
+
+  return normalizedEmail ? normalizedEmail : undefined;
+}
+
+function getConfiguredLocalDemoAdminEmails(environment: FirebaseEnvironment): Set<string> {
+  return new Set(
+    [environment.VITE_LOCAL_DEMO_ADMIN_EMAILS, environment.VITE_LOCAL_DEMO_ADMIN_EMAIL]
+      .flatMap((value) => value?.split(',') ?? [])
+      .map(normalizeEmail)
+      .filter((email): email is string => email !== undefined),
+  );
+}
+
+export function isConfiguredLocalDemoAdmin(
+  email: string | null | undefined,
+  environment: FirebaseEnvironment,
+): boolean {
+  if (
+    environment.DEV !== true ||
+    environment.VITE_APP_ENV !== 'local' ||
+    environment.VITE_LOCAL_CLOUD_AUTH_DEMO !== 'true' ||
+    environment.VITE_FIREBASE_USE_EMULATOR !== 'false' ||
+    environment.VITE_FIREBASE_USE_DATA_EMULATORS !== 'true'
+  ) {
+    return false;
+  }
+
+  const normalizedUserEmail = normalizeEmail(email);
+
+  return (
+    normalizedUserEmail !== undefined &&
+    getConfiguredLocalDemoAdminEmails(environment).has(normalizedUserEmail)
+  );
+}
+
 async function toAuthUser(user: User): Promise<AuthUser> {
   const providerIds = user.providerData
     .map((provider) => provider.providerId)
     .filter((providerId): providerId is string => Boolean(providerId));
   const tokenResult = await user.getIdTokenResult();
-  const normalizedLocalAdminEmail =
-    import.meta.env.VITE_LOCAL_DEMO_ADMIN_EMAIL?.trim().toLowerCase();
-  const normalizedUserEmail = user.email?.trim().toLowerCase();
-  const isConfiguredLocalAdmin =
-    import.meta.env.DEV &&
-    import.meta.env.VITE_APP_ENV === 'local' &&
-    import.meta.env.VITE_LOCAL_CLOUD_AUTH_DEMO === 'true' &&
-    import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'false' &&
-    import.meta.env.VITE_FIREBASE_USE_DATA_EMULATORS === 'true' &&
-    Boolean(normalizedLocalAdminEmail) &&
-    normalizedLocalAdminEmail === normalizedUserEmail;
   const role =
-    getAuthRoleFromClaims(tokenResult.claims) ?? (isConfiguredLocalAdmin ? 'admin' : undefined);
+    getAuthRoleFromClaims(tokenResult.claims) ??
+    (isConfiguredLocalDemoAdmin(user.email, import.meta.env) ? 'admin' : undefined);
 
   return {
     email: user.email,
