@@ -1716,10 +1716,10 @@ a {
 .learning-module-step-list {
   display: grid;
   margin: 0;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--teal) 24%, var(--line));
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--teal-soft) 30%, var(--bg));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   list-style: none;
   gap: 12px;
 }
@@ -6311,8 +6311,10 @@ a {
   }
 
   .learning-module-step-list {
-    padding: 7px;
-    border-radius: 17px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     gap: 9px;
   }
 
