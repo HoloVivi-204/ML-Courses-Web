@@ -1675,10 +1675,19 @@ a {
   line-height: 1.75;
 }
 
-.learning-module-progress-summary {
+.learning-module-heading > .learning-module-progress-summary {
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0 0;
+  padding: 10px 14px;
+  border-left: 4px solid var(--teal);
+  background: color-mix(in srgb, var(--teal-soft) 68%, var(--surface));
   color: var(--teal) !important;
-  font-size: 12px !important;
+  font-size: clamp(16px, 2vw, 19px) !important;
   font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .learning-module-sequence {
@@ -1687,21 +1696,48 @@ a {
   gap: 28px;
 }
 
+.learning-module-sequence-heading {
+  display: grid;
+  max-width: 820px;
+  gap: 10px;
+}
+
+.learning-module-sequence-heading .eyebrow {
+  font-size: 14px;
+  letter-spacing: 0.18em;
+}
+
+.learning-module-sequence-heading > p {
+  max-width: 760px;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
 .learning-module-step-list {
   display: grid;
   margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--line-strong);
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--teal) 24%, var(--line));
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--teal-soft) 30%, var(--bg));
   list-style: none;
+  gap: 12px;
 }
 
 .learning-module-step-card {
   display: grid;
-  padding: 30px 0;
+  padding: 30px 28px;
   align-items: start;
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 8%, transparent);
   grid-template-columns: 82px minmax(0, 1fr) auto;
   gap: 24px;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .learning-module-step-card.is-open {
@@ -1709,17 +1745,21 @@ a {
 }
 
 .learning-module-step-card.is-open:hover {
-  background: color-mix(in srgb, var(--teal-soft) 24%, transparent);
+  border-color: color-mix(in srgb, var(--teal) 48%, var(--line));
+  background: color-mix(in srgb, var(--teal-soft) 24%, var(--surface-strong));
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--teal) 12%, transparent);
+  transform: translateY(-2px);
 }
 
 .learning-module-step-card.is-complete {
-  background: color-mix(in srgb, var(--teal-soft) 28%, transparent);
+  border-color: color-mix(in srgb, var(--teal) 38%, var(--line));
+  background: color-mix(in srgb, var(--teal-soft) 48%, var(--surface-strong));
 }
 
 .learning-module-step-card-link {
   display: grid;
   min-width: 0;
-  padding: 30px 0;
+  padding: 30px 28px;
   align-items: start;
   color: inherit;
   grid-template-columns: 82px minmax(0, 1fr) auto;
@@ -1741,6 +1781,10 @@ a {
   font-size: 14px;
   font-weight: 900;
   letter-spacing: 0.08em;
+}
+
+.learning-module-step-card .eyebrow {
+  font-size: 12px;
 }
 
 .learning-module-step-card h3 {
@@ -6252,14 +6296,35 @@ a {
     padding: 17px 0 48px;
   }
 
+  .learning-module-heading > .learning-module-progress-summary {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 15px !important;
+  }
+
+  .learning-module-sequence-heading .eyebrow {
+    font-size: 12px;
+  }
+
+  .learning-module-sequence-heading > p {
+    font-size: 15px;
+  }
+
+  .learning-module-step-list {
+    padding: 7px;
+    border-radius: 17px;
+    gap: 9px;
+  }
+
   .learning-module-step-card {
-    padding: 26px 0;
+    padding: 22px 20px;
     grid-template-columns: 52px minmax(0, 1fr);
     gap: 16px;
+    border-radius: 13px;
   }
 
   .learning-module-step-card-link {
-    padding: 26px 0;
+    padding: 22px 20px;
     grid-template-columns: 52px minmax(0, 1fr) auto;
     gap: 16px;
   }
@@ -6270,6 +6335,10 @@ a {
 
   .learning-module-step-card h3 {
     font-size: 16px;
+  }
+
+  .learning-module-step-card .eyebrow {
+    font-size: 11px;
   }
 
   .learning-module-step-card .module-trial-link,

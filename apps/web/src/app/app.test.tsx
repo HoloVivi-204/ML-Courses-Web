@@ -2670,6 +2670,13 @@ describe('public learning journey', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Mạng nơ-ron nhiều lớp' }),
     ).toBeVisible();
+    expect(screen.getByText('0/4 bước hoàn thành · 0%')).toBeVisible();
+    expect(screen.getByText('TRÌNH TỰ HỌC')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Đọc từng bài học, hoàn thành phần thực hành, sau đó đạt quiz module để mở Playground.',
+      ),
+    ).toBeVisible();
     expect(
       screen.queryByRole('heading', { level: 2, name: 'Hoàn thành từng bước theo thứ tự' }),
     ).not.toBeInTheDocument();
