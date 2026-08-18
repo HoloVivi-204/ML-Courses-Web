@@ -5337,7 +5337,7 @@ a {
 }
 
 .quiz-option[data-selected='true'] {
-  border-color: transparent;
+  border-color: var(--line);
   background: var(--teal-soft);
   box-shadow: none;
 }
