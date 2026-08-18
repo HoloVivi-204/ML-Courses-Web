@@ -1,5 +1,3 @@
-import { Check } from 'lucide-react';
-
 import { localize, type Locale } from '../catalog/course-data';
 
 import type { QuizAnswerValue, QuizAttemptResult } from './learning-api';
@@ -40,11 +38,7 @@ export function QuizQuestionChoices({
               value={option.optionId}
             />
             <span aria-hidden="true" className="quiz-option-key">
-              {isSelected ? (
-                <Check size={15} strokeWidth={3} />
-              ) : (
-                String.fromCharCode(65 + optionIndex)
-              )}
+              {String.fromCharCode(65 + optionIndex)}
             </span>
             <span className="quiz-option-copy">{localize(option.text, locale)}</span>
           </label>
