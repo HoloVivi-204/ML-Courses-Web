@@ -233,6 +233,26 @@ describe('LearningQuizPage', () => {
     });
   });
 
+  it('separates each question prompt from its labelled answer area', async () => {
+    const learningApiClient = createLearningApiClient();
+    const authContextValue = createAuthContextValue();
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={authContextValue}>
+          <MemoryRouter initialEntries={[POST_PATH]}>
+            <QuizRouteHarness learningApiClient={learningApiClient} />
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Lesson quiz: Overfitting' }),
+    ).toBeVisible();
+    expect(screen.getAllByRole('region', { name: 'Answers' })).toHaveLength(3);
+  });
+
   it('loads the module quiz when the lesson quiz CTA changes the quiz route', async () => {
     const learningApiClient = createLearningApiClient();
     const authContextValue = createAuthContextValue();

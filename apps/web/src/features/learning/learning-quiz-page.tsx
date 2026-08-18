@@ -36,6 +36,7 @@ const copy: Readonly<
   Record<
     Locale,
     {
+      answerLabel: string;
       attempt: (attemptNumber: number) => string;
       backToLesson: string;
       correctAnswer: string;
@@ -57,13 +58,17 @@ const copy: Readonly<
       openPlayground: (algorithm: string) => string;
       retry: string;
       score: (score: number, bestScore: number) => string;
+      selectAllHint: string;
+      selectOneHint: string;
       submit: string;
       submitHint: string;
       submitting: string;
+      questionLabel: (questionNumber: number) => string;
     }
   >
 > = {
   en: {
+    answerLabel: 'Answers',
     attempt: (attemptNumber) => `Attempt ${attemptNumber}`,
     backToLesson: 'Back to lesson',
     correctAnswer: 'Correct answer',
@@ -85,11 +90,15 @@ const copy: Readonly<
     openPlayground: (algorithm) => `Open ${algorithm} Playground`,
     retry: 'Try again',
     score: (score, bestScore) => `Score ${score}% · Best ${bestScore}%`,
+    selectAllHint: 'Select all that apply',
+    selectOneHint: 'Choose one option',
     submit: 'Submit quiz',
     submitHint: 'Choose an answer for every question before submitting.',
     submitting: 'Submitting quiz…',
+    questionLabel: (questionNumber) => `Question ${questionNumber}`,
   },
   vi: {
+    answerLabel: 'Câu trả lời',
     attempt: (attemptNumber) => `Lần làm ${attemptNumber}`,
     backToLesson: 'Quay lại bài học',
     correctAnswer: 'Đáp án đúng',
@@ -111,9 +120,12 @@ const copy: Readonly<
     openPlayground: (algorithm) => `Mở Playground ${algorithm}`,
     retry: 'Làm lại',
     score: (score, bestScore) => `Điểm ${score}% · Cao nhất ${bestScore}%`,
+    selectAllHint: 'Chọn tất cả đáp án đúng',
+    selectOneHint: 'Chọn một đáp án',
     submit: 'Nộp quiz',
     submitHint: 'Hãy chọn đáp án cho tất cả câu hỏi trước khi nộp.',
     submitting: 'Đang nộp quiz…',
+    questionLabel: (questionNumber) => `Câu hỏi ${questionNumber}`,
   },
 };
 
@@ -390,61 +402,85 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
       <form className="quiz-form" onSubmit={submitQuiz}>
         {attempt.questions.map((question, questionIndex) => (
           <fieldset className="quiz-question-card" key={question.questionId}>
-            <legend>
-              <span>{String(questionIndex + 1).padStart(2, '0')}</span>
-              {localize(question.prompt, locale)}
+            <legend className="quiz-question-prompt">
+              <span className="quiz-question-number">
+                {String(questionIndex + 1).padStart(2, '0')}
+              </span>
+              <span className="quiz-question-copy">
+                <span className="quiz-question-label">{text.questionLabel(questionIndex + 1)}</span>
+                <span className="quiz-question-text">{localize(question.prompt, locale)}</span>
+              </span>
             </legend>
 
-            <QuizQuestionChoices
-              answersByQuestionId={answersByQuestionId}
-              disabled={isAttemptClosed || submitStatus === 'submitting'}
-              locale={locale}
-              onAnswerChange={(optionId) =>
-                setAnswersByQuestionId((currentValue) =>
-                  updateAnswerValue(currentValue, {
-                    optionId,
-                    questionId: question.questionId,
-                    questionType: question.type,
-                  }),
-                )
-              }
-              question={question}
-            />
-
-            {submissionResult?.feedback
-              .filter((feedback) => feedback.questionId === question.questionId)
-              .map((feedback) => (
-                <div
-                  className="quiz-feedback-panel"
-                  data-hint-level={feedback.hintLevel}
-                  key={feedback.questionId}
+            <section
+              aria-labelledby={`quiz-question-${question.questionId}-answers`}
+              className="quiz-answer-panel"
+            >
+              <div className="quiz-answer-heading">
+                <span
+                  className="quiz-answer-label"
+                  id={`quiz-question-${question.questionId}-answers`}
                 >
-                  <p className={feedback.isCorrect ? 'quiz-feedback is-correct' : 'quiz-feedback'}>
-                    {feedback.isCorrect ? '✓' : '•'}{' '}
-                    {feedback.isCorrect
-                      ? text.correctFeedback
-                      : feedback.hint
-                        ? `${text.hint(feedback.hintLevel === 1 ? 1 : 2)}: ${localize(feedback.hint, locale)}`
-                        : text.firstWrongFeedback}
-                  </p>
-                  {submissionResult.passed ? (
-                    <dl className="quiz-answer-review">
-                      {feedback.correctAnswer !== undefined ? (
-                        <div>
-                          <dt>{text.correctAnswer}</dt>
-                          <dd>{formatCorrectAnswer(question, feedback.correctAnswer, locale)}</dd>
-                        </div>
-                      ) : null}
-                      {feedback.explanation ? (
-                        <div>
-                          <dt>{text.explanation}</dt>
-                          <dd>{localize(feedback.explanation, locale)}</dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                  ) : null}
-                </div>
-              ))}
+                  {text.answerLabel}
+                </span>
+                <span className="quiz-answer-instruction">
+                  {question.type === 'multiple-choice' ? text.selectAllHint : text.selectOneHint}
+                </span>
+              </div>
+
+              <QuizQuestionChoices
+                answersByQuestionId={answersByQuestionId}
+                disabled={isAttemptClosed || submitStatus === 'submitting'}
+                locale={locale}
+                onAnswerChange={(optionId) =>
+                  setAnswersByQuestionId((currentValue) =>
+                    updateAnswerValue(currentValue, {
+                      optionId,
+                      questionId: question.questionId,
+                      questionType: question.type,
+                    }),
+                  )
+                }
+                question={question}
+              />
+
+              {submissionResult?.feedback
+                .filter((feedback) => feedback.questionId === question.questionId)
+                .map((feedback) => (
+                  <div
+                    className="quiz-feedback-panel"
+                    data-hint-level={feedback.hintLevel}
+                    key={feedback.questionId}
+                  >
+                    <p
+                      className={feedback.isCorrect ? 'quiz-feedback is-correct' : 'quiz-feedback'}
+                    >
+                      {feedback.isCorrect ? '✓' : '•'}{' '}
+                      {feedback.isCorrect
+                        ? text.correctFeedback
+                        : feedback.hint
+                          ? `${text.hint(feedback.hintLevel === 1 ? 1 : 2)}: ${localize(feedback.hint, locale)}`
+                          : text.firstWrongFeedback}
+                    </p>
+                    {submissionResult.passed ? (
+                      <dl className="quiz-answer-review">
+                        {feedback.correctAnswer !== undefined ? (
+                          <div>
+                            <dt>{text.correctAnswer}</dt>
+                            <dd>{formatCorrectAnswer(question, feedback.correctAnswer, locale)}</dd>
+                          </div>
+                        ) : null}
+                        {feedback.explanation ? (
+                          <div>
+                            <dt>{text.explanation}</dt>
+                            <dd>{localize(feedback.explanation, locale)}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    ) : null}
+                  </div>
+                ))}
+            </section>
           </fieldset>
         ))}
 

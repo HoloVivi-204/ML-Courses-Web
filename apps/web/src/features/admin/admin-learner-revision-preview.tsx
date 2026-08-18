@@ -104,17 +104,48 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
           <div className="quiz-form">
             {preview.questions.map((question, questionIndex) => (
               <fieldset className="quiz-question-card" key={question.questionId}>
-                <legend>
-                  <span>{String(questionIndex + 1).padStart(2, '0')}</span>
-                  {localize(question.prompt, locale)}
+                <legend className="quiz-question-prompt">
+                  <span className="quiz-question-number">
+                    {String(questionIndex + 1).padStart(2, '0')}
+                  </span>
+                  <span className="quiz-question-copy">
+                    <span className="quiz-question-label">
+                      {locale === 'vi'
+                        ? `Câu hỏi ${questionIndex + 1}`
+                        : `Question ${questionIndex + 1}`}
+                    </span>
+                    <span className="quiz-question-text">{localize(question.prompt, locale)}</span>
+                  </span>
                 </legend>
-                <QuizQuestionChoices
-                  answersByQuestionId={emptyAnswers}
-                  disabled
-                  locale={locale}
-                  onAnswerChange={() => undefined}
-                  question={question}
-                />
+                <section
+                  aria-labelledby={`quiz-preview-question-${question.questionId}-answers`}
+                  className="quiz-answer-panel"
+                >
+                  <div className="quiz-answer-heading">
+                    <span
+                      className="quiz-answer-label"
+                      id={`quiz-preview-question-${question.questionId}-answers`}
+                    >
+                      {locale === 'vi' ? 'Câu trả lời' : 'Answers'}
+                    </span>
+                    <span className="quiz-answer-instruction">
+                      {question.type === 'multiple-choice'
+                        ? locale === 'vi'
+                          ? 'Chọn tất cả đáp án đúng'
+                          : 'Select all that apply'
+                        : locale === 'vi'
+                          ? 'Chọn một đáp án'
+                          : 'Choose one option'}
+                    </span>
+                  </div>
+                  <QuizQuestionChoices
+                    answersByQuestionId={emptyAnswers}
+                    disabled
+                    locale={locale}
+                    onAnswerChange={() => undefined}
+                    question={question}
+                  />
+                </section>
               </fieldset>
             ))}
           </div>

@@ -17,19 +17,33 @@ export function QuizQuestionChoices({
 }) {
   return (
     <div className="quiz-option-list">
-      {question.options.map((option) => (
-        <label className="quiz-option" key={option.optionId}>
-          <input
-            checked={isOptionSelected(answersByQuestionId[question.questionId], option.optionId)}
-            disabled={disabled}
-            name={question.questionId}
-            onChange={() => onAnswerChange(option.optionId)}
-            type={question.type === 'multiple-choice' ? 'checkbox' : 'radio'}
-            value={option.optionId}
-          />
-          <span>{localize(option.text, locale)}</span>
-        </label>
-      ))}
+      {question.options.map((option, optionIndex) => {
+        const isSelected = isOptionSelected(
+          answersByQuestionId[question.questionId],
+          option.optionId,
+        );
+
+        return (
+          <label
+            className="quiz-option"
+            data-selected={isSelected ? 'true' : 'false'}
+            key={option.optionId}
+          >
+            <input
+              checked={isSelected}
+              disabled={disabled}
+              name={question.questionId}
+              onChange={() => onAnswerChange(option.optionId)}
+              type={question.type === 'multiple-choice' ? 'checkbox' : 'radio'}
+              value={option.optionId}
+            />
+            <span aria-hidden="true" className="quiz-option-key">
+              {String.fromCharCode(65 + optionIndex)}
+            </span>
+            <span>{localize(option.text, locale)}</span>
+          </label>
+        );
+      })}
     </div>
   );
 }
