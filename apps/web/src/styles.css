@@ -5239,14 +5239,18 @@ a {
 }
 
 .quiz-question-number {
-  display: block;
-  padding-top: 2px;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--teal) 45%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--teal-soft) 48%, var(--surface-strong));
   color: var(--teal);
   font-family: ui-monospace, monospace;
-  font-size: clamp(19px, 2vw, 24px);
+  font-size: 16px;
   font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .quiz-question-copy {
@@ -5333,9 +5337,9 @@ a {
 }
 
 .quiz-option[data-selected='true'] {
-  border-color: var(--teal);
+  border-color: transparent;
   background: var(--teal-soft);
-  box-shadow: inset 3px 0 var(--teal);
+  box-shadow: none;
 }
 
 .quiz-option input {
@@ -5350,6 +5354,10 @@ a {
 }
 
 .quiz-option:focus-within {
+  outline: none;
+}
+
+.quiz-option:has(input:focus-visible) {
   outline: 2px solid color-mix(in srgb, var(--teal) 55%, transparent);
   outline-offset: 2px;
 }
@@ -5369,7 +5377,7 @@ a {
 }
 
 .quiz-option[data-selected='true'] .quiz-option-key {
-  border-color: var(--teal);
+  border-color: transparent;
   background: var(--teal);
   color: var(--on-accent);
 }
@@ -6578,8 +6586,9 @@ a {
   }
 
   .quiz-question-number {
-    padding-top: 1px;
-    font-size: 18px;
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
   }
 
   .quiz-question-label {
