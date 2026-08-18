@@ -104,7 +104,11 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
           <div className="quiz-form">
             {preview.questions.map((question, questionIndex) => (
               <fieldset className="quiz-question-card" key={question.questionId}>
-                <legend className="quiz-question-prompt">
+                <legend className="visually-hidden">
+                  {locale === 'vi' ? 'Câu hỏi' : 'Question'} {questionIndex + 1}:{' '}
+                  {localize(question.prompt, locale)}
+                </legend>
+                <div aria-hidden="true" className="quiz-question-prompt">
                   <span className="quiz-question-number">
                     {String(questionIndex + 1).padStart(2, '0')}
                   </span>
@@ -116,7 +120,7 @@ function renderPreviewContent(preview: AdminContentRevisionPreview, locale: Loca
                     </span>
                     <span className="quiz-question-text">{localize(question.prompt, locale)}</span>
                   </span>
-                </legend>
+                </div>
                 <section
                   aria-labelledby={`quiz-preview-question-${question.questionId}-answers`}
                   className="quiz-answer-panel"

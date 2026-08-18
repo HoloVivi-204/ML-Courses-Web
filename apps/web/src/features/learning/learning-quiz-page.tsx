@@ -402,7 +402,10 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
       <form className="quiz-form" onSubmit={submitQuiz}>
         {attempt.questions.map((question, questionIndex) => (
           <fieldset className="quiz-question-card" key={question.questionId}>
-            <legend className="quiz-question-prompt">
+            <legend className="visually-hidden">
+              {text.questionLabel(questionIndex + 1)}: {localize(question.prompt, locale)}
+            </legend>
+            <div aria-hidden="true" className="quiz-question-prompt">
               <span className="quiz-question-number">
                 {String(questionIndex + 1).padStart(2, '0')}
               </span>
@@ -410,7 +413,7 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
                 <span className="quiz-question-label">{text.questionLabel(questionIndex + 1)}</span>
                 <span className="quiz-question-text">{localize(question.prompt, locale)}</span>
               </span>
-            </legend>
+            </div>
 
             <section
               aria-labelledby={`quiz-question-${question.questionId}-answers`}

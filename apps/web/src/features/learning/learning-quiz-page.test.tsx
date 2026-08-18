@@ -251,6 +251,12 @@ describe('LearningQuizPage', () => {
       await screen.findByRole('heading', { level: 1, name: 'Lesson quiz: Overfitting' }),
     ).toBeVisible();
     expect(screen.getAllByRole('region', { name: 'Answers' })).toHaveLength(3);
+    expect(document.querySelectorAll('.quiz-question-card > legend.visually-hidden')).toHaveLength(
+      3,
+    );
+    expect(document.querySelectorAll('.quiz-question-card > .quiz-question-prompt')).toHaveLength(
+      3,
+    );
   });
 
   it('loads the module quiz when the lesson quiz CTA changes the quiz route', async () => {
