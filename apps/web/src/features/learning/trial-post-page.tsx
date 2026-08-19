@@ -7,7 +7,12 @@ import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
 import type { ExternalResource } from './content-block-types';
-import type { LearningApiClient, LearningPostContent, PostViewResult } from './learning-api';
+import {
+  LearningApiError,
+  type LearningApiClient,
+  type LearningPostContent,
+  type PostViewResult,
+} from './learning-api';
 
 interface TrialPostPageProps {
   learningApiClient: LearningApiClient;
@@ -346,10 +351,32 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
           throw new Error('Authenticated user is missing an ID token.');
         }
 
-        const fullPost = await learningApiClient.getFullPostContent({
-          idToken,
-          postId: activePostId,
-        });
+        let fullPost: LearningPostContent;
+
+        try {
+          fullPost = await learningApiClient.getFullPostContent({
+            idToken,
+            postId: activePostId,
+          });
+        } catch (error) {
+          if (!(error instanceof LearningApiError) || error.code !== 'POST_ACCESS_REQUIRED') {
+            throw error;
+          }
+
+          const progressSnapshot = await learningApiClient.getProgress(idToken);
+          const hasPostAccess = progressSnapshot.contentAccess.some(
+            (item) => item.contentType === 'post' && item.entityId === activePostId,
+          );
+
+          if (!hasPostAccess) {
+            throw error;
+          }
+
+          fullPost = await learningApiClient.getFullPostContent({
+            idToken,
+            postId: activePostId,
+          });
+        }
 
         if (fullPost.courseId !== activeCourseId || fullPost.accessLevel !== 'full') {
           throw new Error('The full post response is not valid for this route.');

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createAppI18n } from '../../shared/i18n/i18n';
 import { AuthContext, type AuthContextValue } from '../auth/auth-context';
-import type { LearningApiClient, LearningPostContent } from './learning-api';
+import { LearningApiError, type LearningApiClient, type LearningPostContent } from './learning-api';
 import { TrialPostPage } from './trial-post-page';
 
 const COURSE_ID = 'course-deep-learning-basic';
@@ -73,6 +73,77 @@ describe('TrialPostPage', () => {
     });
 
     expect(backLink).toHaveAttribute('href', `/learn/${COURSE_ID}/modules/${MODULE_ID}`);
+  });
+
+  it('retries full content when post access becomes visible after an initial authorization race', async () => {
+    const getFullPostContent = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new LearningApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.'),
+      )
+      .mockResolvedValueOnce(createPost('full'));
+    const learningApiClient = {
+      getFullPostContent,
+      getProgress: vi.fn().mockResolvedValue({
+        contentAccess: [{ contentType: 'post', entityId: POST_ID }],
+        posts: [],
+      }),
+      getTrialPostContent: vi.fn().mockResolvedValue(createPost('trial')),
+    } as unknown as LearningApiClient;
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={createAuthContextValue()}>
+          <MemoryRouter initialEntries={[`/learn/${COURSE_ID}/posts/${POST_ID}`]}>
+            <Routes>
+              <Route
+                path="/learn/:courseId/posts/:postId"
+                element={<TrialPostPage learningApiClient={learningApiClient} locale="vi" />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    expect(await screen.findByRole('link', { name: 'Mở quiz bài học' })).toHaveAttribute(
+      'href',
+      `/learn/${COURSE_ID}/quizzes/quiz-post-dl-p01`,
+    );
+    expect(getFullPostContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the quiz hidden when the learner still has no post access', async () => {
+    const getFullPostContent = vi
+      .fn()
+      .mockRejectedValue(
+        new LearningApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.'),
+      );
+    const learningApiClient = {
+      getFullPostContent,
+      getProgress: vi.fn().mockResolvedValue({ contentAccess: [], posts: [] }),
+      getTrialPostContent: vi.fn().mockResolvedValue(createPost('trial')),
+    } as unknown as LearningApiClient;
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={createAuthContextValue()}>
+          <MemoryRouter initialEntries={[`/learn/${COURSE_ID}/posts/${POST_ID}`]}>
+            <Routes>
+              <Route
+                path="/learn/:courseId/posts/:postId"
+                element={<TrialPostPage learningApiClient={learningApiClient} locale="vi" />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    await screen.findByRole('heading', { name: 'Một bài học' });
+
+    expect(screen.queryByRole('link', { name: 'Mở quiz bài học' })).not.toBeInTheDocument();
+    expect(getFullPostContent).toHaveBeenCalledTimes(1);
   });
 
   it('hides practice CTA until the learner has demo access', async () => {
