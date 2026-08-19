@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { I18nextProvider } from 'react-i18next';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -154,10 +154,11 @@ function createProgressSnapshot(): LearningProgressSnapshot {
 }
 
 describe('StudentDashboardPage', () => {
-  it('renders enrolled courses, missing conditions, and scenario activity', async () => {
+  it('prioritizes the active course and hides secondary progress details', async () => {
+    const listPlaygroundRuns = vi.fn();
     const learningApiClient = {
       getProgress: vi.fn().mockResolvedValue(createProgressSnapshot()),
-      listPlaygroundRuns: vi.fn().mockResolvedValue({ nextCursor: null, runs: [] }),
+      listPlaygroundRuns,
     } as unknown as LearningApiClient;
     window.localStorage.setItem('ml-path-locale', 'en');
 
@@ -171,28 +172,22 @@ describe('StudentDashboardPage', () => {
       </I18nextProvider>,
     );
 
-    expect(await screen.findByText('1 enrolled courses')).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Deep Learning Basics' }),
+    ).toBeVisible();
     expect(
       screen.queryByRole('heading', { level: 3, name: 'Classical Machine Learning' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Deep Learning Basics' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Open learning path' })).toHaveAttribute(
+    expect(screen.getByText('25%')).toBeVisible();
+    expect(screen.getByText('1 of 11 steps')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Continue learning' })).toHaveAttribute(
       'href',
       '/learn/course-deep-learning-basic',
     );
+    expect(listPlaygroundRuns).not.toHaveBeenCalled();
+    expect(screen.queryByText('not started')).not.toBeInTheDocument();
     expect(
-      screen.queryByText(
-        'Next conditions: overview:cml-m01-foundations, post:cml-p01-problem-data-types',
-      ),
+      screen.queryByRole('region', { name: 'Playground activity by scenario' }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText((text) => text.startsWith('Perceptron') && text.includes('2 runs')),
-    ).toBeVisible();
-    expect(screen.getAllByText('not started')).toHaveLength(2);
-    expect(
-      within(screen.getByRole('region', { name: 'Playground activity by scenario' })).getAllByRole(
-        'listitem',
-      ),
-    ).toHaveLength(1);
   });
 });
