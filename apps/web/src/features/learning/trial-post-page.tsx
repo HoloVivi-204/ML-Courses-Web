@@ -26,6 +26,13 @@ interface PostViewSyncState {
   routeKey: string | null;
 }
 
+interface DemoAccessState {
+  demoIds: ReadonlyArray<string>;
+  routeKey: string;
+  status: 'failed' | 'ready';
+  uid: string;
+}
+
 function isRequiredContentBlock(value: unknown): value is { id: string; required: boolean } {
   return (
     typeof value === 'object' &&
@@ -56,6 +63,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   const [postContentLoadState, setPostContentLoadState] = useState<PostContentLoadState | null>(
     null,
   );
+  const [demoAccessState, setDemoAccessState] = useState<DemoAccessState | null>(null);
   const [savedReadingPosition, setSavedReadingPosition] = useState<string | null>(null);
   const [postViewSyncError, setPostViewSyncError] = useState(false);
   const articleRef = useRef<HTMLElement>(null);
@@ -382,12 +390,14 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
   }, [courseId, getIdToken, learningApiClient, postId, routeKey, status, uid]);
 
   useEffect(() => {
-    if (status !== 'authenticated' || !post || !hasFullAccess || !postId || !uid) {
+    if (status !== 'authenticated' || !post || !hasFullAccess || !postId || !routeKey || !uid) {
       return undefined;
     }
 
     let isActive = true;
     const activePostId = postId;
+    const activeRouteKey = routeKey;
+    const activeUid = uid;
 
     async function loadSavedPostProgress() {
       try {
@@ -398,11 +408,20 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
         }
 
         const progressSnapshot = await learningApiClient.getProgress(idToken);
+        const demoIds = progressSnapshot.contentAccess
+          .filter((item) => item.contentType === 'demo')
+          .map((item) => item.entityId);
         const savedPostProgress = progressSnapshot.posts.find(
           (item) => item.postId === activePostId,
         );
 
         if (isActive) {
+          setDemoAccessState({
+            demoIds,
+            routeKey: activeRouteKey,
+            status: 'ready',
+            uid: activeUid,
+          });
           setSavedReadingPosition(savedPostProgress?.readingPosition ?? null);
           observedItemIdsRef.current = new Set([
             ...observedItemIdsRef.current,
@@ -412,6 +431,14 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
             savedPostProgress?.readingPosition ?? readingPositionRef.current;
         }
       } catch {
+        if (isActive) {
+          setDemoAccessState({
+            demoIds: [],
+            routeKey: activeRouteKey,
+            status: 'failed',
+            uid: activeUid,
+          });
+        }
         // Full content remains readable after authorization; progress can be retried by later activity.
       }
     }
@@ -421,7 +448,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
     return () => {
       isActive = false;
     };
-  }, [getIdToken, hasFullAccess, learningApiClient, post, postId, status, uid]);
+  }, [getIdToken, hasFullAccess, learningApiClient, post, postId, routeKey, status, uid]);
 
   useEffect(() => {
     if (
@@ -496,6 +523,13 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
 
   const eyebrowKey = post.accessLevel === 'full' ? 'trial.fullEyebrow' : 'trial.eyebrow';
   const module = getCourse(post.courseId)?.modules?.find((item) => item.id === post.moduleId);
+  const demoId = module?.demoId ?? null;
+  const hasDemoAccess =
+    demoId !== null &&
+    demoAccessState?.routeKey === routeKey &&
+    demoAccessState.uid === uid &&
+    demoAccessState.status === 'ready' &&
+    demoAccessState.demoIds.includes(demoId);
   const backToLearningPath =
     hasFullAccess && module
       ? {
@@ -507,9 +541,7 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
           path: `/courses/${post.courseId}`,
         };
   const demoPath =
-    post.accessLevel === 'full' && module?.demoId
-      ? `/learn/${post.courseId}/demos/${module.demoId}`
-      : null;
+    post.accessLevel === 'full' && hasDemoAccess ? `/learn/${post.courseId}/demos/${demoId}` : null;
   const quizPath =
     post.accessLevel === 'full' ? `/learn/${post.courseId}/quizzes/${post.postQuizId}` : null;
   const summaryBackPath =

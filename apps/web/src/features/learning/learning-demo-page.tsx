@@ -6,7 +6,12 @@ import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { formatAlgorithmName, formatUserFacingTitle } from '../../shared/user-facing-labels';
 import { FixedDemoFrame } from './fixed-demo-frame';
-import type { DemoCompletionResult, LearningApiClient, LearningDemoContent } from './learning-api';
+import {
+  LearningApiError,
+  type DemoCompletionResult,
+  type LearningApiClient,
+  type LearningDemoContent,
+} from './learning-api';
 
 interface LearningDemoPageProps {
   learningApiClient: LearningApiClient;
@@ -14,6 +19,7 @@ interface LearningDemoPageProps {
 }
 
 type CompletionStatus = 'failed' | 'idle' | 'ready' | 'submitting';
+type DemoLoadStatus = 'access-denied' | 'failed' | 'ready';
 
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
@@ -23,6 +29,8 @@ const copy: Readonly<
   Record<
     Locale,
     {
+      accessDeniedBody: string;
+      accessDeniedTitle: string;
       algorithm: string;
       backToLesson: string;
       complete: string;
@@ -44,6 +52,8 @@ const copy: Readonly<
   >
 > = {
   en: {
+    accessDeniedBody: 'Complete every lesson in this module before opening the practice.',
+    accessDeniedTitle: 'Practice is locked',
     algorithm: 'Algorithm',
     backToLesson: 'Back to lesson',
     complete: 'Completing practice…',
@@ -63,6 +73,8 @@ const copy: Readonly<
     seed: 'Seed',
   },
   vi: {
+    accessDeniedBody: 'Hoàn thành mọi bài học trong module trước khi mở phần thực hành.',
+    accessDeniedTitle: 'Phần thực hành đang bị khóa',
     algorithm: 'Thuật toán',
     backToLesson: 'Quay lại bài học',
     complete: 'Đang ghi nhận phần thực hành…',
@@ -94,7 +106,7 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   } | null>(null);
   const [demoLoadState, setDemoLoadState] = useState<{
     routeKey: string;
-    status: 'failed' | 'ready';
+    status: DemoLoadStatus;
   } | null>(null);
   const demo =
     status === 'authenticated' && loadedDemo?.routeKey === routeKey ? loadedDemo.demo : null;
@@ -108,9 +120,10 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   const completionStarted = useRef(false);
   const text = copy[locale];
   const currentStep = demo?.steps[stepIndex];
+  const course = getCourse(demo?.courseId ?? courseId);
   const module = demo
-    ? getCourse(demo.courseId)?.modules?.find((item) => item.id === demo.moduleId)
-    : null;
+    ? course?.modules?.find((item) => item.id === demo.moduleId)
+    : course?.modules?.find((item) => item.demoId === demoId);
   const backPostId = module?.postIds.at(-1) ?? module?.postId ?? null;
   const moduleQuizId = module ? createModuleQuizId(module.id) : null;
   const moduleQuizPath = moduleQuizId
@@ -182,9 +195,15 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
           setLoadedDemo({ demo: content, routeKey: activeRouteKey });
           setDemoLoadState({ routeKey: activeRouteKey, status: 'ready' });
         }
-      } catch {
+      } catch (error) {
         if (isActive) {
-          setDemoLoadState({ routeKey: activeRouteKey, status: 'failed' });
+          setDemoLoadState({
+            routeKey: activeRouteKey,
+            status:
+              error instanceof LearningApiError && error.statusCode === 403
+                ? 'access-denied'
+                : 'failed',
+          });
         }
       }
     }
@@ -280,7 +299,8 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
     (status === 'authenticated' &&
       routeKey !== null &&
       !demo &&
-      currentDemoLoadState?.status !== 'failed');
+      currentDemoLoadState?.status !== 'failed' &&
+      currentDemoLoadState?.status !== 'access-denied');
 
   if (isDemoLoading) {
     return (
@@ -291,7 +311,17 @@ export function LearningDemoPage({ learningApiClient, locale }: LearningDemoPage
   }
 
   if (!demo || !currentStep) {
-    return <DemoNotFoundPage locale={locale} />;
+    const backCourseId = demo?.courseId ?? courseId;
+    const backPath =
+      backPostId && backCourseId ? `/learn/${backCourseId}/posts/${backPostId}` : '/courses';
+
+    return (
+      <DemoNotFoundPage
+        backPath={backPath}
+        locale={locale}
+        status={currentDemoLoadState?.status === 'access-denied' ? 'access-denied' : 'failed'}
+      />
+    );
   }
 
   return (
@@ -385,16 +415,26 @@ function createModuleQuizId(moduleId: string) {
   return stablePrefix ? `quiz-module-${stablePrefix}` : `quiz-module-${moduleId}`;
 }
 
-function DemoNotFoundPage({ locale }: { locale: Locale }) {
+function DemoNotFoundPage({
+  backPath,
+  locale,
+  status,
+}: {
+  backPath: string;
+  locale: Locale;
+  status: 'access-denied' | 'failed';
+}) {
   const text = copy[locale];
+  const isAccessDenied = status === 'access-denied';
+  const hasLessonBackPath = backPath !== '/courses';
 
   return (
     <main className="not-found page-shell">
-      <span aria-hidden="true">404 / PRACTICE</span>
-      <h1>{text.notFoundTitle}</h1>
-      <p>{text.notFoundBody}</p>
-      <Link className="primary-link" to="/courses">
-        {text.notFoundBack}
+      <span aria-hidden="true">{isAccessDenied ? '403' : '404'} / PRACTICE</span>
+      <h1>{isAccessDenied ? text.accessDeniedTitle : text.notFoundTitle}</h1>
+      <p>{isAccessDenied ? text.accessDeniedBody : text.notFoundBody}</p>
+      <Link className="primary-link" to={backPath}>
+        {hasLessonBackPath ? text.backToLesson : text.notFoundBack}
       </Link>
     </main>
   );
