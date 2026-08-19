@@ -17,10 +17,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type DragEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { courses, localize, type Locale } from '../catalog/course-data';
@@ -42,6 +43,7 @@ import {
   getPlaygroundDataset,
   type PlaygroundDataset,
 } from './playground-datasets';
+import { getPlaygroundBackPath, getPlaygroundLocationPath } from './playground-navigation';
 import { PlaygroundVisualization } from './playground-visualizations';
 
 interface PlaygroundPageProps {
@@ -141,6 +143,9 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
       <section aria-label={t('playground.catalog.listLabel')} className="playground-catalog-grid">
         {scenarioGroups.map(({ registrations, scenarioId }) => {
           const dataset = getPlaygroundDataset(registrations[0]?.datasetVersionId ?? '');
+          const isScenarioUnlocked = registrations.some((registration) =>
+            unlockedAlgorithmIds.has(registration.algorithmId),
+          );
 
           return (
             <article
@@ -185,14 +190,22 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
                   );
                 })}
               </ul>
-              <Link
-                aria-label={`${t('playground.catalog.open')} ${formatScenarioName(scenarioId, locale)}`}
-                className="playground-catalog-link"
-                to={`/playground/${scenarioId}`}
-              >
-                {t('playground.catalog.open')}
-                <ArrowRight aria-hidden="true" size={16} />
-              </Link>
+              {isScenarioUnlocked ? (
+                <Link
+                  aria-label={`${t('playground.catalog.open')} ${formatScenarioName(scenarioId, locale)}`}
+                  className="playground-catalog-link"
+                  state={{ from: '/playground' }}
+                  to={`/playground/${scenarioId}`}
+                >
+                  {t('playground.catalog.open')}
+                  <ArrowRight aria-hidden="true" size={16} />
+                </Link>
+              ) : (
+                <span aria-disabled="true" className="playground-catalog-link is-locked">
+                  <LockKeyhole aria-hidden="true" size={16} />
+                  {t('playground.catalog.locked')}
+                </span>
+              )}
             </article>
           );
         })}
@@ -203,6 +216,7 @@ export function PlaygroundCatalogPage({ learningApiClient, locale }: PlaygroundP
 
 export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProps) {
   const { t } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
   const { scenarioId } = useParams();
   const routeScenarioId = scenarioId ?? '';
@@ -249,6 +263,15 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   const deviceProfile = useMemo(() => getDeviceProfile(), []);
   const [unlockedAlgorithmIds, setUnlockedAlgorithmIds] = useState<ReadonlySet<string>>(
     () => new Set(),
+  );
+  const unlockedScenarioIds = useMemo(
+    () =>
+      new Set(
+        getPlaygroundPairRegistry()
+          .filter((registration) => unlockedAlgorithmIds.has(registration.algorithmId))
+          .map((registration) => registration.scenarioId),
+      ),
+    [unlockedAlgorithmIds],
   );
   const [selectedPairKey, setSelectedPairKey] = useState<string | null>(null);
   const selectedRegistration = useMemo(
@@ -515,9 +538,9 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
   if (!selectedRegistration) {
     return (
       <main className="playground-page page-shell">
-        <Link className="breadcrumb-link" to="/learn/course-deep-learning-basic">
+        <Link className="breadcrumb-link" to={getPlaygroundBackPath(location.state)}>
           <ArrowLeft aria-hidden="true" size={16} />
-          {t('learning.backToCourse')}
+          {t('playground.back')}
         </Link>
         <section className="playground-locked">
           <span className="eyebrow">{t('playground.eyebrow')}</span>
@@ -917,9 +940,9 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
 
   return (
     <main className="playground-page page-shell">
-      <Link className="breadcrumb-link" to="/learn/course-deep-learning-basic">
+      <Link className="breadcrumb-link" to={getPlaygroundBackPath(location.state)}>
         <ArrowLeft aria-hidden="true" size={16} />
-        {t('learning.backToCourse')}
+        {t('playground.back')}
       </Link>
       <section className="playground-hero">
         <div>
@@ -949,8 +972,13 @@ export function PlaygroundPage({ learningApiClient, locale }: PlaygroundPageProp
           );
         }}
         onSelect={handleDatasetSelect}
-        onNavigate={(nextScenarioId) => navigate(`/playground/${nextScenarioId}`)}
+        onNavigate={(nextScenarioId) =>
+          navigate(`/playground/${nextScenarioId}`, {
+            state: { from: getPlaygroundLocationPath(location) },
+          })
+        }
         selectedDatasetVersionId={selectedDatasetVersionId}
+        unlockedScenarioIds={unlockedScenarioIds}
       />
 
       <section className="playground-workspace">
@@ -1230,6 +1258,7 @@ function DatasetTray({
   onSelect,
   onNavigate,
   selectedDatasetVersionId,
+  unlockedScenarioIds,
 }: {
   currentScenarioId: string;
   disabled: boolean;
@@ -1239,6 +1268,7 @@ function DatasetTray({
   onSelect: (datasetVersionId: string) => void;
   onNavigate: (scenarioId: string) => void;
   selectedDatasetVersionId: string | null;
+  unlockedScenarioIds: ReadonlySet<string>;
 }) {
   const { t } = useTranslation();
   const [dropMessage, setDropMessage] = useState<string | null>(null);
@@ -1263,6 +1293,11 @@ function DatasetTray({
     );
 
     if (droppedDataset) {
+      if (!unlockedScenarioIds.has(droppedDataset.scenarioId)) {
+        setDropMessage(t('playground.dataset.lockedDrop'));
+        return;
+      }
+
       setDropMessage(null);
       onDatasetDragged(droppedDataset.scenarioId, droppedDataset.datasetVersionId);
 
@@ -1301,6 +1336,7 @@ function DatasetTray({
             entry.scenarioId === currentScenarioId &&
             entry.datasetVersionId === selectedDatasetVersionId;
           const isCurrentScenario = entry.scenarioId === currentScenarioId;
+          const isScenarioUnlocked = unlockedScenarioIds.has(entry.scenarioId);
 
           return (
             <article
@@ -1308,7 +1344,7 @@ function DatasetTray({
                 isSelected ? 'playground-dataset-card is-selected' : 'playground-dataset-card'
               }
               data-testid={`playground-dataset-card-${entry.datasetVersionId}`}
-              draggable={!disabled}
+              draggable={!disabled && isScenarioUnlocked}
               key={entry.datasetVersionId}
               onDragStart={(event) => handleDragStart(event, entry.datasetVersionId)}
             >
@@ -1326,20 +1362,20 @@ function DatasetTray({
                   {t('playground.dataset.features', { count: dataset.featureColumns.length })}
                 </span>
               </div>
-              <button
-                aria-pressed={isCurrentScenario ? isSelected : undefined}
-                disabled={disabled}
-                onClick={() =>
-                  isCurrentScenario
-                    ? onSelect(entry.datasetVersionId)
-                    : onNavigate(entry.scenarioId)
-                }
-                type="button"
-              >
-                {isCurrentScenario
-                  ? t('playground.dataset.use')
-                  : t('playground.dataset.openScenario')}
-              </button>
+              {isCurrentScenario ? null : isScenarioUnlocked ? (
+                <button
+                  disabled={disabled}
+                  onClick={() => onNavigate(entry.scenarioId)}
+                  type="button"
+                >
+                  {t('playground.dataset.openScenario')}
+                </button>
+              ) : (
+                <span aria-disabled="true" className="playground-dataset-card-status">
+                  <LockKeyhole aria-hidden="true" size={14} />
+                  {t('playground.dataset.locked')}
+                </span>
+              )}
             </article>
           );
         })}
@@ -1454,6 +1490,44 @@ function NumberField({
   step: number;
   value: number;
 }) {
+  const [draftValue, setDraftValue] = useState(() => String(value));
+  const isEditingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditingRef.current) {
+      setDraftValue(String(value));
+    }
+  }, [value]);
+
+  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const nextDraftValue = event.currentTarget.value;
+
+    setDraftValue(nextDraftValue);
+
+    if (nextDraftValue === '' || nextDraftValue === '-' || nextDraftValue.endsWith('.')) {
+      return;
+    }
+
+    const nextValue = Number(nextDraftValue);
+
+    if (Number.isFinite(nextValue)) {
+      onChange(nextValue);
+    }
+  }
+
+  function handleInputBlur() {
+    isEditingRef.current = false;
+    const nextValue = Number(draftValue);
+
+    if (draftValue === '' || !Number.isFinite(nextValue)) {
+      setDraftValue(String(value));
+      return;
+    }
+
+    setDraftValue(String(nextValue));
+    onChange(nextValue);
+  }
+
   return (
     <label className="playground-number-field">
       <span>{label}</span>
@@ -1462,10 +1536,14 @@ function NumberField({
         disabled={disabled}
         max={max}
         min={min}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        onBlur={handleInputBlur}
+        onChange={handleInputChange}
+        onFocus={() => {
+          isEditingRef.current = true;
+        }}
         step={step}
         type="number"
-        value={value}
+        value={draftValue}
       />
     </label>
   );
@@ -2271,7 +2349,7 @@ function formatStaticLabel(label: string, locale: Locale): string {
   const labels: Record<string, { en: string; vi: string }> = {
     Algorithm: { en: 'Algorithm', vi: 'Thuật toán' },
     Boundary: { en: 'Boundary', vi: 'Ranh giới' },
-    Iteration: { en: 'Iteration', vi: 'Vòng lặp' },
+    Iteration: { en: 'Iteration', vi: 'Iteration' },
     Locked: { en: 'locked', vi: 'đã khóa' },
     'Result summary': { en: 'Result summary', vi: 'Tóm tắt kết quả' },
     'Chart summary': { en: 'Chart summary', vi: 'Tóm tắt biểu đồ' },
@@ -2406,19 +2484,19 @@ function formatFeedback(feedbackId: string, locale: Locale): string {
     },
     'learning-rate-too-high': {
       en: 'Learning rate is high: reduce it if the loss oscillates or diverges.',
-      vi: 'Tốc độ học cao: giảm xuống nếu loss dao động hoặc phân kỳ.',
+      vi: 'Learning rate cao: giảm xuống nếu loss dao động hoặc phân kỳ.',
     },
     'learning-rate-too-low': {
       en: 'Learning rate is low: increase it slightly if progress is too slow.',
-      vi: 'Tốc độ học thấp: tăng nhẹ nếu tiến bộ quá chậm.',
+      vi: 'Learning rate thấp: tăng nhẹ nếu tiến bộ quá chậm.',
     },
     'learning-rate-high': {
       en: 'Learning rate is high: reduce it if the loss oscillates or diverges.',
-      vi: 'Tốc độ học cao: giảm xuống nếu loss dao động hoặc phân kỳ.',
+      vi: 'Learning rate cao: giảm xuống nếu loss dao động hoặc phân kỳ.',
     },
     'learning-rate-low': {
       en: 'Learning rate is low: increase it slightly if progress is too slow.',
-      vi: 'Tốc độ học thấp: tăng nhẹ nếu tiến bộ quá chậm.',
+      vi: 'Learning rate thấp: tăng nhẹ nếu tiến bộ quá chậm.',
     },
     'linear-limit': {
       en: 'Linear limit: one straight boundary cannot separate XOR.',
@@ -2446,7 +2524,7 @@ function formatFeedback(feedbackId: string, locale: Locale): string {
     },
     threshold: {
       en: 'Threshold: changing the cutoff trades precision against recall.',
-      vi: 'Ngưỡng phân loại: đổi cutoff sẽ đánh đổi precision và recall.',
+      vi: 'Threshold phân loại: đổi cutoff sẽ đánh đổi precision và recall.',
     },
     'too-few-clusters': {
       en: 'Too few clusters: several distinct groups may be merged together.',

@@ -46,6 +46,16 @@ describe('Playground adapter registry', () => {
     }
   });
 
+  it('keeps canonical machine-learning parameter names in English in the Vietnamese UI', () => {
+    const registry = getPlaygroundPairRegistry();
+
+    for (const entry of registry) {
+      for (const field of entry.parameterFields) {
+        expect(field.label.vi).toBe(field.label.en);
+      }
+    }
+  });
+
   it('runs the implemented pg-xor Perceptron adapter through the generic contract', async () => {
     const adapter = resolveAlgorithmAdapter({
       scenarioId: 'pg-xor',

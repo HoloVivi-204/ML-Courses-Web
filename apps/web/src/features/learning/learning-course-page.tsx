@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, LockKeyhole, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type CourseSummary, type Locale } from '../catalog/course-data';
@@ -19,6 +19,7 @@ import {
   type LearningModuleProgressEntry,
 } from './learning-progression';
 import { formatAlgorithmName, getPlaygroundPathForAlgorithm } from './playground-link-mapping';
+import { getPlaygroundLocationPath } from '../playground/playground-navigation';
 
 interface LearningCoursePageProps {
   learningApiClient: LearningApiClient;
@@ -385,6 +386,7 @@ function VerifiedProgressPanel({
   progressSnapshot: LearningProgressSnapshot;
 }) {
   const { i18n, t } = useTranslation();
+  const location = useLocation();
   const currentModule =
     moduleEntries.find((entry) => entry.progress.status === 'in-progress') ??
     moduleEntries.find((entry) => entry.progress.status === 'completed');
@@ -438,6 +440,7 @@ function VerifiedProgressPanel({
               <Link
                 className="module-trial-link"
                 key={unlock.algorithmId}
+                state={{ from: getPlaygroundLocationPath(location) }}
                 to={unlock.playgroundPath!}
               >
                 {t('learning.progress.openPlayground', {

@@ -3727,6 +3727,11 @@ a {
   gap: 7px;
 }
 
+.playground-catalog-link.is-locked {
+  color: var(--ink-soft);
+  cursor: not-allowed;
+}
+
 .playground-dataset-tray {
   display: grid;
   padding: 18px;
@@ -3820,6 +3825,18 @@ a {
 .playground-dataset-card button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.playground-dataset-card-status {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 9px 12px;
+  background: color-mix(in srgb, var(--ink-soft) 12%, var(--paper));
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
 }
 
 .playground-dataset-selection {

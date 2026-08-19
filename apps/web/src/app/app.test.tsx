@@ -2462,6 +2462,7 @@ describe('public learning journey', () => {
 
   it('shows backend-verified progress and unlocked algorithms on the learning path', async () => {
     window.history.pushState({}, '', '/learn/course-deep-learning-basic');
+    const user = userEvent.setup();
     const learningApiClient = createLearningApiClient({
       getProgress: vi.fn().mockResolvedValue({
         algorithmUnlocks: [
@@ -2542,10 +2543,14 @@ describe('public learning journey', () => {
     expect(screen.getByText('Bài kiểm tra bài học: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
-    expect(screen.getByRole('link', { name: /Mở Playground Perceptron/i })).toHaveAttribute(
-      'href',
-      '/playground/pg-xor',
-    );
+    const playgroundLink = screen.getByRole('link', { name: /Mở Playground Perceptron/i });
+    expect(playgroundLink).toHaveAttribute('href', '/playground/pg-xor');
+    await user.click(playgroundLink);
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('link', { name: 'Quay lại' }));
+    expect(await screen.findByText('Module hoàn thành: 4/4 bước')).toBeVisible();
     expect(learningApiClient.getProgress).toHaveBeenCalledWith('local-id-token');
   });
 
@@ -3474,12 +3479,21 @@ describe('public learning journey', () => {
     expect(screen.getByTestId('playground-scenario-card-pg-house-price')).toHaveTextContent(
       'Cần hoàn thành module',
     );
-    expect(screen.getAllByRole('link', { name: /Mở scenario/i })).toHaveLength(10);
+    expect(screen.getAllByRole('link', { name: /Mở playground/i })).toHaveLength(1);
+    expect(
+      within(screen.getByTestId('playground-scenario-card-pg-house-price')).queryByRole('link', {
+        name: /Mở playground/i,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('playground-scenario-card-pg-house-price')).getByText(
+        'Chưa mở khóa',
+      ),
+    ).toBeVisible();
   });
 
-  it('selects a fixed dataset through the dataset button and drag-drop command', async () => {
+  it('does not render a redundant current-dataset button and keeps drag-drop selection available', async () => {
     window.history.pushState({}, '', '/playground/pg-xor');
-    const user = userEvent.setup();
     const learningApiClient = createLearningApiClient({
       getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
     });
@@ -3494,12 +3508,10 @@ describe('public learning journey', () => {
     const tray = screen.getByTestId('playground-dataset-tray');
     const datasetCard = screen.getByTestId('playground-dataset-card-ds-xor-noisy-v1');
 
-    expect(tray).toHaveTextContent('ds-xor-noisy-v1');
-    const useDatasetButton = within(datasetCard).getByRole('button', {
-      name: /Sử dụng dataset/i,
-    });
-    await user.click(useDatasetButton);
-    expect(useDatasetButton).toHaveAttribute('aria-pressed', 'true');
+    expect(datasetCard).toHaveTextContent('XOR');
+    expect(
+      within(datasetCard).queryByRole('button', { name: /Sử dụng dataset/i }),
+    ).not.toBeInTheDocument();
 
     const dataTransfer = {
       files: [],
@@ -3509,7 +3521,88 @@ describe('public learning journey', () => {
 
     fireEvent.dragOver(tray, { dataTransfer });
     fireEvent.drop(tray, { dataTransfer });
-    expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent('ds-xor-noisy-v1');
+    expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent('XOR');
+  });
+
+  it('does not offer navigation to a locked scenario from the dataset tray', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    const lockedDatasetCard = screen.getByTestId('playground-dataset-card-ds-house-price-v1');
+
+    expect(
+      within(lockedDatasetCard).queryByRole('button', { name: 'Mở scenario' }),
+    ).not.toBeInTheDocument();
+    expect(within(lockedDatasetCard).getByText('Chưa mở khóa')).toBeVisible();
+
+    const dataTransfer = {
+      files: [],
+      getData: vi.fn().mockReturnValue('ds-house-price-v1'),
+      setData: vi.fn(),
+    };
+
+    fireEvent.drop(screen.getByTestId('playground-dataset-tray'), { dataTransfer });
+    expect(screen.getByRole('alert')).toHaveTextContent('Dataset này thuộc scenario chưa mở khóa.');
+    expect(screen.getByRole('heading', { name: 'Playground XOR: Perceptron' })).toBeVisible();
+  });
+
+  it('returns to the Playground catalog after opening a scenario from the catalog', async () => {
+    window.history.pushState({}, '', '/playground');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Danh mục Playground' })).toBeVisible();
+    await user.click(screen.getByRole('link', { name: /Mở playground/i }));
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: 'Quay lại' }));
+    expect(await screen.findByRole('heading', { name: 'Danh mục Playground' })).toBeVisible();
+  });
+
+  it('allows keyboard editing from an empty number field, including decimal values', async () => {
+    window.history.pushState({}, '', '/playground/pg-xor');
+    const user = userEvent.setup();
+    const learningApiClient = createLearningApiClient({
+      getProgress: vi.fn().mockResolvedValue(createUnlockedProgressSnapshot()),
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Playground XOR: Perceptron' }),
+    ).toBeVisible();
+    const epochs = screen.getByRole('spinbutton', { name: 'Epochs' });
+    const learningRate = screen.getByRole('spinbutton', { name: 'Learning rate' });
+
+    expect(learningRate).toHaveAttribute('step', '0.001');
+    await user.clear(epochs);
+    expect((epochs as HTMLInputElement).value).toBe('');
+    await user.type(epochs, '10');
+    expect((epochs as HTMLInputElement).value).toBe('10');
+
+    await user.clear(learningRate);
+    expect((learningRate as HTMLInputElement).value).toBe('');
+    await user.type(learningRate, '0.001');
+    expect((learningRate as HTMLInputElement).value).toBe('0.001');
   });
 
   it('opens the owning scenario when a different approved dataset card is used', async () => {
@@ -3545,9 +3638,7 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByRole('heading', { name: /Playground giá nhà/i })).toBeVisible();
-    expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent(
-      'ds-house-price-v1',
-    );
+    expect(screen.getByTestId('playground-selected-dataset')).toHaveTextContent('Giá nhà');
   });
 
   it('keeps the unlocked mobile K-Means pair playable instead of treating it as locked', async () => {
@@ -3571,7 +3662,7 @@ describe('public learning journey', () => {
 
     expect(await screen.findByRole('heading', { name: /K-Means/i })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Chạy' })).toBeEnabled();
-    expect(screen.getByRole('spinbutton', { name: /Số cụm/i })).toHaveAttribute('max', '8');
+    expect(screen.getByRole('spinbutton', { name: /Clusters \(k\)/i })).toHaveAttribute('max', '8');
     vi.unstubAllGlobals();
   });
 
@@ -4077,9 +4168,9 @@ describe('public learning journey', () => {
 
     await user.click(screen.getByRole('button', { name: /Khôi phục/i }));
 
-    expect(screen.getByRole('spinbutton', { name: 'Tốc độ học' })).toHaveValue(0.2);
+    expect(screen.getByRole('spinbutton', { name: 'Learning rate' })).toHaveValue(0.2);
     expect(screen.getByRole('spinbutton', { name: 'Epochs' })).toHaveValue(200);
-    expect(screen.getByRole('spinbutton', { name: 'Tỷ lệ train' })).toHaveValue(0.8);
+    expect(screen.getByRole('spinbutton', { name: 'Train split' })).toHaveValue(0.8);
     expect(screen.getByRole('spinbutton', { name: 'Seed' })).toHaveValue(7);
     expect(learningApiClient.listPlaygroundRuns).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -4174,12 +4265,12 @@ describe('public learning journey', () => {
       name: 'Renamed XOR baseline',
     });
 
-    await user.clear(screen.getByRole('spinbutton', { name: 'Tốc độ học' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Tốc độ học' }), '0.3');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Learning rate' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Learning rate' }), '0.3');
     await user.clear(screen.getByRole('spinbutton', { name: 'Epochs' }));
     await user.type(screen.getByRole('spinbutton', { name: 'Epochs' }), '150');
-    await user.clear(screen.getByRole('spinbutton', { name: 'Tỷ lệ train' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Tỷ lệ train' }), '0.85');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Train split' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Train split' }), '0.85');
     await user.clear(screen.getByRole('spinbutton', { name: 'Seed' }));
     await user.type(screen.getByRole('spinbutton', { name: 'Seed' }), '9');
 
