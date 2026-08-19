@@ -37,18 +37,18 @@ function createProgressSnapshot(): LearningProgressSnapshot {
         modules: [
           {
             completedStepCount: 0,
-            missingConditions: ['overview:cml-m01-foundations', 'post:cml-p01-problem-data-types'],
+            missingConditions: undefined,
             moduleId: 'cml-m01-foundations',
             overviewViewed: false,
-            progressPercent: 0,
+            progressPercent: 100,
             requiredStepCount: 4,
-            status: 'locked',
+            status: 'completed',
           },
         ],
         posts: [],
-        progressPercent: 0,
+        progressPercent: 100,
         quizzes: [],
-        status: 'not-enrolled',
+        status: 'completed',
       },
       {
         courseId: 'course-deep-learning-basic',
@@ -175,8 +175,12 @@ describe('StudentDashboardPage', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Deep Learning Basics' }),
     ).toBeVisible();
+    expect(screen.getByRole('heading', { level: 2, name: 'Other courses' })).toBeVisible();
     expect(
-      screen.queryByRole('heading', { level: 3, name: 'Classical Machine Learning' }),
+      screen.getByRole('heading', { level: 3, name: 'Classical Machine Learning' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Your courses' }),
     ).not.toBeInTheDocument();
     expect(screen.getByText('25%')).toBeVisible();
     expect(screen.getByText('1 of 11 steps')).toBeVisible();

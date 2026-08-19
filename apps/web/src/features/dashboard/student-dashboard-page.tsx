@@ -104,8 +104,9 @@ export function StudentDashboardPage({ learningApiClient, locale }: StudentDashb
           className="dashboard-other-courses"
         >
           <div className="dashboard-section-heading">
-            <span className="eyebrow">{t('dashboard.courses.eyebrow')}</span>
-            <h2 id="dashboard-other-courses-title">{t('dashboard.courses.title')}</h2>
+            <h2 className="dashboard-section-title" id="dashboard-other-courses-title">
+              {t('dashboard.courses.heading')}
+            </h2>
           </div>
           <div className="dashboard-compact-course-list">
             {otherCourses.map((courseProgress) => (
