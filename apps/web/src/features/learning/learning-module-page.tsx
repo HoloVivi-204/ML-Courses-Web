@@ -6,11 +6,12 @@ import { Link, useParams } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { formatLessonLabel, formatPracticeLabel } from '../../shared/user-facing-labels';
-import type {
-  LearningApiClient,
-  LearningModuleContent,
-  LearningProgressSnapshot,
-  LearningQuizContent,
+import {
+  LearningApiError,
+  type LearningApiClient,
+  type LearningModuleContent,
+  type LearningProgressSnapshot,
+  type LearningQuizContent,
 } from './learning-api';
 import {
   getLearningCourseProgress,
@@ -72,6 +73,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
             moduleId: activeModule.id,
             moduleQuizId: getModuleQuizId(activeModule.id),
             postIds: activeModule.postIds,
+            shouldEnroll: course.modules?.[0]?.id === activeModule.id,
           });
 
     loadTaskRef.current = loadTask;
@@ -392,6 +394,7 @@ function createModuleLoadTask(input: {
   moduleId: string;
   moduleQuizId: string;
   postIds: readonly string[];
+  shouldEnroll: boolean;
 }): ModuleLoadTask {
   return {
     key: input.key,
@@ -400,6 +403,20 @@ function createModuleLoadTask(input: {
 
       if (!idToken) {
         throw new Error('Authenticated user is missing an ID token.');
+      }
+
+      if (input.shouldEnroll) {
+        try {
+          await input.learningApiClient.enrollCourse({
+            courseId: input.courseId,
+            idToken,
+            idempotencyKey: crypto.randomUUID(),
+          });
+        } catch (error) {
+          if (!(error instanceof LearningApiError) || error.code !== 'CONTENT_NOT_PUBLISHED') {
+            throw error;
+          }
+        }
       }
 
       const moduleOverview = await input.learningApiClient.recordModuleOverview({
