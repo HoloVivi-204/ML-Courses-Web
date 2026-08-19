@@ -43,6 +43,15 @@ export class LearningContentReadError extends Error {
   }
 }
 
+export function isFirestorePermissionDeniedError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'permission-denied'
+  );
+}
+
 function getConfiguredFirestore(): Firestore {
   const app = getConfiguredFirebaseApp();
 

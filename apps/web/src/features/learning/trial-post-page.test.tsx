@@ -113,12 +113,83 @@ describe('TrialPostPage', () => {
     expect(getFullPostContent).toHaveBeenCalledTimes(2);
   });
 
+  it('retries full content when Firestore denies the initial read during an access race', async () => {
+    const getFullPostContent = vi
+      .fn()
+      .mockRejectedValueOnce({
+        code: 'permission-denied',
+        message: 'Missing or insufficient permissions.',
+      })
+      .mockResolvedValueOnce(createPost('full'));
+    const learningApiClient = {
+      getFullPostContent,
+      getProgress: vi.fn().mockResolvedValue({
+        contentAccess: [{ contentType: 'post', entityId: POST_ID }],
+        posts: [],
+      }),
+      getTrialPostContent: vi.fn().mockResolvedValue(createPost('trial')),
+    } as unknown as LearningApiClient;
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={createAuthContextValue()}>
+          <MemoryRouter initialEntries={[`/learn/${COURSE_ID}/posts/${POST_ID}`]}>
+            <Routes>
+              <Route
+                path="/learn/:courseId/posts/:postId"
+                element={<TrialPostPage learningApiClient={learningApiClient} locale="vi" />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    expect(await screen.findByRole('link', { name: 'Mở quiz bài học' })).toHaveAttribute(
+      'href',
+      `/learn/${COURSE_ID}/quizzes/quiz-post-dl-p01`,
+    );
+    expect(getFullPostContent).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the quiz hidden when the learner still has no post access', async () => {
     const getFullPostContent = vi
       .fn()
       .mockRejectedValue(
         new LearningApiError(403, 'POST_ACCESS_REQUIRED', 'Post access is required.'),
       );
+    const learningApiClient = {
+      getFullPostContent,
+      getProgress: vi.fn().mockResolvedValue({ contentAccess: [], posts: [] }),
+      getTrialPostContent: vi.fn().mockResolvedValue(createPost('trial')),
+    } as unknown as LearningApiClient;
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={createAuthContextValue()}>
+          <MemoryRouter initialEntries={[`/learn/${COURSE_ID}/posts/${POST_ID}`]}>
+            <Routes>
+              <Route
+                path="/learn/:courseId/posts/:postId"
+                element={<TrialPostPage learningApiClient={learningApiClient} locale="vi" />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    await screen.findByRole('heading', { name: 'Một bài học' });
+
+    expect(screen.queryByRole('link', { name: 'Mở quiz bài học' })).not.toBeInTheDocument();
+    expect(getFullPostContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the quiz hidden when Firestore denies access and no post grant exists', async () => {
+    const getFullPostContent = vi.fn().mockRejectedValue({
+      code: 'permission-denied',
+      message: 'Missing or insufficient permissions.',
+    });
     const learningApiClient = {
       getFullPostContent,
       getProgress: vi.fn().mockResolvedValue({ contentAccess: [], posts: [] }),

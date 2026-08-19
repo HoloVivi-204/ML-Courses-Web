@@ -7,6 +7,7 @@ import { useAuth } from '../auth/auth-context';
 import { getCourse, localize, type Locale } from '../catalog/course-data';
 import { ContentBlockNavigation, ContentBlockRenderer } from './content-block-renderer';
 import type { ExternalResource } from './content-block-types';
+import { isFirestorePermissionDeniedError } from './firebase-learning-content-gateway';
 import {
   LearningApiError,
   type LearningApiClient,
@@ -359,7 +360,11 @@ export function TrialPostPage({ learningApiClient, locale }: TrialPostPageProps)
             postId: activePostId,
           });
         } catch (error) {
-          if (!(error instanceof LearningApiError) || error.code !== 'POST_ACCESS_REQUIRED') {
+          const isPostAccessRequired =
+            (error instanceof LearningApiError && error.code === 'POST_ACCESS_REQUIRED') ||
+            isFirestorePermissionDeniedError(error);
+
+          if (!isPostAccessRequired) {
             throw error;
           }
 
