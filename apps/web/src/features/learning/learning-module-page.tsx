@@ -126,6 +126,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
   }
 
   const courseProgress = getLearningCourseProgress(progressSnapshot, course.id);
+  const progressForModule = courseProgress ?? progressSnapshot;
   const contentAccess = new Set(
     progressSnapshot.contentAccess.map((item) => `${item.contentType}:${item.entityId}`),
   );
@@ -137,7 +138,7 @@ export function LearningModulePage({ learningApiClient, locale }: LearningModule
     (postId) => postProgressById.get(postId)?.completed === true,
   );
   const demoCompleted = module.demoId
-    ? progressSnapshot.demos.some((demo) => demo.demoId === module.demoId && demo.completed)
+    ? progressForModule.demos.some((demo) => demo.demoId === module.demoId && demo.completed)
     : true;
   const isModuleQuizOpen = completedPosts && demoCompleted;
   const firstIncompletePostId = module.postIds.find(

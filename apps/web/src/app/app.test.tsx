@@ -2537,9 +2537,9 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    expect(await screen.findByText('Tiến độ đã xác minh: 33%')).toBeVisible();
-    expect(screen.getByText('Module hoàn thành: 4/4 bước')).toBeVisible();
-    expect(screen.getByText('Quiz bài học: 100% · đạt · 1 lần làm')).toBeVisible();
+    expect(await screen.findByText('Module hoàn thành: 4/4 bước')).toBeVisible();
+    expect(screen.queryByText('Tiến độ đã xác minh: 33%')).not.toBeInTheDocument();
+    expect(screen.getByText('Bài kiểm tra bài học: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Quiz module: 100% · đạt · 1 lần làm')).toBeVisible();
     expect(screen.getByText('Perceptron đã mở')).toBeVisible();
     expect(screen.getByRole('link', { name: /Mở Playground Perceptron/i })).toHaveAttribute(

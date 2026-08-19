@@ -936,7 +936,7 @@ async function runNaiveBayes(
           : `Naive Bayes reaches F1 ${binaryMetrics?.f1 ?? 0} on the synthetic SMS test split.`,
       vi:
         definition.primaryMetric === 'macro-f1'
-          ? `Naive Bayes dat macro-F1 ${multiclassMetrics.macroF1} tren tap kiem tra wine tong hop.`
+          ? `Naive Bayes đạt macro-F1 ${multiclassMetrics.macroF1} trên tập kiểm tra wine tổng hợp.`
           : `Naive Bayes đạt F1 ${binaryMetrics?.f1 ?? 0} trên tập kiểm tra SMS tổng hợp.`,
     },
   };
@@ -1017,7 +1017,7 @@ async function runLogisticRegression(
       vi:
         definition.scenarioId === 'pg-spam-detection'
           ? `Hồi quy logistic đạt F1 ${metrics.f1} trên tập kiểm tra SMS tổng hợp.`
-          : `Logistic regression dat recall ${metrics.recall} tren tap kiem tra rui ro tin dung tong hop.`,
+          : `Logistic regression đạt recall ${metrics.recall} trên tập kiểm tra rủi ro tín dụng tổng hợp.`,
     },
   };
 }
@@ -1175,7 +1175,7 @@ async function runKnn(
     },
     textAlternative: {
       en: `KNN reaches F1 ${binaryMetrics.f1} and AUC ${auc} on the synthetic customer-churn test split.`,
-      vi: `KNN dat F1 ${binaryMetrics.f1} va AUC ${auc} tren tap kiem tra customer churn tong hop.`,
+      vi: `KNN đạt F1 ${binaryMetrics.f1} và AUC ${auc} trên tập kiểm tra customer churn tổng hợp.`,
     },
   };
 }
@@ -1267,7 +1267,7 @@ async function runRandomForest(
     },
     textAlternative: {
       en: `Random Forest reaches F1 ${binaryMetrics.f1} and AUC ${auc} on the synthetic customer-churn test split.`,
-      vi: `Random Forest dat F1 ${binaryMetrics.f1} va AUC ${auc} tren tap kiem tra customer churn tong hop.`,
+      vi: `Random Forest đạt F1 ${binaryMetrics.f1} và AUC ${auc} trên tập kiểm tra customer churn tổng hợp.`,
     },
   };
 }
@@ -1351,7 +1351,7 @@ async function runSvm(
       },
       textAlternative: {
         en: `RBF SVM reaches recall ${metrics.recall} on the synthetic credit-risk test split.`,
-        vi: `RBF SVM dat recall ${metrics.recall} tren tap kiem tra rui ro tin dung tong hop.`,
+        vi: `RBF SVM đạt recall ${metrics.recall} trên tập kiểm tra rủi ro tín dụng tổng hợp.`,
       },
     };
   } finally {
@@ -1451,7 +1451,7 @@ async function runHierarchicalClustering(
     },
     textAlternative: {
       en: `Ward hierarchical clustering finds ${config.clusters} retail segments with silhouette ${silhouette}.`,
-      vi: `Ward hierarchical clustering tim ${config.clusters} nhom retail voi silhouette ${silhouette}.`,
+      vi: `Ward hierarchical clustering tìm ${config.clusters} nhóm retail với silhouette ${silhouette}.`,
     },
   };
 }
@@ -1720,9 +1720,9 @@ async function runMlp(
           ? `MLP giải được tập XOR phi tuyến với accuracy ${Math.round(
               roundedAccuracy * 100,
             )}% và loss ${roundedLoss}.`
-          : `MLP giai duoc tap moons phi tuyen voi accuracy ${Math.round(
+          : `MLP giải được tập moons phi tuyến với accuracy ${Math.round(
               roundedAccuracy * 100,
-            )}% va loss ${roundedLoss}.`,
+            )}% và loss ${roundedLoss}.`,
     },
   };
 }

@@ -389,12 +389,9 @@ function VerifiedProgressPanel({
     moduleEntries.find((entry) => entry.progress.status === 'in-progress') ??
     moduleEntries.find((entry) => entry.progress.status === 'completed');
   const quizzes = courseProgress?.quizzes ?? progressSnapshot.quizzes;
-  const progressPercent =
-    courseProgress?.progressPercent ?? progressSnapshot.enrollment.progressPercent;
 
   return (
     <section className="learning-progress-panel" aria-label={t('learning.progress.label')}>
-      <p>{t('learning.progress.verified', { percent: progressPercent })}</p>
       {currentModule ? (
         <p>
           {t('learning.progress.moduleSteps', {

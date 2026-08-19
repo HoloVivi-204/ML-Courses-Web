@@ -117,7 +117,6 @@ const resources = {
       'learning.enrollment.failed':
         'We could not confirm enrollment. Refresh or try again after signing in.',
       'learning.progress.label': 'Verified learning progress',
-      'learning.progress.verified': 'Verified progress: {{percent}}%',
       'learning.progress.moduleSteps': 'Module complete: {{completed}}/{{required}} steps',
       'learning.progress.quiz.label': 'Verified quiz progress',
       'learning.progress.quiz.post': 'Lesson quiz: {{score}}% · {{status}} · {{attempts}}',
@@ -688,7 +687,6 @@ const resources = {
       'learning.enrollment.failed':
         'Chưa thể xác nhận việc ghi danh. Hãy tải lại hoặc thử lại sau khi đăng nhập.',
       'learning.progress.label': 'Tiến độ học đã xác minh',
-      'learning.progress.verified': 'Tiến độ đã xác minh: {{percent}}%',
       'learning.progress.moduleSteps': 'Module hoàn thành: {{completed}}/{{required}} bước',
       'learning.progress.quiz.label': 'Tiến độ quiz đã xác minh',
       'learning.progress.quiz.post': 'Bài kiểm tra bài học: {{score}}% · {{status}} · {{attempts}}',

@@ -39,6 +39,8 @@ const copy: Readonly<
       answerLabel: string;
       attempt: (attemptNumber: number) => string;
       backToLesson: string;
+      completedBody: (score: number, attempts: number) => string;
+      completedTitle: string;
       correctAnswer: string;
       correctFeedback: string;
       continueModuleQuiz: string;
@@ -57,6 +59,7 @@ const copy: Readonly<
       notFoundTitle: string;
       openPlayground: (algorithm: string) => string;
       retry: string;
+      retake: string;
       score: (score: number, bestScore: number) => string;
       selectAllHint: string;
       selectOneHint: string;
@@ -71,6 +74,9 @@ const copy: Readonly<
     answerLabel: 'Answers',
     attempt: (attemptNumber) => `Attempt ${attemptNumber}`,
     backToLesson: 'Back to lesson',
+    completedBody: (score, attempts) =>
+      `You have already passed this quiz. Best score ${score}% · ${attempts} recorded attempt${attempts === 1 ? '' : 's'}.`,
+    completedTitle: 'Quiz completed',
     correctAnswer: 'Correct answer',
     correctFeedback: 'Correct',
     continueModuleQuiz: 'Open the module quiz',
@@ -89,6 +95,7 @@ const copy: Readonly<
     notFoundTitle: 'Quiz not available',
     openPlayground: (algorithm) => `Open ${algorithm} Playground`,
     retry: 'Try again',
+    retake: 'Retake quiz',
     score: (score, bestScore) => `Score ${score}% · Best ${bestScore}%`,
     selectAllHint: 'Select all that apply',
     selectOneHint: 'Choose one option',
@@ -101,6 +108,9 @@ const copy: Readonly<
     answerLabel: 'Câu trả lời',
     attempt: (attemptNumber) => `Lần làm ${attemptNumber}`,
     backToLesson: 'Quay lại bài học',
+    completedBody: (score, attempts) =>
+      `Bạn đã đạt quiz này. Điểm cao nhất: ${score}% · ${attempts} lần làm đã ghi nhận.`,
+    completedTitle: 'Quiz đã hoàn thành',
     correctAnswer: 'Đáp án đúng',
     correctFeedback: 'Đúng',
     continueModuleQuiz: 'Mở quiz module',
@@ -119,6 +129,7 @@ const copy: Readonly<
     notFoundTitle: 'Quiz chưa khả dụng',
     openPlayground: (algorithm) => `Mở Playground ${algorithm}`,
     retry: 'Làm lại',
+    retake: 'Làm lại quiz',
     score: (score, bestScore) => `Điểm ${score}% · Cao nhất ${bestScore}%`,
     selectAllHint: 'Chọn tất cả đáp án đúng',
     selectOneHint: 'Chọn một đáp án',
@@ -171,6 +182,11 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
     quizRoute && progressSnapshot
       ? getQuizCourseProgress(progressSnapshot, quizRoute.courseId)
       : undefined;
+  const currentQuizProgress =
+    quizRoute && quizCourseProgress
+      ? quizCourseProgress.quizzes.find((quiz) => quiz.quizId === quizRoute.quizId)
+      : undefined;
+  const hasPassedQuiz = currentQuizProgress?.passed === true;
   const hasAccess =
     canVerifyBackendProgress &&
     progressStatus === 'ready' &&
@@ -246,10 +262,12 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
 
         attemptStarted.current = true;
         const [nextAttempt, nextQuizContent] = await Promise.all([
-          learningApiClient.createQuizAttempt({
-            idToken,
-            quizId: activeQuizRoute.quizId,
-          }),
+          hasPassedQuiz && attemptRequestIndex === 0
+            ? Promise.resolve(null)
+            : learningApiClient.createQuizAttempt({
+                idToken,
+                quizId: activeQuizRoute.quizId,
+              }),
           learningApiClient.getQuizContent(activeQuizRoute.quizId),
         ]);
 
@@ -282,7 +300,7 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
     return () => {
       isActive = false;
     };
-  }, [attemptRequestIndex, getIdToken, hasAccess, learningApiClient, quizRoute]);
+  }, [attemptRequestIndex, getIdToken, hasAccess, hasPassedQuiz, learningApiClient, quizRoute]);
 
   if (!quizRoute || !canVerifyBackendProgress) {
     return <QuizNotFoundPage locale={locale} />;
@@ -304,6 +322,40 @@ function LearningQuizPageContent({ learningApiClient, locale }: LearningQuizPage
     return (
       <main className="route-loading page-shell" role="status">
         {text.loading}
+      </main>
+    );
+  }
+
+  if (pageStatus === 'ready' && !attempt && quizContent && currentQuizProgress?.passed) {
+    return (
+      <main className="learning-quiz-page page-shell">
+        <Link
+          className="breadcrumb-link"
+          to={
+            backPostId
+              ? `/learn/${quizRoute.courseId}/posts/${backPostId}`
+              : `/learn/${quizRoute.courseId}`
+          }
+        >
+          <ArrowLeft aria-hidden="true" size={16} />
+          {text.backToLesson}
+        </Link>
+
+        <header className="quiz-heading">
+          <span className="eyebrow">{text.completedTitle}</span>
+          <h1>{localize(quizContent.title, locale)}</h1>
+          <p>{localize(quizContent.description, locale)}</p>
+        </header>
+
+        <section aria-live="polite" className="quiz-submit-card">
+          <p className="is-correct">
+            <CheckCircle2 aria-hidden="true" size={18} />
+            {text.completedBody(currentQuizProgress.bestScore, currentQuizProgress.attemptCount)}
+          </p>
+          <button className="primary-link" onClick={requestNewAttempt} type="button">
+            {text.retake}
+          </button>
+        </section>
       </main>
     );
   }
@@ -574,7 +626,7 @@ function hasVerifiedQuizProgress(
 function getQuizCourseProgress(
   progressSnapshot: LearningProgressSnapshot,
   courseId: string,
-): Pick<LearningProgressSnapshot, 'demos' | 'posts'> | undefined {
+): Pick<LearningProgressSnapshot, 'demos' | 'posts' | 'quizzes'> | undefined {
   const courseProgress = getLearningCourseProgress(progressSnapshot, courseId);
 
   if (courseProgress) {

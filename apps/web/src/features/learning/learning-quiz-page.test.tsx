@@ -78,6 +78,21 @@ function createProgressSnapshot(): LearningProgressSnapshot {
   };
 }
 
+function createPassedModuleQuizProgressSnapshot(): LearningProgressSnapshot {
+  return {
+    ...createProgressSnapshot(),
+    quizzes: [
+      {
+        attemptCount: 1,
+        bestScore: 100,
+        passed: true,
+        quizId: MODULE_QUIZ_ID,
+        quizKind: 'module',
+      },
+    ],
+  };
+}
+
 function createMultiCourseProgressSnapshot(): LearningProgressSnapshot {
   const deepLearningProgress = createProgressSnapshot();
 
@@ -227,6 +242,40 @@ describe('LearningQuizPage', () => {
         name: 'Module quiz: Training and generalization',
       }),
     ).toBeVisible();
+    expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
+      idToken: 'test-id-token',
+      quizId: MODULE_QUIZ_ID,
+    });
+  });
+
+  it('does not start another attempt when reopening a passed module quiz', async () => {
+    const learningApiClient = createLearningApiClient();
+    const authContextValue = createAuthContextValue();
+    const user = userEvent.setup();
+    learningApiClient.getProgress = vi
+      .fn()
+      .mockResolvedValue(createPassedModuleQuizProgressSnapshot());
+
+    render(
+      <I18nextProvider i18n={createAppI18n()}>
+        <AuthContext.Provider value={authContextValue}>
+          <MemoryRouter initialEntries={[MODULE_PATH]}>
+            <QuizRouteHarness learningApiClient={learningApiClient} />
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </I18nextProvider>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Module quiz: Training and generalization' }),
+    ).toBeVisible();
+    expect(screen.getByText(/Best score 100%/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Retake quiz' })).toBeVisible();
+    expect(learningApiClient.createQuizAttempt).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Retake quiz' }));
+
+    expect(await screen.findByTestId('quiz-attempt')).toBeVisible();
     expect(learningApiClient.createQuizAttempt).toHaveBeenCalledWith({
       idToken: 'test-id-token',
       quizId: MODULE_QUIZ_ID,

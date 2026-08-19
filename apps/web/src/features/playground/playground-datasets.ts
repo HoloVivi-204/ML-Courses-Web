@@ -75,7 +75,7 @@ const playgroundDatasets = [
     task: 'binary-classification',
     textAlternative: {
       en: 'Two deterministic noisy moon shapes with two numeric features and a binary label.',
-      vi: 'Hai cung trang khuyet co nhieu xac dinh voi hai dac trung so va nhan nhi phan.',
+      vi: 'Hai cung trăng khuyết có nhiễu xác định với hai đặc trưng số và nhãn nhị phân.',
     },
   }),
   createDataset({
@@ -119,7 +119,7 @@ const playgroundDatasets = [
     task: 'binary-classification',
     textAlternative: {
       en: 'Synthetic customer-churn rows with pre-encoded tenure, charge, support, and contract signals.',
-      vi: 'Du lieu customer churn tong hop voi tenure, chi phi, lien he ho tro va loai hop dong da ma hoa so.',
+      vi: 'Dữ liệu customer churn tổng hợp với tenure, chi phí, liên hệ hỗ trợ và loại hợp đồng đã mã hóa số.',
     },
   }),
   createDataset({
@@ -141,7 +141,7 @@ const playgroundDatasets = [
     task: 'multiclass-classification',
     textAlternative: {
       en: 'Synthetic wine cultivar rows with four standardized numeric chemistry indicators and three classes.',
-      vi: 'Du lieu cultivar ruou vang tong hop voi bon chi bao hoa hoc dang so va ba lop.',
+      vi: 'Dữ liệu cultivar rượu vang tổng hợp với bốn chỉ báo hóa học dạng số và ba lớp.',
     },
   }),
   createDataset({

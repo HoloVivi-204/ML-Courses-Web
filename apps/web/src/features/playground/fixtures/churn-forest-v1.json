@@ -34,7 +34,7 @@
     },
     "textAlternative": {
       "en": "Random Forest reaches F1 1 and AUC 1 on the synthetic customer-churn test split.",
-      "vi": "Random Forest dat F1 1 va AUC 1 tren tap kiem tra customer churn tong hop."
+      "vi": "Random Forest đạt F1 1 và AUC 1 trên tập kiểm tra customer churn tổng hợp."
     }
   }
 }

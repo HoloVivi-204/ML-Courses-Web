@@ -29,7 +29,7 @@
     },
     "textAlternative": {
       "en": "RBF SVM reaches recall 1 on the synthetic credit-risk test split.",
-      "vi": "RBF SVM dat recall 1 tren tap kiem tra rui ro tin dung tong hop."
+      "vi": "RBF SVM đạt recall 1 trên tập kiểm tra rủi ro tín dụng tổng hợp."
     }
   }
 }

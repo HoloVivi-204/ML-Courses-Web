@@ -26,7 +26,7 @@
     },
     "textAlternative": {
       "en": "Naive Bayes reaches macro-F1 1 on the synthetic wine test split.",
-      "vi": "Naive Bayes dat macro-F1 1 tren tap kiem tra wine tong hop."
+      "vi": "Naive Bayes đạt macro-F1 1 trên tập kiểm tra wine tổng hợp."
     }
   }
 }

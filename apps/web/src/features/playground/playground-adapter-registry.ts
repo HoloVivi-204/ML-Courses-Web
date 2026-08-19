@@ -195,7 +195,7 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Nonlinear moons MLP baseline',
     intro: {
       en: 'Train a two-layer MLP on fixed noisy moons and inspect nonlinear accuracy and loss.',
-      vi: 'Huan luyen MLP hai lop tren noisy moons co dinh va xem accuracy, loss phi tuyen.',
+      vi: 'Huấn luyện MLP hai lớp trên noisy moons cố định và xem accuracy, loss phi tuyến.',
     },
     parameterFields: [
       {
@@ -462,14 +462,14 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Customer churn KNN baseline',
     intro: {
       en: 'Classify fixed customer-churn rows with KNN and inspect F1, AUC, precision, and recall.',
-      vi: 'Phan loai customer churn co dinh bang KNN va xem F1, AUC, precision, recall.',
+      vi: 'Phân loại customer churn cố định bằng KNN và xem F1, AUC, precision, recall.',
     },
     parameterFields: [
       {
         id: 'k',
         integer: true,
         kind: 'number',
-        label: { en: 'Nearest neighbors (k)', vi: 'So lang gieng (k)' },
+        label: { en: 'Nearest neighbors (k)', vi: 'Số láng giềng (k)' },
         min: 1,
         max: 50,
         maxByDeviceProfile: { mobile: 25 },
@@ -478,7 +478,7 @@ const playgroundPairRegistry = [
       {
         id: 'distance',
         kind: 'enum',
-        label: { en: 'Distance', vi: 'Khoang cach' },
+        label: { en: 'Distance', vi: 'Khoảng cách' },
         options: [{ value: 'euclidean', label: { en: 'Euclidean', vi: 'Euclidean' } }],
       },
       commonParameterFields.trainRatio,
@@ -506,14 +506,14 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Customer churn Random Forest baseline',
     intro: {
       en: 'Train a seeded Random Forest on fixed customer-churn rows and inspect F1, AUC, precision, and recall.',
-      vi: 'Huan luyen Random Forest seeded tren customer churn co dinh va xem F1, AUC, precision, recall.',
+      vi: 'Huấn luyện Random Forest seeded trên customer churn cố định và xem F1, AUC, precision, recall.',
     },
     parameterFields: [
       {
         id: 'trees',
         integer: true,
         kind: 'number',
-        label: { en: 'Trees', vi: 'So cay' },
+        label: { en: 'Trees', vi: 'Số cây' },
         min: 1,
         max: 200,
         maxByDeviceProfile: { mobile: 50 },
@@ -523,7 +523,7 @@ const playgroundPairRegistry = [
         id: 'maxDepth',
         integer: true,
         kind: 'number',
-        label: { en: 'Max depth', vi: 'Do sau toi da' },
+        label: { en: 'Max depth', vi: 'Độ sâu tối đa' },
         min: 1,
         max: 15,
         maxByDeviceProfile: { mobile: 8 },
@@ -602,7 +602,7 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Credit logistic baseline',
     intro: {
       en: 'Train logistic regression on fixed credit-risk rows and inspect recall, F1, precision, and AUC.',
-      vi: 'Huan luyen logistic regression tren du lieu rui ro tin dung co dinh va xem recall, F1, precision, AUC.',
+      vi: 'Huấn luyện logistic regression trên dữ liệu rủi ro tín dụng cố định và xem recall, F1, precision, AUC.',
     },
     parameterFields: [
       commonParameterFields.learningRate,
@@ -610,7 +610,7 @@ const playgroundPairRegistry = [
       {
         id: 'threshold',
         kind: 'number',
-        label: { en: 'Threshold', vi: 'Nguong' },
+        label: { en: 'Threshold', vi: 'Ngưỡng' },
         min: 0,
         max: 1,
         step: 0.05,
@@ -621,7 +621,7 @@ const playgroundPairRegistry = [
     primaryMetricId: 'recall',
     title: {
       en: 'Credit risk Playground: Logistic regression',
-      vi: 'Playground rui ro tin dung: Logistic regression',
+      vi: 'Playground rủi ro tín dụng: Logistic regression',
     },
     adapter: createLogisticRegressionAdapter({
       datasetVersionId: 'ds-credit-risk-v1',
@@ -646,7 +646,7 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Credit RBF SVM baseline',
     intro: {
       en: 'Train an RBF SVM on fixed credit-risk rows and inspect recall, F1, and precision.',
-      vi: 'Huan luyen SVM RBF tren du lieu rui ro tin dung co dinh va xem recall, F1, precision.',
+      vi: 'Huấn luyện SVM RBF trên dữ liệu rủi ro tín dụng cố định và xem recall, F1, precision.',
     },
     parameterFields: [
       {
@@ -675,7 +675,7 @@ const playgroundPairRegistry = [
     primaryMetricId: 'recall',
     title: {
       en: 'Credit risk Playground: RBF SVM',
-      vi: 'Playground rui ro tin dung: RBF SVM',
+      vi: 'Playground rủi ro tín dụng: RBF SVM',
     },
     adapter: createSvmAdapter(),
   },
@@ -693,7 +693,7 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Wine Naive Bayes baseline',
     intro: {
       en: 'Fit Gaussian Naive Bayes on fixed wine cultivars and inspect macro-F1 and accuracy.',
-      vi: 'Fit Gaussian Naive Bayes tren cultivar wine co dinh va xem macro-F1, accuracy.',
+      vi: 'Fit Gaussian Naive Bayes trên cultivar wine cố định và xem macro-F1, accuracy.',
     },
     parameterFields: [
       {
@@ -778,7 +778,7 @@ const playgroundPairRegistry = [
     defaultConfigName: 'Retail Ward clustering baseline',
     intro: {
       en: 'Merge fixed retail rows with Ward linkage and inspect silhouette and the dendrogram cut.',
-      vi: 'Gop cac dong retail co dinh bang Ward linkage va xem silhouette cung diem cat dendrogram.',
+      vi: 'Gộp các dòng retail cố định bằng Ward linkage và xem silhouette cùng điểm cắt dendrogram.',
     },
     parameterFields: [
       {
@@ -790,14 +790,14 @@ const playgroundPairRegistry = [
       {
         id: 'distance',
         kind: 'enum',
-        label: { en: 'Distance', vi: 'Khoang cach' },
+        label: { en: 'Distance', vi: 'Khoảng cách' },
         options: [{ value: 'euclidean', label: { en: 'Euclidean', vi: 'Euclidean' } }],
       },
       {
         id: 'clusters',
         integer: true,
         kind: 'number',
-        label: { en: 'Clusters', vi: 'So cum' },
+        label: { en: 'Clusters', vi: 'Số cụm' },
         min: 2,
         max: 12,
         maxByDeviceProfile: { mobile: 8 },
@@ -807,7 +807,7 @@ const playgroundPairRegistry = [
     primaryMetricId: 'silhouette',
     title: {
       en: 'Retail segments Playground: Hierarchical clustering',
-      vi: 'Playground phan nhom ban le: Hierarchical clustering',
+      vi: 'Playground phân nhóm bán lẻ: Hierarchical clustering',
     },
     adapter: createHierarchicalClusteringAdapter(),
   },

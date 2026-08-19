@@ -26,7 +26,7 @@
     },
     "textAlternative": {
       "en": "The MLP solves the nonlinear moons split with accuracy 97% and loss 0.027.",
-      "vi": "MLP giai duoc tap moons phi tuyen voi accuracy 97% va loss 0.027."
+      "vi": "MLP giải được tập moons phi tuyến với accuracy 97% và loss 0.027."
     }
   }
 }

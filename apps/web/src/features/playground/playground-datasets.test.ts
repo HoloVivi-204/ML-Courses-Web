@@ -44,4 +44,25 @@ describe('Playground dataset registry', () => {
     expect(firstSplit.testRows).toHaveLength(100);
     expect(firstSplit.trainRows[0]?.rowId).toBe('xor-3-073');
   });
+
+  it('keeps Vietnamese copy accented in the dataset and scenario registry', () => {
+    const nonlinearMlp = getPlaygroundPairRegistry().find(
+      (registration) => registration.scenarioId === 'pg-nonlinear-2d',
+    );
+    const churnKnn = getPlaygroundPairRegistry().find(
+      (registration) =>
+        registration.scenarioId === 'pg-customer-churn' && registration.algorithmId === 'knn',
+    );
+
+    expect(nonlinearMlp?.intro.vi).toContain('Huấn luyện');
+    expect(churnKnn?.intro.vi).toBe(
+      'Phân loại customer churn cố định bằng KNN và xem F1, AUC, precision, recall.',
+    );
+    expect(churnKnn?.parameterFields.find((field) => field.id === 'k')?.label.vi).toBe(
+      'Số láng giềng (k)',
+    );
+    expect(getPlaygroundDataset('ds-moons-2d-v1').textAlternative.vi).toContain(
+      'cung trăng khuyết',
+    );
+  });
 });
