@@ -184,6 +184,11 @@ describe('StudentDashboardPage', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('25%')).toBeVisible();
     expect(screen.getByText('1 of 11 steps')).toBeVisible();
+    expect(screen.getByText('Current module')).toBeVisible();
+    expect(screen.getByText('Module 1 · Neurons and Perceptrons')).toBeVisible();
+    expect(screen.getByText('Next up')).toBeVisible();
+    expect(screen.getByText('Lesson 1')).toBeVisible();
+    expect(screen.getByText('3 modules · 3 lessons · 4 hours')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Continue learning' })).toHaveAttribute(
       'href',
       '/learn/course-deep-learning-basic',

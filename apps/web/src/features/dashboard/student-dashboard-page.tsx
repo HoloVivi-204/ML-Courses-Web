@@ -21,6 +21,15 @@ interface DashboardData {
   progressSnapshot: LearningProgressSnapshot;
 }
 
+interface DashboardFocusDetails {
+  currentModuleNumber: number | null;
+  currentModuleTitle: string;
+  durationHours: number | null;
+  moduleCount: number;
+  nextStep: string;
+  postCount: number;
+}
+
 type DashboardStatus = 'failed' | 'loading' | 'ready';
 
 export function StudentDashboardPage({ learningApiClient, locale }: StudentDashboardPageProps) {
@@ -136,11 +145,12 @@ function FocusCourseCard({
   const { completedStepCount, requiredStepCount } = getCourseStepSummary(courseProgress);
   const nextCondition = getNextDashboardCondition(courseProgress);
   const isComplete = courseProgress.status === 'completed' || progressPercent >= 100;
+  const focusDetails = getDashboardFocusDetails(courseProgress, course, locale, isComplete);
   const nextStep = nextCondition
     ? formatMissingConditions([nextCondition], course, locale)
     : isComplete
       ? t('dashboard.focus.completed')
-      : t('dashboard.focus.nextFallback');
+      : focusDetails.nextStep;
   const title = course ? localize(course.title, locale) : t('dashboard.courses.fallbackTitle');
 
   return (
@@ -181,6 +191,36 @@ function FocusCourseCard({
           {isComplete ? <CheckCircle2 size={15} /> : null}
           {isComplete ? ` ${nextStep}` : t('dashboard.focus.next', { step: nextStep })}
         </span>
+      </div>
+
+      <div aria-label={t('dashboard.focus.detailsLabel')} className="dashboard-focus-details">
+        <div className="dashboard-focus-detail">
+          <span className="dashboard-focus-detail-label">
+            {t('dashboard.focus.details.currentModule')}
+          </span>
+          <strong>
+            {t('dashboard.focus.details.moduleValue', {
+              number: focusDetails.currentModuleNumber ?? '—',
+              title: focusDetails.currentModuleTitle,
+            })}
+          </strong>
+        </div>
+        <div className="dashboard-focus-detail">
+          <span className="dashboard-focus-detail-label">{t('dashboard.focus.details.next')}</span>
+          <strong>{nextStep}</strong>
+        </div>
+        <div className="dashboard-focus-detail">
+          <span className="dashboard-focus-detail-label">
+            {t('dashboard.focus.details.structure')}
+          </span>
+          <strong>
+            {t('dashboard.focus.details.structureValue', {
+              hours: focusDetails.durationHours ?? '—',
+              lessons: formatCount(focusDetails.postCount, locale),
+              modules: formatCount(focusDetails.moduleCount, locale),
+            })}
+          </strong>
+        </div>
       </div>
 
       <Link
@@ -307,6 +347,59 @@ function getNextDashboardCondition(courseProgress: LearningCourseProgress): stri
   }
 
   return null;
+}
+
+function getDashboardFocusDetails(
+  courseProgress: LearningCourseProgress,
+  course: ReturnType<typeof getCourse>,
+  locale: Locale,
+  isComplete: boolean,
+): DashboardFocusDetails {
+  const currentModuleProgress =
+    courseProgress.modules.find((moduleProgress) => moduleProgress.status === 'in-progress') ??
+    courseProgress.modules.find((moduleProgress) => moduleProgress.status !== 'completed') ??
+    courseProgress.modules.at(-1);
+  const currentModule = course?.modules?.find(
+    (module) => module.id === currentModuleProgress?.moduleId,
+  );
+  const currentModuleIndex = currentModuleProgress
+    ? (currentModule?.index ?? courseProgress.modules.indexOf(currentModuleProgress) + 1)
+    : null;
+  const currentModuleTitle = currentModule
+    ? localize(currentModule.title, locale)
+    : locale === 'vi'
+      ? 'Lộ trình học'
+      : 'Learning path';
+  const postProgressById = new Map(
+    courseProgress.posts.map((postProgress) => [postProgress.postId, postProgress]),
+  );
+  const nextPostIndex = currentModule?.postIds.findIndex(
+    (postId) => postProgressById.get(postId)?.completed !== true,
+  );
+  const nextStep = isComplete
+    ? locale === 'vi'
+      ? 'Đã hoàn thành'
+      : 'Course complete'
+    : nextPostIndex !== undefined && nextPostIndex >= 0
+      ? formatLessonLabel(nextPostIndex + 1, locale)
+      : currentModule?.demoId &&
+          !courseProgress.demos.some(
+            (demoProgress) =>
+              demoProgress.demoId === currentModule.demoId && demoProgress.completed,
+          )
+        ? formatPracticeLabel(locale)
+        : locale === 'vi'
+          ? 'Quiz module'
+          : 'Module quiz';
+
+  return {
+    currentModuleNumber: currentModuleIndex,
+    currentModuleTitle,
+    durationHours: course?.durationHours ?? null,
+    moduleCount: course?.moduleCount ?? courseProgress.modules.length,
+    nextStep,
+    postCount: course?.postCount ?? courseProgress.posts.length,
+  };
 }
 
 function getIntlLocale(locale: Locale): string {
