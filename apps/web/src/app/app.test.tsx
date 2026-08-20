@@ -3159,6 +3159,58 @@ describe('public learning journey', () => {
     );
   });
 
+  it('keeps a valid course trial lesson selected when saving another draft edit', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const trialPost = createTrialPostSummary({
+      courseId: 'course-deep-learning-basic',
+      entityId: 'dl-p01-neuron-perceptron',
+      title: { en: 'A neuron makes a decision', vi: 'Nơ-ron đưa ra quyết định' },
+    });
+    const draft = createCourseDraftFixture({ trialPostId: trialPost.entityId });
+    const updateAdminContentDraft = vi.fn().mockResolvedValue({
+      ...draft,
+      revisionVersion: 2,
+    });
+    const learningApiClient = createLearningApiClient({
+      createAdminContentDraft: vi.fn().mockResolvedValue(draft),
+      getAdminContentRevisionPreview: vi.fn().mockRejectedValue(new Error('Preview unavailable')),
+      listAdminContent: vi.fn().mockImplementation((input) => {
+        return Promise.resolve(
+          input.entityType === 'post'
+            ? createAdminContentPage([trialPost])
+            : createAdminContentPage([createCourseSummaryFixture()]),
+        );
+      }),
+      updateAdminContentDraft,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Tạo bản nháp' }));
+
+    const selector = await screen.findByLabelText('Bài học dùng để học thử');
+    await screen.findByRole('option', { name: 'Nơ-ron đưa ra quyết định' });
+    expect(selector).toHaveValue(trialPost.entityId);
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeEnabled();
+
+    await user.clear(screen.getByLabelText('Tiêu đề (tiếng Anh)'));
+    await user.type(screen.getByLabelText('Tiêu đề (tiếng Anh)'), 'Updated course title');
+    await user.click(screen.getByRole('button', { name: 'Lưu bản nháp' }));
+
+    expect(updateAdminContentDraft).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      metadata: draft.metadata,
+      preview: draft.preview,
+      revisionId: draft.draftRevisionId,
+      revisionVersion: draft.revisionVersion,
+      title: { ...draft.title, en: 'Updated course title' },
+      trialPostId: trialPost.entityId,
+    });
+  });
+
   it('keeps unsaved course edits intact and blocks saving when lesson loading fails', async () => {
     window.history.pushState({}, '', '/admin/content');
     const user = userEvent.setup();

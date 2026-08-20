@@ -1,7 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const schedulerDependencies = vi.hoisted(() => ({
+  getFirebaseAdminApp: vi.fn(),
+  getFirestore: vi.fn(),
+  runLocalAnalyticsAggregation: vi.fn(),
+}));
+
+vi.mock('firebase-admin/firestore', () => ({
+  getFirestore: schedulerDependencies.getFirestore,
+}));
+
+vi.mock('./admin-report-repository.js', () => ({
+  runLocalAnalyticsAggregation: schedulerDependencies.runLocalAnalyticsAggregation,
+}));
+
+vi.mock('./firebase-admin-app.js', () => ({
+  getFirebaseAdminApp: schedulerDependencies.getFirebaseAdminApp,
+}));
+
 import {
   createDailyAdminReportAggregationHandler,
+  dailyAdminReportAggregationHandler,
   DAILY_ADMIN_REPORT_AGGREGATION_OPTIONS,
 } from './admin-report-scheduler.js';
 import { dailyAdminReportAggregation } from './index.js';
@@ -29,6 +48,20 @@ describe('daily Admin report scheduler', () => {
     await handler();
 
     expect(aggregateAdminReport).toHaveBeenCalledOnce();
+  });
+
+  it('wires the scheduled handler to the shared Firestore aggregation', async () => {
+    const firebaseApp = { name: 'admin-report-app' };
+    const firestore = { name: 'admin-report-firestore' };
+    schedulerDependencies.getFirebaseAdminApp.mockReturnValue(firebaseApp);
+    schedulerDependencies.getFirestore.mockReturnValue(firestore);
+    schedulerDependencies.runLocalAnalyticsAggregation.mockResolvedValue(undefined);
+
+    await dailyAdminReportAggregationHandler();
+
+    expect(schedulerDependencies.getFirebaseAdminApp).toHaveBeenCalledOnce();
+    expect(schedulerDependencies.getFirestore).toHaveBeenCalledWith(firebaseApp);
+    expect(schedulerDependencies.runLocalAnalyticsAggregation).toHaveBeenCalledWith(firestore);
   });
 
   it('propagates aggregation failures for Cloud Scheduler retries', async () => {
