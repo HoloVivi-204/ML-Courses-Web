@@ -11,6 +11,8 @@ import type { AuthGateway } from '../features/auth/auth-context';
 import { getCourse } from '../features/catalog/course-data';
 import {
   LearningApiError,
+  type AdminContentDraft,
+  type AdminContentSummary,
   type AdminContentSourceReview,
   type LearningApiClient,
   type PlaygroundConfig,
@@ -73,6 +75,87 @@ function createAuthenticatedGateway(input: { role?: 'admin' | undefined } = {}):
 
 function createAdminContentPage<T>(content: readonly T[]) {
   return { content: [...content], nextCursor: null };
+}
+
+function createCourseDraftFixture(overrides: Partial<AdminContentDraft> = {}): AdminContentDraft {
+  return {
+    baseRevisionId: 'course-deep-learning-basic-rev-r1',
+    courseId: 'course-deep-learning-basic',
+    draftRevisionId: 'draft-course-deep-learning-basic-rev-d1',
+    entityId: 'course-deep-learning-basic',
+    entityType: 'course',
+    localeAvailability: ['en', 'vi'],
+    metadata: {
+      attribution: {
+        en: 'Course attribution',
+        vi: 'Ghi nguồn khóa học',
+      },
+      externalLinkUrl: null,
+    },
+    preview: {
+      en: 'Course draft preview',
+      vi: 'Xem trước bản nháp khóa học',
+    },
+    revisionVersion: 1,
+    sourceStatus: 'seeded',
+    status: 'draft',
+    title: {
+      en: 'Deep Learning foundations',
+      vi: 'Nền tảng Deep Learning',
+    },
+    trialPostId: null,
+    validationStatus: 'not-run',
+    ...overrides,
+  };
+}
+
+function createCourseSummaryFixture(
+  overrides: Partial<AdminContentSummary> = {},
+): AdminContentSummary {
+  return {
+    courseId: 'course-deep-learning-basic',
+    draftRevisionId: null,
+    entityId: 'course-deep-learning-basic',
+    entityType: 'course',
+    localeAvailability: ['en', 'vi'],
+    preview: {
+      en: 'Published course copy',
+      vi: 'Nội dung khóa học hiện tại',
+    },
+    publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+    sourceStatus: 'seeded',
+    status: 'published',
+    title: {
+      en: 'Deep Learning foundations',
+      vi: 'Nền tảng Deep Learning',
+    },
+    validationStatus: 'not-run',
+    ...overrides,
+  };
+}
+
+function createTrialPostSummary(input: {
+  courseId: string;
+  entityId: string;
+  title: { en: string; vi: string };
+}): AdminContentSummary {
+  return {
+    courseId: input.courseId,
+    draftRevisionId: null,
+    entityId: input.entityId,
+    entityType: 'post',
+    localeAvailability: ['en', 'vi'],
+    moduleId: `${input.courseId}-module`,
+    preview: {
+      en: 'Lesson preview',
+      vi: 'Xem trước bài học',
+    },
+    publishedRevisionId: `${input.entityId}-rev-r1`,
+    sourceStatus: 'seeded',
+    status: 'published',
+    title: input.title,
+    validationStatus: 'not-run',
+  };
 }
 
 function createDeferred<T>() {
@@ -2836,17 +2919,18 @@ describe('public learning journey', () => {
         { timeout: LAZY_ROUTE_TIMEOUT_MS },
       ),
     ).toBeVisible();
-    expect(screen.getByText('Dữ liệu học tập server-verified')).toBeVisible();
+    expect(await screen.findByText('Tiến độ học tập')).toBeVisible();
     expect(screen.getByText('4 học viên')).toBeVisible();
-    expect(screen.getByText('course-deep-learning-basic')).toBeVisible();
+    expect(screen.getByText('Học sâu cơ bản')).toBeVisible();
     expect(screen.getByText('3 ghi danh · 2 bắt đầu · 1 hoàn thành')).toBeVisible();
     expect(screen.getByText('Điểm quiz trung bình 81%')).toBeVisible();
-    expect(screen.getByText('q-dl-m01-xor-limit · 3 câu sai')).toBeVisible();
-    expect(screen.getByText('Hoạt động Playground client-computed')).toBeVisible();
+    expect(screen.getByText('Câu hỏi 1')).toBeVisible();
+    expect(screen.getByText('3 lượt trả lời sai')).toBeVisible();
+    expect(screen.getByText('Hoạt động thực hành tương tác')).toBeVisible();
     expect(screen.getByText('9 run · 1 lỗi')).toBeVisible();
     expect(screen.getByText('Tỷ lệ lỗi 11%')).toBeVisible();
-    expect(screen.getByText('pg-xor · Perceptron · 9 run')).toBeVisible();
-    expect(screen.getByText('Published 8 · Draft 1 · Pending 1')).toBeVisible();
+    expect(screen.getByText('XOR · Perceptron · 9 run')).toBeVisible();
+    expect(screen.getByText('Đã xuất bản 8 · Draft 1 · Chờ kiểm tra 1')).toBeVisible();
     expect(
       screen.queryByText(/điểm thành tích|achievement score|overall score/i),
     ).not.toBeInTheDocument();
@@ -2889,16 +2973,406 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Quản trị nội dung seed' })).toBeVisible();
-    expect(await screen.findAllByText('dl-p01-neuron-perceptron')).toHaveLength(2);
-    expect(await screen.findByText('post-dl-p01-neuron-perceptron-rev-r1')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Nội dung khóa học' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Chọn nội dung' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sửa và xem trước' })).toBeVisible();
     expect(await screen.findByText(/Read from a single neuron decision/i)).toBeVisible();
-    expect(await screen.findByText('Google Machine Learning Crash Course')).toBeVisible();
-    expect(await screen.findByText('source-google-ml-crash-course')).toBeVisible();
-    expect(await screen.findByText('CC BY 4.0')).toBeVisible();
-    expect(await screen.findByText('https://creativecommons.org/licenses/by/4.0/')).toBeVisible();
+    expect(screen.queryByText('dl-p01-neuron-perceptron')).not.toBeInTheDocument();
+    expect(screen.queryByText('post-dl-p01-neuron-perceptron-rev-r1')).not.toBeInTheDocument();
+    expect(screen.queryByText('source-google-ml-crash-course')).not.toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/answerKey|correctAnswer|hint/i);
     expect(listAdminContent).toHaveBeenCalledWith({ idToken: 'local-id-token' });
+  });
+
+  it('guides an admin to choose a course trial lesson and saves it with the draft', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const courseDraft = {
+      baseRevisionId: 'course-deep-learning-basic-rev-r1',
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: 'draft-course-deep-learning-basic-rev-d1',
+      entityId: 'course-deep-learning-basic',
+      entityType: 'course' as const,
+      localeAvailability: ['en', 'vi'] as const,
+      metadata: {
+        attribution: {
+          en: 'Course attribution',
+          vi: 'Ghi nguồn khóa học',
+        },
+        externalLinkUrl: null,
+      },
+      preview: {
+        en: 'Course draft preview',
+        vi: 'Xem trước bản nháp khóa học',
+      },
+      revisionVersion: 1,
+      sourceStatus: 'seeded' as const,
+      status: 'draft' as const,
+      title: {
+        en: 'Deep Learning foundations',
+        vi: 'Nền tảng Deep Learning',
+      },
+      trialPostId: 'removed-trial-post',
+      validationStatus: 'not-run' as const,
+    };
+    const firstTrialPost = {
+      courseId: 'course-deep-learning-basic',
+      draftRevisionId: null,
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post' as const,
+      localeAvailability: ['en', 'vi'] as const,
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'First lesson preview',
+        vi: 'Xem trước bài đầu tiên',
+      },
+      publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      sourceStatus: 'seeded' as const,
+      status: 'published' as const,
+      title: {
+        en: 'A neuron makes a decision',
+        vi: 'Nơ-ron đưa ra quyết định',
+      },
+      validationStatus: 'not-run' as const,
+    };
+    const secondTrialPost = {
+      ...firstTrialPost,
+      entityId: 'dl-p02-bias',
+      title: {
+        en: 'Bias changes the boundary',
+        vi: 'Bias thay đổi ranh giới',
+      },
+    };
+    const wrongCoursePost = {
+      ...firstTrialPost,
+      courseId: 'course-other',
+      entityId: 'other-course-post',
+      title: {
+        en: 'Other course lesson',
+        vi: 'Bài học khóa khác',
+      },
+    };
+    const firstTrialPostPage = createDeferred<{
+      content: Array<typeof firstTrialPost>;
+      nextCursor: string | null;
+    }>();
+    const listAdminContent = vi.fn().mockImplementation((input) => {
+      if (input.entityType === 'post') {
+        return Promise.resolve(
+          input.cursor === 'next-page'
+            ? createAdminContentPage([secondTrialPost, firstTrialPost])
+            : firstTrialPostPage.promise,
+        );
+      }
+
+      return Promise.resolve(
+        createAdminContentPage([
+          {
+            courseId: 'course-deep-learning-basic',
+            draftRevisionId: null,
+            entityId: 'course-deep-learning-basic',
+            entityType: 'course' as const,
+            localeAvailability: ['en', 'vi'] as const,
+            preview: {
+              en: 'Published course copy',
+              vi: 'Nội dung khóa học hiện tại',
+            },
+            publishedRevisionId: 'course-deep-learning-basic-rev-r1',
+            sourceStatus: 'seeded' as const,
+            status: 'published' as const,
+            title: {
+              en: 'Deep Learning foundations',
+              vi: 'Nền tảng Deep Learning',
+            },
+            validationStatus: 'not-run' as const,
+          },
+        ]),
+      );
+    });
+    const createAdminContentDraft = vi.fn().mockResolvedValue(courseDraft);
+    const getAdminContentRevisionPreview = vi
+      .fn()
+      .mockRejectedValue(new Error('Preview unavailable'));
+    const updateAdminContentDraft = vi.fn().mockResolvedValue({
+      ...courseDraft,
+      revisionVersion: 2,
+      trialPostId: firstTrialPost.entityId,
+    });
+    const learningApiClient = createLearningApiClient({
+      createAdminContentDraft,
+      getAdminContentRevisionPreview,
+      listAdminContent,
+      updateAdminContentDraft,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Chọn nội dung' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Tạo bản nháp' }));
+
+    const selector = await screen.findByLabelText('Bài học dùng để học thử');
+    expect(selector).toBeDisabled();
+    expect(listAdminContent).toHaveBeenCalledWith({
+      courseId: 'course-deep-learning-basic',
+      entityType: 'post',
+      idToken: 'local-id-token',
+      limit: 100,
+    });
+    firstTrialPostPage.resolve({
+      content: [firstTrialPost, wrongCoursePost],
+      nextCursor: 'next-page',
+    });
+    expect(await screen.findByRole('option', { name: 'Nơ-ron đưa ra quyết định' })).toBeVisible();
+    expect(screen.getByRole('option', { name: 'Bias thay đổi ranh giới' })).toBeVisible();
+    expect(listAdminContent).toHaveBeenCalledWith({
+      courseId: 'course-deep-learning-basic',
+      cursor: 'next-page',
+      entityType: 'post',
+      idToken: 'local-id-token',
+      limit: 100,
+    });
+    expect(screen.queryByRole('option', { name: 'Bài học khóa khác' })).not.toBeInTheDocument();
+    expect(screen.queryByText('dl-p01-neuron-perceptron')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Hãy chọn một bài học thuộc khóa học này trước khi lưu.'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+
+    await user.selectOptions(selector, firstTrialPost.entityId);
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeEnabled();
+    expect(updateAdminContentDraft).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Lưu bản nháp' }));
+
+    expect(updateAdminContentDraft).toHaveBeenCalledWith({
+      idToken: 'local-id-token',
+      metadata: courseDraft.metadata,
+      preview: courseDraft.preview,
+      revisionId: courseDraft.draftRevisionId,
+      revisionVersion: courseDraft.revisionVersion,
+      title: courseDraft.title,
+      trialPostId: firstTrialPost.entityId,
+    });
+    expect(document.body).not.toHaveTextContent(
+      /emulator|production|credential|gvhd|checksum|evidence/i,
+    );
+  });
+
+  it('keeps unsaved course edits intact and blocks saving when lesson loading fails', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const draft = createCourseDraftFixture();
+    const listAdminContent = vi.fn().mockImplementation((input) => {
+      return input.entityType === 'post'
+        ? Promise.reject(new Error('Lesson list unavailable'))
+        : Promise.resolve(createAdminContentPage([createCourseSummaryFixture()]));
+    });
+    const learningApiClient = createLearningApiClient({
+      createAdminContentDraft: vi.fn().mockResolvedValue(draft),
+      getAdminContentRevisionPreview: vi.fn().mockRejectedValue(new Error('Preview unavailable')),
+      listAdminContent,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Tạo bản nháp' }));
+    await user.clear(await screen.findByLabelText('Tiêu đề (tiếng Anh)'));
+    await user.type(screen.getByLabelText('Tiêu đề (tiếng Anh)'), 'Unsaved course title');
+
+    expect(
+      await screen.findByText('Không tải được các bài học trong khóa học. Hãy thử lại.'),
+    ).toBeVisible();
+    expect(screen.getByDisplayValue('Unsaved course title')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+  });
+
+  it('blocks saving a course draft when there are no eligible lessons', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const draft = createCourseDraftFixture();
+    const listAdminContent = vi.fn().mockImplementation((input) => {
+      return input.entityType === 'post'
+        ? Promise.resolve(createAdminContentPage([]))
+        : Promise.resolve(createAdminContentPage([createCourseSummaryFixture()]));
+    });
+    const learningApiClient = createLearningApiClient({
+      createAdminContentDraft: vi.fn().mockResolvedValue(draft),
+      getAdminContentRevisionPreview: vi.fn().mockRejectedValue(new Error('Preview unavailable')),
+      listAdminContent,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Tạo bản nháp' }));
+
+    expect(await screen.findByText('Hãy thêm bài học vào khóa học trước khi chọn.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+  });
+
+  it('labels each trial lesson with only its current English title', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const draft = createCourseDraftFixture();
+    const trialPost = {
+      courseId: draft.courseId,
+      draftRevisionId: null,
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post' as const,
+      localeAvailability: ['en', 'vi'] as const,
+      moduleId: 'dl-m01-neuron-perceptron',
+      preview: {
+        en: 'First lesson preview',
+        vi: 'Xem trước bài đầu tiên',
+      },
+      publishedRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
+      sourceStatus: 'seeded' as const,
+      status: 'published' as const,
+      title: {
+        en: 'A neuron makes a decision',
+        vi: 'Nơ-ron đưa ra quyết định',
+      },
+      validationStatus: 'not-run' as const,
+    };
+    const listAdminContent = vi.fn().mockImplementation((input) => {
+      return input.entityType === 'post'
+        ? Promise.resolve(createAdminContentPage([trialPost]))
+        : Promise.resolve(createAdminContentPage([createCourseSummaryFixture()]));
+    });
+    const learningApiClient = createLearningApiClient({
+      createAdminContentDraft: vi.fn().mockResolvedValue(draft),
+      getAdminContentRevisionPreview: vi.fn().mockRejectedValue(new Error('Preview unavailable')),
+      listAdminContent,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Chuyển sang tiếng Anh' }));
+    expect(await screen.findByRole('heading', { name: 'Choose content' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Create draft' }));
+
+    expect(await screen.findByRole('option', { name: 'A neuron makes a decision' })).toBeVisible();
+    expect(
+      screen.queryByRole('option', { name: 'Nơ-ron đưa ra quyết định' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('dl-p01-neuron-perceptron')).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale lesson response after the admin changes the selected course', async () => {
+    window.history.pushState({}, '', '/admin/content');
+    const user = userEvent.setup();
+    const firstDraft = createCourseDraftFixture({
+      courseId: 'course-first',
+      draftRevisionId: 'draft-course-first-rev-d1',
+      entityId: 'course-first',
+      title: { en: 'First course', vi: 'Khóa học thứ nhất' },
+    });
+    const secondDraft = createCourseDraftFixture({
+      courseId: 'course-second',
+      draftRevisionId: 'draft-course-second-rev-d1',
+      entityId: 'course-second',
+      title: { en: 'Second course', vi: 'Khóa học thứ hai' },
+    });
+    const firstPostPage = createDeferred<{
+      content: AdminContentSummary[];
+      nextCursor: string | null;
+    }>();
+    const secondPostPage = createDeferred<{
+      content: AdminContentSummary[];
+      nextCursor: string | null;
+    }>();
+    const firstPost = createTrialPostSummary({
+      courseId: firstDraft.courseId,
+      entityId: 'first-course-post',
+      title: { en: 'First course lesson', vi: 'Bài học cũ' },
+    });
+    const secondPost = createTrialPostSummary({
+      courseId: secondDraft.courseId,
+      entityId: 'second-course-post',
+      title: { en: 'Second course lesson', vi: 'Bài học mới' },
+    });
+    const listAdminContent = vi.fn().mockImplementation((input) => {
+      if (input.entityType === 'post') {
+        return input.courseId === firstDraft.courseId
+          ? firstPostPage.promise
+          : secondPostPage.promise;
+      }
+
+      return Promise.resolve(
+        createAdminContentPage([
+          createCourseSummaryFixture({
+            ...firstDraft,
+            draftRevisionId: firstDraft.draftRevisionId,
+            status: 'published',
+          }),
+          createCourseSummaryFixture({
+            ...secondDraft,
+            draftRevisionId: secondDraft.draftRevisionId,
+            status: 'published',
+          }),
+        ]),
+      );
+    });
+    const getAdminContentRevisionPreview = vi.fn().mockImplementation(({ revisionId }) => {
+      const draft = revisionId === firstDraft.draftRevisionId ? firstDraft : secondDraft;
+
+      return Promise.resolve({
+        draft,
+        preview: {
+          contentType: 'course' as const,
+          course: {
+            courseId: draft.courseId,
+            description: draft.preview,
+            revisionId: draft.draftRevisionId,
+            title: draft.title,
+          },
+        },
+      });
+    });
+    const learningApiClient = createLearningApiClient({
+      getAdminContentRevisionPreview,
+      listAdminContent,
+    });
+
+    render(
+      <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
+    );
+
+    await screen.findByLabelText('Bài học dùng để học thử');
+    await waitFor(() =>
+      expect(listAdminContent).toHaveBeenCalledWith({
+        courseId: firstDraft.courseId,
+        entityType: 'post',
+        idToken: 'local-id-token',
+        limit: 100,
+      }),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Khóa học thứ hai/ }));
+    await waitFor(() =>
+      expect(listAdminContent).toHaveBeenCalledWith({
+        courseId: secondDraft.courseId,
+        entityType: 'post',
+        idToken: 'local-id-token',
+        limit: 100,
+      }),
+    );
+    secondPostPage.resolve({ content: [secondPost], nextCursor: null });
+
+    expect(await screen.findByRole('option', { name: 'Bài học mới' })).toBeVisible();
+    firstPostPage.resolve({ content: [firstPost], nextCursor: null });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('option', { name: 'Bài học cũ' })).not.toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Bài học mới' })).toBeVisible();
+    });
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
   });
 
   it('lets an authenticated admin create and preview a draft without replacing the published preview', async () => {
@@ -2967,27 +3441,25 @@ describe('public learning journey', () => {
     );
 
     expect(await screen.findByText('Published learner copy')).toBeVisible();
-    expect(await screen.findByText('Thiếu source/license review')).toBeVisible();
     expect(screen.queryByText('Google Machine Learning Crash Course')).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: /draft/i }));
+    await user.click(await screen.findByRole('button', { name: /Tạo bản nháp/i }));
 
     expect(createAdminContentDraft).toHaveBeenCalledWith({
       entityId: 'dl-p01-neuron-perceptron',
       entityType: 'post',
       idToken: 'local-id-token',
     });
-    expect(await screen.findAllByText('draft-post-dl-p01-neuron-perceptron-rev-d1')).toHaveLength(
-      2,
-    );
-    expect(screen.getAllByText('Draft-only copy')).toHaveLength(2);
+    expect(
+      screen.queryByText('draft-post-dl-p01-neuron-perceptron-rev-d1'),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Draft-only copy')).toBeVisible();
     expect(screen.getByText('Published learner copy')).toBeVisible();
   });
 
-  it('renders a durable draft through learner components and keeps attached evidence pending', async () => {
+  it('renders a durable post draft in the learner view without internal editorial controls', async () => {
     window.history.pushState({}, '', '/admin/content');
     const user = userEvent.setup();
-    const checksum = 'b'.repeat(64);
     const draft = {
       baseRevisionId: 'post-dl-p01-neuron-perceptron-rev-r1',
       courseId: 'course-deep-learning-basic',
@@ -3026,26 +3498,6 @@ describe('public learning journey', () => {
       throw new Error('Expected seeded learner post content.');
     }
 
-    let evidence = [] as Array<{
-      artifactId: string;
-      checksum: string;
-      evidenceRef: string;
-      kind: 'license';
-      result: 'pending';
-    }>;
-    const attachAdminContentEvidence = vi.fn().mockImplementation((input) => {
-      const attachedEvidence = {
-        artifactId: 'dl-p01-neuron-perceptron',
-        checksum: input.checksum,
-        evidenceRef: input.evidenceRef,
-        kind: input.kind,
-        result: 'pending' as const,
-      };
-
-      evidence = [attachedEvidence];
-
-      return Promise.resolve(attachedEvidence);
-    });
     const getAdminContentRevisionPreview = vi.fn().mockResolvedValue({
       draft,
       preview: {
@@ -3057,9 +3509,6 @@ describe('public learning journey', () => {
           title: draft.title,
         },
       },
-    });
-    const listAdminContentEvidence = vi.fn().mockImplementation(() => {
-      return Promise.resolve({ contentChecksum: checksum, evidence });
     });
     const listAdminContent = vi.fn().mockResolvedValue(
       createAdminContentPage([
@@ -3086,10 +3535,8 @@ describe('public learning journey', () => {
       ]),
     );
     const learningApiClient = createLearningApiClient({
-      attachAdminContentEvidence,
       getAdminContentRevisionPreview,
       listAdminContent,
-      listAdminContentEvidence,
     });
 
     render(
@@ -3117,19 +3564,10 @@ describe('public learning journey', () => {
 
     await user.selectOptions(screen.getByLabelText('Giao diện preview'), 'dark');
     expect(learnerPreview).toHaveAttribute('data-preview-theme', 'dark');
-
-    await user.type(screen.getByLabelText('Reference'), 'evidence://license-review/runtime');
-    await user.click(screen.getByRole('button', { name: 'Attach pending evidence' }));
-
-    expect(attachAdminContentEvidence).toHaveBeenCalledWith({
-      checksum,
-      evidenceRef: 'evidence://license-review/runtime',
-      idToken: 'local-id-token',
-      kind: 'license',
-      revisionId: draft.draftRevisionId,
-    });
-    expect(await screen.findByText('evidence://license-review/runtime')).toBeVisible();
-    expect(screen.getByText('pending', { exact: true })).toBeVisible();
+    expect(screen.queryByLabelText('Bài học dùng để học thử')).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(
+      /emulator|production|credential|gvhd|checksum|evidence/i,
+    );
   });
 
   it('lets an authenticated admin edit a draft with revision concurrency', async () => {
@@ -3226,18 +3664,19 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: /draft/i }));
-    await user.clear(await screen.findByLabelText('Title EN'));
-    await user.type(screen.getByLabelText('Title EN'), 'Edited draft title');
-    await user.clear(screen.getByLabelText('Preview EN'));
-    await user.type(screen.getByLabelText('Preview EN'), 'Edited draft preview copy');
-    await user.clear(screen.getByLabelText('Attribution EN'));
-    await user.type(screen.getByLabelText('Attribution EN'), 'Edited attribution');
+    await user.click(await screen.findByRole('button', { name: /Tạo bản nháp/i }));
+    expect(listAdminContent).toHaveBeenCalledTimes(1);
+    await user.clear(await screen.findByLabelText('Tiêu đề (tiếng Anh)'));
+    await user.type(screen.getByLabelText('Tiêu đề (tiếng Anh)'), 'Edited draft title');
+    await user.clear(screen.getByLabelText('Mô tả ngắn (tiếng Anh)'));
+    await user.type(screen.getByLabelText('Mô tả ngắn (tiếng Anh)'), 'Edited draft preview copy');
+    await user.clear(screen.getByLabelText('Ghi chú tham khảo (tiếng Anh)'));
+    await user.type(screen.getByLabelText('Ghi chú tham khảo (tiếng Anh)'), 'Edited attribution');
     await user.type(
-      screen.getByLabelText('External link URL'),
+      screen.getByLabelText('Liên kết tham khảo'),
       'https://developers.google.com/machine-learning/crash-course',
     );
-    await user.click(screen.getByRole('button', { name: /Save draft|Lưu draft/i }));
+    await user.click(screen.getByRole('button', { name: /Lưu bản nháp/i }));
 
     expect(updateAdminContentDraft).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -3259,7 +3698,7 @@ describe('public learning journey', () => {
         vi: 'Draft title VI',
       },
     });
-    expect(await screen.findAllByText('Edited draft preview copy')).toHaveLength(2);
+    expect(await screen.findByDisplayValue('Edited draft preview copy')).toBeVisible();
     expect(screen.getByText('Published learner copy')).toBeVisible();
   }, 10_000);
 
@@ -3379,20 +3818,19 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: /draft/i }));
-    expect(
-      await screen.findByText(
-        'Chỉ demo trên Emulator cục bộ. Thao tác này không phê duyệt publish production.',
-      ),
-    ).toBeVisible();
-    await user.click(await screen.findByRole('button', { name: /Validate draft|Kiểm tra draft/i }));
-    expect(await screen.findByText(/Draft passed validation|Draft đã qua kiểm tra/i)).toBeVisible();
-    await user.clear(screen.getByLabelText(/Lifecycle reason|Lý do lifecycle/i));
-    await user.type(
-      screen.getByLabelText(/Lifecycle reason|Lý do lifecycle/i),
-      'Reviewed localized draft copy for pilot release.',
+    await user.click(await screen.findByRole('button', { name: /Tạo bản nháp/i }));
+    expect(await screen.findByRole('heading', { name: 'Rà soát và xuất bản' })).toBeVisible();
+    expect(document.body).not.toHaveTextContent(
+      /emulator|production|credential|gvhd|checksum|evidence/i,
     );
-    await user.click(screen.getByRole('button', { name: /Publish draft/i }));
+    await user.click(await screen.findByRole('button', { name: /Kiểm tra nội dung/i }));
+    expect(await screen.findByText(/Nội dung đã sẵn sàng cho bước tiếp theo/i)).toBeVisible();
+    await user.clear(screen.getByLabelText('Ghi chú thay đổi'));
+    await user.type(
+      screen.getByLabelText('Ghi chú thay đổi'),
+      'Đã rà soát nội dung trước khi xuất bản.',
+    );
+    await user.click(screen.getByRole('button', { name: /Xuất bản thay đổi/i }));
 
     expect(validateAdminContentDraft).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -3402,11 +3840,11 @@ describe('public learning journey', () => {
       idToken: 'local-id-token',
       idempotencyKey: expect.any(String),
       publicationScope: 'emulator-demo',
-      reason: 'Reviewed localized draft copy for pilot release.',
+      reason: 'Đã rà soát nội dung trước khi xuất bản.',
       revisionId: 'draft-post-dl-p01-neuron-perceptron-rev-d1',
     });
     expect(await screen.findByText('Draft preview ready for publish')).toBeVisible();
-    expect(screen.getByText('post-dl-p01-neuron-perceptron-rev-r1')).toBeVisible();
+    expect(screen.queryByText('post-dl-p01-neuron-perceptron-rev-r1')).not.toBeInTheDocument();
     expect(screen.queryByText('Published learner copy')).not.toBeInTheDocument();
   });
 
@@ -3424,7 +3862,7 @@ describe('public learning journey', () => {
 
     expect(await screen.findByRole('heading', { name: 'Cần quyền Admin' })).toBeVisible();
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Bạn cần Admin claim để xem nội dung seed.',
+      'Bạn cần quyền quản trị để xem nội dung này.',
     );
     expect(screen.queryByText('dl-p01-neuron-perceptron')).not.toBeInTheDocument();
     expect(listAdminContent).toHaveBeenCalledWith({ idToken: 'local-id-token' });

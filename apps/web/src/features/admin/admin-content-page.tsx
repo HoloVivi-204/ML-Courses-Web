@@ -1,5 +1,14 @@
-import { ArrowLeft, CheckCircle2, FilePlus, FileText, RotateCcw, ShieldCheck } from 'lucide-react';
-import { lazy, type FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, FilePlus, FileText, RotateCcw, ShieldCheck } from 'lucide-react';
+import {
+  lazy,
+  type FormEvent,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
@@ -7,11 +16,8 @@ import { useAuth } from '../auth/auth-context';
 import type { Locale } from '../catalog/course-data';
 import type {
   AdminContentDraft,
-  AdminContentEvidenceKind,
-  AdminContentEvidenceState,
   AdminContentMetadata,
   AdminContentRevisionPreview,
-  AdminContentSourceReview,
   AdminContentSummary,
   LearningApiClient,
   UpdateAdminContentDraftInput,
@@ -32,7 +38,10 @@ interface AdminContentPageProps {
 
 type LoadStatus = 'failed' | 'loading' | 'ready';
 type DraftActionStatus = 'creating' | 'failed' | 'idle';
-type DraftEditableFields = Pick<UpdateAdminContentDraftInput, 'metadata' | 'preview' | 'title'>;
+type DraftEditableFields = Pick<
+  UpdateAdminContentDraftInput,
+  'metadata' | 'preview' | 'title' | 'trialPostId'
+>;
 type LifecycleActionStatus =
   'failed' | 'idle' | 'publishing' | 'rolling-back' | 'succeeded' | 'unpublishing' | 'validating';
 type DraftSaveStatus = 'failed' | 'idle' | 'saved' | 'saving';
@@ -51,6 +60,12 @@ interface DraftFormState {
   previewVi: string;
   titleEn: string;
   titleVi: string;
+  trialPostId: string;
+}
+
+interface TrialPostOption {
+  id: string;
+  title: string;
 }
 
 interface LearnerPreviewState {
@@ -100,11 +115,15 @@ function createDraftFormState(draft: AdminContentDraft): DraftFormState {
     previewVi: draft.preview.vi,
     titleEn: formatUserFacingTitle(draft.title.en),
     titleVi: formatUserFacingTitle(draft.title.vi),
+    trialPostId: draft.trialPostId ?? '',
   };
 }
 
-function createDraftEditableFields(formState: DraftFormState): DraftEditableFields {
-  return {
+function createDraftEditableFields(
+  draft: AdminContentDraft,
+  formState: DraftFormState,
+): DraftEditableFields {
+  const fields: DraftEditableFields = {
     metadata: {
       attribution: {
         en: formState.attributionEn,
@@ -121,50 +140,12 @@ function createDraftEditableFields(formState: DraftFormState): DraftEditableFiel
       vi: formState.titleVi,
     },
   };
+
+  return draft.entityType === 'course' ? { ...fields, trialPostId: formState.trialPostId } : fields;
 }
 
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
-}
-
-function SourceReviewMeta({
-  locale,
-  sourceReview,
-}: {
-  locale: Locale;
-  sourceReview?: AdminContentSourceReview | undefined;
-}) {
-  const { t } = useTranslation();
-
-  if (!sourceReview) {
-    return (
-      <div>
-        <dt>{t('admin.content.sourceReview')}</dt>
-        <dd>{t('admin.content.sourceReviewMissing')}</dd>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div>
-        <dt>{t('admin.content.sourceTitle')}</dt>
-        <dd>{sourceReview.title}</dd>
-      </div>
-      <div>
-        <dt>{t('admin.content.license')}</dt>
-        <dd>{sourceReview.license.name}</dd>
-      </div>
-      <div>
-        <dt>{t('admin.content.licenseUrl')}</dt>
-        <dd>{sourceReview.license.url}</dd>
-      </div>
-      <div>
-        <dt>{t('admin.content.sourceAttribution')}</dt>
-        <dd>{sourceReview.attribution[locale]}</dd>
-      </div>
-    </>
-  );
 }
 
 export function AdminContentPage({ learningApiClient, locale }: AdminContentPageProps) {
@@ -186,37 +167,6 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
   >({});
   const [previewTheme, setPreviewTheme] = useState<Theme>(theme);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-
-  const loadDraftEvidence = useCallback(
-    async (revisionId: string): Promise<AdminContentEvidenceState> => {
-      const idToken = await getIdToken();
-
-      if (!idToken) {
-        throw new Error('Authenticated user is missing an ID token.');
-      }
-
-      return learningApiClient.listAdminContentEvidence({ idToken, revisionId });
-    },
-    [getIdToken, learningApiClient],
-  );
-
-  const attachDraftEvidence = useCallback(
-    async (input: {
-      checksum: string;
-      evidenceRef: string;
-      kind: AdminContentEvidenceKind;
-      revisionId: string;
-    }) => {
-      const idToken = await getIdToken();
-
-      if (!idToken) {
-        throw new Error('Authenticated user is missing an ID token.');
-      }
-
-      return learningApiClient.attachAdminContentEvidence({ ...input, idToken });
-    },
-    [getIdToken, learningApiClient],
-  );
 
   useEffect(() => {
     let isActive = true;
@@ -371,6 +321,63 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
 
     return idToken;
   }
+
+  const loadCourseTrialPosts = useCallback(
+    async (courseId: string): Promise<readonly TrialPostOption[]> => {
+      const idToken = await getIdToken();
+
+      if (!idToken) {
+        throw new Error('Authenticated user is missing an ID token.');
+      }
+      const candidatesById = new Map<string, TrialPostOption>();
+      const visitedCursors = new Set<string>();
+      let cursor: string | undefined;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        const page = await learningApiClient.listAdminContent({
+          courseId,
+          ...(cursor ? { cursor } : {}),
+          entityType: 'post',
+          idToken,
+          limit: 100,
+        });
+
+        for (const candidate of page.content) {
+          const candidateTitle = candidate.title?.[locale];
+
+          if (
+            candidate.entityType !== 'post' ||
+            candidate.courseId !== courseId ||
+            typeof candidate.entityId !== 'string' ||
+            !candidate.entityId.trim() ||
+            typeof candidateTitle !== 'string' ||
+            !candidateTitle.trim() ||
+            candidatesById.has(candidate.entityId)
+          ) {
+            continue;
+          }
+
+          candidatesById.set(candidate.entityId, {
+            id: candidate.entityId,
+            title: formatUserFacingTitle(candidateTitle),
+          });
+        }
+
+        const nextCursor = typeof page.nextCursor === 'string' ? page.nextCursor.trim() : undefined;
+
+        if (nextCursor && !visitedCursors.has(nextCursor)) {
+          visitedCursors.add(nextCursor);
+          cursor = nextCursor;
+        } else {
+          hasNextPage = false;
+        }
+      }
+
+      return [...candidatesById.values()];
+    },
+    [getIdToken, learningApiClient, locale],
+  );
 
   function updateContentItem(updatedContent: AdminContentSummary): void {
     setContent((currentContent) => {
@@ -573,8 +580,7 @@ export function AdminContentPage({ learningApiClient, locale }: AdminContentPage
             item={selectedContent}
             locale={locale}
             onCreateDraft={handleCreateDraft}
-            onAttachEvidence={attachDraftEvidence}
-            onLoadEvidence={loadDraftEvidence}
+            onLoadCourseTrialPosts={loadCourseTrialPosts}
             onPublishDraft={handlePublishDraft}
             onRollbackContent={handleRollbackContent}
             onUnpublishContent={handleUnpublishContent}
@@ -607,9 +613,12 @@ function ContentInventoryList({
 
   return (
     <section className="admin-content-list" aria-label={t('admin.content.inventory')}>
-      <div className="admin-content-panel-heading">
-        <FileText aria-hidden="true" size={18} />
-        <h2>{t('admin.content.inventory')}</h2>
+      <div className="admin-content-step-heading">
+        <span aria-hidden="true">1</span>
+        <div>
+          <p>{t('admin.content.step.choose.eyebrow')}</p>
+          <h2>{t('admin.content.step.choose')}</h2>
+        </div>
       </div>
 
       {content.length ? (
@@ -648,9 +657,8 @@ function ContentPreview({
   learnerPreview,
   item,
   locale,
-  onAttachEvidence,
   onCreateDraft,
-  onLoadEvidence,
+  onLoadCourseTrialPosts,
   onPublishDraft,
   onRollbackContent,
   onUnpublishContent,
@@ -667,14 +675,8 @@ function ContentPreview({
   learnerPreview: AdminContentRevisionPreview | null;
   item: AdminContentSummary | null;
   locale: Locale;
-  onAttachEvidence: (input: {
-    checksum: string;
-    evidenceRef: string;
-    kind: AdminContentEvidenceKind;
-    revisionId: string;
-  }) => Promise<unknown>;
   onCreateDraft: (item: AdminContentSummary) => void;
-  onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
+  onLoadCourseTrialPosts: (courseId: string) => Promise<readonly TrialPostOption[]>;
   onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
   onRollbackContent: (revisionId: string, reason: string) => Promise<void>;
   onUnpublishContent: (item: AdminContentSummary, reason: string) => Promise<void>;
@@ -701,9 +703,12 @@ function ContentPreview({
 
   return (
     <section className="admin-content-preview">
-      <div className="admin-content-panel-heading">
-        <ShieldCheck aria-hidden="true" size={18} />
-        <h2>{t('admin.content.preview')}</h2>
+      <div className="admin-content-step-heading">
+        <span aria-hidden="true">2</span>
+        <div>
+          <p>{t('admin.content.step.edit.eyebrow')}</p>
+          <h2>{t('admin.content.step.edit')}</h2>
+        </div>
       </div>
 
       <div className="admin-content-preview-title">
@@ -711,37 +716,9 @@ function ContentPreview({
         <h3>{formatUserFacingTitle(item.title[locale])}</h3>
       </div>
 
-      <dl className="admin-content-meta">
-        <div>
-          <dt>{t('admin.content.status')}</dt>
-          <dd>{t(`admin.content.status.${item.status}`)}</dd>
-        </div>
-        {item.publicationScope ? (
-          <div>
-            <dt>{t('admin.content.publicationScope')}</dt>
-            <dd>{t(`admin.content.publicationScope.${item.publicationScope}`)}</dd>
-          </div>
-        ) : null}
-        <div>
-          <dt>{t('admin.content.draftRevision')}</dt>
-          <dd>
-            {item.draftRevisionId ? t('admin.content.draftExists') : t('admin.content.noDraft')}
-          </dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.locales')}</dt>
-          <dd>{item.localeAvailability.join(' / ')}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.source')}</dt>
-          <dd>{item.sourceStatus}</dd>
-        </div>
-        <SourceReviewMeta locale={locale} sourceReview={item.sourceReview} />
-        <div>
-          <dt>{t('admin.content.validation')}</dt>
-          <dd>{item.validationStatus}</dd>
-        </div>
-      </dl>
+      <p className="admin-content-selection-note">
+        {item.draftRevisionId ? t('admin.content.draftExists') : t('admin.content.noDraft')}
+      </p>
 
       <div className="admin-content-actions">
         <button
@@ -789,8 +766,7 @@ function ContentPreview({
           key={`${draftPreview.draftRevisionId}:${draftPreview.revisionVersion}`}
           locale={locale}
           learnerPreview={learnerPreview}
-          onAttachEvidence={onAttachEvidence}
-          onLoadEvidence={onLoadEvidence}
+          onLoadCourseTrialPosts={onLoadCourseTrialPosts}
           onPublishDraft={onPublishDraft}
           onUpdateDraft={onUpdateDraft}
           onValidateDraft={onValidateDraft}
@@ -811,8 +787,7 @@ function DraftPreview({
   draft,
   learnerPreview,
   locale,
-  onAttachEvidence,
-  onLoadEvidence,
+  onLoadCourseTrialPosts,
   onPublishDraft,
   onUpdateDraft,
   onValidateDraft,
@@ -825,13 +800,7 @@ function DraftPreview({
   draft: AdminContentDraft;
   learnerPreview: AdminContentRevisionPreview | null;
   locale: Locale;
-  onAttachEvidence: (input: {
-    checksum: string;
-    evidenceRef: string;
-    kind: AdminContentEvidenceKind;
-    revisionId: string;
-  }) => Promise<unknown>;
-  onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
+  onLoadCourseTrialPosts: (courseId: string) => Promise<readonly TrialPostOption[]>;
   onPublishDraft: (draft: AdminContentDraft, reason: string) => Promise<void>;
   onUpdateDraft: (draft: AdminContentDraft, fields: DraftEditableFields) => Promise<void>;
   onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
@@ -842,49 +811,16 @@ function DraftPreview({
   setPreviewTheme: (theme: Theme) => void;
 }) {
   const { t } = useTranslation();
-  const secondaryLocale: Locale = locale === 'vi' ? 'en' : 'vi';
-  const metadata = getDraftMetadata(draft);
 
   return (
     <section className="admin-content-draft-preview" aria-label={t('admin.content.draftPreview')}>
-      <div className="admin-content-panel-heading">
-        <FilePlus aria-hidden="true" size={18} />
-        <h3>{t('admin.content.draftPreview')}</h3>
-      </div>
+      <p className="admin-content-draft-note">{t('admin.content.draftPreview')}</p>
 
-      <dl className="admin-content-meta">
-        <div>
-          <dt>{t('admin.content.status')}</dt>
-          <dd>{t('admin.content.status.draft')}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.revisionVersion')}</dt>
-          <dd>{draft.revisionVersion}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.attribution')}</dt>
-          <dd>{metadata.attribution[locale]}</dd>
-        </div>
-        <div>
-          <dt>{t('admin.content.externalLink')}</dt>
-          <dd>{metadata.externalLinkUrl ?? t('admin.content.noExternalLink')}</dd>
-        </div>
-        <SourceReviewMeta locale={locale} sourceReview={draft.sourceReview} />
-      </dl>
-
-      <div className="admin-content-preview-copy">
-        <article>
-          <span>{locale.toUpperCase()}</span>
-          <h4>{formatUserFacingTitle(draft.title[locale])}</h4>
-          <p>{draft.preview[locale]}</p>
-        </article>
-        <article>
-          <span>{secondaryLocale.toUpperCase()}</span>
-          <h4>{formatUserFacingTitle(draft.title[secondaryLocale])}</h4>
-          <p>{draft.preview[secondaryLocale]}</p>
-        </article>
-      </div>
-
+      <DraftEditor
+        draft={draft}
+        onLoadCourseTrialPosts={onLoadCourseTrialPosts}
+        onUpdateDraft={onUpdateDraft}
+      />
       <DraftLearnerPreviewPanel
         learnerPreview={learnerPreview}
         locale={locale}
@@ -895,13 +831,6 @@ function DraftPreview({
         setPreviewTheme={setPreviewTheme}
       />
 
-      <DraftEvidencePanel
-        draft={draft}
-        onAttachEvidence={onAttachEvidence}
-        onLoadEvidence={onLoadEvidence}
-      />
-
-      <DraftEditor draft={draft} onUpdateDraft={onUpdateDraft} />
       <DraftLifecyclePanel
         draft={draft}
         onPublishDraft={onPublishDraft}
@@ -935,14 +864,14 @@ function DraftLearnerPreviewPanel({
           language: 'Ngôn ngữ preview',
           loading: 'Đang tải learner preview…',
           theme: 'Giao diện preview',
-          title: 'Learner runtime preview',
+          title: 'Xem trước như người học',
         }
       : {
-          failed: 'The learner preview could not be loaded. Try again later.',
-          language: 'Preview language',
-          loading: 'Loading learner preview…',
-          theme: 'Preview theme',
-          title: 'Learner runtime preview',
+          failed: 'The learner view could not be loaded. Try again later.',
+          language: 'View language',
+          loading: 'Loading learner view…',
+          theme: 'View theme',
+          title: 'Learner view',
         };
 
   return (
@@ -992,173 +921,6 @@ function DraftLearnerPreviewPanel({
   );
 }
 
-const requiredEvidenceKinds: readonly AdminContentEvidenceKind[] = [
-  'license',
-  'provenance',
-  'content-review',
-  'gvhd-confirmation',
-];
-
-type EvidencePanelStatus = 'attaching' | 'failed' | 'loading' | 'ready';
-
-function DraftEvidencePanel({
-  draft,
-  onAttachEvidence,
-  onLoadEvidence,
-}: {
-  draft: AdminContentDraft;
-  onAttachEvidence: (input: {
-    checksum: string;
-    evidenceRef: string;
-    kind: AdminContentEvidenceKind;
-    revisionId: string;
-  }) => Promise<unknown>;
-  onLoadEvidence: (revisionId: string) => Promise<AdminContentEvidenceState>;
-}) {
-  const { t } = useTranslation();
-  const [checksum, setChecksum] = useState('');
-  const [evidenceRef, setEvidenceRef] = useState('');
-  const [evidenceState, setEvidenceState] = useState<AdminContentEvidenceState | null>(null);
-  const [kind, setKind] = useState<AdminContentEvidenceKind>('license');
-  const [status, setStatus] = useState<EvidencePanelStatus>('loading');
-
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadEvidence() {
-      setStatus('loading');
-
-      try {
-        const nextEvidenceState = await onLoadEvidence(draft.draftRevisionId);
-
-        if (isActive) {
-          setChecksum(nextEvidenceState.contentChecksum);
-          setEvidenceState(nextEvidenceState);
-          setStatus('ready');
-        }
-      } catch {
-        if (isActive) {
-          setStatus('failed');
-        }
-      }
-    }
-
-    void loadEvidence();
-
-    return () => {
-      isActive = false;
-    };
-  }, [draft.draftRevisionId, onLoadEvidence]);
-
-  const evidenceByKind = new Map(
-    evidenceState?.evidence.map((evidence) => [evidence.kind, evidence]),
-  );
-
-  async function attachEvidence(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!checksum.trim() || !evidenceRef.trim()) {
-      return;
-    }
-
-    setStatus('attaching');
-
-    try {
-      await onAttachEvidence({
-        checksum: checksum.trim(),
-        evidenceRef: evidenceRef.trim(),
-        kind,
-        revisionId: draft.draftRevisionId,
-      });
-      const nextEvidenceState = await onLoadEvidence(draft.draftRevisionId);
-
-      setChecksum(nextEvidenceState.contentChecksum);
-      setEvidenceRef('');
-      setEvidenceState(nextEvidenceState);
-      setStatus('ready');
-    } catch {
-      setStatus('failed');
-    }
-  }
-
-  return (
-    <section className="admin-content-evidence-panel" aria-label={t('admin.content.evidence')}>
-      <div className="admin-content-panel-heading">
-        <ShieldCheck aria-hidden="true" size={18} />
-        <h3>{t('admin.content.evidence')}</h3>
-      </div>
-      <p className="admin-content-emulator-notice" role="note">
-        {t('admin.content.evidenceNotice')}
-      </p>
-
-      <dl className="admin-content-evidence-list">
-        {requiredEvidenceKinds.map((requiredKind) => {
-          const evidence = evidenceByKind.get(requiredKind);
-
-          return (
-            <div key={requiredKind}>
-              <dt>{requiredKind}</dt>
-              <dd data-evidence-status={evidence?.result ?? 'missing'}>
-                {evidence ? evidence.result : 'missing'}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-
-      <form className="admin-content-evidence-form" onSubmit={attachEvidence}>
-        <label>
-          <span>Evidence type</span>
-          <select
-            onChange={(event) => setKind(event.target.value as AdminContentEvidenceKind)}
-            value={kind}
-          >
-            {requiredEvidenceKinds.map((requiredKind) => (
-              <option key={requiredKind} value={requiredKind}>
-                {requiredKind}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Reference</span>
-          <input
-            onChange={(event) => setEvidenceRef(event.target.value)}
-            placeholder="evidence://review/reference"
-            required
-            type="text"
-            value={evidenceRef}
-          />
-        </label>
-        <label className="admin-content-evidence-checksum">
-          <span>Draft checksum</span>
-          <input
-            onChange={(event) => setChecksum(event.target.value)}
-            pattern="[a-f0-9]{64}"
-            required
-            type="text"
-            value={checksum}
-          />
-        </label>
-        <button
-          className="admin-content-secondary-button"
-          disabled={status === 'attaching' || status === 'loading'}
-          type="submit"
-        >
-          {status === 'attaching' ? 'Attaching evidence…' : 'Attach pending evidence'}
-        </button>
-      </form>
-
-      {status === 'loading' ? <p role="status">Loading evidence…</p> : null}
-      {status === 'failed' ? (
-        <p className="admin-content-inline-error" role="alert">
-          Evidence could not be loaded or attached. Check the checksum and retry.
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 function DraftLifecyclePanel({
   draft,
   onPublishDraft,
@@ -1169,7 +931,7 @@ function DraftLifecyclePanel({
   onValidateDraft: (draft: AdminContentDraft) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [reason, setReason] = useState('Reviewed localized draft copy for pilot release.');
+  const [reason, setReason] = useState(() => t('admin.content.defaultReviewReason'));
   const [status, setStatus] = useState<LifecycleActionStatus>('idle');
   const canPublish = draft.validationStatus === 'valid';
   const isBusy = status === 'publishing' || status === 'validating';
@@ -1204,14 +966,15 @@ function DraftLifecyclePanel({
 
   return (
     <form className="admin-content-lifecycle-form" onSubmit={publishDraft}>
-      <div className="admin-content-panel-heading">
-        <CheckCircle2 aria-hidden="true" size={18} />
-        <h3>{t('admin.content.lifecycle')}</h3>
+      <div className="admin-content-step-heading">
+        <span aria-hidden="true">3</span>
+        <div>
+          <p>{t('admin.content.step.review.eyebrow')}</p>
+          <h3>{t('admin.content.step.review')}</h3>
+        </div>
       </div>
 
-      <p className="admin-content-emulator-notice" role="note">
-        {t('admin.content.emulatorDemoOnly')}
-      </p>
+      <p className="admin-content-review-hint">{t('admin.content.reviewHint')}</p>
 
       <label>
         <span>{t('admin.content.lifecycleReason')}</span>
@@ -1271,7 +1034,7 @@ function PublishedLifecyclePanel({
   onUnpublishContent: (item: AdminContentSummary, reason: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [reason, setReason] = useState('Planned lifecycle change for pilot review.');
+  const [reason, setReason] = useState(() => t('admin.content.defaultRecoveryReason'));
   const [status, setStatus] = useState<LifecycleActionStatus>('idle');
   const canRollback = Boolean(item.previousPublishedRevisionId);
   const canUnpublish = item.entityType === 'course' && item.status === 'published';
@@ -1312,80 +1075,145 @@ function PublishedLifecyclePanel({
   }
 
   return (
-    <section className="admin-content-lifecycle-form" aria-label={t('admin.content.lifecycle')}>
-      <div className="admin-content-panel-heading">
-        <RotateCcw aria-hidden="true" size={18} />
-        <h3>{t('admin.content.lifecycle')}</h3>
-      </div>
+    <details className="admin-content-recovery" aria-label={t('admin.content.recovery')}>
+      <summary>
+        <RotateCcw aria-hidden="true" size={16} />
+        {t('admin.content.recovery')}
+      </summary>
 
-      <label>
-        <span>{t('admin.content.lifecycleReason')}</span>
-        <textarea
-          onChange={(event) => setReason(event.target.value)}
-          required
-          rows={2}
-          value={reason}
-        />
-      </label>
+      <div className="admin-content-recovery-body">
+        <label>
+          <span>{t('admin.content.lifecycleReason')}</span>
+          <textarea
+            onChange={(event) => setReason(event.target.value)}
+            required
+            rows={2}
+            value={reason}
+          />
+        </label>
 
-      <div className="admin-content-actions">
-        {canUnpublish ? (
-          <button
-            className="admin-content-secondary-button"
-            disabled={isBusy || !reason.trim()}
-            onClick={unpublishContent}
-            type="button"
-          >
-            {status === 'unpublishing'
-              ? t('admin.content.unpublishing')
-              : t('admin.content.unpublish')}
-          </button>
+        <div className="admin-content-actions">
+          {canUnpublish ? (
+            <button
+              className="admin-content-secondary-button"
+              disabled={isBusy || !reason.trim()}
+              onClick={unpublishContent}
+              type="button"
+            >
+              {status === 'unpublishing'
+                ? t('admin.content.unpublishing')
+                : t('admin.content.unpublish')}
+            </button>
+          ) : null}
+          {canRollback ? (
+            <button
+              className="admin-content-secondary-button"
+              disabled={isBusy || !reason.trim()}
+              onClick={rollbackContent}
+              type="button"
+            >
+              {status === 'rolling-back'
+                ? t('admin.content.rollingBack')
+                : t('admin.content.rollback')}
+            </button>
+          ) : null}
+        </div>
+
+        {status === 'succeeded' ? (
+          <p className="admin-content-save-state" role="status">
+            {t('admin.content.lifecycleSaved')}
+          </p>
         ) : null}
-        {canRollback ? (
-          <button
-            className="admin-content-secondary-button"
-            disabled={isBusy || !reason.trim()}
-            onClick={rollbackContent}
-            type="button"
-          >
-            {status === 'rolling-back'
-              ? t('admin.content.rollingBack')
-              : t('admin.content.rollback')}
-          </button>
+        {status === 'failed' ? (
+          <p className="admin-content-inline-error" role="alert">
+            {t('admin.content.lifecycleFailed')}
+          </p>
         ) : null}
       </div>
-
-      {status === 'succeeded' ? (
-        <p className="admin-content-save-state" role="status">
-          {t('admin.content.lifecycleSaved')}
-        </p>
-      ) : null}
-      {status === 'failed' ? (
-        <p className="admin-content-inline-error" role="alert">
-          {t('admin.content.lifecycleFailed')}
-        </p>
-      ) : null}
-    </section>
+    </details>
   );
 }
 
 function DraftEditor({
   draft,
+  onLoadCourseTrialPosts,
   onUpdateDraft,
 }: {
   draft: AdminContentDraft;
+  onLoadCourseTrialPosts: (courseId: string) => Promise<readonly TrialPostOption[]>;
   onUpdateDraft: (draft: AdminContentDraft, fields: DraftEditableFields) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [formState, setFormState] = useState<DraftFormState>(() => createDraftFormState(draft));
   const [saveStatus, setSaveStatus] = useState<DraftSaveStatus>('idle');
+  const [trialPostLoadStatus, setTrialPostLoadStatus] = useState<LoadStatus>(() =>
+    draft.entityType === 'course' ? 'loading' : 'ready',
+  );
+  const [trialPostOptions, setTrialPostOptions] = useState<readonly TrialPostOption[]>([]);
+  const trialPostRequestRef = useRef(0);
+  const isCourseDraft = draft.entityType === 'course';
+
+  useEffect(() => {
+    const requestId = trialPostRequestRef.current + 1;
+    trialPostRequestRef.current = requestId;
+
+    if (!isCourseDraft) {
+      return undefined;
+    }
+
+    let isActive = true;
+
+    async function loadTrialPosts() {
+      await Promise.resolve();
+
+      if (!isActive || trialPostRequestRef.current !== requestId) {
+        return;
+      }
+
+      setTrialPostLoadStatus('loading');
+      setTrialPostOptions([]);
+
+      try {
+        const options = await onLoadCourseTrialPosts(draft.courseId);
+
+        if (isActive && trialPostRequestRef.current === requestId) {
+          setTrialPostOptions(options);
+          setTrialPostLoadStatus('ready');
+        }
+      } catch {
+        if (isActive && trialPostRequestRef.current === requestId) {
+          setTrialPostOptions([]);
+          setTrialPostLoadStatus('failed');
+        }
+      }
+    }
+
+    void loadTrialPosts();
+
+    return () => {
+      isActive = false;
+    };
+  }, [draft.courseId, isCourseDraft, onLoadCourseTrialPosts]);
+
+  const hasEligibleTrialPost = trialPostOptions.some(
+    (option) => option.id === formState.trialPostId,
+  );
+  const isTrialPostSelectionBlockingSave =
+    isCourseDraft &&
+    (trialPostLoadStatus !== 'ready' || !trialPostOptions.length || !hasEligibleTrialPost);
+  const isSaveDisabled = saveStatus === 'saving' || isTrialPostSelectionBlockingSave;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSaveDisabled) {
+      return;
+    }
+
     setSaveStatus('saving');
 
     try {
-      await onUpdateDraft(draft, createDraftEditableFields(formState));
+      await onUpdateDraft(draft, createDraftEditableFields(draft, formState));
       setSaveStatus('saved');
     } catch {
       setSaveStatus('failed');
@@ -1409,8 +1237,53 @@ function DraftEditor({
       </div>
 
       <div className="admin-content-form-grid">
+        {isCourseDraft ? (
+          <fieldset className="admin-content-trial-post-field admin-content-form-wide">
+            <legend>{t('admin.content.trialPost')}</legend>
+            <p>{t('admin.content.trialPostHint')}</p>
+            <label>
+              <span>{t('admin.content.trialPost')}</span>
+              <select
+                aria-label={t('admin.content.trialPost')}
+                disabled={trialPostLoadStatus !== 'ready'}
+                onChange={(event) => updateField('trialPostId', event.target.value)}
+                required
+                value={formState.trialPostId}
+              >
+                <option disabled value="">
+                  {t('admin.content.trialPostPlaceholder')}
+                </option>
+                {trialPostOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {trialPostLoadStatus === 'loading' ? (
+              <p role="status">{t('admin.content.trialPostLoading')}</p>
+            ) : null}
+            {trialPostLoadStatus === 'failed' ? (
+              <p className="admin-content-inline-error" role="alert">
+                {t('admin.content.trialPostFailed')}
+              </p>
+            ) : null}
+            {trialPostLoadStatus === 'ready' && !trialPostOptions.length ? (
+              <p className="admin-content-inline-error" role="alert">
+                {t('admin.content.trialPostEmpty')}
+              </p>
+            ) : null}
+            {trialPostLoadStatus === 'ready' &&
+            trialPostOptions.length > 0 &&
+            !hasEligibleTrialPost ? (
+              <p className="admin-content-inline-error" role="alert">
+                {t('admin.content.trialPostInvalid')}
+              </p>
+            ) : null}
+          </fieldset>
+        ) : null}
         <label>
-          <span>Title EN</span>
+          <span>{t('admin.content.field.title.en')}</span>
           <input
             onChange={(event) => updateField('titleEn', event.target.value)}
             required
@@ -1419,7 +1292,7 @@ function DraftEditor({
           />
         </label>
         <label>
-          <span>Title VI</span>
+          <span>{t('admin.content.field.title.vi')}</span>
           <input
             onChange={(event) => updateField('titleVi', event.target.value)}
             required
@@ -1428,7 +1301,7 @@ function DraftEditor({
           />
         </label>
         <label>
-          <span>Preview EN</span>
+          <span>{t('admin.content.field.preview.en')}</span>
           <textarea
             onChange={(event) => updateField('previewEn', event.target.value)}
             required
@@ -1437,7 +1310,7 @@ function DraftEditor({
           />
         </label>
         <label>
-          <span>Preview VI</span>
+          <span>{t('admin.content.field.preview.vi')}</span>
           <textarea
             onChange={(event) => updateField('previewVi', event.target.value)}
             required
@@ -1446,7 +1319,7 @@ function DraftEditor({
           />
         </label>
         <label>
-          <span>Attribution EN</span>
+          <span>{t('admin.content.field.attribution.en')}</span>
           <textarea
             onChange={(event) => updateField('attributionEn', event.target.value)}
             required
@@ -1455,7 +1328,7 @@ function DraftEditor({
           />
         </label>
         <label>
-          <span>Attribution VI</span>
+          <span>{t('admin.content.field.attribution.vi')}</span>
           <textarea
             onChange={(event) => updateField('attributionVi', event.target.value)}
             required
@@ -1464,7 +1337,7 @@ function DraftEditor({
           />
         </label>
         <label className="admin-content-form-wide">
-          <span>External link URL</span>
+          <span>{t('admin.content.field.externalLink')}</span>
           <input
             onChange={(event) => updateField('externalLinkUrl', event.target.value)}
             placeholder="https://example.com/source"
@@ -1475,11 +1348,7 @@ function DraftEditor({
       </div>
 
       <div className="admin-content-actions">
-        <button
-          className="admin-content-draft-button"
-          disabled={saveStatus === 'saving'}
-          type="submit"
-        >
+        <button className="admin-content-draft-button" disabled={isSaveDisabled} type="submit">
           {saveStatus === 'saving' ? t('admin.content.savingDraft') : t('admin.content.saveDraft')}
         </button>
         {saveStatus === 'saved' ? (
