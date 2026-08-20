@@ -2336,6 +2336,7 @@ a {
 }
 
 .dashboard-client-actions > button,
+.profile-display-name-form > button,
 .profile-preferences-form > button {
   min-height: 42px;
   padding: 0 14px;
@@ -2349,6 +2350,7 @@ a {
 }
 
 .dashboard-client-actions > button:disabled,
+.profile-display-name-form > button:disabled,
 .profile-preferences-form > button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -2653,11 +2655,13 @@ a {
   font-size: 13px;
 }
 
+.profile-display-name-form,
 .profile-preferences-form {
   display: grid;
   gap: 9px;
 }
 
+.profile-display-name-form label,
 .profile-preferences-form label {
   color: var(--ink-soft);
   font-size: 11px;
@@ -2666,6 +2670,7 @@ a {
   text-transform: uppercase;
 }
 
+.profile-display-name-form input,
 .profile-preferences-form select {
   width: 100%;
   min-height: 44px;
@@ -2676,6 +2681,7 @@ a {
   color: var(--ink);
 }
 
+.profile-display-name-form input:focus,
 .profile-preferences-form select:focus {
   border-color: var(--teal);
   box-shadow: 4px 4px 0 color-mix(in srgb, var(--teal) 18%, transparent);
