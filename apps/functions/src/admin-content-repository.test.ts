@@ -55,6 +55,28 @@ async function validatePostDraftWithTrialPostId(trialPostId: string | null) {
   });
 }
 
+async function validateHealthyCourseDraftWithLegacyCourseTrialPostId(
+  trialPostId: string | null | undefined,
+) {
+  const repository = createStaticAdminContentRepository(
+    releaseOneContent.map((content) =>
+      content.entityType === 'course' && content.entityId === 'course-classical-ml'
+        ? { ...content, trialPostId }
+        : content,
+    ),
+  );
+  const created = await repository.createDraft({
+    createdByUid: 'admin-01',
+    entityId: 'course-deep-learning-basic',
+    entityType: 'course',
+  });
+
+  return repository.validateDraft({
+    actorUid: 'admin-01',
+    revisionId: created.data.draft.draftRevisionId,
+  });
+}
+
 describe('Static Admin content trial post validation', () => {
   it.each([
     ['undefined', undefined],
@@ -96,13 +118,33 @@ describe('Static Admin content trial post validation', () => {
     });
   });
 
-  it('accepts exactly one post from the course being validated', async () => {
+  it('accepts a healthy catalog when the course being validated selects its own post', async () => {
     const result = await validateCourseDraftWithTrialPostId({
       courseId: 'course-deep-learning-basic',
       trialPostId: 'dl-p01-neuron-perceptron',
     });
 
     expect(result.data.validation.status).toBe('valid');
+  });
+
+  it.each([
+    ['is missing a trial post', undefined],
+    ['has a null trial post', null],
+    ['references a nonexistent trial post', 'cml-p99-missing-post'],
+    ['references a trial post from another course', 'dl-p01-neuron-perceptron'],
+  ])('rejects a healthy draft when another course candidate %s', async (_caseName, trialPostId) => {
+    await expect(
+      validateHealthyCourseDraftWithLegacyCourseTrialPostId(trialPostId),
+    ).rejects.toMatchObject({
+      code: 'ADMIN_CONTENT_DRAFT_VALIDATION_FAILED',
+      details: [
+        expect.objectContaining({
+          checkId: 'trial-post-configuration',
+          status: 'failed',
+        }),
+      ],
+      statusCode: 422,
+    });
   });
 
   it.each([

@@ -840,6 +840,23 @@ function hasValidTaskFingerprintRegistry(content: readonly AdminContentSummary[]
   );
 }
 
+function hasValidCourseTrialPostConfiguration(input: {
+  course: Pick<AdminContentSummary, 'courseId' | 'trialPostId'>;
+  publishCandidateContent: readonly AdminContentSummary[];
+}): boolean {
+  const { course, publishCandidateContent } = input;
+
+  return (
+    typeof course.trialPostId === 'string' &&
+    publishCandidateContent.some(
+      (item) =>
+        item.entityType === 'post' &&
+        item.courseId === course.courseId &&
+        item.entityId === course.trialPostId,
+    )
+  );
+}
+
 function hasValidDraftTrialPostConfiguration(input: {
   draft: AdminContentDraft;
   publishCandidateContent: readonly AdminContentSummary[];
@@ -850,14 +867,22 @@ function hasValidDraftTrialPostConfiguration(input: {
     return draft.trialPostId === undefined;
   }
 
-  return (
-    typeof draft.trialPostId === 'string' &&
-    publishCandidateContent.some(
-      (item) =>
-        item.entityType === 'post' &&
-        item.courseId === draft.courseId &&
-        item.entityId === draft.trialPostId,
-    )
+  return hasValidCourseTrialPostConfiguration({
+    course: draft,
+    publishCandidateContent,
+  });
+}
+
+function hasValidPublishCandidateTrialPostConfiguration(
+  publishCandidateContent: readonly AdminContentSummary[],
+): boolean {
+  return publishCandidateContent.every(
+    (item) =>
+      item.entityType !== 'course' ||
+      hasValidCourseTrialPostConfiguration({
+        course: item,
+        publishCandidateContent,
+      }),
   );
 }
 
@@ -925,7 +950,9 @@ function createValidationChecks(input: {
     }),
     createValidationCheck({
       checkId: 'trial-post-configuration',
-      isPassed: hasValidDraftTrialPostConfiguration({ draft, publishCandidateContent }),
+      isPassed:
+        hasValidDraftTrialPostConfiguration({ draft, publishCandidateContent }) &&
+        hasValidPublishCandidateTrialPostConfiguration(publishCandidateContent),
       message:
         'Each course must select exactly one post from that course as its Admin-configured trial post.',
     }),
