@@ -16,6 +16,112 @@ async function createPostDraft(repository: ReturnType<typeof createStaticAdminCo
   });
 }
 
+async function validateCourseDraftWithTrialPostId(input: {
+  courseId: string;
+  trialPostId: string | null | undefined;
+}) {
+  const repository = createStaticAdminContentRepository(
+    releaseOneContent.map((content) =>
+      content.entityType === 'course' && content.entityId === input.courseId
+        ? { ...content, trialPostId: input.trialPostId }
+        : content,
+    ),
+  );
+  const created = await repository.createDraft({
+    createdByUid: 'admin-01',
+    entityId: input.courseId,
+    entityType: 'course',
+  });
+
+  return repository.validateDraft({
+    actorUid: 'admin-01',
+    revisionId: created.data.draft.draftRevisionId,
+  });
+}
+
+async function validatePostDraftWithTrialPostId(trialPostId: string | null) {
+  const repository = createStaticAdminContentRepository(
+    releaseOneContent.map((content) =>
+      content.entityType === 'post' && content.entityId === 'dl-p01-neuron-perceptron'
+        ? { ...content, trialPostId }
+        : content,
+    ),
+  );
+  const created = await createPostDraft(repository);
+
+  return repository.validateDraft({
+    actorUid: 'admin-01',
+    revisionId: created.data.draft.draftRevisionId,
+  });
+}
+
+describe('Static Admin content trial post validation', () => {
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['a nonexistent post', 'dl-p99-missing-post'],
+  ])('rejects a course draft with %s at validation', async (_caseName, trialPostId) => {
+    await expect(
+      validateCourseDraftWithTrialPostId({
+        courseId: 'course-deep-learning-basic',
+        trialPostId,
+      }),
+    ).rejects.toMatchObject({
+      code: 'ADMIN_CONTENT_DRAFT_VALIDATION_FAILED',
+      details: [
+        expect.objectContaining({
+          checkId: 'trial-post-configuration',
+          status: 'failed',
+        }),
+      ],
+      statusCode: 422,
+    });
+  });
+
+  it('rejects a course draft whose selected post belongs to another course', async () => {
+    await expect(
+      validateCourseDraftWithTrialPostId({
+        courseId: 'course-classical-ml',
+        trialPostId: 'dl-p01-neuron-perceptron',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ADMIN_CONTENT_DRAFT_VALIDATION_FAILED',
+      details: [
+        expect.objectContaining({
+          checkId: 'trial-post-configuration',
+          status: 'failed',
+        }),
+      ],
+      statusCode: 422,
+    });
+  });
+
+  it('accepts exactly one post from the course being validated', async () => {
+    const result = await validateCourseDraftWithTrialPostId({
+      courseId: 'course-deep-learning-basic',
+      trialPostId: 'dl-p01-neuron-perceptron',
+    });
+
+    expect(result.data.validation.status).toBe('valid');
+  });
+
+  it.each([
+    ['a post ID', 'dl-p01-neuron-perceptron'],
+    ['null', null],
+  ])('rejects %s on a non-course draft', async (_caseName, trialPostId) => {
+    await expect(validatePostDraftWithTrialPostId(trialPostId)).rejects.toMatchObject({
+      code: 'ADMIN_CONTENT_DRAFT_VALIDATION_FAILED',
+      details: [
+        expect.objectContaining({
+          checkId: 'trial-post-configuration',
+          status: 'failed',
+        }),
+      ],
+      statusCode: 422,
+    });
+  });
+});
+
 describe('Static Admin content draft audit', () => {
   it('keeps the draft unchanged when append fails and releases the revision lock for retry', async () => {
     const auditRecords: AdminContentDraftUpdateAuditRecord[] = [];

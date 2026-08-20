@@ -840,26 +840,25 @@ function hasValidTaskFingerprintRegistry(content: readonly AdminContentSummary[]
   );
 }
 
-function hasValidCourseTrialPostRegistry(content: readonly AdminContentSummary[]): boolean {
-  const courses = content.filter((item) => item.entityType === 'course');
+function hasValidDraftTrialPostConfiguration(input: {
+  draft: AdminContentDraft;
+  publishCandidateContent: readonly AdminContentSummary[];
+}): boolean {
+  const { draft, publishCandidateContent } = input;
 
-  return courses.every((course) => {
-    const trialPostId = course.trialPostId;
+  if (draft.entityType !== 'course') {
+    return draft.trialPostId === undefined;
+  }
 
-    if (trialPostId === undefined) {
-      return true;
-    }
-
-    return (
-      typeof trialPostId === 'string' &&
-      content.some(
-        (item) =>
-          item.entityType === 'post' &&
-          item.courseId === course.courseId &&
-          item.entityId === trialPostId,
-      )
-    );
-  });
+  return (
+    typeof draft.trialPostId === 'string' &&
+    publishCandidateContent.some(
+      (item) =>
+        item.entityType === 'post' &&
+        item.courseId === draft.courseId &&
+        item.entityId === draft.trialPostId,
+    )
+  );
 }
 
 function createValidationChecks(input: {
@@ -926,9 +925,7 @@ function createValidationChecks(input: {
     }),
     createValidationCheck({
       checkId: 'trial-post-configuration',
-      isPassed:
-        (draft.entityType === 'course' || draft.trialPostId === undefined) &&
-        hasValidCourseTrialPostRegistry(publishCandidateContent),
+      isPassed: hasValidDraftTrialPostConfiguration({ draft, publishCandidateContent }),
       message:
         'Each course must select exactly one post from that course as its Admin-configured trial post.',
     }),

@@ -165,6 +165,18 @@ async function setReviewedDraftSourceMetadata(app: ReturnType<typeof createApiAp
     .expect(200);
 }
 
+function expectOnlyTrialPostConfigurationFailure(body: {
+  error: { code: unknown; details: unknown };
+}) {
+  expect(body.error.code).toBe('ADMIN_CONTENT_DRAFT_VALIDATION_FAILED');
+  expect(body.error.details).toEqual([
+    expect.objectContaining({
+      checkId: 'trial-post-configuration',
+      status: 'failed',
+    }),
+  ]);
+}
+
 describe('API foundation', () => {
   it('returns the canonical success envelope from the public health endpoint', async () => {
     const response = await request(createApiApp()).get('/api/v1/health').expect(200);
@@ -2132,6 +2144,137 @@ describe('API foundation', () => {
       revisionVersion: 2,
       trialPostId: 'dl-p01-neuron-perceptron',
     });
+
+    const validationResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-course-course-deep-learning-basic-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(200);
+
+    expect(validationResponse.body.data.validation.checks).toContainEqual(
+      expect.objectContaining({
+        checkId: 'trial-post-configuration',
+        status: 'passed',
+      }),
+    );
+  });
+
+  it.each([
+    ['null', 'course-deep-learning-basic', null],
+    ['a nonexistent post', 'course-deep-learning-basic', 'dl-p99-missing-post'],
+    ['a post from another course', 'course-classical-ml', 'dl-p01-neuron-perceptron'],
+  ])(
+    'allows %s through the course draft PATCH, then rejects it at validation',
+    async (_caseName, courseId, trialPostId) => {
+      const app = createApiApp({
+        verifyAuthToken: async () => ({
+          uid: 'admin-01',
+          displayName: 'Operator',
+          role: 'admin',
+        }),
+      });
+
+      const revisionId = `draft-course-${courseId}-rev-d1`;
+
+      await request(app)
+        .post(`/api/v1/admin/content/course/${courseId}/drafts`)
+        .set('authorization', 'Bearer admin-id-token')
+        .expect(201);
+
+      const updatedDraft = await request(app)
+        .patch(`/api/v1/admin/revisions/${revisionId}`)
+        .set('authorization', 'Bearer admin-id-token')
+        .send({
+          revisionVersion: 1,
+          trialPostId,
+        })
+        .expect(200);
+
+      expect(updatedDraft.body.data.draft.trialPostId).toBe(trialPostId);
+
+      const validationResponse = await request(app)
+        .post(`/api/v1/admin/revisions/${revisionId}/validate`)
+        .set('authorization', 'Bearer admin-id-token')
+        .expect(422);
+
+      expectOnlyTrialPostConfigurationFailure(validationResponse.body);
+    },
+  );
+
+  it('allows an unselected course draft to be created, then rejects the direct validation bypass', async () => {
+    const unselectedCourse: AdminContentSummary = {
+      courseId: 'course-trial-validation',
+      draftRevisionId: null,
+      emergencyBlocked: false,
+      entityId: 'course-trial-validation',
+      entityType: 'course',
+      localeAvailability: ['en', 'vi'],
+      preview: {
+        en: 'Course used to verify trial-post validation.',
+        vi: 'Khoa hoc dung de kiem tra trial post.',
+      },
+      publishedRevisionId: 'course-trial-validation-rev-r1',
+      sourceReview: releaseOneContentFixture.sourceReview,
+      sourceStatus: 'seeded',
+      status: 'published',
+      title: {
+        en: 'Trial post validation course',
+        vi: 'Khoa hoc kiem tra trial post',
+      },
+      validationStatus: 'not-run',
+    };
+    const app = createApiApp({
+      adminContentRepository: createStaticAdminContentRepository([unselectedCourse]),
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    const createdDraft = await request(app)
+      .post('/api/v1/admin/content/course/course-trial-validation/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    expect(createdDraft.body.data.draft).not.toHaveProperty('trialPostId');
+
+    const validationResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-course-course-trial-validation-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expectOnlyTrialPostConfigurationFailure(validationResponse.body);
+  });
+
+  it('allows a non-course trial post PATCH, then rejects it at validation', async () => {
+    const app = createApiApp({
+      verifyAuthToken: async () => ({
+        uid: 'admin-01',
+        displayName: 'Operator',
+        role: 'admin',
+      }),
+    });
+
+    await request(app)
+      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(201);
+
+    await request(app)
+      .patch('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1')
+      .set('authorization', 'Bearer admin-id-token')
+      .send({
+        revisionVersion: 1,
+        trialPostId: 'dl-p01-neuron-perceptron',
+      })
+      .expect(200);
+
+    const validationResponse = await request(app)
+      .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
+      .set('authorization', 'Bearer admin-id-token')
+      .expect(422);
+
+    expectOnlyTrialPostConfigurationFailure(validationResponse.body);
   });
 
   it('rejects stale draft edits with optimistic concurrency conflict', async () => {
@@ -2288,19 +2431,36 @@ describe('API foundation', () => {
     });
   });
 
-  it('fails draft validation when required source, license, attribution, or external link evidence is missing', async () => {
+  it('fails draft validation when repository-side metadata bypasses the HTTP(S) external-link invariant', async () => {
+    const repository = createStaticAdminContentRepository();
+    const createdDraft = await repository.createDraft({
+      createdByUid: 'admin-01',
+      entityId: 'dl-p01-neuron-perceptron',
+      entityType: 'post',
+    });
+    await repository.updateDraft({
+      actorUid: 'admin-01',
+      patch: {
+        metadata: {
+          attribution: {
+            en: 'Reviewed source attribution.',
+            vi: 'Attribution source reviewed.',
+          },
+          externalLinkUrl: 'ftp://example.invalid/untrusted-source',
+        },
+      },
+      requestId: 'request-invalid-external-link-validation',
+      revisionId: createdDraft.data.draft.draftRevisionId,
+      revisionVersion: 1,
+    });
     const app = createApiApp({
+      adminContentRepository: repository,
       verifyAuthToken: async () => ({
         uid: 'admin-01',
         displayName: 'Operator',
         role: 'admin',
       }),
     });
-
-    await request(app)
-      .post('/api/v1/admin/content/post/dl-p01-neuron-perceptron/drafts')
-      .set('authorization', 'Bearer admin-id-token')
-      .expect(201);
 
     const response = await request(app)
       .post('/api/v1/admin/revisions/draft-post-dl-p01-neuron-perceptron-rev-d1/validate')
