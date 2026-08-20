@@ -2973,9 +2973,22 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Nội dung khóa học' })).toBeVisible();
-    expect(await screen.findByRole('heading', { name: 'Chọn nội dung' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Sửa và xem trước' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Quản lý nội dung khóa học' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Chọn nội dung cần sửa' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Sửa và xem kết quả' })).toBeVisible();
+    expect(
+      screen.getByText(
+        'Chọn khóa học hoặc bài học, tạo bản nháp riêng để sửa, rồi kiểm tra trước khi cập nhật cho học viên.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Bắt đầu chỉnh sửa' })).toBeVisible();
+    expect(screen.getByText('Đang mở')).toBeVisible();
+    expect(screen.getByText('Nội dung học viên đang xem')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Tạo một bản nháp riêng để bạn sửa. Nội dung học viên đang xem vẫn giữ nguyên.',
+      ),
+    ).toBeVisible();
     expect(await screen.findByText(/Read from a single neuron decision/i)).toBeVisible();
     expect(screen.queryByText('dl-p01-neuron-perceptron')).not.toBeInTheDocument();
     expect(screen.queryByText('post-dl-p01-neuron-perceptron-rev-r1')).not.toBeInTheDocument();
@@ -3109,8 +3122,8 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Chọn nội dung' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Tạo bản nháp' }));
+    expect(await screen.findByRole('heading', { name: 'Chọn nội dung cần sửa' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Bắt đầu chỉnh sửa' }));
 
     const selector = await screen.findByLabelText('Bài học dùng để học thử');
     expect(selector).toBeDisabled();
@@ -3138,12 +3151,12 @@ describe('public learning journey', () => {
     expect(
       screen.getByText('Hãy chọn một bài học thuộc khóa học này trước khi lưu.'),
     ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
 
     await user.selectOptions(selector, firstTrialPost.entityId);
-    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeEnabled();
     expect(updateAdminContentDraft).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Lưu bản nháp' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     expect(updateAdminContentDraft).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -3189,16 +3202,16 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Tạo bản nháp' }));
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu chỉnh sửa' }));
 
     const selector = await screen.findByLabelText('Bài học dùng để học thử');
     await screen.findByRole('option', { name: 'Nơ-ron đưa ra quyết định' });
     expect(selector).toHaveValue(trialPost.entityId);
-    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeEnabled();
 
     await user.clear(screen.getByLabelText('Tiêu đề (tiếng Anh)'));
     await user.type(screen.getByLabelText('Tiêu đề (tiếng Anh)'), 'Updated course title');
-    await user.click(screen.getByRole('button', { name: 'Lưu bản nháp' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     expect(updateAdminContentDraft).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -3230,7 +3243,7 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Tạo bản nháp' }));
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu chỉnh sửa' }));
     await user.clear(await screen.findByLabelText('Tiêu đề (tiếng Anh)'));
     await user.type(screen.getByLabelText('Tiêu đề (tiếng Anh)'), 'Unsaved course title');
 
@@ -3238,7 +3251,7 @@ describe('public learning journey', () => {
       await screen.findByText('Không tải được các bài học trong khóa học. Hãy thử lại.'),
     ).toBeVisible();
     expect(screen.getByDisplayValue('Unsaved course title')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   });
 
   it('blocks saving a course draft when there are no eligible lessons', async () => {
@@ -3260,10 +3273,10 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Tạo bản nháp' }));
+    await user.click(await screen.findByRole('button', { name: 'Bắt đầu chỉnh sửa' }));
 
     expect(await screen.findByText('Hãy thêm bài học vào khóa học trước khi chọn.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   });
 
   it('labels each trial lesson with only its current English title', async () => {
@@ -3306,8 +3319,8 @@ describe('public learning journey', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'Chuyển sang tiếng Anh' }));
-    expect(await screen.findByRole('heading', { name: 'Choose content' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
+    expect(await screen.findByRole('heading', { name: 'Choose what to edit' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Start editing' }));
 
     expect(await screen.findByRole('option', { name: 'A neuron makes a decision' })).toBeVisible();
     expect(
@@ -3424,7 +3437,7 @@ describe('public learning journey', () => {
       expect(screen.queryByRole('option', { name: 'Bài học cũ' })).not.toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Bài học mới' })).toBeVisible();
     });
-    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   });
 
   it('lets an authenticated admin create and preview a draft without replacing the published preview', async () => {
@@ -3495,7 +3508,7 @@ describe('public learning journey', () => {
     expect(await screen.findByText('Published learner copy')).toBeVisible();
     expect(screen.queryByText('Google Machine Learning Crash Course')).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: /Tạo bản nháp/i }));
+    await user.click(await screen.findByRole('button', { name: /Bắt đầu chỉnh sửa/i }));
 
     expect(createAdminContentDraft).toHaveBeenCalledWith({
       entityId: 'dl-p01-neuron-perceptron',
@@ -3716,7 +3729,7 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: /Tạo bản nháp/i }));
+    await user.click(await screen.findByRole('button', { name: /Bắt đầu chỉnh sửa/i }));
     expect(listAdminContent).toHaveBeenCalledTimes(1);
     await user.clear(await screen.findByLabelText('Tiêu đề (tiếng Anh)'));
     await user.type(screen.getByLabelText('Tiêu đề (tiếng Anh)'), 'Edited draft title');
@@ -3728,7 +3741,7 @@ describe('public learning journey', () => {
       screen.getByLabelText('Liên kết tham khảo'),
       'https://developers.google.com/machine-learning/crash-course',
     );
-    await user.click(screen.getByRole('button', { name: /Lưu bản nháp/i }));
+    await user.click(screen.getByRole('button', { name: /Lưu thay đổi/i }));
 
     expect(updateAdminContentDraft).toHaveBeenCalledWith({
       idToken: 'local-id-token',
@@ -3870,19 +3883,19 @@ describe('public learning journey', () => {
       <App authGateway={createAuthenticatedGateway()} learningApiClient={learningApiClient} />,
     );
 
-    await user.click(await screen.findByRole('button', { name: /Tạo bản nháp/i }));
-    expect(await screen.findByRole('heading', { name: 'Rà soát và xuất bản' })).toBeVisible();
+    await user.click(await screen.findByRole('button', { name: /Bắt đầu chỉnh sửa/i }));
+    expect(await screen.findByRole('heading', { name: 'Kiểm tra và cập nhật' })).toBeVisible();
     expect(document.body).not.toHaveTextContent(
       /emulator|production|credential|gvhd|checksum|evidence/i,
     );
     await user.click(await screen.findByRole('button', { name: /Kiểm tra nội dung/i }));
-    expect(await screen.findByText(/Nội dung đã sẵn sàng cho bước tiếp theo/i)).toBeVisible();
-    await user.clear(screen.getByLabelText('Ghi chú thay đổi'));
+    expect(await screen.findByText(/Đã kiểm tra\. Có thể cập nhật cho học viên/i)).toBeVisible();
+    await user.clear(screen.getByLabelText('Bạn đã thay đổi gì? (bắt buộc)'));
     await user.type(
-      screen.getByLabelText('Ghi chú thay đổi'),
+      screen.getByLabelText('Bạn đã thay đổi gì? (bắt buộc)'),
       'Đã rà soát nội dung trước khi xuất bản.',
     );
-    await user.click(screen.getByRole('button', { name: /Xuất bản thay đổi/i }));
+    await user.click(screen.getByRole('button', { name: /Cập nhật cho học viên/i }));
 
     expect(validateAdminContentDraft).toHaveBeenCalledWith({
       idToken: 'local-id-token',

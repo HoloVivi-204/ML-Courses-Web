@@ -3127,6 +3127,14 @@ a {
   text-transform: uppercase;
 }
 
+.admin-content-card .admin-content-card-action {
+  justify-self: end;
+  color: var(--teal);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
 .admin-content-card code,
 .admin-content-preview-title code,
 .admin-content-meta code {
@@ -3590,6 +3598,14 @@ a {
   line-height: 1;
 }
 
+.admin-content-section-help {
+  max-width: 62ch;
+  margin: -8px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .admin-content-card {
   position: relative;
   min-height: 104px;
@@ -3613,6 +3629,13 @@ a {
   padding: 3px 0 6px;
 }
 
+.admin-content-current-label {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .admin-content-selection-note {
   padding: 11px 13px;
   border-left: 3px solid color-mix(in srgb, var(--teal) 56%, var(--line));
@@ -3633,6 +3656,20 @@ a {
   border-left-color: var(--teal);
   background: color-mix(in srgb, var(--teal) 4%, var(--surface));
   gap: 18px;
+}
+
+.admin-content-action-help,
+.admin-content-recovery-help {
+  flex: 1 1 100%;
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-content-recovery-help {
+  flex: initial;
 }
 
 .admin-content-draft-note {

@@ -620,6 +620,7 @@ function ContentInventoryList({
           <h2>{t('admin.content.step.choose')}</h2>
         </div>
       </div>
+      <p className="admin-content-section-help">{t('admin.content.inventoryHelp')}</p>
 
       {content.length ? (
         <ul>
@@ -639,6 +640,11 @@ function ContentInventoryList({
                   <span>{t(`admin.content.entity.${item.entityType}`)}</span>
                   <strong>{formatUserFacingTitle(item.title[locale])}</strong>
                   {item.draftRevisionId ? <em>{t('admin.content.draftBadge')}</em> : null}
+                  <span className="admin-content-card-action">
+                    {key === selectedKey
+                      ? t('admin.content.cardSelected')
+                      : t('admin.content.cardOpen')}
+                  </span>
                 </button>
               </li>
             );
@@ -710,8 +716,10 @@ function ContentPreview({
           <h2>{t('admin.content.step.edit')}</h2>
         </div>
       </div>
+      <p className="admin-content-section-help">{t('admin.content.previewHelp')}</p>
 
       <div className="admin-content-preview-title">
+        <p className="admin-content-current-label">{t('admin.content.currentContent')}</p>
         <span>{t(`admin.content.entity.${item.entityType}`)}</span>
         <h3>{formatUserFacingTitle(item.title[locale])}</h3>
       </div>
@@ -722,6 +730,7 @@ function ContentPreview({
 
       <div className="admin-content-actions">
         <button
+          aria-describedby={!item.draftRevisionId ? 'admin-content-create-draft-help' : undefined}
           className="admin-content-draft-button"
           disabled={draftActionStatus === 'creating' || item.draftRevisionId !== null}
           onClick={() => onCreateDraft(item)}
@@ -734,6 +743,11 @@ function ContentPreview({
               ? t('admin.content.draftExists')
               : t('admin.content.createDraft')}
         </button>
+        {!item.draftRevisionId ? (
+          <p className="admin-content-action-help" id="admin-content-create-draft-help">
+            {t('admin.content.createDraftHelp')}
+          </p>
+        ) : null}
         {draftActionStatus === 'failed' ? (
           <p className="admin-content-inline-error" role="alert">
             {t('admin.content.draftFailed')}
@@ -1082,6 +1096,7 @@ function PublishedLifecyclePanel({
       </summary>
 
       <div className="admin-content-recovery-body">
+        <p className="admin-content-recovery-help">{t('admin.content.recoveryHelp')}</p>
         <label>
           <span>{t('admin.content.lifecycleReason')}</span>
           <textarea
@@ -1351,6 +1366,7 @@ function DraftEditor({
         <button className="admin-content-draft-button" disabled={isSaveDisabled} type="submit">
           {saveStatus === 'saving' ? t('admin.content.savingDraft') : t('admin.content.saveDraft')}
         </button>
+        <p className="admin-content-action-help">{t('admin.content.saveDraftHelp')}</p>
         {saveStatus === 'saved' ? (
           <p className="admin-content-save-state" role="status">
             {t('admin.content.draftSaved')}
